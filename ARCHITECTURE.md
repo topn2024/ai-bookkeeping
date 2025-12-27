@@ -2519,6 +2519,1590 @@ alerts:
 
 ---
 
+## 十八A、日志系统设计
+
+### 18A.1 日志分层架构
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        日志采集层                                │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │  App日志    │  │  API日志    │  │  系统日志   │             │
+│  │ (Flutter)   │  │ (FastAPI)   │  │ (Nginx等)   │             │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘             │
+└─────────┼────────────────┼────────────────┼─────────────────────┘
+          │                │                │
+          ▼                ▼                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        日志处理层                                │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │              Filebeat / Fluent Bit (日志收集)               │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        日志存储层                                │
+│  ┌───────────────────┐          ┌───────────────────┐          │
+│  │   Elasticsearch   │    或    │   阿里云SLS       │          │
+│  │   (自建)          │          │   (云服务)        │          │
+│  └───────────────────┘          └───────────────────┘          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        日志展示层                                │
+│  ┌───────────────────┐          ┌───────────────────┐          │
+│  │     Kibana        │    或    │   SLS控制台       │          │
+│  └───────────────────┘          └───────────────────┘          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 18A.2 日志级别规范
+
+| 级别 | 名称 | 使用场景 | 示例 |
+|------|------|----------|------|
+| **CRITICAL** | 严重 | 系统崩溃、数据丢失 | 数据库连接池耗尽 |
+| **ERROR** | 错误 | 功能异常、需要修复 | 支付回调验签失败 |
+| **WARNING** | 警告 | 潜在问题、需关注 | 接口响应时间过长 |
+| **INFO** | 信息 | 正常业务流程 | 用户登录成功 |
+| **DEBUG** | 调试 | 开发调试信息 | 请求参数详情 |
+
+### 18A.3 日志格式规范
+
+#### 统一JSON格式
+
+```json
+{
+  "timestamp": "2024-12-27T15:30:45.123Z",
+  "level": "INFO",
+  "logger": "api.transactions",
+  "trace_id": "abc123def456",
+  "span_id": "span789",
+  "user_id": "user_xxx",
+  "request_id": "req_yyy",
+  "message": "Transaction created successfully",
+  "context": {
+    "transaction_id": "txn_zzz",
+    "amount": 35.50,
+    "category": "餐饮"
+  },
+  "duration_ms": 45,
+  "host": "api-server-1",
+  "env": "production"
+}
+```
+
+### 18A.4 后端日志实现
+
+```python
+# app/core/logging.py
+import logging
+import json
+import sys
+from datetime import datetime
+from contextvars import ContextVar
+from typing import Optional
+
+# 请求上下文
+request_id_var: ContextVar[Optional[str]] = ContextVar('request_id', default=None)
+trace_id_var: ContextVar[Optional[str]] = ContextVar('trace_id', default=None)
+user_id_var: ContextVar[Optional[str]] = ContextVar('user_id', default=None)
+
+class JSONFormatter(logging.Formatter):
+    """JSON格式日志输出"""
+
+    def format(self, record: logging.LogRecord) -> str:
+        log_data = {
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'level': record.levelname,
+            'logger': record.name,
+            'message': record.getMessage(),
+            'trace_id': trace_id_var.get(),
+            'request_id': request_id_var.get(),
+            'user_id': user_id_var.get(),
+            'host': socket.gethostname(),
+            'env': settings.ENVIRONMENT,
+        }
+
+        # 添加异常信息
+        if record.exc_info:
+            log_data['exception'] = self.formatException(record.exc_info)
+
+        # 添加额外上下文
+        if hasattr(record, 'context'):
+            log_data['context'] = record.context
+
+        # 添加耗时
+        if hasattr(record, 'duration_ms'):
+            log_data['duration_ms'] = record.duration_ms
+
+        return json.dumps(log_data, ensure_ascii=False)
+
+
+def setup_logging():
+    """配置日志系统"""
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    # 控制台输出
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(JSONFormatter())
+    root_logger.addHandler(console_handler)
+
+    # 文件输出（生产环境）
+    if settings.ENVIRONMENT == 'production':
+        file_handler = logging.handlers.RotatingFileHandler(
+            filename='/var/log/app/api.log',
+            maxBytes=100 * 1024 * 1024,  # 100MB
+            backupCount=10,
+            encoding='utf-8'
+        )
+        file_handler.setFormatter(JSONFormatter())
+        root_logger.addHandler(file_handler)
+
+
+class AppLogger:
+    """应用日志工具类"""
+
+    def __init__(self, name: str):
+        self.logger = logging.getLogger(name)
+
+    def info(self, message: str, **context):
+        self._log(logging.INFO, message, context)
+
+    def warning(self, message: str, **context):
+        self._log(logging.WARNING, message, context)
+
+    def error(self, message: str, exc_info=None, **context):
+        self._log(logging.ERROR, message, context, exc_info=exc_info)
+
+    def debug(self, message: str, **context):
+        self._log(logging.DEBUG, message, context)
+
+    def _log(self, level: int, message: str, context: dict, exc_info=None):
+        record = self.logger.makeRecord(
+            self.logger.name, level, '', 0, message, (), exc_info
+        )
+        if context:
+            record.context = context
+        self.logger.handle(record)
+
+
+# 使用示例
+logger = AppLogger('api.transactions')
+logger.info('Transaction created', transaction_id='txn_123', amount=35.50)
+```
+
+### 18A.5 请求日志中间件
+
+```python
+# app/middleware/logging.py
+import time
+import uuid
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """请求日志中间件"""
+
+    async def dispatch(self, request: Request, call_next):
+        # 生成请求ID和追踪ID
+        request_id = str(uuid.uuid4())[:8]
+        trace_id = request.headers.get('X-Trace-ID', str(uuid.uuid4()))
+
+        # 设置上下文
+        request_id_var.set(request_id)
+        trace_id_var.set(trace_id)
+
+        # 记录开始时间
+        start_time = time.time()
+
+        # 请求日志
+        logger.info(
+            'Request started',
+            method=request.method,
+            path=request.url.path,
+            query=str(request.query_params),
+            client_ip=request.client.host,
+            user_agent=request.headers.get('User-Agent'),
+        )
+
+        try:
+            response = await call_next(request)
+            duration_ms = (time.time() - start_time) * 1000
+
+            # 响应日志
+            logger.info(
+                'Request completed',
+                method=request.method,
+                path=request.url.path,
+                status_code=response.status_code,
+                duration_ms=round(duration_ms, 2),
+            )
+
+            # 添加追踪头
+            response.headers['X-Request-ID'] = request_id
+            response.headers['X-Trace-ID'] = trace_id
+
+            return response
+
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            logger.error(
+                'Request failed',
+                method=request.method,
+                path=request.url.path,
+                error=str(e),
+                duration_ms=round(duration_ms, 2),
+                exc_info=True,
+            )
+            raise
+```
+
+### 18A.6 业务日志规范
+
+```python
+# 业务日志示例
+
+# 用户模块
+logger = AppLogger('biz.user')
+logger.info('User registered', user_id='xxx', method='wechat')
+logger.info('User logged in', user_id='xxx', ip='1.2.3.4')
+logger.warning('Login failed', phone='138****1234', reason='wrong_password', attempts=3)
+
+# 交易模块
+logger = AppLogger('biz.transaction')
+logger.info('Transaction created', txn_id='xxx', user_id='xxx', type='expense', amount=35.5)
+logger.info('Transaction updated', txn_id='xxx', changes={'amount': [35.5, 40.0]})
+logger.info('Transaction deleted', txn_id='xxx', user_id='xxx')
+
+# AI模块
+logger = AppLogger('biz.ai')
+logger.info('OCR started', user_id='xxx', image_size=1024000)
+logger.info('OCR completed', user_id='xxx', duration_ms=1500, confidence=0.95)
+logger.error('OCR failed', user_id='xxx', error='Image too blurry')
+
+# 支付模块
+logger = AppLogger('biz.payment')
+logger.info('Payment order created', order_no='xxx', amount=98, method='wechat_pay')
+logger.info('Payment callback received', order_no='xxx', transaction_id='wx_xxx')
+logger.info('Payment completed', order_no='xxx', user_id='xxx')
+logger.error('Payment callback verification failed', order_no='xxx', reason='sign_mismatch')
+
+# 会员模块
+logger = AppLogger('biz.membership')
+logger.info('Trial activated', user_id='xxx', expire_at='2025-01-27')
+logger.info('Member upgraded', user_id='xxx', level=4, expire_at='2026-01-27')
+logger.info('Member expired', user_id='xxx', level=4)
+```
+
+### 18A.7 日志存储与归档
+
+```yaml
+# 日志保留策略
+retention:
+  # 热数据（实时查询）
+  hot:
+    duration: 7d
+    storage: SSD
+
+  # 温数据（历史查询）
+  warm:
+    duration: 30d
+    storage: HDD
+
+  # 冷数据（归档）
+  cold:
+    duration: 365d
+    storage: OSS
+    compressed: true
+
+# 日志索引配置
+indices:
+  app-logs:
+    shards: 3
+    replicas: 1
+    refresh_interval: 5s
+
+  access-logs:
+    shards: 5
+    replicas: 1
+    refresh_interval: 10s
+```
+
+### 18A.8 前端日志采集
+
+```dart
+// lib/core/logging/app_logger.dart
+import 'package:dio/dio.dart';
+
+enum LogLevel { debug, info, warning, error }
+
+class AppLogger {
+  static final AppLogger _instance = AppLogger._internal();
+  factory AppLogger() => _instance;
+  AppLogger._internal();
+
+  final List<LogEntry> _buffer = [];
+  static const int _bufferSize = 50;
+  static const Duration _flushInterval = Duration(minutes: 1);
+
+  void log(LogLevel level, String message, {Map<String, dynamic>? context}) {
+    final entry = LogEntry(
+      timestamp: DateTime.now(),
+      level: level,
+      message: message,
+      context: context,
+      userId: AuthService.currentUserId,
+      deviceId: DeviceInfo.deviceId,
+      appVersion: AppConfig.version,
+    );
+
+    _buffer.add(entry);
+
+    // 错误日志立即上报
+    if (level == LogLevel.error) {
+      _flush();
+    } else if (_buffer.length >= _bufferSize) {
+      _flush();
+    }
+  }
+
+  Future<void> _flush() async {
+    if (_buffer.isEmpty) return;
+
+    final logs = List<LogEntry>.from(_buffer);
+    _buffer.clear();
+
+    try {
+      await _uploadLogs(logs);
+    } catch (e) {
+      // 上传失败，存储到本地
+      await _saveToLocal(logs);
+    }
+  }
+
+  // 崩溃日志
+  void logCrash(dynamic error, StackTrace stackTrace) {
+    log(
+      LogLevel.error,
+      'App crashed',
+      context: {
+        'error': error.toString(),
+        'stackTrace': stackTrace.toString(),
+      },
+    );
+    _flush();
+  }
+
+  // 用户行为日志
+  void logEvent(String event, {Map<String, dynamic>? params}) {
+    log(LogLevel.info, event, context: params);
+  }
+
+  // 页面访问日志
+  void logPageView(String pageName, {Map<String, dynamic>? params}) {
+    log(LogLevel.info, 'page_view', context: {
+      'page': pageName,
+      ...?params,
+    });
+  }
+
+  // 性能日志
+  void logPerformance(String metric, int durationMs) {
+    log(LogLevel.info, 'performance', context: {
+      'metric': metric,
+      'duration_ms': durationMs,
+    });
+  }
+}
+
+// 使用示例
+final logger = AppLogger();
+logger.logEvent('transaction_created', params: {'amount': 35.5});
+logger.logPageView('home');
+logger.logPerformance('api_transactions_list', 150);
+```
+
+---
+
+## 十八B、监控与告警系统
+
+### 18B.1 监控架构
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        监控数据源                                │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │  应用指标   │  │  系统指标   │  │  业务指标   │             │
+│  │ (Metrics)  │  │ (Node)     │  │ (Custom)   │             │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘             │
+└─────────┼────────────────┼────────────────┼─────────────────────┘
+          │                │                │
+          ▼                ▼                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     Prometheus (指标收集)                        │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  - 应用Metrics端点 (/metrics)                               │ │
+│  │  - Node Exporter (系统指标)                                 │ │
+│  │  - Redis Exporter / PostgreSQL Exporter                    │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│    Grafana      │ │  Alertmanager   │ │   PagerDuty/    │
+│   (可视化)      │ │    (告警)       │ │   钉钉/飞书     │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+```
+
+### 18B.2 监控指标体系
+
+#### 应用层指标 (RED)
+
+```python
+# app/core/metrics.py
+from prometheus_client import Counter, Histogram, Gauge
+
+# 请求计数 (Request)
+http_requests_total = Counter(
+    'http_requests_total',
+    'Total HTTP requests',
+    ['method', 'endpoint', 'status_code']
+)
+
+# 错误计数 (Error)
+http_errors_total = Counter(
+    'http_errors_total',
+    'Total HTTP errors',
+    ['method', 'endpoint', 'error_type']
+)
+
+# 响应时间 (Duration)
+http_request_duration_seconds = Histogram(
+    'http_request_duration_seconds',
+    'HTTP request duration',
+    ['method', 'endpoint'],
+    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+)
+
+# 活跃连接数
+http_active_connections = Gauge(
+    'http_active_connections',
+    'Number of active HTTP connections'
+)
+```
+
+#### 数据库指标
+
+```python
+# 数据库连接池
+db_pool_connections = Gauge(
+    'db_pool_connections',
+    'Database connection pool status',
+    ['state']  # active, idle, waiting
+)
+
+# 查询时间
+db_query_duration_seconds = Histogram(
+    'db_query_duration_seconds',
+    'Database query duration',
+    ['operation', 'table']
+)
+
+# 慢查询计数
+db_slow_queries_total = Counter(
+    'db_slow_queries_total',
+    'Total slow queries (>1s)',
+    ['operation', 'table']
+)
+```
+
+#### 业务指标
+
+```python
+# 用户指标
+users_registered_total = Counter(
+    'users_registered_total',
+    'Total registered users',
+    ['method']  # wechat, apple, phone
+)
+
+users_active = Gauge(
+    'users_active',
+    'Current active users',
+    ['period']  # dau, wau, mau
+)
+
+# 记账指标
+transactions_created_total = Counter(
+    'transactions_created_total',
+    'Total transactions created',
+    ['type', 'source']  # expense/income, manual/ocr/voice
+)
+
+# AI指标
+ai_requests_total = Counter(
+    'ai_requests_total',
+    'Total AI requests',
+    ['type', 'status']  # ocr/voice, success/failed
+)
+
+ai_request_duration_seconds = Histogram(
+    'ai_request_duration_seconds',
+    'AI request duration',
+    ['type']
+)
+
+# 支付指标
+payment_orders_total = Counter(
+    'payment_orders_total',
+    'Total payment orders',
+    ['product', 'method', 'status']
+)
+
+payment_revenue_total = Counter(
+    'payment_revenue_total',
+    'Total revenue in cents',
+    ['product', 'method']
+)
+
+# 会员指标
+members_active = Gauge(
+    'members_active',
+    'Current active members',
+    ['level']  # trial, monthly, yearly, lifetime
+)
+
+trial_conversions_total = Counter(
+    'trial_conversions_total',
+    'Trial to paid conversions'
+)
+```
+
+### 18B.3 Metrics中间件
+
+```python
+# app/middleware/metrics.py
+import time
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class MetricsMiddleware(BaseHTTPMiddleware):
+    """Prometheus指标收集中间件"""
+
+    async def dispatch(self, request: Request, call_next):
+        # 增加活跃连接数
+        http_active_connections.inc()
+
+        method = request.method
+        endpoint = self._get_endpoint(request)
+        start_time = time.time()
+
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+
+            # 记录请求
+            http_requests_total.labels(
+                method=method,
+                endpoint=endpoint,
+                status_code=status_code
+            ).inc()
+
+            # 记录耗时
+            duration = time.time() - start_time
+            http_request_duration_seconds.labels(
+                method=method,
+                endpoint=endpoint
+            ).observe(duration)
+
+            return response
+
+        except Exception as e:
+            # 记录错误
+            http_errors_total.labels(
+                method=method,
+                endpoint=endpoint,
+                error_type=type(e).__name__
+            ).inc()
+            raise
+
+        finally:
+            http_active_connections.dec()
+
+    def _get_endpoint(self, request: Request) -> str:
+        # 归一化路径，避免高基数
+        # /api/v1/transactions/123 -> /api/v1/transactions/{id}
+        path = request.url.path
+        # 替换UUID和数字ID
+        import re
+        path = re.sub(r'/[0-9a-f-]{36}', '/{id}', path)
+        path = re.sub(r'/\d+', '/{id}', path)
+        return path
+```
+
+### 18B.4 告警规则配置
+
+```yaml
+# prometheus/alerts.yml
+groups:
+  - name: api_alerts
+    rules:
+      # API可用性告警
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_errors_total[5m]))
+          / sum(rate(http_requests_total[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API错误率过高"
+          description: "错误率 {{ $value | humanizePercentage }} 超过1%"
+
+      # 响应时间告警
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API响应时间过长"
+          description: "P95响应时间 {{ $value | humanizeDuration }}"
+
+      # 请求量突增
+      - alert: RequestSpike
+        expr: |
+          sum(rate(http_requests_total[5m]))
+          > 2 * sum(rate(http_requests_total[1h] offset 1d))
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "请求量异常突增"
+
+  - name: database_alerts
+    rules:
+      # 数据库连接池
+      - alert: DbConnectionPoolExhausted
+        expr: db_pool_connections{state="waiting"} > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "数据库连接池等待过多"
+
+      # 慢查询
+      - alert: TooManySlowQueries
+        expr: rate(db_slow_queries_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "慢查询过多"
+
+  - name: business_alerts
+    rules:
+      # 支付成功率
+      - alert: LowPaymentSuccessRate
+        expr: |
+          sum(rate(payment_orders_total{status="success"}[1h]))
+          / sum(rate(payment_orders_total[1h])) < 0.95
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "支付成功率过低"
+          description: "成功率 {{ $value | humanizePercentage }}"
+
+      # AI服务异常
+      - alert: AIServiceDown
+        expr: |
+          sum(rate(ai_requests_total{status="failed"}[5m]))
+          / sum(rate(ai_requests_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI服务异常"
+
+      # 新用户注册骤降
+      - alert: RegistrationDrop
+        expr: |
+          sum(increase(users_registered_total[1h]))
+          < 0.5 * sum(increase(users_registered_total[1h] offset 1d))
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "新用户注册量骤降"
+
+  - name: infrastructure_alerts
+    rules:
+      # CPU使用率
+      - alert: HighCpuUsage
+        expr: |
+          100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU使用率过高: {{ $value }}%"
+
+      # 内存使用率
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "内存使用率过高: {{ $value }}%"
+
+      # 磁盘使用率
+      - alert: DiskSpaceLow
+        expr: |
+          (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "磁盘空间不足: {{ $value }}%"
+```
+
+### 18B.5 告警通知配置
+
+```yaml
+# alertmanager/config.yml
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default'
+  routes:
+    # 严重告警
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      repeat_interval: 1h
+
+    # 一般告警
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      repeat_interval: 4h
+
+receivers:
+  - name: 'default'
+    webhook_configs:
+      - url: 'http://webhook/default'
+
+  - name: 'critical-alerts'
+    webhook_configs:
+      # 钉钉告警
+      - url: 'https://oapi.dingtalk.com/robot/send?access_token=xxx'
+        send_resolved: true
+      # 飞书告警
+      - url: 'https://open.feishu.cn/open-apis/bot/v2/hook/xxx'
+        send_resolved: true
+    # 电话告警（可选）
+    # pagerduty_configs:
+    #   - service_key: 'xxx'
+
+  - name: 'warning-alerts'
+    webhook_configs:
+      - url: 'https://oapi.dingtalk.com/robot/send?access_token=xxx'
+```
+
+### 18B.6 Grafana仪表盘
+
+```json
+{
+  "dashboard": {
+    "title": "AI Bookkeeping - Overview",
+    "panels": [
+      {
+        "title": "请求量 (QPS)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total[1m]))"
+          }
+        ]
+      },
+      {
+        "title": "错误率",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_errors_total[5m])) / sum(rate(http_requests_total[5m])) * 100"
+          }
+        ]
+      },
+      {
+        "title": "响应时间 (P95/P99)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P99"
+          }
+        ]
+      },
+      {
+        "title": "活跃用户",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "users_active{period='dau'}"
+          }
+        ]
+      },
+      {
+        "title": "今日收入",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(payment_revenue_total[24h])) / 100"
+          }
+        ]
+      },
+      {
+        "title": "AI调用量",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(ai_requests_total[5m])) by (type)"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 18B.7 健康检查接口
+
+```python
+# app/api/v1/health.py
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+router = APIRouter()
+
+@router.get("/health")
+async def health_check():
+    """基础健康检查"""
+    return {"status": "healthy"}
+
+@router.get("/health/ready")
+async def readiness_check(db: AsyncSession = Depends(get_db)):
+    """就绪检查（含依赖服务）"""
+    checks = {}
+
+    # 数据库检查
+    try:
+        await db.execute(text("SELECT 1"))
+        checks['database'] = 'healthy'
+    except Exception as e:
+        checks['database'] = f'unhealthy: {e}'
+
+    # Redis检查
+    try:
+        await redis.ping()
+        checks['redis'] = 'healthy'
+    except Exception as e:
+        checks['redis'] = f'unhealthy: {e}'
+
+    # 整体状态
+    is_healthy = all(v == 'healthy' for v in checks.values())
+
+    return {
+        'status': 'healthy' if is_healthy else 'unhealthy',
+        'checks': checks,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+
+@router.get("/health/live")
+async def liveness_check():
+    """存活检查"""
+    return {"status": "alive"}
+```
+
+---
+
+## 十八C、代码架构规范
+
+### 18C.1 项目分层架构
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        表现层 (Presentation)                     │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  API Routes / Controllers / Schemas (Request/Response)      │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        业务层 (Business/Service)                 │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  Services / Use Cases / Domain Logic                        │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        数据层 (Data/Repository)                  │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  Repositories / DAOs / External Services                    │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        基础设施层 (Infrastructure)               │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  Database / Cache / Message Queue / External APIs           │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 18C.2 后端目录结构（最终版）
+
+```
+server/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                     # FastAPI应用入口
+│   │
+│   ├── core/                       # 核心配置
+│   │   ├── __init__.py
+│   │   ├── config.py               # 配置管理
+│   │   ├── security.py             # 安全认证
+│   │   ├── database.py             # 数据库连接
+│   │   ├── redis.py                # Redis连接
+│   │   ├── logging.py              # 日志配置
+│   │   ├── metrics.py              # 指标收集
+│   │   └── exceptions.py           # 异常定义
+│   │
+│   ├── api/                        # API层
+│   │   ├── __init__.py
+│   │   ├── deps.py                 # 依赖注入
+│   │   └── v1/
+│   │       ├── __init__.py
+│   │       ├── router.py           # 路由汇总
+│   │       ├── auth.py             # 认证接口
+│   │       ├── users.py            # 用户接口
+│   │       ├── transactions.py     # 记账接口
+│   │       ├── books.py            # 账本接口
+│   │       ├── accounts.py         # 账户接口
+│   │       ├── categories.py       # 分类接口
+│   │       ├── stats.py            # 统计接口
+│   │       ├── ai.py               # AI接口
+│   │       ├── payment.py          # 支付接口
+│   │       ├── membership.py       # 会员接口
+│   │       └── health.py           # 健康检查
+│   │
+│   ├── models/                     # 数据库模型 (SQLAlchemy)
+│   │   ├── __init__.py
+│   │   ├── base.py                 # 基础模型
+│   │   ├── user.py
+│   │   ├── transaction.py
+│   │   ├── book.py
+│   │   ├── account.py
+│   │   ├── category.py
+│   │   ├── membership.py
+│   │   └── campaign.py
+│   │
+│   ├── schemas/                    # Pydantic模型 (API Schema)
+│   │   ├── __init__.py
+│   │   ├── base.py                 # 基础Schema
+│   │   ├── user.py
+│   │   ├── transaction.py
+│   │   ├── book.py
+│   │   ├── account.py
+│   │   ├── stats.py
+│   │   └── payment.py
+│   │
+│   ├── services/                   # 业务服务层
+│   │   ├── __init__.py
+│   │   ├── base.py                 # 基础服务
+│   │   ├── auth_service.py
+│   │   ├── user_service.py
+│   │   ├── transaction_service.py
+│   │   ├── stats_service.py
+│   │   ├── ai_service.py
+│   │   ├── payment_service.py
+│   │   ├── membership_service.py
+│   │   └── campaign_service.py
+│   │
+│   ├── repositories/               # 数据仓库层
+│   │   ├── __init__.py
+│   │   ├── base.py                 # 基础仓库
+│   │   ├── user_repository.py
+│   │   ├── transaction_repository.py
+│   │   └── ...
+│   │
+│   ├── middleware/                 # 中间件
+│   │   ├── __init__.py
+│   │   ├── logging.py              # 请求日志
+│   │   ├── metrics.py              # 指标收集
+│   │   ├── error_handler.py        # 错误处理
+│   │   └── rate_limit.py           # 限流
+│   │
+│   ├── tasks/                      # 异步任务 (Celery)
+│   │   ├── __init__.py
+│   │   ├── celery_app.py
+│   │   ├── email_tasks.py
+│   │   ├── ai_tasks.py
+│   │   ├── backup_tasks.py
+│   │   └── scheduled_tasks.py
+│   │
+│   ├── integrations/               # 外部服务集成
+│   │   ├── __init__.py
+│   │   ├── wechat/                 # 微信集成
+│   │   │   ├── __init__.py
+│   │   │   ├── auth.py
+│   │   │   └── pay.py
+│   │   ├── alipay/                 # 支付宝集成
+│   │   │   ├── __init__.py
+│   │   │   └── pay.py
+│   │   ├── apple/                  # Apple集成
+│   │   │   ├── __init__.py
+│   │   │   ├── auth.py
+│   │   │   └── iap.py
+│   │   ├── ai/                     # AI服务集成
+│   │   │   ├── __init__.py
+│   │   │   ├── claude.py
+│   │   │   ├── whisper.py
+│   │   │   └── ocr.py
+│   │   └── sms/                    # 短信服务
+│   │       ├── __init__.py
+│   │       └── aliyun_sms.py
+│   │
+│   └── utils/                      # 工具函数
+│       ├── __init__.py
+│       ├── datetime.py
+│       ├── currency.py
+│       ├── validators.py
+│       └── helpers.py
+│
+├── migrations/                     # 数据库迁移 (Alembic)
+│   ├── versions/
+│   ├── env.py
+│   └── alembic.ini
+│
+├── tests/                          # 测试代码
+│   ├── __init__.py
+│   ├── conftest.py                 # 测试配置
+│   ├── unit/                       # 单元测试
+│   │   ├── services/
+│   │   └── utils/
+│   ├── integration/                # 集成测试
+│   │   └── api/
+│   └── e2e/                        # 端到端测试
+│
+├── scripts/                        # 脚本
+│   ├── init_db.py
+│   ├── seed_data.py
+│   └── migrate.py
+│
+├── docker/                         # Docker配置
+│   ├── Dockerfile
+│   ├── Dockerfile.dev
+│   └── docker-compose.yml
+│
+├── requirements/                   # 依赖管理
+│   ├── base.txt
+│   ├── dev.txt
+│   └── prod.txt
+│
+├── .env.example                    # 环境变量示例
+├── pyproject.toml                  # 项目配置
+└── README.md
+```
+
+### 18C.3 前端目录结构（最终版）
+
+```
+app/
+├── android/                        # Android原生代码
+├── ios/                            # iOS原生代码
+├── lib/
+│   ├── main.dart                   # 入口文件
+│   │
+│   ├── app/                        # 应用配置
+│   │   ├── app.dart                # App根组件
+│   │   ├── routes.dart             # 路由配置
+│   │   └── di.dart                 # 依赖注入
+│   │
+│   ├── core/                       # 核心模块
+│   │   ├── config/                 # 配置
+│   │   │   ├── app_config.dart
+│   │   │   └── api_config.dart
+│   │   ├── constants/              # 常量
+│   │   │   ├── app_constants.dart
+│   │   │   └── api_constants.dart
+│   │   ├── theme/                  # 主题
+│   │   │   ├── app_theme.dart
+│   │   │   ├── app_colors.dart
+│   │   │   └── app_text_styles.dart
+│   │   ├── utils/                  # 工具类
+│   │   │   ├── date_utils.dart
+│   │   │   ├── currency_utils.dart
+│   │   │   └── validators.dart
+│   │   ├── extensions/             # 扩展方法
+│   │   │   ├── string_ext.dart
+│   │   │   ├── datetime_ext.dart
+│   │   │   └── context_ext.dart
+│   │   ├── logging/                # 日志
+│   │   │   └── app_logger.dart
+│   │   └── errors/                 # 错误处理
+│   │       ├── exceptions.dart
+│   │       └── error_handler.dart
+│   │
+│   ├── data/                       # 数据层
+│   │   ├── models/                 # 数据模型
+│   │   │   ├── user_model.dart
+│   │   │   ├── transaction_model.dart
+│   │   │   ├── book_model.dart
+│   │   │   └── ...
+│   │   ├── repositories/           # 数据仓库
+│   │   │   ├── base_repository.dart
+│   │   │   ├── auth_repository.dart
+│   │   │   ├── transaction_repository.dart
+│   │   │   └── ...
+│   │   ├── datasources/            # 数据源
+│   │   │   ├── remote/             # 远程数据源
+│   │   │   │   ├── api_client.dart
+│   │   │   │   └── api_endpoints.dart
+│   │   │   └── local/              # 本地数据源
+│   │   │       ├── database.dart
+│   │   │       └── preferences.dart
+│   │   └── providers/              # 状态提供者
+│   │       ├── auth_provider.dart
+│   │       ├── transaction_provider.dart
+│   │       └── ...
+│   │
+│   ├── domain/                     # 领域层
+│   │   ├── entities/               # 领域实体
+│   │   │   ├── user.dart
+│   │   │   ├── transaction.dart
+│   │   │   └── ...
+│   │   ├── usecases/               # 用例
+│   │   │   ├── auth/
+│   │   │   ├── transaction/
+│   │   │   └── ...
+│   │   └── interfaces/             # 接口定义
+│   │       └── repositories/
+│   │
+│   ├── features/                   # 功能模块
+│   │   ├── auth/                   # 认证模块
+│   │   │   ├── screens/
+│   │   │   │   ├── login_screen.dart
+│   │   │   │   └── register_screen.dart
+│   │   │   ├── widgets/
+│   │   │   └── providers/
+│   │   ├── home/                   # 首页模块
+│   │   │   ├── screens/
+│   │   │   │   └── home_screen.dart
+│   │   │   └── widgets/
+│   │   │       ├── overview_card.dart
+│   │   │       ├── quick_actions.dart
+│   │   │       └── recent_transactions.dart
+│   │   ├── transaction/            # 记账模块
+│   │   │   ├── screens/
+│   │   │   │   ├── add_transaction_screen.dart
+│   │   │   │   └── transaction_detail_screen.dart
+│   │   │   └── widgets/
+│   │   │       ├── category_selector.dart
+│   │   │       ├── amount_input.dart
+│   │   │       └── account_selector.dart
+│   │   ├── stats/                  # 统计模块
+│   │   │   ├── screens/
+│   │   │   └── widgets/
+│   │   ├── ai/                     # AI记账模块
+│   │   │   ├── screens/
+│   │   │   │   ├── camera_screen.dart
+│   │   │   │   └── voice_input_screen.dart
+│   │   │   └── widgets/
+│   │   ├── profile/                # 个人中心
+│   │   │   ├── screens/
+│   │   │   └── widgets/
+│   │   └── settings/               # 设置模块
+│   │       ├── screens/
+│   │       └── widgets/
+│   │
+│   ├── shared/                     # 共享组件
+│   │   ├── widgets/                # 通用组件
+│   │   │   ├── buttons/
+│   │   │   ├── cards/
+│   │   │   ├── inputs/
+│   │   │   ├── dialogs/
+│   │   │   └── loading/
+│   │   └── layouts/                # 布局组件
+│   │       ├── app_scaffold.dart
+│   │       └── bottom_nav.dart
+│   │
+│   └── l10n/                       # 国际化
+│       ├── app_zh.arb
+│       ├── app_en.arb
+│       └── ...
+│
+├── assets/                         # 资源文件
+│   ├── images/
+│   ├── icons/
+│   ├── fonts/
+│   └── animations/
+│
+├── test/                           # 测试代码
+│   ├── unit/
+│   ├── widget/
+│   └── integration/
+│
+├── pubspec.yaml                    # 依赖配置
+├── analysis_options.yaml           # 代码分析配置
+└── README.md
+```
+
+### 18C.4 编码规范
+
+#### Python后端规范
+
+```python
+# 1. 命名规范
+class UserService:          # 类名：PascalCase
+    def get_user_by_id():   # 方法名：snake_case
+        user_name = ""      # 变量名：snake_case
+        MAX_RETRY = 3       # 常量：UPPER_SNAKE_CASE
+
+# 2. 类型注解
+from typing import Optional, List
+from pydantic import BaseModel
+
+class UserCreate(BaseModel):
+    email: str
+    nickname: Optional[str] = None
+
+async def get_users(skip: int = 0, limit: int = 100) -> List[User]:
+    pass
+
+# 3. 文档字符串
+def create_transaction(
+    user_id: str,
+    amount: Decimal,
+    category_id: str,
+) -> Transaction:
+    """
+    创建交易记录
+
+    Args:
+        user_id: 用户ID
+        amount: 交易金额
+        category_id: 分类ID
+
+    Returns:
+        创建的交易记录
+
+    Raises:
+        ValidationError: 参数验证失败
+        InsufficientBalanceError: 余额不足
+    """
+    pass
+
+# 4. 异常处理
+class AppException(Exception):
+    """应用异常基类"""
+    def __init__(self, code: str, message: str, status_code: int = 400):
+        self.code = code
+        self.message = message
+        self.status_code = status_code
+
+class NotFoundError(AppException):
+    def __init__(self, resource: str, id: str):
+        super().__init__(
+            code="NOT_FOUND",
+            message=f"{resource} with id {id} not found",
+            status_code=404
+        )
+
+# 5. 依赖注入
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session() as session:
+        yield session
+
+@router.get("/users/{user_id}")
+async def get_user(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    pass
+```
+
+#### Flutter前端规范
+
+```dart
+// 1. 命名规范
+class TransactionService {}  // 类名：PascalCase
+void getUserById() {}        // 方法名：camelCase
+final userName = '';         // 变量名：camelCase
+const maxRetry = 3;          // 常量：camelCase
+final _privateVar = '';      // 私有变量：_camelCase
+
+// 2. 文件命名
+// user_service.dart         // 文件名：snake_case
+// transaction_model.dart
+
+// 3. Widget规范
+class TransactionCard extends StatelessWidget {
+  const TransactionCard({
+    super.key,
+    required this.transaction,
+    this.onTap,
+  });
+
+  final Transaction transaction;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        title: Text(transaction.category),
+        subtitle: Text(transaction.note ?? ''),
+        trailing: Text(
+          transaction.formattedAmount,
+          style: TextStyle(
+            color: transaction.isExpense ? Colors.red : Colors.green,
+          ),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+// 4. 状态管理 (Riverpod)
+final transactionListProvider = FutureProvider.family<List<Transaction>, TransactionFilter>(
+  (ref, filter) async {
+    final repository = ref.watch(transactionRepositoryProvider);
+    return repository.getTransactions(filter);
+  },
+);
+
+// 5. 错误处理
+class AppException implements Exception {
+  final String code;
+  final String message;
+
+  const AppException(this.code, this.message);
+}
+
+class NetworkException extends AppException {
+  const NetworkException([String? message])
+    : super('NETWORK_ERROR', message ?? 'Network error occurred');
+}
+
+// 6. 扩展方法
+extension DateTimeExt on DateTime {
+  String get formatted => DateFormat('yyyy-MM-dd').format(this);
+  bool get isToday => DateUtils.isSameDay(this, DateTime.now());
+}
+```
+
+### 18C.5 Git工作流规范
+
+```bash
+# 分支命名
+main                    # 主分支，生产环境
+develop                 # 开发分支
+feature/xxx             # 功能分支
+bugfix/xxx              # 修复分支
+hotfix/xxx              # 紧急修复分支
+release/v1.0.0          # 发布分支
+
+# Commit Message规范 (Conventional Commits)
+feat: 添加用户注册功能
+fix: 修复登录验证码发送失败问题
+docs: 更新API文档
+style: 格式化代码
+refactor: 重构交易服务
+test: 添加单元测试
+chore: 更新依赖版本
+
+# 示例
+feat(auth): add WeChat login support
+fix(payment): handle alipay callback timeout
+docs(api): update transaction endpoint docs
+refactor(service): extract common logic to base service
+```
+
+### 18C.6 API设计规范
+
+```yaml
+# RESTful API规范
+
+# 1. URL设计
+GET    /api/v1/transactions          # 列表
+POST   /api/v1/transactions          # 创建
+GET    /api/v1/transactions/{id}     # 详情
+PUT    /api/v1/transactions/{id}     # 全量更新
+PATCH  /api/v1/transactions/{id}     # 部分更新
+DELETE /api/v1/transactions/{id}     # 删除
+
+# 2. 查询参数
+GET /api/v1/transactions?page=1&page_size=20&sort=-created_at&type=expense
+
+# 3. 统一响应格式
+# 成功响应
+{
+  "code": 0,
+  "message": "success",
+  "data": { ... },
+  "meta": {
+    "page": 1,
+    "page_size": 20,
+    "total": 100
+  }
+}
+
+# 错误响应
+{
+  "code": "VALIDATION_ERROR",
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "amount",
+      "message": "Amount must be positive"
+    }
+  ]
+}
+
+# 4. HTTP状态码
+200 OK              # 成功
+201 Created         # 创建成功
+204 No Content      # 删除成功
+400 Bad Request     # 请求参数错误
+401 Unauthorized    # 未认证
+403 Forbidden       # 无权限
+404 Not Found       # 资源不存在
+422 Unprocessable   # 业务逻辑错误
+429 Too Many Requests # 限流
+500 Internal Error  # 服务器错误
+
+# 5. 版本控制
+/api/v1/...         # URL版本
+Accept: application/vnd.api+json;version=1  # Header版本
+```
+
+### 18C.7 测试规范
+
+```python
+# tests/unit/services/test_transaction_service.py
+
+import pytest
+from decimal import Decimal
+from unittest.mock import Mock, AsyncMock
+
+class TestTransactionService:
+    """交易服务单元测试"""
+
+    @pytest.fixture
+    def service(self, mock_repository):
+        return TransactionService(repository=mock_repository)
+
+    @pytest.fixture
+    def mock_repository(self):
+        return Mock(spec=TransactionRepository)
+
+    async def test_create_transaction_success(self, service):
+        """测试创建交易成功"""
+        # Arrange
+        data = TransactionCreate(
+            amount=Decimal("35.50"),
+            type=TransactionType.EXPENSE,
+            category_id="cat_123",
+        )
+
+        # Act
+        result = await service.create_transaction("user_123", data)
+
+        # Assert
+        assert result.amount == Decimal("35.50")
+        assert result.type == TransactionType.EXPENSE
+
+    async def test_create_transaction_invalid_amount(self, service):
+        """测试创建交易-金额无效"""
+        data = TransactionCreate(
+            amount=Decimal("-10"),
+            type=TransactionType.EXPENSE,
+            category_id="cat_123",
+        )
+
+        with pytest.raises(ValidationError) as exc:
+            await service.create_transaction("user_123", data)
+
+        assert exc.value.code == "INVALID_AMOUNT"
+
+# 测试覆盖率要求
+# - 单元测试覆盖率 > 80%
+# - 核心业务逻辑覆盖率 > 90%
+# - 集成测试覆盖主要API接口
+```
+
+### 18C.8 代码审查清单
+
+```markdown
+## Code Review Checklist
+
+### 功能性
+- [ ] 代码实现了需求描述的功能
+- [ ] 边界条件和异常情况已处理
+- [ ] 没有引入安全漏洞
+
+### 代码质量
+- [ ] 命名清晰、有意义
+- [ ] 函数/方法职责单一
+- [ ] 没有重复代码
+- [ ] 复杂逻辑有注释说明
+
+### 性能
+- [ ] 没有N+1查询问题
+- [ ] 大数据量有分页处理
+- [ ] 适当使用缓存
+
+### 可维护性
+- [ ] 有适当的单元测试
+- [ ] 遵循项目编码规范
+- [ ] 配置项使用环境变量
+
+### 日志与监控
+- [ ] 关键业务有日志记录
+- [ ] 错误日志包含必要上下文
+- [ ] 添加了必要的监控指标
+```
+
+---
+
 ## 十九、开发计划（更新版）
 
 ### 第一阶段：基础功能 (MVP)
