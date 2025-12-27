@@ -4144,4 +4144,799 @@ class TestTransactionService:
 
 ---
 
+## 二十、竞品特性集成（Mint/YNAB）
+
+基于对 Mint、YNAB（You Need A Budget）及其他主流记账应用的分析，集成以下优秀特性：
+
+### 20.1 零基预算系统（YNAB方法论）
+
+#### 核心理念
+YNAB 的四大法则：
+1. **给每一分钱一个用途** - 将所有收入分配到具体类别
+2. **拥抱真实开支** - 将大额低频支出分摊到每月
+3. **灵活调整** - 预算不是死板的，可以根据实际情况调整
+4. **让钱"变老"** - 增加收入与支出之间的时间差
+
+#### 功能设计
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      零基预算仪表盘                               │
+├─────────────────────────────────────────────────────────────────┤
+│  💰 待分配金额: ¥5,280.00                                        │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│                                                                  │
+│  📦 必要支出                              预算        已用        │
+│  ├── 🏠 房租                            ¥3,000     ¥3,000 ✓     │
+│  ├── ⚡ 水电燃气                         ¥300       ¥185         │
+│  ├── 📱 手机话费                         ¥100       ¥0           │
+│  └── 🚇 交通出行                         ¥400       ¥280         │
+│                                                                  │
+│  🍽️ 生活消费                                                     │
+│  ├── 🛒 买菜做饭                         ¥1,500     ¥892         │
+│  ├── 🍔 外出就餐                         ¥600       ¥445         │
+│  └── ☕ 咖啡饮料                         ¥200       ¥128         │
+│                                                                  │
+│  🎯 储蓄目标                                                     │
+│  ├── 🏖️ 年假旅行（6个月后）              ¥500/月    ¥2,500/¥3,000│
+│  ├── 💻 换电脑（3个月后）                ¥1,000/月  ¥1,000/¥3,000│
+│  └── 🎄 年终礼物                         ¥200/月    ¥1,000/¥2,400│
+│                                                                  │
+│  📊 "钱龄"指标: 28天 ↑                                           │
+│  (平均每花一笔钱，这笔钱在账户里待了28天)                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 数据表设计
+
+```sql
+-- 预算分配表（零基预算）
+CREATE TABLE budget_allocations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    book_id UUID REFERENCES books(id),
+    category_id UUID REFERENCES categories(id),
+    year_month VARCHAR(7) NOT NULL,  -- 格式: 2024-01
+    budgeted_amount DECIMAL(15,2) DEFAULT 0,  -- 预算金额
+    spent_amount DECIMAL(15,2) DEFAULT 0,     -- 已花金额
+    available_amount DECIMAL(15,2) DEFAULT 0, -- 剩余可用
+    overspent_amount DECIMAL(15,2) DEFAULT 0, -- 超支金额
+    is_rollover BOOLEAN DEFAULT TRUE,         -- 是否结转到下月
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, book_id, category_id, year_month)
+);
+
+-- 收入待分配池
+CREATE TABLE income_pool (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    book_id UUID REFERENCES books(id),
+    total_income DECIMAL(15,2) DEFAULT 0,      -- 总收入
+    allocated_amount DECIMAL(15,2) DEFAULT 0,  -- 已分配
+    unallocated_amount DECIMAL(15,2) DEFAULT 0, -- 待分配
+    year_month VARCHAR(7) NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 钱龄追踪
+CREATE TABLE money_age (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    calculated_date DATE NOT NULL,
+    average_age_days INT NOT NULL,  -- 平均钱龄（天）
+    trend VARCHAR(10),  -- up, down, stable
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### 20.2 目标追踪系统
+
+#### 目标类型
+
+| 类型 | 说明 | 示例 |
+|------|------|------|
+| **储蓄余额目标** | 到某日期存够一定金额 | 6个月后存够¥10,000去旅行 |
+| **月度开支目标** | 每月该类别花费不超过 | 每月餐饮不超过¥2,000 |
+| **还债目标** | 到某日期还清债务 | 12个月内还清信用卡 |
+| **定期存款目标** | 每月固定存入金额 | 每月存¥1,000应急金 |
+| **自定义目标** | 灵活设定 | 每周存¥100买新手机 |
+
+#### 目标进度可视化
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🎯 我的目标                                                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🏖️ 年假旅行基金                                                 │
+│  目标: ¥12,000  |  已存: ¥7,500  |  剩余: ¥4,500                 │
+│  ████████████████████░░░░░░░░  62.5%                            │
+│  📅 距离目标还有 3 个月 | 建议每月存: ¥1,500                      │
+│                                                                  │
+│  💳 还清信用卡                                                   │
+│  待还: ¥8,500  |  已还: ¥11,500  |  节省利息: ¥680               │
+│  ████████████████████████░░░░  57.5%                            │
+│  📅 按当前进度，预计 5 个月后还清                                  │
+│  💡 每月多还 ¥200，可以提前 1 个月还清，节省 ¥150 利息             │
+│                                                                  │
+│  🎄 年终礼物基金                                                  │
+│  目标: ¥3,000  |  已存: ¥2,200  |  本月需存: ¥400                │
+│  ██████████████████████░░░░░░  73.3%                            │
+│  ✅ 进度正常，继续保持！                                          │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 数据表设计
+
+```sql
+-- 财务目标表
+CREATE TABLE financial_goals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    book_id UUID REFERENCES books(id),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    goal_type INT NOT NULL,  -- 1:储蓄 2:月度开支 3:还债 4:定期存款 5:自定义
+    target_amount DECIMAL(15,2) NOT NULL,
+    current_amount DECIMAL(15,2) DEFAULT 0,
+    target_date DATE,
+    monthly_contribution DECIMAL(15,2),  -- 每月建议存入
+    linked_account_id UUID REFERENCES accounts(id),  -- 关联账户
+    linked_category_id UUID REFERENCES categories(id),  -- 关联分类
+    icon VARCHAR(50),
+    color VARCHAR(20),
+    priority INT DEFAULT 0,
+    is_completed BOOLEAN DEFAULT FALSE,
+    completed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 目标进度记录
+CREATE TABLE goal_progress (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    goal_id UUID REFERENCES financial_goals(id),
+    record_date DATE NOT NULL,
+    amount_added DECIMAL(15,2),
+    current_total DECIMAL(15,2),
+    progress_percent DECIMAL(5,2),
+    note TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### 20.3 还款模拟器（债务规划）
+
+#### 功能说明
+帮助用户规划信用卡、贷款等债务的还款策略。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  💳 还款模拟器                                                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  我的债务总览                                                     │
+│  ───────────────────────────────────────────────────────────────│
+│  招商信用卡        ¥12,500    年利率 18.25%                      │
+│  花呗              ¥3,200     年利率 15.00%                      │
+│  白条              ¥5,800     年利率 12.00%                      │
+│  ───────────────────────────────────────────────────────────────│
+│  债务总计          ¥21,500                                       │
+│                                                                  │
+│  📊 还款策略对比                                                  │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ 策略              月还款    还清时间    总利息    节省       ││
+│  ├─────────────────────────────────────────────────────────────┤│
+│  │ 最低还款          ¥800     36个月     ¥7,350    --         ││
+│  │ 雪球法(先小额)    ¥1,500   18个月     ¥2,890    ¥4,460     ││
+│  │ 雪崩法(先高息)    ¥1,500   17个月     ¥2,450    ¥4,900 ⭐  ││
+│  │ 自定义            ¥2,000   12个月     ¥1,680    ¥5,670     ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                  │
+│  💡 建议: 使用雪崩法，优先还清利率最高的招商信用卡                  │
+│                                                                  │
+│  [应用此策略]  [自定义设置]  [导出还款计划]                        │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 数据表设计
+
+```sql
+-- 债务表
+CREATE TABLE debts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    account_id UUID REFERENCES accounts(id),  -- 关联账户
+    name VARCHAR(100) NOT NULL,
+    debt_type INT NOT NULL,  -- 1:信用卡 2:消费贷 3:房贷 4:车贷 5:其他
+    principal_amount DECIMAL(15,2) NOT NULL,  -- 本金
+    current_balance DECIMAL(15,2) NOT NULL,   -- 当前余额
+    interest_rate DECIMAL(5,2) NOT NULL,      -- 年利率%
+    minimum_payment DECIMAL(15,2),            -- 最低还款额
+    due_day INT,                              -- 还款日
+    start_date DATE,
+    expected_payoff_date DATE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 还款计划表
+CREATE TABLE payoff_plans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    name VARCHAR(100) NOT NULL,
+    strategy_type INT NOT NULL,  -- 1:雪球法 2:雪崩法 3:自定义
+    monthly_budget DECIMAL(15,2) NOT NULL,
+    total_interest_saved DECIMAL(15,2),
+    expected_months INT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 还款计划详情
+CREATE TABLE payoff_plan_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    plan_id UUID REFERENCES payoff_plans(id),
+    debt_id UUID REFERENCES debts(id),
+    payment_order INT NOT NULL,  -- 还款顺序
+    monthly_payment DECIMAL(15,2),
+    expected_payoff_date DATE
+);
+```
+
+### 20.4 订阅管理与账单提醒
+
+#### 订阅追踪
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  📱 我的订阅                            本月总计: ¥268           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🎵 Apple Music          ¥11/月    下次扣款: 1月5日             │
+│  📺 爱奇艺VIP            ¥25/月    下次扣款: 1月12日            │
+│  ☁️ iCloud 200G          ¥21/月    下次扣款: 1月15日            │
+│  🎮 PlayStation Plus     ¥38/月    下次扣款: 1月20日            │
+│  📚 微信读书无限卡        ¥19/月    下次扣款: 1月22日            │
+│  🏋️ 健身房会员           ¥99/月    下次扣款: 1月28日            │
+│  🚗 停车包月             ¥55/月    下次扣款: 1月30日            │
+│                                                                  │
+│  ⚠️ 价格变动提醒                                                 │
+│  ───────────────────────────────────────────────────────────────│
+│  爱奇艺VIP 下月将涨价: ¥25 → ¥30 (+20%)                         │
+│                                                                  │
+│  📊 年度订阅开支: ¥3,216    比去年增加 ¥420 (+15%)               │
+│                                                                  │
+│  [添加订阅]  [导出报告]                                          │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 账单提醒
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  📅 即将到期账单                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🔴 明天 (1月5日)                                                │
+│     └── 💳 招商信用卡还款  ¥3,580                                │
+│                                                                  │
+│  🟡 后天 (1月6日)                                                │
+│     └── ⚡ 电费           ¥156                                   │
+│                                                                  │
+│  🟢 本周内                                                       │
+│     ├── 📱 手机话费       ¥68     1月8日                        │
+│     ├── 🏠 物业费         ¥280    1月10日                       │
+│     └── 🌐 宽带费         ¥99     1月10日                       │
+│                                                                  │
+│  💡 本周待缴总计: ¥4,183                                         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 数据表设计
+
+```sql
+-- 订阅服务表
+CREATE TABLE subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    icon VARCHAR(50),
+    category_id UUID REFERENCES categories(id),
+    account_id UUID REFERENCES accounts(id),  -- 扣款账户
+    amount DECIMAL(15,2) NOT NULL,
+    currency VARCHAR(10) DEFAULT 'CNY',
+    billing_cycle INT NOT NULL,  -- 1:日 2:周 3:月 4:季 5:年
+    billing_day INT,  -- 每月/每年的扣款日
+    start_date DATE NOT NULL,
+    end_date DATE,  -- 订阅结束日期
+    next_billing_date DATE,
+    last_amount DECIMAL(15,2),  -- 上次金额（用于检测涨价）
+    price_change_alert BOOLEAN DEFAULT TRUE,
+    reminder_days INT DEFAULT 3,  -- 提前几天提醒
+    is_active BOOLEAN DEFAULT TRUE,
+    auto_record BOOLEAN DEFAULT TRUE,  -- 自动生成账目
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 账单提醒表
+CREATE TABLE bill_reminders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    name VARCHAR(100) NOT NULL,
+    bill_type INT NOT NULL,  -- 1:信用卡 2:水电 3:房租 4:物业 5:其他
+    amount DECIMAL(15,2),
+    due_date DATE NOT NULL,
+    repeat_type INT,  -- 0:一次 1:每月 2:每季 3:每年
+    account_id UUID REFERENCES accounts(id),
+    reminder_days INT[] DEFAULT '{3,1,0}',  -- 提前3天、1天、当天提醒
+    is_paid BOOLEAN DEFAULT FALSE,
+    paid_at TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 价格变动历史
+CREATE TABLE subscription_price_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subscription_id UUID REFERENCES subscriptions(id),
+    old_price DECIMAL(15,2),
+    new_price DECIMAL(15,2),
+    change_percent DECIMAL(5,2),
+    effective_date DATE,
+    notified BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### 20.5 净资产追踪
+
+#### 功能说明
+实时展示用户的总资产、总负债和净资产变化趋势。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  💎 我的净资产                          更新于: 2024-01-05      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│                    ¥ 285,680                                     │
+│                    净资产 ↑ 2.3%                                 │
+│                                                                  │
+│  📈 资产                                📉 负债                  │
+│  ──────────────────────                 ──────────────────────  │
+│  💳 银行存款   ¥125,000                 💳 信用卡    ¥12,500    │
+│  📱 支付宝     ¥23,500                  🏠 房贷      ¥580,000   │
+│  💰 微信      ¥8,200                    🚗 车贷      ¥85,000    │
+│  🏠 房产      ¥2,000,000                                        │
+│  🚗 汽车      ¥180,000                                          │
+│  📊 基金      ¥45,000                                           │
+│  📈 股票      ¥32,480                                           │
+│  ──────────────────────                 ──────────────────────  │
+│  合计         ¥2,414,180                合计        ¥677,500    │
+│                                                                  │
+│  📊 净资产趋势（近12个月）                                        │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │     ╭─╮                                              ╭──────││
+│  │ ╭───╯ ╰───╮          ╭────────╮              ╭───────╯      ││
+│  │─╯          ╰──────────╯        ╰──────────────╯             ││
+│  │ 2月  3月  4月  5月  6月  7月  8月  9月  10月 11月 12月 1月   ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                  │
+│  💡 本月净资产增加 ¥6,420，主要来自工资收入和投资收益              │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 数据表设计
+
+```sql
+-- 资产账户表（扩展accounts表）
+ALTER TABLE accounts ADD COLUMN asset_type INT DEFAULT 1;
+-- 1:流动资产 2:固定资产 3:投资资产 4:负债
+
+-- 资产估值表（用于房产、汽车等需要估值的资产）
+CREATE TABLE asset_valuations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id UUID REFERENCES accounts(id),
+    valuation_date DATE NOT NULL,
+    valuation_amount DECIMAL(15,2) NOT NULL,
+    valuation_source VARCHAR(50),  -- manual, api, estimate
+    note TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 净资产快照（每日/每周记录）
+CREATE TABLE net_worth_snapshots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    snapshot_date DATE NOT NULL,
+    total_assets DECIMAL(15,2) NOT NULL,
+    total_liabilities DECIMAL(15,2) NOT NULL,
+    net_worth DECIMAL(15,2) NOT NULL,
+    assets_breakdown JSONB,  -- 资产明细
+    liabilities_breakdown JSONB,  -- 负债明细
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, snapshot_date)
+);
+```
+
+### 20.6 分账功能（拆分交易）
+
+#### 功能说明
+一笔交易可以拆分到多个分类，适用于超市购物等场景。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  📝 拆分交易                                                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🏪 沃尔玛超市                              总计: ¥358.50        │
+│  📅 2024-01-05                                                   │
+│                                                                  │
+│  拆分明细:                                                       │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ 🥬 买菜做饭                             ¥156.00             ││
+│  │ 🧴 日用品                               ¥89.50              ││
+│  │ 🍪 零食饮料                             ¥68.00              ││
+│  │ 🧒 母婴用品                             ¥45.00              ││
+│  │                                                             ││
+│  │ [+ 添加拆分项]                                              ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                  │
+│  已分配: ¥358.50  |  剩余: ¥0.00  ✓                             │
+│                                                                  │
+│  [取消]                                        [保存拆分]       │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 数据表设计
+
+```sql
+-- 交易拆分表
+CREATE TABLE transaction_splits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    transaction_id UUID REFERENCES transactions(id),
+    category_id UUID REFERENCES categories(id),
+    amount DECIMAL(15,2) NOT NULL,
+    note VARCHAR(200),
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 在transactions表添加字段
+ALTER TABLE transactions ADD COLUMN is_split BOOLEAN DEFAULT FALSE;
+```
+
+### 20.7 家庭共享账本
+
+#### 功能说明
+支持家庭成员共同管理财务，类似YNAB Together。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  👨‍👩‍👧‍👦 家庭账本                                                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  成员 (4人)                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ 👨 爸爸 (管理员)    本月支出: ¥8,520    预算剩余: ¥1,480     ││
+│  │ 👩 妈妈 (管理员)    本月支出: ¥6,350    预算剩余: ¥2,650     ││
+│  │ 👧 女儿 (成员)      本月支出: ¥1,200    预算剩余: ¥300       ││
+│  │ 👦 儿子 (成员)      本月支出: ¥850      预算剩余: ¥150       ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                  │
+│  📊 家庭本月总览                                                  │
+│  ───────────────────────────────────────────────────────────────│
+│  总收入: ¥28,000  |  总支出: ¥16,920  |  结余: ¥11,080          │
+│                                                                  │
+│  🏠 共同开支                                                     │
+│  ├── 房贷           ¥6,500                                      │
+│  ├── 水电燃气       ¥450                                        │
+│  ├── 物业费         ¥280                                        │
+│  └── 家庭采购       ¥2,800                                      │
+│                                                                  │
+│  ⚙️ 权限设置                                                     │
+│  │ ☑️ 成员可查看家庭总览                                         │
+│  │ ☐ 成员可查看其他成员明细                                      │
+│  │ ☑️ 成员消费需要审批（超过¥500）                               │
+│  │ ☑️ 预算超支自动通知管理员                                     │
+│                                                                  │
+│  [邀请成员]  [权限设置]  [查看报表]                               │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 数据表扩展
+
+```sql
+-- 扩展book_members表
+ALTER TABLE book_members ADD COLUMN monthly_budget DECIMAL(15,2);
+ALTER TABLE book_members ADD COLUMN can_view_others BOOLEAN DEFAULT FALSE;
+ALTER TABLE book_members ADD COLUMN approval_threshold DECIMAL(15,2);  -- 超过此金额需审批
+ALTER TABLE book_members ADD COLUMN color VARCHAR(20);  -- 成员标识颜色
+
+-- 审批记录表
+CREATE TABLE transaction_approvals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    transaction_id UUID REFERENCES transactions(id),
+    requester_id UUID REFERENCES users(id),
+    approver_id UUID REFERENCES users(id),
+    status INT DEFAULT 0,  -- 0:待审批 1:已批准 2:已拒绝
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    processed_at TIMESTAMP
+);
+```
+
+### 20.8 智能洞察与建议
+
+#### AI驱动的财务分析
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  💡 智能洞察                                    本周 (3条)       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ⚠️ 消费异常                                                     │
+│  ───────────────────────────────────────────────────────────────│
+│  本周外卖支出 ¥380，比上周增加 65%。                              │
+│  建议: 尝试减少外卖频次，每周省下 ¥150 可用于储蓄。                │
+│                                                  [查看详情]      │
+│                                                                  │
+│  📊 消费趋势                                                     │
+│  ───────────────────────────────────────────────────────────────│
+│  您的咖啡消费连续3个月上涨，本月已达 ¥420。                        │
+│  建议: 考虑购买咖啡机，预计6个月可回本。                           │
+│                                                  [设置预算]      │
+│                                                                  │
+│  🎯 目标进度                                                     │
+│  ───────────────────────────────────────────────────────────────│
+│  「年假旅行基金」进度落后于计划，建议本月增加存入 ¥300。            │
+│                                                  [调整计划]      │
+│                                                                  │
+│  💰 省钱机会                                                     │
+│  ───────────────────────────────────────────────────────────────│
+│  发现您有3个视频会员订阅（爱奇艺、优酷、腾讯），                    │
+│  合并为一个可每月节省 ¥35。                                       │
+│                                                  [查看订阅]      │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 预算预警
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🔔 预算预警                                                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🔴 已超支                                                       │
+│     └── 🍔 外出就餐   ¥650 / ¥500   超支 ¥150                   │
+│                                                                  │
+│  🟡 即将用完 (>80%)                                              │
+│     ├── ☕ 咖啡饮料   ¥178 / ¥200   剩余 ¥22                    │
+│     └── 🎮 娱乐      ¥425 / ¥500   剩余 ¥75                     │
+│                                                                  │
+│  🟢 进度正常                                                     │
+│     ├── 🛒 买菜做饭   ¥892 / ¥1500  剩余 ¥608                   │
+│     ├── 🚇 交通出行   ¥280 / ¥400   剩余 ¥120                   │
+│     └── 👕 服装购物   ¥0 / ¥300     剩余 ¥300                   │
+│                                                                  │
+│  ───────────────────────────────────────────────────────────────│
+│  💡 建议: 从「服装购物」调拨 ¥150 到「外出就餐」                   │
+│                                              [一键调拨]          │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 数据表设计
+
+```sql
+-- 智能洞察表
+CREATE TABLE financial_insights (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    insight_type INT NOT NULL,
+    -- 1:消费异常 2:趋势分析 3:目标提醒 4:省钱建议 5:预算预警
+    title VARCHAR(200) NOT NULL,
+    content TEXT NOT NULL,
+    data JSONB,  -- 相关数据
+    action_type VARCHAR(50),  -- 建议的操作类型
+    action_data JSONB,  -- 操作所需数据
+    priority INT DEFAULT 0,  -- 优先级
+    is_read BOOLEAN DEFAULT FALSE,
+    is_dismissed BOOLEAN DEFAULT FALSE,
+    valid_until TIMESTAMP,  -- 有效期
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 周期性分析报告
+CREATE TABLE periodic_reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    report_type INT NOT NULL,  -- 1:周报 2:月报 3:年报
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    summary JSONB NOT NULL,  -- 收支摘要
+    insights JSONB,  -- 洞察列表
+    comparisons JSONB,  -- 同比/环比
+    recommendations JSONB,  -- 建议列表
+    is_sent BOOLEAN DEFAULT FALSE,
+    sent_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### 20.9 周期性交易自动识别
+
+#### 功能说明
+AI自动识别重复出现的交易，提示用户设置为定期交易。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🔄 发现重复交易                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  我们发现以下交易可能是定期发生的:                                 │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ 🏋️ 乐刻健身                                                 ││
+│  │ 每月15日前后  |  ¥99  |  已出现 6 次                         ││
+│  │                                                             ││
+│  │ [设为定期交易]  [忽略]  [不再提醒]                            ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ ☕ 瑞幸咖啡                                                  ││
+│  │ 每周一至周五  |  ¥15-20  |  已出现 23 次                     ││
+│  │                                                             ││
+│  │ [设为定期交易]  [忽略]  [不再提醒]                            ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 数据表设计
+
+```sql
+-- 交易模式识别
+CREATE TABLE transaction_patterns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    pattern_type INT NOT NULL,  -- 1:固定周期 2:工作日 3:周末 4:月初/月末
+    merchant_name VARCHAR(200),
+    category_id UUID REFERENCES categories(id),
+    avg_amount DECIMAL(15,2),
+    amount_variance DECIMAL(15,2),  -- 金额波动范围
+    frequency_days INT,  -- 平均间隔天数
+    occurrence_count INT,  -- 出现次数
+    confidence DECIMAL(3,2),  -- 置信度
+    suggested_schedule JSONB,  -- 建议的定期设置
+    is_confirmed BOOLEAN DEFAULT FALSE,
+    is_dismissed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### 20.10 新增API列表
+
+```
+#### 零基预算模块
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/budgets/zero-based | 获取零基预算分配 |
+| POST | /api/v1/budgets/allocate | 分配预算到分类 |
+| POST | /api/v1/budgets/reallocate | 预算再分配 |
+| GET | /api/v1/budgets/unallocated | 获取待分配金额 |
+| GET | /api/v1/stats/money-age | 获取钱龄指标 |
+
+#### 目标追踪模块
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/goals | 获取目标列表 |
+| POST | /api/v1/goals | 创建目标 |
+| PUT | /api/v1/goals/{id} | 更新目标 |
+| DELETE | /api/v1/goals/{id} | 删除目标 |
+| POST | /api/v1/goals/{id}/contribute | 向目标存入资金 |
+| GET | /api/v1/goals/{id}/progress | 获取目标进度 |
+
+#### 债务管理模块
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/debts | 获取债务列表 |
+| POST | /api/v1/debts | 添加债务 |
+| PUT | /api/v1/debts/{id} | 更新债务 |
+| POST | /api/v1/debts/simulate | 还款模拟 |
+| GET | /api/v1/debts/payoff-plans | 获取还款计划 |
+| POST | /api/v1/debts/payoff-plans | 创建还款计划 |
+
+#### 订阅管理模块
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/subscriptions | 获取订阅列表 |
+| POST | /api/v1/subscriptions | 添加订阅 |
+| PUT | /api/v1/subscriptions/{id} | 更新订阅 |
+| DELETE | /api/v1/subscriptions/{id} | 删除订阅 |
+| GET | /api/v1/subscriptions/upcoming | 获取即将扣款的订阅 |
+| GET | /api/v1/subscriptions/price-changes | 获取价格变动 |
+
+#### 账单提醒模块
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/bill-reminders | 获取账单提醒列表 |
+| POST | /api/v1/bill-reminders | 创建账单提醒 |
+| PUT | /api/v1/bill-reminders/{id} | 更新账单提醒 |
+| POST | /api/v1/bill-reminders/{id}/mark-paid | 标记已支付 |
+
+#### 净资产模块
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/net-worth | 获取净资产概览 |
+| GET | /api/v1/net-worth/history | 获取净资产历史 |
+| POST | /api/v1/assets/{id}/valuate | 更新资产估值 |
+
+#### 智能洞察模块
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/insights | 获取智能洞察 |
+| POST | /api/v1/insights/{id}/dismiss | 忽略洞察 |
+| POST | /api/v1/insights/{id}/action | 执行建议操作 |
+| GET | /api/v1/reports/weekly | 获取周报 |
+| GET | /api/v1/reports/monthly | 获取月报 |
+
+#### 交易拆分模块
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /api/v1/transactions/{id}/split | 拆分交易 |
+| PUT | /api/v1/transactions/{id}/splits | 更新拆分 |
+| DELETE | /api/v1/transactions/{id}/splits | 取消拆分 |
+
+#### 家庭共享模块
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/family/overview | 获取家庭总览 |
+| GET | /api/v1/family/members | 获取成员列表及消费 |
+| PUT | /api/v1/family/members/{id}/budget | 设置成员预算 |
+| GET | /api/v1/family/approvals | 获取待审批列表 |
+| POST | /api/v1/family/approvals/{id}/approve | 审批通过 |
+| POST | /api/v1/family/approvals/{id}/reject | 审批拒绝 |
+```
+
+### 20.11 功能对比总结
+
+| 功能 | Mint | YNAB | 本应用 |
+|------|:----:|:----:|:------:|
+| 账户同步 | ✓ | ✓ | ✓ (手动/AI识别) |
+| 自动分类 | ✓ | ✓ | ✓ (AI增强) |
+| 预算管理 | ✓ | ✓ | ✓ |
+| 零基预算 | ✗ | ✓ | ✓ |
+| 目标追踪 | ✓ | ✓ | ✓ |
+| 债务规划 | ✗ | ✓ | ✓ |
+| 订阅管理 | ✓ | ✗ | ✓ |
+| 账单提醒 | ✓ | ✗ | ✓ |
+| 信用分数 | ✓ | ✗ | ✗ (国内无此服务) |
+| 净资产追踪 | ✓ | ✓ | ✓ |
+| 交易拆分 | ✗ | ✓ | ✓ |
+| 家庭共享 | ✗ | ✓ | ✓ |
+| 智能洞察 | ✓ | ✗ | ✓ (AI增强) |
+| 图片识别 | ✗ | ✗ | ✓ |
+| 语音记账 | ✗ | ✗ | ✓ |
+| 邮件解析 | ✗ | ✗ | ✓ |
+| 离线模式 | ✗ | ✗ | ✓ |
+| 多语言 | ✗ | ✓ | ✓ |
+| 多货币 | ✗ | ✓ | ✓ |
+
+---
+
 以上是AI智能记账应用的完整架构设计，包含了所有确认的功能需求。如有需要调整的地方请提出。
