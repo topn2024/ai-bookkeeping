@@ -1497,7 +1497,422 @@ CELERYBEAT_SCHEDULE = {
 
 ---
 
-## 十八、开发计划（更新版）
+## 十八、扩展性架构设计
+
+### 18.1 容量规划目标
+
+| 阶段 | DAU | 注册用户 | 日记账量 | 并发请求 | 数据增长/月 |
+|------|-----|----------|----------|----------|-------------|
+| **初期** | 1,000 | 5,000 | 5,000条 | 50 QPS | 500MB |
+| **中期** | 10,000 | 50,000 | 50,000条 | 500 QPS | 5GB |
+| **远期** | 100,000 | 500,000 | 500,000条 | 5,000 QPS | 50GB |
+
+### 18.2 三阶段架构演进
+
+#### 阶段一：单机架构 (1,000 DAU)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     云服务器 (单机)                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │   Nginx     │  │   FastAPI   │  │   Celery    │         │
+│  │  (反向代理) │  │  (2 workers)│  │  (1 worker) │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │ PostgreSQL  │  │    Redis    │  │   MinIO     │         │
+│  │  (单实例)   │  │  (单实例)   │  │  (本地存储) │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**服务器配置（阿里云）：**
+| 资源 | 配置 | 月费用 |
+|------|------|--------|
+| ECS | 2核4G | ¥150 |
+| 云盘 | 100GB SSD | ¥40 |
+| 带宽 | 5Mbps | ¥100 |
+| **合计** | | **¥290/月** |
+
+**性能指标：**
+- API响应时间: < 200ms (P95)
+- 支持并发: 50-100 QPS
+- 数据库连接数: 20
+
+---
+
+#### 阶段二：分离架构 (10,000 DAU)
+
+```
+                        ┌─────────────┐
+                        │     SLB     │
+                        │  (负载均衡) │
+                        └──────┬──────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+     ┌────────▼────────┐ ┌────▼────┐ ┌────────▼────────┐
+     │   API Server 1  │ │   ...   │ │   API Server 2  │
+     │   (2核4G)       │ │         │ │   (2核4G)       │
+     └────────┬────────┘ └────┬────┘ └────────┬────────┘
+              │               │               │
+              └───────────────┼───────────────┘
+                              │
+       ┌──────────────────────┼──────────────────────┐
+       │                      │                      │
+┌──────▼──────┐       ┌───────▼───────┐      ┌──────▼──────┐
+│  PostgreSQL │       │     Redis     │      │     OSS     │
+│   (2核4G)   │       │    (1核2G)    │      │  (对象存储) │
+│   主从复制   │       │    单实例     │      │             │
+└─────────────┘       └───────────────┘      └─────────────┘
+```
+
+**服务器配置（阿里云）：**
+| 资源 | 配置 | 数量 | 月费用 |
+|------|------|------|--------|
+| SLB | 标准型 | 1 | ¥50 |
+| ECS (API) | 2核4G | 2 | ¥300 |
+| RDS PostgreSQL | 2核4G | 1 | ¥400 |
+| Redis | 1核2G | 1 | ¥150 |
+| OSS | 100GB | 1 | ¥20 |
+| 带宽 | 10Mbps | 1 | ¥200 |
+| **合计** | | | **¥1,120/月** |
+
+**性能指标：**
+- API响应时间: < 150ms (P95)
+- 支持并发: 300-500 QPS
+- 数据库连接池: 50
+- 读写分离支持
+
+**升级路径（从阶段一）：**
+1. 数据库迁移到RDS（约2小时停机）
+2. 部署第二台API服务器
+3. 配置SLB负载均衡
+4. 文件存储迁移到OSS
+5. **预计升级成本**: ¥0（平滑迁移）
+6. **预计升级时间**: 1天
+
+---
+
+#### 阶段三：集群架构 (100,000 DAU)
+
+```
+                           ┌─────────────┐
+                           │     CDN     │
+                           │  (静态资源) │
+                           └──────┬──────┘
+                                  │
+                           ┌──────▼──────┐
+                           │     SLB     │
+                           │ (负载均衡)  │
+                           └──────┬──────┘
+                                  │
+        ┌─────────────────────────┼─────────────────────────┐
+        │                         │                         │
+┌───────▼───────┐         ┌───────▼───────┐         ┌───────▼───────┐
+│  API Pod x N  │         │  API Pod x N  │         │  API Pod x N  │
+│  (K8s集群)    │         │  (K8s集群)    │         │  (K8s集群)    │
+└───────┬───────┘         └───────┬───────┘         └───────┬───────┘
+        │                         │                         │
+        └─────────────────────────┼─────────────────────────┘
+                                  │
+    ┌─────────────────────────────┼─────────────────────────────┐
+    │                             │                             │
+┌───▼───┐                   ┌─────▼─────┐                 ┌─────▼─────┐
+│ PG主库 │◄──── 同步复制 ───►│  PG从库   │                 │  PG从库   │
+│(4核16G)│                   │ (4核8G)   │                 │ (4核8G)   │
+└───┬───┘                   └───────────┘                 └───────────┘
+    │
+    │  ┌─────────────────────────────────────────────────────────────┐
+    │  │                     Redis Cluster                           │
+    │  │   ┌─────────┐   ┌─────────┐   ┌─────────┐                  │
+    └──┼──►│ Master1 │   │ Master2 │   │ Master3 │                  │
+       │   │ Slave1  │   │ Slave2  │   │ Slave3  │                  │
+       │   └─────────┘   └─────────┘   └─────────┘                  │
+       └─────────────────────────────────────────────────────────────┘
+```
+
+**服务器配置（阿里云）：**
+| 资源 | 配置 | 数量 | 月费用 |
+|------|------|------|--------|
+| ACK集群 | 4核8G节点 | 4 | ¥2,400 |
+| SLB | 高性能型 | 1 | ¥200 |
+| RDS PostgreSQL | 4核16G主 + 4核8G从x2 | 3 | ¥2,500 |
+| Redis集群 | 4G集群版 | 1 | ¥800 |
+| OSS | 1TB + CDN | 1 | ¥300 |
+| 带宽 | 50Mbps | 1 | ¥1,000 |
+| 日志服务 | SLS | 1 | ¥200 |
+| **合计** | | | **¥7,400/月** |
+
+**性能指标：**
+- API响应时间: < 100ms (P95)
+- 支持并发: 3,000-5,000 QPS
+- 数据库连接池: 200
+- 自动扩缩容支持
+
+---
+
+### 18.3 数据库扩展策略
+
+#### 分表策略（10万DAU时启用）
+
+```sql
+-- 账目表按用户ID哈希分表
+-- transactions_0, transactions_1, ... transactions_15 (16张表)
+
+-- 分表路由函数
+CREATE OR REPLACE FUNCTION get_transaction_table(user_id UUID)
+RETURNS TEXT AS $$
+BEGIN
+    RETURN 'transactions_' || (hashtext(user_id::text) & 15)::text;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+#### 读写分离配置
+
+```python
+# SQLAlchemy读写分离
+DATABASES = {
+    'default': {
+        'write': 'postgresql://master:5432/bookkeeping',
+        'read': [
+            'postgresql://slave1:5432/bookkeeping',
+            'postgresql://slave2:5432/bookkeeping',
+        ]
+    }
+}
+
+class RoutingSession:
+    def get_bind(self, mapper=None, clause=None):
+        if self._flushing:
+            return engines['write']
+        return random.choice(engines['read'])
+```
+
+#### 热数据分离
+
+```sql
+-- 热数据表（最近3个月）
+CREATE TABLE transactions_hot (
+    LIKE transactions INCLUDING ALL
+);
+
+-- 冷数据表（3个月前）
+CREATE TABLE transactions_cold (
+    LIKE transactions INCLUDING ALL
+);
+
+-- 定时迁移任务（每日凌晨执行）
+-- 将3个月前的数据从hot迁移到cold
+```
+
+---
+
+### 18.4 缓存策略
+
+#### 多级缓存架构
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  本地缓存   │ ──► │   Redis     │ ──► │  数据库     │
+│  (LRU 1min) │     │  (TTL 5min) │     │             │
+└─────────────┘     └─────────────┘     └─────────────┘
+```
+
+#### 缓存键设计
+
+```python
+CACHE_KEYS = {
+    # 用户信息 (TTL: 30分钟)
+    'user:{user_id}': 'user_info',
+
+    # 用户账本列表 (TTL: 10分钟)
+    'user:{user_id}:books': 'book_list',
+
+    # 月度统计 (TTL: 5分钟)
+    'stats:{user_id}:{book_id}:{year}:{month}': 'monthly_stats',
+
+    # 分类列表 (TTL: 1小时)
+    'categories:{user_id}': 'category_list',
+
+    # 汇率 (TTL: 1小时)
+    'exchange_rate:{from}:{to}:{date}': 'rate',
+}
+```
+
+#### 缓存更新策略
+
+```python
+class CacheManager:
+    # 写后失效模式
+    async def invalidate_on_write(self, user_id: str, entity: str):
+        patterns = {
+            'transaction': [
+                f'stats:{user_id}:*',
+                f'user:{user_id}:recent_transactions',
+            ],
+            'account': [
+                f'user:{user_id}:accounts',
+                f'account:{user_id}:*',
+            ],
+        }
+        for pattern in patterns.get(entity, []):
+            await self.redis.delete_pattern(pattern)
+```
+
+---
+
+### 18.5 API性能优化
+
+#### 接口限流配置
+
+```python
+from fastapi_limiter import RateLimiter
+
+# 限流规则
+RATE_LIMITS = {
+    # 普通接口: 100次/分钟
+    'default': '100/minute',
+
+    # AI接口: 10次/分钟 (免费用户) / 60次/分钟 (VIP)
+    'ai_ocr': {'free': '10/minute', 'vip': '60/minute'},
+    'ai_voice': {'free': '20/minute', 'vip': '120/minute'},
+
+    # 登录接口: 5次/分钟 (防暴力破解)
+    'auth_login': '5/minute',
+
+    # 导出接口: 5次/小时
+    'export': '5/hour',
+}
+```
+
+#### 批量接口优化
+
+```python
+# 批量创建账目 (减少网络往返)
+@router.post("/transactions/batch")
+async def batch_create_transactions(
+    transactions: List[TransactionCreate],  # 最多50条
+    db: AsyncSession = Depends(get_db)
+):
+    # 使用批量插入
+    await db.execute(
+        insert(Transaction),
+        [t.dict() for t in transactions]
+    )
+```
+
+#### 响应压缩
+
+```python
+from fastapi.middleware.gzip import GZipMiddleware
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+```
+
+---
+
+### 18.6 监控与告警
+
+#### 监控指标
+
+```yaml
+# Prometheus 监控配置
+metrics:
+  # 应用层
+  - api_request_total          # 请求总数
+  - api_request_duration_seconds  # 响应时间
+  - api_error_total            # 错误数
+
+  # 数据库层
+  - db_connection_pool_size    # 连接池大小
+  - db_query_duration_seconds  # 查询时间
+
+  # 缓存层
+  - cache_hit_ratio            # 缓存命中率
+  - cache_memory_usage         # 内存使用
+
+  # 业务层
+  - active_users_daily         # 日活用户
+  - transactions_created_total # 记账数量
+  - ai_requests_total          # AI调用次数
+```
+
+#### 告警规则
+
+```yaml
+alerts:
+  # API响应时间 > 500ms
+  - alert: HighApiLatency
+    expr: api_request_duration_seconds{quantile="0.95"} > 0.5
+    for: 5m
+
+  # 错误率 > 1%
+  - alert: HighErrorRate
+    expr: rate(api_error_total[5m]) / rate(api_request_total[5m]) > 0.01
+    for: 5m
+
+  # 数据库连接池使用 > 80%
+  - alert: DbConnectionPoolHigh
+    expr: db_connection_pool_size / db_connection_pool_max > 0.8
+    for: 5m
+
+  # Redis内存使用 > 80%
+  - alert: RedisMemoryHigh
+    expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+    for: 5m
+```
+
+---
+
+### 18.7 成本对比总结
+
+| 阶段 | DAU | 月费用 | 单用户成本 | 升级成本 |
+|------|-----|--------|------------|----------|
+| 初期 | 1,000 | ¥290 | ¥0.29 | - |
+| 中期 | 10,000 | ¥1,120 | ¥0.11 | ¥0 |
+| 远期 | 100,000 | ¥7,400 | ¥0.07 | ¥0 |
+
+**关键设计原则：**
+1. **无状态API服务** - 支持水平扩展
+2. **数据库读写分离** - 扩展读性能
+3. **多级缓存** - 减少数据库压力
+4. **异步任务队列** - AI处理不阻塞主流程
+5. **平滑升级** - 每次升级停机时间 < 30分钟
+
+---
+
+### 18.8 技术选型对比
+
+#### 为什么选择单体架构而非微服务（初期）
+
+| 维度 | 单体架构 | 微服务架构 |
+|------|----------|------------|
+| 开发复杂度 | 低 | 高 |
+| 部署复杂度 | 低 | 高 |
+| 运维成本 | ¥290/月 | ¥2000+/月 |
+| 适合阶段 | < 5万DAU | > 10万DAU |
+| 团队规模 | 1-3人 | 5+人 |
+
+**结论：** 初期采用单体架构，当DAU超过5万且团队扩大后再考虑微服务拆分。
+
+#### 潜在的微服务拆分方案（远期）
+
+```
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│  用户服务   │  │  记账服务   │  │  统计服务   │
+│ user-svc   │  │ txn-svc    │  │ stats-svc  │
+└─────────────┘  └─────────────┘  └─────────────┘
+
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│  AI服务    │  │  通知服务   │  │  支付服务   │
+│  ai-svc    │  │ notify-svc │  │ payment-svc│
+└─────────────┘  └─────────────┘  └─────────────┘
+```
+
+---
+
+## 十九、开发计划（更新版）
 
 ### 第一阶段：基础功能 (MVP)
 - [ ] 用户认证（手机号+第三方登录）
