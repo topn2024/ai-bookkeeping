@@ -696,15 +696,846 @@ ai-bookkeeping-server/
 
 ---
 
-## 十二、待确认事项
+## 十二、第三方登录设计
 
-1. **用户体系**：是否需要支持微信/Apple登录？
-2. **货币支持**：是否需要多货币记账？
-3. **数据同步**：是否需要离线模式和本地数据？
-4. **推送通知**：是否需要记账提醒、账单提醒？
-5. **商业模式**：会员功能的具体权益是什么？
-6. **国际化**：是否需要多语言支持？
+### 12.1 支持的登录方式
+
+| 登录方式 | 平台 | 技术方案 |
+|----------|------|----------|
+| 微信登录 | iOS/Android | 微信开放平台SDK |
+| Apple登录 | iOS | Sign in with Apple |
+| 手机号登录 | 全平台 | 短信验证码 |
+| 邮箱登录 | 全平台 | 邮箱+密码 |
+
+### 12.2 微信登录流程
+
+```
+┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
+│  App端   │ ──▶ │ 微信授权  │ ──▶ │  后端    │ ──▶ │ 返回Token│
+│ 拉起微信  │     │ 获取code │     │ 换取信息  │     │ 登录成功  │
+└──────────┘     └──────────┘     └──────────┘     └──────────┘
+```
+
+### 12.3 Apple登录流程 (iOS)
+
+```
+┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
+│  App端   │ ──▶ │ Apple授权 │ ──▶ │  后端    │ ──▶ │ 返回Token│
+│ Face ID  │     │ 获取Token │     │ 验证JWT  │     │ 登录成功  │
+└──────────┘     └──────────┘     └──────────┘     └──────────┘
+```
+
+### 12.4 第三方账号绑定表
+
+```sql
+-- 第三方登录绑定表
+CREATE TABLE oauth_bindings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    provider VARCHAR(20) NOT NULL,      -- wechat, apple, google
+    provider_user_id VARCHAR(100) NOT NULL,
+    union_id VARCHAR(100),              -- 微信UnionID
+    access_token TEXT,
+    refresh_token TEXT,
+    expires_at TIMESTAMP,
+    raw_data JSONB,                     -- 原始返回数据
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(provider, provider_user_id)
+);
+```
 
 ---
 
-以上是AI智能记账应用的完整架构设计，请确认是否有需要调整的地方。
+## 十三、多货币系统设计
+
+### 13.1 货币支持
+
+支持全球主流货币，根据用户IP自动设置默认货币：
+
+| 货币代码 | 货币名称 | 符号 | 国家/地区 |
+|----------|----------|------|-----------|
+| CNY | 人民币 | ¥ | 中国大陆 |
+| USD | 美元 | $ | 美国 |
+| EUR | 欧元 | € | 欧盟 |
+| GBP | 英镑 | £ | 英国 |
+| JPY | 日元 | ¥ | 日本 |
+| HKD | 港币 | HK$ | 香港 |
+| TWD | 新台币 | NT$ | 台湾 |
+| SGD | 新加坡元 | S$ | 新加坡 |
+| AUD | 澳元 | A$ | 澳大利亚 |
+| CAD | 加元 | C$ | 加拿大 |
+| KRW | 韩元 | ₩ | 韩国 |
+| THB | 泰铢 | ฿ | 泰国 |
+| MYR | 马来西亚令吉 | RM | 马来西亚 |
+
+### 13.2 汇率管理
+
+```sql
+-- 货币表
+CREATE TABLE currencies (
+    code VARCHAR(3) PRIMARY KEY,        -- ISO 4217
+    name VARCHAR(50) NOT NULL,
+    name_en VARCHAR(50) NOT NULL,
+    symbol VARCHAR(10) NOT NULL,
+    decimal_places INT DEFAULT 2,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+-- 汇率表（每日更新）
+CREATE TABLE exchange_rates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    base_currency VARCHAR(3) DEFAULT 'USD',
+    target_currency VARCHAR(3) NOT NULL,
+    rate DECIMAL(20,10) NOT NULL,
+    rate_date DATE NOT NULL,
+    source VARCHAR(50),                 -- 数据来源
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(base_currency, target_currency, rate_date)
+);
+
+-- 用户货币设置
+ALTER TABLE users ADD COLUMN default_currency VARCHAR(3) DEFAULT 'CNY';
+ALTER TABLE users ADD COLUMN detected_country VARCHAR(2);  -- IP检测国家
+```
+
+### 13.3 账目货币扩展
+
+```sql
+-- 账目表添加货币字段
+ALTER TABLE transactions ADD COLUMN currency VARCHAR(3) DEFAULT 'CNY';
+ALTER TABLE transactions ADD COLUMN original_amount DECIMAL(15,2);      -- 原始金额
+ALTER TABLE transactions ADD COLUMN original_currency VARCHAR(3);        -- 原始货币
+ALTER TABLE transactions ADD COLUMN exchange_rate DECIMAL(20,10);       -- 转换汇率
+
+-- 账户表添加货币字段
+ALTER TABLE accounts ADD COLUMN currency VARCHAR(3) DEFAULT 'CNY';
+```
+
+### 13.4 货币转换逻辑
+
+```python
+# 货币转换服务
+class CurrencyService:
+    async def convert(
+        self,
+        amount: Decimal,
+        from_currency: str,
+        to_currency: str,
+        date: date = None
+    ) -> tuple[Decimal, Decimal]:
+        """
+        返回: (转换后金额, 汇率)
+        """
+        if from_currency == to_currency:
+            return amount, Decimal('1')
+
+        rate = await self.get_rate(from_currency, to_currency, date)
+        converted = amount * rate
+        return converted.quantize(Decimal('0.01')), rate
+
+    async def get_rate(self, from_curr: str, to_curr: str, date: date = None):
+        # 1. 优先从缓存获取
+        # 2. 从数据库获取
+        # 3. 调用汇率API更新
+        pass
+```
+
+### 13.5 IP地理位置检测
+
+```python
+# 登录/注册时检测用户所在国家
+async def detect_user_location(ip_address: str) -> dict:
+    """
+    使用 IP2Location 或 MaxMind GeoIP2 检测
+    返回: {country_code: 'CN', currency: 'CNY', language: 'zh-CN'}
+    """
+    # 推荐使用 MaxMind GeoLite2 (免费) 或 GeoIP2 (付费)
+    pass
+```
+
+---
+
+## 十四、离线模式设计
+
+### 14.1 离线架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Flutter App                             │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │                   Repository Layer                       │ │
+│  │  ┌──────────────┐         ┌──────────────┐              │ │
+│  │  │ Remote Source│ ◄─────► │ Local Source │              │ │
+│  │  │   (API)      │  Sync   │  (SQLite)    │              │ │
+│  │  └──────────────┘         └──────────────┘              │ │
+│  └─────────────────────────────────────────────────────────┘ │
+│                              │                               │
+│                     ┌────────▼────────┐                      │
+│                     │  Sync Manager   │                      │
+│                     │ (冲突解决/队列) │                      │
+│                     └─────────────────┘                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 14.2 本地数据库设计 (SQLite)
+
+```sql
+-- 离线操作队列
+CREATE TABLE sync_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    operation_type TEXT NOT NULL,       -- create, update, delete
+    entity_type TEXT NOT NULL,          -- transaction, account, category
+    entity_id TEXT NOT NULL,
+    payload TEXT NOT NULL,              -- JSON数据
+    created_at INTEGER NOT NULL,        -- Unix timestamp
+    retry_count INTEGER DEFAULT 0,
+    last_error TEXT,
+    status TEXT DEFAULT 'pending'       -- pending, syncing, synced, failed
+);
+
+-- 本地账目缓存
+CREATE TABLE local_transactions (
+    id TEXT PRIMARY KEY,
+    server_id TEXT,                     -- 服务器ID，新建时为NULL
+    data TEXT NOT NULL,                 -- JSON完整数据
+    is_synced INTEGER DEFAULT 0,
+    local_updated_at INTEGER NOT NULL,
+    server_updated_at INTEGER,
+    is_deleted INTEGER DEFAULT 0
+);
+
+-- 同步状态表
+CREATE TABLE sync_status (
+    entity_type TEXT PRIMARY KEY,
+    last_sync_at INTEGER,
+    last_server_timestamp INTEGER
+);
+```
+
+### 14.3 同步策略
+
+```dart
+class SyncManager {
+  // 同步优先级
+  static const syncOrder = [
+    'categories',    // 1. 先同步分类
+    'accounts',      // 2. 再同步账户
+    'transactions',  // 3. 最后同步账目
+  ];
+
+  // 冲突解决策略
+  ConflictResolution resolveConflict(LocalData local, ServerData server) {
+    // 策略1: 服务器优先 (默认)
+    // 策略2: 本地优先
+    // 策略3: 最新修改优先
+    // 策略4: 用户手动选择
+
+    if (server.updatedAt > local.localUpdatedAt) {
+      return ConflictResolution.useServer;
+    }
+    return ConflictResolution.useLocal;
+  }
+}
+```
+
+### 14.4 离线数据清理策略
+
+```dart
+class OfflineDataManager {
+  // 清理配置
+  static const config = {
+    'maxLocalDays': 90,           // 最多保留90天数据
+    'maxLocalSize': 100 * 1024 * 1024,  // 最大100MB
+    'cleanupThreshold': 80 * 1024 * 1024, // 80MB时开始清理
+    'keepRecentDays': 30,         // 始终保留最近30天
+  };
+
+  Future<void> cleanupIfNeeded() async {
+    final currentSize = await getLocalDataSize();
+
+    if (currentSize > config['cleanupThreshold']) {
+      // 1. 删除超过90天的已同步数据
+      await deleteOldSyncedData(config['maxLocalDays']);
+
+      // 2. 如果还超过阈值，压缩图片缓存
+      await compressImageCache();
+
+      // 3. 清理临时文件
+      await clearTempFiles();
+    }
+  }
+
+  // 定期清理任务 (每周一次)
+  void scheduleWeeklyCleanup() {
+    // 在WiFi环境下执行
+    // 在充电状态下执行
+    // 在App后台时执行
+  }
+}
+```
+
+### 14.5 存储空间管理界面
+
+```
+存储空间管理
+├── 总占用: 45.2 MB
+│   ├── 账目数据: 12.3 MB (3,240条)
+│   ├── 图片缓存: 28.5 MB (156张)
+│   └── 其他缓存: 4.4 MB
+├── 自动清理: 开启
+│   ├── 保留最近: 90天
+│   └── 最大空间: 100 MB
+└── [清理缓存] [导出数据]
+```
+
+---
+
+## 十五、会员系统设计
+
+### 15.1 会员等级
+
+| 等级 | 名称 | 价格 | 有效期 |
+|------|------|------|--------|
+| 0 | 免费用户 | 免费 | 永久 |
+| 1 | 月度会员 | ¥12/月 | 1个月 |
+| 2 | 年度会员 | ¥98/年 | 1年 |
+| 3 | 终身会员 | ¥298 | 永久 |
+
+### 15.2 功能权益对比
+
+| 功能 | 免费用户 | VIP会员 |
+|------|----------|---------|
+| **基础记账** | | |
+| 手动记账 | ✅ 无限 | ✅ 无限 |
+| 账本数量 | 2个 | ✅ 无限 |
+| 账户数量 | 5个 | ✅ 无限 |
+| 成员协作 | 2人 | ✅ 10人 |
+| **AI功能** | | |
+| 图片识别记账 | 5次/月 | ✅ 无限 |
+| 语音记账 | 10次/月 | ✅ 无限 |
+| 邮箱账单解析 | ❌ | ✅ |
+| 智能分类建议 | ❌ | ✅ |
+| **统计报表** | | |
+| 基础统计 | ✅ | ✅ |
+| 趋势分析 | 最近3月 | ✅ 全部 |
+| 分类占比 | ✅ | ✅ |
+| 年度报告 | ❌ | ✅ |
+| 自定义报表 | ❌ | ✅ |
+| **数据功能** | | |
+| 数据导出(CSV) | ❌ | ✅ |
+| 数据导出(Excel) | ❌ | ✅ |
+| 云端备份 | 手动/月 | ✅ 自动/日 |
+| 历史备份保留 | 1份 | ✅ 30份 |
+| **高级功能** | | |
+| 定时记账 | ❌ | ✅ |
+| 桌面小组件 | 基础 | ✅ 全部 |
+| 自定义分类图标 | ❌ | ✅ |
+| 主题皮肤 | 2款 | ✅ 全部 |
+| 去广告 | ❌ | ✅ |
+| **专属服务** | | |
+| 客服支持 | 工单 | ✅ 专属客服 |
+| 新功能优先体验 | ❌ | ✅ |
+
+### 15.3 会员数据表
+
+```sql
+-- 会员订单表
+CREATE TABLE member_orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    order_no VARCHAR(50) UNIQUE NOT NULL,
+    product_type INT NOT NULL,           -- 1:月度 2:年度 3:终身
+    amount DECIMAL(10,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'CNY',
+    payment_method VARCHAR(20),          -- wechat, alipay, apple
+    payment_status INT DEFAULT 0,        -- 0:待支付 1:已支付 2:已退款
+    paid_at TIMESTAMP,
+    expire_at TIMESTAMP,
+    transaction_id VARCHAR(100),         -- 第三方交易号
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 会员权益使用记录
+CREATE TABLE member_usage (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    feature_type VARCHAR(50) NOT NULL,   -- ocr, voice, export
+    usage_date DATE NOT NULL,
+    usage_count INT DEFAULT 1,
+    UNIQUE(user_id, feature_type, usage_date)
+);
+
+-- 用户表扩展
+ALTER TABLE users ADD COLUMN member_type INT DEFAULT 0;
+ALTER TABLE users ADD COLUMN member_start_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN member_expire_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN is_lifetime BOOLEAN DEFAULT FALSE;
+```
+
+### 15.4 会员功能限制检查
+
+```python
+class MembershipService:
+    # 免费用户限制
+    FREE_LIMITS = {
+        'max_books': 2,
+        'max_accounts': 5,
+        'max_members': 2,
+        'ocr_monthly': 5,
+        'voice_monthly': 10,
+        'trend_months': 3,
+    }
+
+    async def check_feature_access(
+        self,
+        user_id: str,
+        feature: str
+    ) -> tuple[bool, str]:
+        """
+        检查用户是否有权限使用某功能
+        返回: (是否允许, 提示消息)
+        """
+        user = await self.get_user(user_id)
+
+        if user.is_vip:
+            return True, ""
+
+        # 检查限制
+        if feature == 'ocr':
+            used = await self.get_monthly_usage(user_id, 'ocr')
+            if used >= self.FREE_LIMITS['ocr_monthly']:
+                return False, "本月免费识别次数已用完，升级VIP享无限次数"
+
+        return True, ""
+```
+
+### 15.5 促销活动支持
+
+```sql
+-- 优惠券表
+CREATE TABLE coupons (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(20) UNIQUE NOT NULL,
+    coupon_type INT NOT NULL,            -- 1:折扣 2:满减 3:免费时长
+    discount_value DECIMAL(10,2),        -- 折扣值或金额
+    min_amount DECIMAL(10,2),            -- 最低消费
+    applicable_products INT[],           -- 适用产品
+    total_count INT,                     -- 总数量
+    used_count INT DEFAULT 0,
+    start_at TIMESTAMP,
+    expire_at TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 用户优惠券
+CREATE TABLE user_coupons (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    coupon_id UUID REFERENCES coupons(id),
+    status INT DEFAULT 0,                -- 0:未使用 1:已使用 2:已过期
+    used_at TIMESTAMP,
+    order_id UUID,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+---
+
+## 十六、国际化(i18n)设计
+
+### 16.1 支持的语言
+
+| 语言代码 | 语言名称 | 默认地区 |
+|----------|----------|----------|
+| zh-CN | 简体中文 | 中国大陆 |
+| zh-TW | 繁体中文 | 台湾、香港、澳门 |
+| en-US | 英语 | 美国、英国、澳洲等 |
+| ja-JP | 日语 | 日本 |
+| ko-KR | 韩语 | 韩国 |
+| th-TH | 泰语 | 泰国 |
+| vi-VN | 越南语 | 越南 |
+| ms-MY | 马来语 | 马来西亚 |
+
+### 16.2 语言检测优先级
+
+```dart
+class LocaleManager {
+  Locale detectUserLocale(UserInfo? user, String? ipCountry) {
+    // 1. 用户手动设置的语言（最高优先级）
+    if (user?.preferredLanguage != null) {
+      return Locale(user!.preferredLanguage);
+    }
+
+    // 2. 根据IP检测的国家
+    if (ipCountry != null) {
+      return _countryToLocale(ipCountry);
+    }
+
+    // 3. 设备系统语言
+    final deviceLocale = Platform.localeName;
+    if (_supportedLocales.contains(deviceLocale)) {
+      return Locale(deviceLocale);
+    }
+
+    // 4. 默认中文
+    return const Locale('zh', 'CN');
+  }
+
+  static const _countryLocaleMap = {
+    'CN': 'zh-CN',
+    'TW': 'zh-TW',
+    'HK': 'zh-TW',
+    'US': 'en-US',
+    'GB': 'en-US',
+    'JP': 'ja-JP',
+    'KR': 'ko-KR',
+    'TH': 'th-TH',
+    // ...
+  };
+}
+```
+
+### 16.3 Flutter国际化实现
+
+```yaml
+# pubspec.yaml
+dependencies:
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.18.0
+
+flutter:
+  generate: true
+```
+
+```dart
+// lib/l10n/app_zh.arb
+{
+  "@@locale": "zh",
+  "appName": "智能记账",
+  "home": "首页",
+  "stats": "统计",
+  "bills": "账单",
+  "profile": "我的",
+  "expense": "支出",
+  "income": "收入",
+  "transfer": "转账",
+  "monthlyExpense": "本月支出",
+  "monthlyIncome": "本月收入",
+  "balance": "结余",
+  "budget": "预算",
+  "category": "分类",
+  "account": "账户",
+  "note": "备注",
+  "save": "保存",
+  "cancel": "取消",
+  "delete": "删除",
+  "edit": "编辑",
+  "settings": "设置",
+  "language": "语言",
+  "currency": "货币",
+  "theme": "主题",
+  "about": "关于",
+  "logout": "退出登录",
+  "upgradeToVip": "升级VIP",
+  "aiRecognition": "AI识别",
+  "voiceInput": "语音记账",
+  "scanReceipt": "扫描小票",
+
+  "categoryFood": "餐饮",
+  "categoryHousing": "住房",
+  "categoryEntertainment": "娱乐",
+  "categoryTransport": "交通",
+  "categoryShopping": "购物",
+  "categoryMedical": "医疗",
+  "categorySalary": "工资",
+  "categoryBonus": "奖金",
+
+  "freeUsageExhausted": "本月免费{feature}次数已用完",
+  "@freeUsageExhausted": {
+    "placeholders": {
+      "feature": {"type": "String"}
+    }
+  }
+}
+```
+
+```dart
+// lib/l10n/app_en.arb
+{
+  "@@locale": "en",
+  "appName": "AI Bookkeeping",
+  "home": "Home",
+  "stats": "Statistics",
+  "bills": "Bills",
+  "profile": "Profile",
+  "expense": "Expense",
+  "income": "Income",
+  "transfer": "Transfer",
+  "monthlyExpense": "Monthly Expense",
+  "monthlyIncome": "Monthly Income",
+  "balance": "Balance",
+  // ...
+}
+```
+
+### 16.4 后端多语言支持
+
+```python
+# 后端返回的错误消息也支持多语言
+class I18nMessages:
+    messages = {
+        'auth.invalid_password': {
+            'zh-CN': '密码错误',
+            'en-US': 'Invalid password',
+            'ja-JP': 'パスワードが間違っています',
+        },
+        'member.quota_exceeded': {
+            'zh-CN': '本月免费次数已用完，请升级VIP',
+            'en-US': 'Free quota exceeded, please upgrade to VIP',
+            'ja-JP': '今月の無料回数を超えました。VIPにアップグレードしてください',
+        },
+    }
+
+    @classmethod
+    def get(cls, key: str, locale: str = 'zh-CN') -> str:
+        return cls.messages.get(key, {}).get(locale, key)
+```
+
+### 16.5 用户语言设置
+
+```sql
+-- 用户表添加语言设置
+ALTER TABLE users ADD COLUMN preferred_language VARCHAR(10);
+ALTER TABLE users ADD COLUMN detected_language VARCHAR(10);  -- IP检测语言
+```
+
+---
+
+## 十七、数据备份系统设计
+
+### 17.1 备份策略
+
+| 用户类型 | 自动备份频率 | 保留份数 | 手动备份 |
+|----------|--------------|----------|----------|
+| 免费用户 | 每月1次 | 1份 | ✅ |
+| VIP会员 | 每日1次 | 30份 | ✅ 无限 |
+
+### 17.2 备份数据表
+
+```sql
+-- 用户备份记录表
+CREATE TABLE user_backups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    backup_type INT NOT NULL,            -- 1:自动 2:手动
+    backup_size BIGINT NOT NULL,         -- 字节数
+    file_path VARCHAR(500) NOT NULL,     -- OSS路径
+    file_hash VARCHAR(64),               -- SHA256校验
+    data_summary JSONB,                  -- 数据摘要
+    status INT DEFAULT 0,                -- 0:进行中 1:成功 2:失败
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP                 -- 过期时间
+);
+
+-- 数据摘要示例
+-- {
+--   "transactions_count": 1234,
+--   "accounts_count": 5,
+--   "books_count": 2,
+--   "categories_count": 30,
+--   "date_range": {"from": "2024-01-01", "to": "2024-12-27"},
+--   "total_expense": 50000.00,
+--   "total_income": 80000.00
+-- }
+```
+
+### 17.3 备份内容
+
+```json
+{
+  "version": "1.0",
+  "created_at": "2024-12-27T10:00:00Z",
+  "user_id": "xxx",
+  "data": {
+    "user_settings": {
+      "default_currency": "CNY",
+      "preferred_language": "zh-CN",
+      "theme": "light"
+    },
+    "books": [...],
+    "accounts": [...],
+    "categories": [...],
+    "transactions": [...],
+    "budgets": [...],
+    "scheduled_transactions": [...]
+  }
+}
+```
+
+### 17.4 备份服务实现
+
+```python
+class BackupService:
+    async def create_backup(self, user_id: str, backup_type: int = 1) -> str:
+        """创建用户数据备份"""
+
+        # 1. 收集用户所有数据
+        data = await self._collect_user_data(user_id)
+
+        # 2. 序列化为JSON
+        json_data = json.dumps(data, ensure_ascii=False, default=str)
+
+        # 3. 压缩
+        compressed = gzip.compress(json_data.encode('utf-8'))
+
+        # 4. 加密（使用用户专属密钥）
+        encrypted = await self._encrypt_data(compressed, user_id)
+
+        # 5. 上传到OSS
+        file_path = f"backups/{user_id}/{datetime.now().strftime('%Y%m%d_%H%M%S')}.backup"
+        await self.oss.upload(file_path, encrypted)
+
+        # 6. 记录备份信息
+        backup_record = await self._save_backup_record(
+            user_id=user_id,
+            backup_type=backup_type,
+            file_path=file_path,
+            backup_size=len(encrypted),
+            data_summary=self._generate_summary(data)
+        )
+
+        # 7. 清理过期备份
+        await self._cleanup_old_backups(user_id)
+
+        return backup_record.id
+
+    async def restore_backup(self, user_id: str, backup_id: str):
+        """恢复用户数据"""
+
+        # 1. 获取备份文件
+        backup = await self.get_backup(backup_id)
+        encrypted = await self.oss.download(backup.file_path)
+
+        # 2. 解密
+        compressed = await self._decrypt_data(encrypted, user_id)
+
+        # 3. 解压
+        json_data = gzip.decompress(compressed).decode('utf-8')
+        data = json.loads(json_data)
+
+        # 4. 恢复数据（事务处理）
+        async with self.db.transaction():
+            # 清空现有数据
+            await self._clear_user_data(user_id)
+            # 导入备份数据
+            await self._import_data(user_id, data)
+
+        return True
+
+    async def _cleanup_old_backups(self, user_id: str):
+        """清理过期备份"""
+        user = await self.get_user(user_id)
+        keep_count = 30 if user.is_vip else 1
+
+        # 获取所有备份，按时间倒序
+        backups = await self.get_user_backups(user_id, order_by='-created_at')
+
+        # 删除超出保留数量的备份
+        for backup in backups[keep_count:]:
+            await self.oss.delete(backup.file_path)
+            await backup.delete()
+```
+
+### 17.5 定时备份任务
+
+```python
+# Celery定时任务
+@celery.task
+def scheduled_backup():
+    """每日凌晨3点执行"""
+
+    # VIP用户每日备份
+    vip_users = User.query.filter(User.is_vip == True).all()
+    for user in vip_users:
+        create_backup.delay(user.id, backup_type=1)
+
+    # 免费用户每月1号备份
+    if datetime.now().day == 1:
+        free_users = User.query.filter(User.is_vip == False).all()
+        for user in free_users:
+            create_backup.delay(user.id, backup_type=1)
+
+# Celery Beat配置
+CELERYBEAT_SCHEDULE = {
+    'daily-backup': {
+        'task': 'tasks.scheduled_backup',
+        'schedule': crontab(hour=3, minute=0),
+    },
+}
+```
+
+### 17.6 备份管理界面
+
+```
+数据备份
+├── 最近备份: 2024-12-27 03:00
+├── 备份大小: 2.3 MB
+├── 数据概要:
+│   ├── 账目: 3,240条
+│   ├── 账本: 2个
+│   └── 时间范围: 2024-01 ~ 2024-12
+├── 历史备份 (VIP: 30份 / 免费: 1份)
+│   ├── 2024-12-27 03:00 - 2.3 MB [恢复] [下载] [删除]
+│   ├── 2024-12-26 03:00 - 2.2 MB [恢复] [下载] [删除]
+│   └── ...
+└── [立即备份] [导出到本地]
+```
+
+---
+
+## 十八、开发计划（更新版）
+
+### 第一阶段：基础功能 (MVP)
+- [ ] 用户认证（手机号+第三方登录）
+- [ ] 手动记账（支出/收入/转账）
+- [ ] 基础分类管理
+- [ ] 账目列表和详情
+- [ ] 简单统计（本月收支）
+- [ ] 多语言基础框架
+- [ ] 离线模式基础支持
+
+### 第二阶段：核心功能
+- [ ] 多账本支持
+- [ ] 账户管理
+- [ ] 完整统计报表
+- [ ] 预算功能
+- [ ] 多货币支持
+- [ ] 数据导出
+- [ ] 数据备份
+
+### 第三阶段：AI功能
+- [ ] 图片识别记账
+- [ ] 语音记账
+- [ ] 邮箱账单解析
+- [ ] 智能分类建议
+
+### 第四阶段：高级功能
+- [ ] 多成员协作
+- [ ] 定时记账
+- [ ] 桌面小组件
+- [ ] 会员系统
+- [ ] 支付集成
+
+### 第五阶段：优化迭代
+- [ ] 性能优化
+- [ ] 更多语言支持
+- [ ] 更多货币支持
+- [ ] 高级报表功能
+
+---
+
+以上是AI智能记账应用的完整架构设计，包含了所有确认的功能需求。如有需要调整的地方请提出。
