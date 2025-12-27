@@ -566,44 +566,66 @@ ai-bookkeeping-server/
 
 ## 八、部署架构
 
+> **设计原则**：遵循"极简设计"和"演进式架构"原则，初期不引入K8s等复杂技术，随业务增长逐步升级。
+
 ### 8.1 开发环境
 - 本地开发使用Docker Compose
 - 热重载支持
+- 统一开发环境配置
 
-### 8.2 生产环境
+### 8.2 生产环境（按DAU阶段部署）
 
+#### 阶段一：1,000 DAU - 单机部署
 ```
-                           ┌─────────────────┐
-                           │   CDN (静态)    │
-                           └────────┬────────┘
-                                    │
-                           ┌────────▼────────┐
-                           │  负载均衡 (SLB) │
-                           └────────┬────────┘
-                                    │
-              ┌─────────────────────┼─────────────────────┐
-              │                     │                     │
-     ┌────────▼────────┐   ┌────────▼────────┐   ┌────────▼────────┐
-     │   API Server 1  │   │   API Server 2  │   │   API Server N  │
-     │   (K8s Pod)     │   │   (K8s Pod)     │   │   (K8s Pod)     │
-     └────────┬────────┘   └────────┬────────┘   └────────┬────────┘
-              │                     │                     │
-              └─────────────────────┼─────────────────────┘
-                                    │
-     ┌──────────────────────────────┼──────────────────────────────┐
-     │                              │                              │
-┌────▼────┐                   ┌─────▼─────┐                  ┌─────▼─────┐
-│PostgreSQL│                   │   Redis   │                  │   MinIO   │
-│ (RDS)   │                   │  Cluster  │                  │   (OSS)   │
-└─────────┘                   └───────────┘                  └───────────┘
+┌─────────────────────────────────────────────────────────┐
+│              云服务器 (2核4G ECS)                         │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐    │
+│  │  Nginx  │  │ FastAPI │  │ Celery  │  │ Cron    │    │
+│  │(反向代理)│  │(2 workers)│ │(1 worker)│ │(定时任务)│    │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘    │
+│  ┌─────────┐  ┌─────────┐                              │
+│  │PostgreSQL│ │  Redis  │   本地存储：100GB SSD         │
+│  └─────────┘  └─────────┘                              │
+└─────────────────────────────────────────────────────────┘
+月成本：约 ¥300
 ```
 
-### 8.3 推荐云服务
-- **服务器**：阿里云ECS / AWS EC2
-- **数据库**：阿里云RDS PostgreSQL
-- **缓存**：阿里云Redis
-- **存储**：阿里云OSS
-- **容器**：阿里云ACK (Kubernetes)
+#### 阶段二：10,000 DAU - 双节点+主从
+```
+                        ┌─────────────┐
+                        │     SLB     │
+                        └──────┬──────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+     ┌────────▼────────┐      │       ┌────────▼────────┐
+     │  API Server 1   │      │       │  API Server 2   │
+     │   (2核4G ECS)   │      │       │   (2核4G ECS)   │
+     └────────┬────────┘      │       └────────┬────────┘
+              │               │                │
+              └───────────────┼────────────────┘
+                              │
+       ┌──────────────────────┼──────────────────────┐
+       │                      │                      │
+┌──────▼──────┐       ┌───────▼───────┐       ┌──────▼──────┐
+│ PostgreSQL  │       │     Redis     │       │     OSS     │
+│  RDS主从    │       │   (1核2G)     │       │  对象存储    │
+│  (2核4G)    │       │               │       │             │
+└─────────────┘       └───────────────┘       └─────────────┘
+月成本：约 ¥1,200
+```
+
+#### 阶段三：100,000 DAU - 集群架构
+- 详见第十八节"扩展性架构设计"
+- 此阶段才考虑引入容器化(K8s)
+
+### 8.3 推荐云服务（按阶段）
+
+| 阶段 | 服务器 | 数据库 | 缓存 | 存储 |
+|------|--------|--------|------|------|
+| 1K DAU | 1×ECS 2核4G | 本地PostgreSQL | 本地Redis | 本地存储 |
+| 10K DAU | 2×ECS 2核4G | RDS主从2核4G | 云Redis 1核2G | OSS |
+| 100K DAU | 4×ECS或K8s | RDS主从4核8G | Redis集群 | OSS+CDN |
 
 ---
 
@@ -10178,4 +10200,768 @@ async def sign_agreement(
 
 ---
 
-以上是AI智能记账应用的完整架构设计，包含了所有确认的功能需求。如有需要调整的地方请提出。
+## 二十九、架构设计原则与高可用保障
+
+本节总结整体架构设计所遵循的核心原则，并补充高可用、数据一致性等关键设计。
+
+### 29.1 十大架构设计原则
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     架构设计原则总览                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1️⃣ 单一职责原则                                                │
+│     各模块只负责一个明确功能，不掺杂无关逻辑                       │
+│     ✅ 本架构已遵循：见第22节模块解耦设计                         │
+│                                                                  │
+│  2️⃣ 高可用优先原则                                              │
+│     目标 SLA: 99.9%（每月故障时间 < 43分钟）                      │
+│     策略：冗余部署、故障切换、降级熔断、数据多副本                 │
+│                                                                  │
+│  3️⃣ 分层架构原则                                                │
+│     API层 → Service层 → Repository层 → Infrastructure层          │
+│     ✅ 本架构已遵循：见第22节分层架构图                           │
+│                                                                  │
+│  4️⃣ 性能与成本平衡原则                                          │
+│     优先非资源型优化（索引、缓存、异步），再考虑资源扩容           │
+│     ✅ 本架构已遵循：见第26节性能优化设计                         │
+│                                                                  │
+│  5️⃣ 可扩展性原则                                                │
+│     支持功能扩展（新增模块）和规模扩展（水平扩容）                 │
+│     ✅ 本架构已遵循：见第18节三阶段架构演进                       │
+│                                                                  │
+│  6️⃣ 数据一致性原则                                              │
+│     事务控制、Cache-Aside策略、分布式锁                           │
+│     📌 本节补充详细设计                                          │
+│                                                                  │
+│  7️⃣ 极简设计原则                                                │
+│     够用就好，不引入当前用不上的复杂技术                           │
+│     ✅ 本架构已修正：10K DAU不使用K8s                             │
+│                                                                  │
+│  8️⃣ 可观测性原则                                                │
+│     监控、日志、链路追踪，主动预警而非被动救火                     │
+│     ✅ 本架构已遵循：见第18A/18B节日志与监控设计                  │
+│                                                                  │
+│  9️⃣ 安全性原则                                                  │
+│     数据加密、权限控制、接口防护                                  │
+│     ✅ 本架构已遵循：见第27节安全与隐私设计                       │
+│                                                                  │
+│  🔟 演进式架构原则                                               │
+│     随业务发展逐步迭代，避免一步到位的"完美架构"                   │
+│     ✅ 本架构已遵循：1K→10K→100K DAU渐进升级                     │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 29.2 SLA与可用性目标
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     可用性目标定义                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  📊 SLA目标                                                      │
+│  ├── 初期 (1K DAU): 99.5% (月故障 < 3.6小时)                     │
+│  ├── 中期 (10K DAU): 99.9% (月故障 < 43分钟)                     │
+│  └── 远期 (100K DAU): 99.95% (月故障 < 22分钟)                   │
+│                                                                  │
+│  ⏱️ 响应时间目标 (P95)                                          │
+│  ├── 核心API（记账、查询）: < 200ms                              │
+│  ├── AI识别接口: < 3s                                           │
+│  ├── 报表统计: < 500ms                                          │
+│  └── 页面加载: < 1s                                             │
+│                                                                  │
+│  💾 数据目标                                                     │
+│  ├── 数据持久性: 99.999999999% (11个9)                          │
+│  ├── RPO (恢复点目标): < 1小时                                  │
+│  └── RTO (恢复时间目标): < 4小时                                │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 29.3 高可用设计
+
+#### 29.3.1 幂等性设计
+
+```python
+from functools import wraps
+import hashlib
+import json
+
+class IdempotencyService:
+    """
+    幂等性服务 - 防止重复提交导致数据错误
+    关键接口：账单创建、支付回调、转账等
+    """
+
+    def __init__(self, redis: Redis):
+        self.redis = redis
+        self.default_ttl = 3600 * 24  # 24小时
+
+    async def get_idempotency_key(self, user_id: str, request_data: dict) -> str:
+        """生成幂等键"""
+        content = f"{user_id}:{json.dumps(request_data, sort_keys=True)}"
+        return f"idempotent:{hashlib.md5(content.encode()).hexdigest()}"
+
+    async def check_and_set(self, key: str, result: dict = None) -> tuple[bool, dict]:
+        """
+        检查幂等性
+        返回: (is_duplicate, cached_result)
+        """
+        cached = await self.redis.get(key)
+        if cached:
+            return True, json.loads(cached)
+
+        # 设置处理中标记，防止并发
+        if not await self.redis.setnx(f"{key}:processing", "1"):
+            # 已有请求在处理中，等待结果
+            await asyncio.sleep(0.5)
+            cached = await self.redis.get(key)
+            if cached:
+                return True, json.loads(cached)
+            raise ConcurrentRequestError("请求处理中，请稍后重试")
+
+        await self.redis.expire(f"{key}:processing", 30)
+        return False, None
+
+    async def set_result(self, key: str, result: dict):
+        """保存处理结果"""
+        await self.redis.setex(key, self.default_ttl, json.dumps(result))
+        await self.redis.delete(f"{key}:processing")
+
+
+# 幂等性装饰器
+def idempotent(key_fields: list[str] = None):
+    """
+    幂等性装饰器
+    @idempotent(key_fields=['amount', 'category_id', 'transaction_date'])
+    """
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            request = kwargs.get('request')
+            current_user = kwargs.get('current_user')
+            data = kwargs.get('data')
+
+            # 构建幂等键
+            if key_fields:
+                key_data = {k: getattr(data, k, None) for k in key_fields}
+            else:
+                key_data = data.dict() if hasattr(data, 'dict') else data
+
+            idempotency_svc = get_idempotency_service()
+            key = await idempotency_svc.get_idempotency_key(
+                str(current_user.id), key_data
+            )
+
+            # 检查是否重复请求
+            is_duplicate, cached_result = await idempotency_svc.check_and_set(key)
+            if is_duplicate:
+                return cached_result
+
+            # 执行原函数
+            try:
+                result = await func(*args, **kwargs)
+                await idempotency_svc.set_result(key, result)
+                return result
+            except Exception as e:
+                await idempotency_svc.redis.delete(f"{key}:processing")
+                raise
+
+        return wrapper
+    return decorator
+
+
+# 使用示例
+@router.post("/transactions")
+@idempotent(key_fields=['amount', 'category_id', 'transaction_date', 'description'])
+async def create_transaction(
+    data: TransactionCreate,
+    current_user: User = Depends(get_current_user),
+):
+    """创建账单 - 幂等接口"""
+    return await transaction_service.create(current_user.id, data)
+```
+
+#### 29.3.2 熔断与降级设计
+
+```python
+import asyncio
+from enum import Enum
+from datetime import datetime, timedelta
+from collections import deque
+
+class CircuitState(Enum):
+    CLOSED = "closed"      # 正常状态
+    OPEN = "open"          # 熔断状态
+    HALF_OPEN = "half_open"  # 半开状态
+
+class CircuitBreaker:
+    """
+    熔断器 - 防止故障级联
+    用于：外部API调用（Claude API、支付接口等）
+    """
+
+    def __init__(
+        self,
+        name: str,
+        failure_threshold: int = 5,      # 失败阈值
+        success_threshold: int = 3,      # 恢复阈值
+        timeout: int = 30,               # 熔断时间(秒)
+        window_size: int = 60,           # 统计窗口(秒)
+    ):
+        self.name = name
+        self.failure_threshold = failure_threshold
+        self.success_threshold = success_threshold
+        self.timeout = timeout
+        self.window_size = window_size
+
+        self.state = CircuitState.CLOSED
+        self.failures = deque()
+        self.successes = 0
+        self.last_failure_time = None
+        self.lock = asyncio.Lock()
+
+    async def call(self, func, *args, fallback=None, **kwargs):
+        """执行受保护的调用"""
+        async with self.lock:
+            # 检查熔断状态
+            if self.state == CircuitState.OPEN:
+                if self._should_try_reset():
+                    self.state = CircuitState.HALF_OPEN
+                    self.successes = 0
+                else:
+                    # 熔断中，执行降级
+                    if fallback:
+                        return await fallback(*args, **kwargs)
+                    raise CircuitOpenError(f"Circuit {self.name} is open")
+
+        try:
+            result = await func(*args, **kwargs)
+            await self._on_success()
+            return result
+        except Exception as e:
+            await self._on_failure()
+            if fallback:
+                return await fallback(*args, **kwargs)
+            raise
+
+    async def _on_success(self):
+        async with self.lock:
+            if self.state == CircuitState.HALF_OPEN:
+                self.successes += 1
+                if self.successes >= self.success_threshold:
+                    self.state = CircuitState.CLOSED
+                    self.failures.clear()
+
+    async def _on_failure(self):
+        async with self.lock:
+            now = datetime.utcnow()
+            self.failures.append(now)
+            self.last_failure_time = now
+
+            # 清理过期的失败记录
+            cutoff = now - timedelta(seconds=self.window_size)
+            while self.failures and self.failures[0] < cutoff:
+                self.failures.popleft()
+
+            # 判断是否需要熔断
+            if len(self.failures) >= self.failure_threshold:
+                self.state = CircuitState.OPEN
+
+            if self.state == CircuitState.HALF_OPEN:
+                self.state = CircuitState.OPEN
+
+    def _should_try_reset(self) -> bool:
+        if not self.last_failure_time:
+            return True
+        return datetime.utcnow() - self.last_failure_time > timedelta(seconds=self.timeout)
+
+
+# 全局熔断器注册
+circuit_breakers = {
+    'claude_api': CircuitBreaker('claude_api', failure_threshold=3, timeout=60),
+    'payment_api': CircuitBreaker('payment_api', failure_threshold=5, timeout=120),
+    'ocr_service': CircuitBreaker('ocr_service', failure_threshold=3, timeout=30),
+}
+
+
+# 使用示例
+async def call_claude_api(prompt: str) -> str:
+    """调用Claude API（带熔断保护）"""
+
+    async def _call():
+        return await claude_client.complete(prompt)
+
+    async def _fallback(prompt: str):
+        # 降级：使用本地规则匹配
+        return local_category_matcher.match(prompt)
+
+    return await circuit_breakers['claude_api'].call(
+        _call,
+        fallback=lambda: _fallback(prompt)
+    )
+```
+
+#### 29.3.3 服务降级策略
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       服务降级策略                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🔴 核心功能 (绝不降级)                                          │
+│  ├── 用户登录/注册                                              │
+│  ├── 账单创建/编辑/删除                                          │
+│  ├── 账单列表查询                                                │
+│  └── 数据同步                                                    │
+│                                                                  │
+│  🟡 重要功能 (压力大时降级)                                       │
+│  ├── AI智能分类 → 降级为用户手动选择                              │
+│  ├── 图片OCR识别 → 降级为手动输入                                 │
+│  ├── 统计报表 → 降级为缓存数据（可能延迟）                         │
+│  └── 预算提醒 → 降级为延迟推送                                    │
+│                                                                  │
+│  🟢 非核心功能 (优先降级)                                         │
+│  ├── 邮件账单解析 → 直接跳过                                      │
+│  ├── 用户画像分析 → 暂停                                         │
+│  ├── 营销活动推送 → 暂停                                         │
+│  └── 埋点数据上报 → 本地缓存，稍后重试                            │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+```python
+class DegradationManager:
+    """服务降级管理器"""
+
+    def __init__(self, redis: Redis):
+        self.redis = redis
+
+    async def is_degraded(self, service: str) -> bool:
+        """检查服务是否处于降级状态"""
+        return await self.redis.get(f"degradation:{service}") == "1"
+
+    async def set_degradation(self, service: str, enabled: bool, ttl: int = 300):
+        """设置服务降级状态"""
+        if enabled:
+            await self.redis.setex(f"degradation:{service}", ttl, "1")
+        else:
+            await self.redis.delete(f"degradation:{service}")
+
+    async def get_system_load(self) -> dict:
+        """获取系统负载"""
+        # 从监控系统获取
+        return {
+            'cpu_usage': 75.0,
+            'memory_usage': 80.0,
+            'db_connections': 45,
+            'request_queue': 100,
+        }
+
+    async def auto_degrade_if_needed(self):
+        """根据系统负载自动降级"""
+        load = await self.get_system_load()
+
+        # CPU > 90% 或 内存 > 90%，降级非核心服务
+        if load['cpu_usage'] > 90 or load['memory_usage'] > 90:
+            await self.set_degradation('ai_classification', True)
+            await self.set_degradation('email_parsing', True)
+            await self.set_degradation('analytics', True)
+
+        # 请求队列过长，降级报表统计
+        if load['request_queue'] > 500:
+            await self.set_degradation('statistics', True)
+```
+
+### 29.4 数据一致性设计
+
+#### 29.4.1 Cache-Aside 策略
+
+```python
+class CacheAsideRepository:
+    """
+    Cache-Aside 模式实现
+    读：先读缓存，未命中则读数据库并写入缓存
+    写：先写数据库，再删除缓存（而非更新缓存）
+    """
+
+    def __init__(self, db: AsyncSession, redis: Redis):
+        self.db = db
+        self.redis = redis
+        self.default_ttl = 300  # 5分钟
+
+    async def get(self, key: str, db_query: Callable) -> Optional[dict]:
+        """读取数据"""
+        # 1. 先读缓存
+        cached = await self.redis.get(key)
+        if cached:
+            return json.loads(cached)
+
+        # 2. 缓存未命中，读数据库
+        data = await db_query()
+        if data is None:
+            return None
+
+        # 3. 写入缓存
+        await self.redis.setex(key, self.default_ttl, json.dumps(data))
+        return data
+
+    async def invalidate(self, key: str):
+        """删除缓存（写操作后调用）"""
+        await self.redis.delete(key)
+
+    async def invalidate_pattern(self, pattern: str):
+        """批量删除缓存"""
+        keys = await self.redis.keys(pattern)
+        if keys:
+            await self.redis.delete(*keys)
+
+
+# 使用示例
+class TransactionRepository:
+    def __init__(self, db: AsyncSession, redis: Redis):
+        self.cache = CacheAsideRepository(db, redis)
+        self.db = db
+
+    async def get_by_id(self, transaction_id: UUID) -> Optional[Transaction]:
+        """获取账单详情"""
+        cache_key = f"transaction:{transaction_id}"
+
+        async def db_query():
+            result = await self.db.execute(
+                select(Transaction).where(Transaction.id == transaction_id)
+            )
+            tx = result.scalar_one_or_none()
+            return tx.to_dict() if tx else None
+
+        return await self.cache.get(cache_key, db_query)
+
+    async def update(self, transaction_id: UUID, data: dict) -> Transaction:
+        """更新账单"""
+        # 1. 先写数据库
+        tx = await self._update_db(transaction_id, data)
+
+        # 2. 删除缓存（而非更新）
+        await self.cache.invalidate(f"transaction:{transaction_id}")
+        # 同时删除相关列表缓存
+        await self.cache.invalidate_pattern(f"transactions:user:{tx.user_id}:*")
+
+        return tx
+```
+
+#### 29.4.2 分布式锁
+
+```python
+import uuid
+from contextlib import asynccontextmanager
+
+class DistributedLock:
+    """
+    分布式锁 - 用于高并发场景下的资源保护
+    场景：余额修改、预算扣减、会员权益发放等
+    """
+
+    def __init__(self, redis: Redis):
+        self.redis = redis
+
+    @asynccontextmanager
+    async def acquire(
+        self,
+        resource: str,
+        timeout: int = 10,
+        retry_times: int = 3,
+        retry_delay: float = 0.1,
+    ):
+        """
+        获取锁
+        @param resource: 资源标识
+        @param timeout: 锁超时时间(秒)
+        @param retry_times: 重试次数
+        @param retry_delay: 重试间隔(秒)
+        """
+        lock_key = f"lock:{resource}"
+        lock_value = str(uuid.uuid4())
+        acquired = False
+
+        for _ in range(retry_times):
+            # 尝试获取锁
+            acquired = await self.redis.set(
+                lock_key, lock_value, nx=True, ex=timeout
+            )
+            if acquired:
+                break
+            await asyncio.sleep(retry_delay)
+
+        if not acquired:
+            raise LockAcquisitionError(f"Failed to acquire lock for {resource}")
+
+        try:
+            yield
+        finally:
+            # 释放锁（只释放自己持有的锁）
+            lua_script = """
+            if redis.call("get", KEYS[1]) == ARGV[1] then
+                return redis.call("del", KEYS[1])
+            else
+                return 0
+            end
+            """
+            await self.redis.eval(lua_script, 1, lock_key, lock_value)
+
+
+# 使用示例
+class AccountService:
+    def __init__(self, redis: Redis, db: AsyncSession):
+        self.lock = DistributedLock(redis)
+        self.db = db
+
+    async def transfer(
+        self,
+        from_account_id: UUID,
+        to_account_id: UUID,
+        amount: Decimal,
+    ):
+        """转账 - 需要分布式锁保护"""
+        # 对两个账户加锁（按ID排序避免死锁）
+        lock_ids = sorted([str(from_account_id), str(to_account_id)])
+        lock_resource = f"account:{lock_ids[0]}:{lock_ids[1]}"
+
+        async with self.lock.acquire(lock_resource, timeout=30):
+            async with self.db.begin():
+                # 扣减源账户
+                from_account = await self.get_account(from_account_id)
+                if from_account.balance < amount:
+                    raise InsufficientBalanceError()
+                from_account.balance -= amount
+
+                # 增加目标账户
+                to_account = await self.get_account(to_account_id)
+                to_account.balance += amount
+
+                await self.db.commit()
+```
+
+#### 29.4.3 事务一致性
+
+```python
+from sqlalchemy.orm import Session
+from contextlib import asynccontextmanager
+
+class TransactionCoordinator:
+    """事务协调器 - 确保复杂操作的原子性"""
+
+    def __init__(self, db: AsyncSession, redis: Redis, event_bus: EventBus):
+        self.db = db
+        self.redis = redis
+        self.event_bus = event_bus
+
+    @asynccontextmanager
+    async def transaction(self):
+        """数据库事务上下文"""
+        try:
+            yield self.db
+            await self.db.commit()
+        except Exception as e:
+            await self.db.rollback()
+            raise
+
+    async def create_transaction_with_balance_update(
+        self,
+        user_id: UUID,
+        transaction_data: TransactionCreate,
+    ) -> Transaction:
+        """
+        创建账单并更新账户余额
+        保证：要么全部成功，要么全部回滚
+        """
+        async with self.transaction():
+            # 1. 创建账单记录
+            transaction = Transaction(
+                user_id=user_id,
+                **transaction_data.dict()
+            )
+            self.db.add(transaction)
+
+            # 2. 更新账户余额
+            account = await self.db.get(Account, transaction_data.account_id)
+            if transaction_data.type == TransactionType.EXPENSE:
+                account.balance -= transaction_data.amount
+            else:
+                account.balance += transaction_data.amount
+
+            # 3. 更新预算使用量（如有）
+            if transaction_data.type == TransactionType.EXPENSE:
+                await self._update_budget_usage(
+                    user_id,
+                    transaction_data.category_id,
+                    transaction_data.amount,
+                )
+
+            await self.db.flush()
+
+            # 4. 发布事件（在事务提交后执行）
+            await self.event_bus.publish(TransactionCreatedEvent(
+                transaction_id=transaction.id,
+                user_id=user_id,
+            ))
+
+            return transaction
+
+    async def _update_budget_usage(
+        self,
+        user_id: UUID,
+        category_id: UUID,
+        amount: Decimal,
+    ):
+        """更新预算使用量"""
+        budget = await self.db.execute(
+            select(Budget).where(
+                Budget.user_id == user_id,
+                Budget.category_id == category_id,
+                Budget.period_start <= date.today(),
+                Budget.period_end >= date.today(),
+            )
+        )
+        budget = budget.scalar_one_or_none()
+        if budget:
+            budget.used_amount += amount
+```
+
+### 29.5 故障恢复设计
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       故障恢复策略                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🔄 自动故障切换                                                 │
+│  ├── 数据库：RDS主从自动切换 (30秒内)                            │
+│  ├── Redis：主从自动切换 (10秒内)                                │
+│  ├── 应用：SLB健康检查剔除故障节点 (10秒内)                       │
+│  └── DNS：多区域容灾，自动切换                                   │
+│                                                                  │
+│  📋 备份与恢复                                                   │
+│  ├── 数据库：每日全量备份 + 实时binlog                           │
+│  ├── 文件：OSS跨区域复制                                        │
+│  ├── 配置：Git版本管理                                          │
+│  └── 恢复演练：每季度一次                                        │
+│                                                                  │
+│  📞 故障响应流程                                                 │
+│  ├── P0 (全站不可用): 10分钟响应, 30分钟恢复                     │
+│  ├── P1 (核心功能受损): 30分钟响应, 2小时恢复                    │
+│  ├── P2 (非核心功能受损): 2小时响应, 8小时恢复                   │
+│  └── P3 (用户体验问题): 24小时响应, 72小时修复                   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 29.6 架构检查清单
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     架构设计检查清单                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ✅ 高可用                                                       │
+│  □ 无单点故障（双节点部署）                                       │
+│  □ 幂等性设计（关键接口）                                         │
+│  □ 熔断降级（外部依赖）                                          │
+│  □ 健康检查（所有服务）                                          │
+│  □ 故障自动切换                                                  │
+│                                                                  │
+│  ✅ 高性能                                                       │
+│  □ 响应时间 < 1秒                                                │
+│  □ 缓存策略（热点数据）                                          │
+│  □ 数据库索引优化                                                │
+│  □ 异步处理（耗时任务）                                          │
+│  □ 连接池配置                                                    │
+│                                                                  │
+│  ✅ 可扩展                                                       │
+│  □ 模块解耦（可独立部署）                                         │
+│  □ 水平扩容（无状态服务）                                         │
+│  □ 读写分离（数据库）                                            │
+│  □ 接口版本化                                                    │
+│                                                                  │
+│  ✅ 易维护                                                       │
+│  □ 完善日志（结构化）                                            │
+│  □ 监控告警（核心指标）                                          │
+│  □ 文档齐全                                                      │
+│  □ 自动化部署                                                    │
+│                                                                  │
+│  ✅ 低成本                                                       │
+│  □ 按需扩容（不过度配置）                                         │
+│  □ 资源复用（共享组件）                                          │
+│  □ 优先非资源优化                                                │
+│                                                                  │
+│  ✅ 数据一致                                                     │
+│  □ 事务控制                                                      │
+│  □ Cache-Aside策略                                               │
+│  □ 分布式锁（并发场景）                                          │
+│  □ 数据备份                                                      │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 三十、架构总结
+
+### 30.1 五大核心目标达成情况
+
+| 目标 | 状态 | 关键实现 |
+|------|------|----------|
+| **高可用** | ✅ | 双节点部署、幂等性、熔断降级、故障切换 |
+| **高性能** | ✅ | <1s响应、Redis缓存、索引优化、异步任务 |
+| **可扩展** | ✅ | 模块解耦、三阶段演进、水平扩容、接口版本化 |
+| **易维护** | ✅ | 结构化日志、监控告警、代码规范、自动化 |
+| **低成本** | ✅ | 极简设计、按需扩容、优先非资源优化 |
+
+### 30.2 架构演进路线图
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       架构演进路线                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Phase 1: 1,000 DAU                                              │
+│  ┌─────────────────────────────────────────────┐                │
+│  │ 单机部署 + 本地数据库 + 本地Redis            │                │
+│  │ 月成本: ¥300                                │                │
+│  └─────────────────────────────────────────────┘                │
+│                          │                                       │
+│                          ▼ 用户增长                               │
+│  Phase 2: 10,000 DAU                                             │
+│  ┌─────────────────────────────────────────────┐                │
+│  │ 双节点 + SLB + RDS主从 + 云Redis + OSS      │                │
+│  │ 月成本: ¥1,200                              │                │
+│  └─────────────────────────────────────────────┘                │
+│                          │                                       │
+│                          ▼ 用户增长                               │
+│  Phase 3: 100,000 DAU                                            │
+│  ┌─────────────────────────────────────────────┐                │
+│  │ K8s集群 + RDS高可用 + Redis集群 + CDN       │                │
+│  │ 月成本: ¥5,000+                             │                │
+│  └─────────────────────────────────────────────┘                │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 30.3 文档章节索引
+
+| 章节 | 内容 | 核心原则 |
+|------|------|----------|
+| 1-7 | 项目概述、技术架构、数据库、API、前端、AI、目录结构 | 分层架构、单一职责 |
+| 8-10 | 部署架构、开发计划、分类预设 | 极简设计、演进式架构 |
+| 11-15 | 安全、三方登录、多币种、离线、会员支付 | 安全性、可扩展性 |
+| 16-18 | 国际化、备份、扩展性架构 | 可扩展性、演进式架构 |
+| 18A-18C | 日志、监控、代码规范 | 可观测性、易维护 |
+| 19-21 | 开发计划、竞品特性、用户反馈 | 功能扩展 |
+| 22-24 | 模块解耦、UI/UX、埋点 | 单一职责、可观测性 |
+| 25-28 | 主题换肤、性能优化、安全隐私、用户协议 | 高性能、安全性 |
+| 29-30 | 架构原则、高可用保障、总结 | 全部原则 |
+
+---
+
+以上是AI智能记账应用的完整架构设计，严格遵循高内聚低耦合、高可用、高性能、可扩展、易维护、低成本的设计原则。如有需要调整的地方请提出。
