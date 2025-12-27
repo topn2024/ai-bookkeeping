@@ -8485,4 +8485,1697 @@ GET /api/v1/themes
 
 ---
 
+## 二十六、性能优化设计
+
+### 26.1 性能目标
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        性能指标要求                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ⚡ 响应时间目标 (P95)                                           │
+│  ├── 页面切换: < 300ms                                          │
+│  ├── 按钮点击反馈: < 100ms                                       │
+│  ├── 列表滚动: 60fps (16ms/帧)                                  │
+│  ├── API请求: < 500ms                                           │
+│  ├── 图片加载: < 1000ms                                         │
+│  └── 整体操作: < 1000ms (用户感知)                               │
+│                                                                  │
+│  📱 启动时间                                                     │
+│  ├── 冷启动: < 2秒                                              │
+│  ├── 热启动: < 500ms                                            │
+│  └── 首屏渲染: < 1.5秒                                          │
+│                                                                  │
+│  💾 资源占用                                                     │
+│  ├── 内存占用: < 150MB (正常使用)                                │
+│  ├── 安装包大小: < 50MB (Android) / < 80MB (iOS)                │
+│  └── 本地缓存: < 200MB                                          │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 26.2 前端性能优化
+
+```dart
+/// 1. 图片优化
+class ImageOptimization {
+  /// 图片懒加载
+  static Widget lazyImage(String url, {double? width, double? height}) {
+    return CachedNetworkImage(
+      imageUrl: url,
+      width: width,
+      height: height,
+      memCacheWidth: width?.toInt(),  // 内存缓存尺寸优化
+      placeholder: (_, __) => Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(color: Colors.white),
+      ),
+      errorWidget: (_, __, ___) => Icon(Icons.error),
+      fadeInDuration: Duration(milliseconds: 200),
+    );
+  }
+
+  /// 图片预加载（首页关键图片）
+  static Future<void> precacheImages(BuildContext context) async {
+    final criticalImages = [
+      'assets/images/logo.png',
+      'assets/images/empty_state.png',
+    ];
+    for (final image in criticalImages) {
+      precacheImage(AssetImage(image), context);
+    }
+  }
+}
+
+/// 2. 列表性能优化
+class OptimizedListView extends StatelessWidget {
+  final List<Transaction> transactions;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      // 关键优化参数
+      itemCount: transactions.length,
+      itemExtent: 72,  // 固定高度，提升滚动性能
+      cacheExtent: 500, // 预渲染区域
+      addAutomaticKeepAlives: false,  // 减少内存占用
+      addRepaintBoundaries: true,     // 独立重绘边界
+      itemBuilder: (context, index) {
+        return RepaintBoundary(
+          child: TransactionItem(
+            key: ValueKey(transactions[index].id),
+            transaction: transactions[index],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 3. 状态管理优化 - 精细化订阅
+final transactionListProvider = StateNotifierProvider<TransactionListNotifier, AsyncValue<List<Transaction>>>((ref) {
+  return TransactionListNotifier(ref);
+});
+
+// 派生状态 - 只订阅需要的数据
+final todayTotalProvider = Provider<double>((ref) {
+  final transactions = ref.watch(transactionListProvider).valueOrNull ?? [];
+  return transactions
+      .where((t) => t.date.isToday)
+      .fold(0.0, (sum, t) => sum + t.amount);
+});
+
+/// 4. 防抖和节流
+class Debouncer {
+  final Duration delay;
+  Timer? _timer;
+
+  Debouncer({this.delay = const Duration(milliseconds: 300)});
+
+  void run(VoidCallback action) {
+    _timer?.cancel();
+    _timer = Timer(delay, action);
+  }
+
+  void dispose() => _timer?.cancel();
+}
+
+class Throttler {
+  final Duration interval;
+  DateTime? _lastRun;
+
+  Throttler({this.interval = const Duration(milliseconds: 100)});
+
+  void run(VoidCallback action) {
+    final now = DateTime.now();
+    if (_lastRun == null || now.difference(_lastRun!) > interval) {
+      _lastRun = now;
+      action();
+    }
+  }
+}
+
+/// 5. 按钮点击即时反馈
+class ResponsiveButton extends StatefulWidget {
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  State<ResponsiveButton> createState() => _ResponsiveButtonState();
+}
+
+class _ResponsiveButtonState extends State<ResponsiveButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        // 触觉反馈
+        HapticFeedback.lightImpact();
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.95 : 1.0,
+        duration: Duration(milliseconds: 100),
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// 6. 页面预加载
+class PagePreloader {
+  static final Map<String, Widget> _cache = {};
+
+  /// 预构建下一个可能访问的页面
+  static void preload(String route, Widget Function() builder) {
+    if (!_cache.containsKey(route)) {
+      _cache[route] = builder();
+    }
+  }
+
+  static Widget? get(String route) => _cache[route];
+
+  static void clear() => _cache.clear();
+}
+```
+
+### 26.3 网络请求优化
+
+```dart
+/// API客户端优化配置
+class OptimizedApiClient {
+  late final Dio _dio;
+
+  OptimizedApiClient() {
+    _dio = Dio(BaseOptions(
+      baseUrl: AppConfig.apiBaseUrl,
+      connectTimeout: Duration(seconds: 10),
+      receiveTimeout: Duration(seconds: 15),
+      sendTimeout: Duration(seconds: 10),
+    ));
+
+    // 拦截器配置
+    _dio.interceptors.addAll([
+      // 1. 请求缓存
+      DioCacheInterceptor(options: CacheOptions(
+        store: HiveCacheStore(AppConfig.cachePath),
+        policy: CachePolicy.request,
+        maxStale: Duration(days: 7),
+        hitCacheOnErrorExcept: [401, 403],
+      )),
+
+      // 2. 请求重试
+      RetryInterceptor(
+        dio: _dio,
+        retries: 3,
+        retryDelays: [
+          Duration(seconds: 1),
+          Duration(seconds: 2),
+          Duration(seconds: 3),
+        ],
+      ),
+
+      // 3. 请求日志（仅调试模式）
+      if (kDebugMode) LogInterceptor(
+        requestBody: true,
+        responseBody: true,
+      ),
+    ]);
+  }
+
+  /// 并发请求优化
+  Future<List<T>> batchRequest<T>(
+    List<Future<T> Function()> requests, {
+    int maxConcurrent = 3,
+  }) async {
+    final results = <T>[];
+    for (var i = 0; i < requests.length; i += maxConcurrent) {
+      final batch = requests.skip(i).take(maxConcurrent);
+      final batchResults = await Future.wait(batch.map((r) => r()));
+      results.addAll(batchResults);
+    }
+    return results;
+  }
+}
+
+/// 请求合并 - 相同请求去重
+class RequestDeduplicator {
+  static final Map<String, Future> _pendingRequests = {};
+
+  static Future<T> dedupe<T>(String key, Future<T> Function() request) async {
+    if (_pendingRequests.containsKey(key)) {
+      return _pendingRequests[key] as Future<T>;
+    }
+
+    final future = request();
+    _pendingRequests[key] = future;
+
+    try {
+      return await future;
+    } finally {
+      _pendingRequests.remove(key);
+    }
+  }
+}
+
+/// 数据预取
+class DataPrefetcher {
+  /// 首页数据预取
+  static Future<void> prefetchHomeData(Ref ref) async {
+    await Future.wait([
+      ref.read(transactionListProvider.notifier).loadRecent(),
+      ref.read(statisticsProvider.notifier).loadToday(),
+      ref.read(budgetProvider.notifier).loadCurrent(),
+    ]);
+  }
+
+  /// 后台静默刷新
+  static void scheduleBackgroundRefresh(Ref ref) {
+    Timer.periodic(Duration(minutes: 5), (_) {
+      if (AppLifecycleState.resumed == WidgetsBinding.instance.lifecycleState) {
+        ref.read(syncProvider.notifier).silentSync();
+      }
+    });
+  }
+}
+```
+
+### 26.4 后端性能优化
+
+```python
+# 1. 数据库查询优化
+from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload, joinedload
+
+class TransactionRepository:
+    async def get_list_optimized(
+        self,
+        user_id: UUID,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> list[Transaction]:
+        """优化的列表查询"""
+        query = (
+            select(Transaction)
+            .where(Transaction.user_id == user_id)
+            .options(
+                # 预加载关联数据，避免N+1问题
+                selectinload(Transaction.category),
+                selectinload(Transaction.account),
+            )
+            .order_by(Transaction.transaction_date.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def get_statistics_optimized(
+        self,
+        user_id: UUID,
+        start_date: date,
+        end_date: date,
+    ) -> dict:
+        """使用聚合查询，避免加载大量数据"""
+        query = (
+            select(
+                Transaction.type,
+                func.sum(Transaction.amount).label('total'),
+                func.count().label('count'),
+            )
+            .where(
+                Transaction.user_id == user_id,
+                Transaction.transaction_date.between(start_date, end_date),
+            )
+            .group_by(Transaction.type)
+        )
+        result = await self.session.execute(query)
+        return {row.type: {'total': row.total, 'count': row.count} for row in result}
+
+
+# 2. Redis缓存策略
+from redis import asyncio as aioredis
+from functools import wraps
+import json
+
+class CacheService:
+    def __init__(self, redis: aioredis.Redis):
+        self.redis = redis
+
+    async def get_or_set(
+        self,
+        key: str,
+        factory: Callable,
+        ttl: int = 300,  # 5分钟默认
+    ):
+        """缓存穿透保护"""
+        cached = await self.redis.get(key)
+        if cached:
+            return json.loads(cached)
+
+        # 使用分布式锁防止缓存击穿
+        lock_key = f"lock:{key}"
+        if await self.redis.setnx(lock_key, "1"):
+            await self.redis.expire(lock_key, 10)
+            try:
+                data = await factory()
+                await self.redis.setex(key, ttl, json.dumps(data))
+                return data
+            finally:
+                await self.redis.delete(lock_key)
+        else:
+            # 等待其他请求完成
+            await asyncio.sleep(0.1)
+            return await self.get_or_set(key, factory, ttl)
+
+    async def invalidate_pattern(self, pattern: str):
+        """批量失效缓存"""
+        keys = await self.redis.keys(pattern)
+        if keys:
+            await self.redis.delete(*keys)
+
+
+# 缓存装饰器
+def cached(key_template: str, ttl: int = 300):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            cache = get_cache_service()
+            key = key_template.format(**kwargs)
+            return await cache.get_or_set(key, lambda: func(*args, **kwargs), ttl)
+        return wrapper
+    return decorator
+
+
+# 3. 接口响应优化
+from fastapi import Response
+from fastapi.responses import ORJSONResponse
+import orjson
+
+# 使用更快的JSON序列化库
+app = FastAPI(default_response_class=ORJSONResponse)
+
+# 响应压缩
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+# 4. 连接池优化
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.pool import AsyncAdaptedQueuePool
+
+engine = create_async_engine(
+    DATABASE_URL,
+    poolclass=AsyncAdaptedQueuePool,
+    pool_size=20,           # 连接池大小
+    max_overflow=30,        # 最大溢出连接
+    pool_timeout=30,        # 连接超时
+    pool_recycle=1800,      # 连接回收时间
+    pool_pre_ping=True,     # 连接健康检查
+)
+
+
+# 5. 异步任务处理
+from celery import Celery
+
+celery_app = Celery(
+    'tasks',
+    broker='redis://localhost:6379/1',
+    backend='redis://localhost:6379/2',
+)
+
+@celery_app.task(bind=True, max_retries=3)
+def process_receipt_async(self, image_data: bytes, user_id: str):
+    """异步处理小票识别，不阻塞主请求"""
+    try:
+        result = ocr_service.recognize(image_data)
+        # 通过WebSocket或推送通知用户
+        notify_user(user_id, result)
+    except Exception as e:
+        self.retry(exc=e, countdown=5)
+```
+
+### 26.5 性能监控
+
+```python
+# 请求耗时监控中间件
+import time
+from fastapi import Request
+from prometheus_client import Histogram, Counter
+
+REQUEST_LATENCY = Histogram(
+    'http_request_duration_seconds',
+    'HTTP request latency',
+    ['method', 'endpoint', 'status'],
+    buckets=[0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 10.0]
+)
+
+SLOW_REQUEST_COUNTER = Counter(
+    'slow_requests_total',
+    'Number of requests exceeding 1 second',
+    ['method', 'endpoint']
+)
+
+@app.middleware("http")
+async def performance_monitoring(request: Request, call_next):
+    start_time = time.time()
+
+    response = await call_next(request)
+
+    duration = time.time() - start_time
+    endpoint = request.url.path
+    method = request.method
+
+    # 记录指标
+    REQUEST_LATENCY.labels(method, endpoint, response.status_code).observe(duration)
+
+    # 超过1秒的慢请求告警
+    if duration > 1.0:
+        SLOW_REQUEST_COUNTER.labels(method, endpoint).inc()
+        logger.warning(f"Slow request: {method} {endpoint} took {duration:.2f}s")
+
+    # 添加响应头
+    response.headers["X-Response-Time"] = f"{duration:.3f}s"
+
+    return response
+```
+
+```dart
+/// Flutter端性能监控
+class PerformanceMonitor {
+  static void init() {
+    // 帧率监控
+    WidgetsBinding.instance.addTimingsCallback((timings) {
+      for (final timing in timings) {
+        final buildDuration = timing.buildDuration.inMilliseconds;
+        final rasterDuration = timing.rasterDuration.inMilliseconds;
+
+        // 丢帧检测 (超过16ms)
+        if (buildDuration > 16 || rasterDuration > 16) {
+          AnalyticsSDK().track('performance', {
+            'type': 'frame_drop',
+            'build_ms': buildDuration,
+            'raster_ms': rasterDuration,
+          });
+        }
+      }
+    });
+  }
+
+  /// API请求耗时追踪
+  static Future<T> trackApiCall<T>(
+    String name,
+    Future<T> Function() request,
+  ) async {
+    final stopwatch = Stopwatch()..start();
+    try {
+      final result = await request();
+      stopwatch.stop();
+
+      AnalyticsSDK().track('performance', {
+        'type': 'api_call',
+        'name': name,
+        'duration_ms': stopwatch.elapsedMilliseconds,
+        'success': true,
+      });
+
+      // 超过1秒警告
+      if (stopwatch.elapsedMilliseconds > 1000) {
+        debugPrint('⚠️ Slow API: $name took ${stopwatch.elapsedMilliseconds}ms');
+      }
+
+      return result;
+    } catch (e) {
+      stopwatch.stop();
+      AnalyticsSDK().track('performance', {
+        'type': 'api_call',
+        'name': name,
+        'duration_ms': stopwatch.elapsedMilliseconds,
+        'success': false,
+        'error': e.toString(),
+      });
+      rethrow;
+    }
+  }
+}
+```
+
+---
+
+## 二十七、安全与隐私设计
+
+### 27.1 安全架构概述
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        安全架构设计                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🔒 传输安全                                                     │
+│  ├── 全站HTTPS (TLS 1.3)                                        │
+│  ├── 证书固定 (Certificate Pinning)                             │
+│  ├── HSTS强制HTTPS                                              │
+│  └── 敏感数据额外加密传输                                        │
+│                                                                  │
+│  🛡️ 应用安全                                                    │
+│  ├── 代码混淆 (ProGuard/R8)                                     │
+│  ├── 反调试检测                                                  │
+│  ├── 完整性校验                                                  │
+│  └── 安全键盘 (金额输入)                                         │
+│                                                                  │
+│  💾 数据安全                                                     │
+│  ├── 本地数据加密存储                                            │
+│  ├── 敏感信息脱敏显示                                            │
+│  ├── 数据库字段加密                                              │
+│  └── 安全删除 (数据擦除)                                         │
+│                                                                  │
+│  👤 身份安全                                                     │
+│  ├── JWT + Refresh Token                                        │
+│  ├── 生物识别认证                                                │
+│  ├── 设备绑定                                                    │
+│  └── 异常登录检测                                                │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 27.2 HTTPS与传输安全
+
+```python
+# Nginx HTTPS配置
+"""
+server {
+    listen 443 ssl http2;
+    server_name api.aibook.app;
+
+    # TLS 1.3配置
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    # 证书配置
+    ssl_certificate /etc/letsencrypt/live/api.aibook.app/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.aibook.app/privkey.pem;
+
+    # HSTS (强制HTTPS)
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+    # 安全响应头
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # OCSP Stapling
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 8.8.8.8 8.8.4.4 valid=300s;
+}
+
+# HTTP重定向到HTTPS
+server {
+    listen 80;
+    server_name api.aibook.app;
+    return 301 https://$server_name$request_uri;
+}
+"""
+```
+
+```dart
+/// Flutter证书固定
+class SecureHttpClient {
+  static Dio createSecureClient() {
+    final dio = Dio();
+
+    // 证书固定
+    (dio.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate = (client) {
+      client.badCertificateCallback = (cert, host, port) {
+        // 验证证书指纹
+        final fingerprint = sha256.convert(cert.der).toString();
+        final trustedFingerprints = [
+          'ABC123...', // 生产环境证书指纹
+          'DEF456...', // 备用证书指纹
+        ];
+        return trustedFingerprints.contains(fingerprint);
+      };
+      return client;
+    };
+
+    return dio;
+  }
+}
+
+/// 敏感数据加密传输
+class SecureTransmission {
+  static final _key = encrypt.Key.fromSecureRandom(32);
+  static final _encrypter = encrypt.Encrypter(encrypt.AES(_key));
+
+  /// 加密敏感请求数据
+  static String encryptPayload(Map<String, dynamic> data) {
+    final json = jsonEncode(data);
+    final iv = encrypt.IV.fromSecureRandom(16);
+    final encrypted = _encrypter.encrypt(json, iv: iv);
+    return '${iv.base64}:${encrypted.base64}';
+  }
+
+  /// 解密响应数据
+  static Map<String, dynamic> decryptPayload(String encrypted) {
+    final parts = encrypted.split(':');
+    final iv = encrypt.IV.fromBase64(parts[0]);
+    final decrypted = _encrypter.decrypt64(parts[1], iv: iv);
+    return jsonDecode(decrypted);
+  }
+}
+```
+
+### 27.3 本地数据安全
+
+```dart
+/// 安全存储服务
+class SecureStorageService {
+  static final _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
+      storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
+    ),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
+  );
+
+  /// 存储敏感数据
+  static Future<void> saveSecure(String key, String value) async {
+    await _secureStorage.write(key: key, value: value);
+  }
+
+  /// 读取敏感数据
+  static Future<String?> readSecure(String key) async {
+    return await _secureStorage.read(key: key);
+  }
+
+  /// 删除敏感数据
+  static Future<void> deleteSecure(String key) async {
+    await _secureStorage.delete(key: key);
+  }
+
+  /// 安全清除所有数据
+  static Future<void> clearAll() async {
+    await _secureStorage.deleteAll();
+  }
+}
+
+/// 数据库加密
+class EncryptedDatabase {
+  static Future<Database> open() async {
+    // 生成或获取加密密钥
+    var key = await SecureStorageService.readSecure('db_key');
+    if (key == null) {
+      key = base64Encode(List<int>.generate(32, (_) => Random.secure().nextInt(256)));
+      await SecureStorageService.saveSecure('db_key', key);
+    }
+
+    final path = await getDatabasesPath();
+    final dbPath = join(path, 'aibook_encrypted.db');
+
+    return openDatabase(
+      dbPath,
+      password: key,  // SQLCipher加密
+      version: 1,
+      onCreate: (db, version) async {
+        // 创建表结构
+      },
+    );
+  }
+}
+
+/// 敏感信息脱敏显示
+class DataMasker {
+  /// 手机号脱敏: 138****8888
+  static String maskPhone(String phone) {
+    if (phone.length != 11) return phone;
+    return '${phone.substring(0, 3)}****${phone.substring(7)}';
+  }
+
+  /// 邮箱脱敏: t***@example.com
+  static String maskEmail(String email) {
+    final parts = email.split('@');
+    if (parts.length != 2) return email;
+    final name = parts[0];
+    final masked = name.length > 1
+        ? '${name[0]}${'*' * (name.length - 1)}'
+        : name;
+    return '$masked@${parts[1]}';
+  }
+
+  /// 金额脱敏（可选显示）
+  static String maskAmount(double amount, {bool show = true}) {
+    return show ? '¥${amount.toStringAsFixed(2)}' : '¥****';
+  }
+
+  /// 银行卡号脱敏: **** **** **** 1234
+  static String maskBankCard(String cardNo) {
+    if (cardNo.length < 4) return cardNo;
+    return '**** **** **** ${cardNo.substring(cardNo.length - 4)}';
+  }
+}
+```
+
+### 27.4 身份认证安全
+
+```python
+# JWT安全配置
+from datetime import datetime, timedelta
+from jose import jwt, JWTError
+from passlib.context import CryptContext
+import secrets
+
+class AuthSecurity:
+    # 密码加密
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+    # JWT配置
+    SECRET_KEY = os.getenv("JWT_SECRET_KEY")  # 至少256位
+    ALGORITHM = "HS256"
+    ACCESS_TOKEN_EXPIRE = timedelta(minutes=30)
+    REFRESH_TOKEN_EXPIRE = timedelta(days=30)
+
+    @classmethod
+    def hash_password(cls, password: str) -> str:
+        return cls.pwd_context.hash(password)
+
+    @classmethod
+    def verify_password(cls, plain: str, hashed: str) -> bool:
+        return cls.pwd_context.verify(plain, hashed)
+
+    @classmethod
+    def create_access_token(cls, user_id: str, device_id: str) -> str:
+        expire = datetime.utcnow() + cls.ACCESS_TOKEN_EXPIRE
+        payload = {
+            "sub": user_id,
+            "device_id": device_id,
+            "exp": expire,
+            "iat": datetime.utcnow(),
+            "jti": secrets.token_urlsafe(16),  # 唯一标识，用于撤销
+        }
+        return jwt.encode(payload, cls.SECRET_KEY, algorithm=cls.ALGORITHM)
+
+    @classmethod
+    def create_refresh_token(cls, user_id: str, device_id: str) -> str:
+        expire = datetime.utcnow() + cls.REFRESH_TOKEN_EXPIRE
+        payload = {
+            "sub": user_id,
+            "device_id": device_id,
+            "exp": expire,
+            "type": "refresh",
+            "jti": secrets.token_urlsafe(16),
+        }
+        return jwt.encode(payload, cls.SECRET_KEY, algorithm=cls.ALGORITHM)
+
+
+# 登录安全策略
+class LoginSecurity:
+    MAX_ATTEMPTS = 5
+    LOCKOUT_DURATION = timedelta(minutes=30)
+
+    def __init__(self, redis: Redis):
+        self.redis = redis
+
+    async def check_login_allowed(self, identifier: str) -> bool:
+        """检查是否允许登录"""
+        key = f"login_attempts:{identifier}"
+        attempts = await self.redis.get(key)
+        return int(attempts or 0) < self.MAX_ATTEMPTS
+
+    async def record_failed_attempt(self, identifier: str):
+        """记录失败尝试"""
+        key = f"login_attempts:{identifier}"
+        pipe = self.redis.pipeline()
+        pipe.incr(key)
+        pipe.expire(key, int(self.LOCKOUT_DURATION.total_seconds()))
+        await pipe.execute()
+
+    async def clear_attempts(self, identifier: str):
+        """登录成功后清除记录"""
+        await self.redis.delete(f"login_attempts:{identifier}")
+
+    async def detect_anomaly(self, user_id: str, request: Request) -> bool:
+        """异常登录检测"""
+        current_ip = request.client.host
+        current_device = request.headers.get("X-Device-ID")
+
+        # 获取历史登录记录
+        history_key = f"login_history:{user_id}"
+        history = await self.redis.lrange(history_key, 0, 10)
+
+        # 检测异常
+        for record in history:
+            data = json.loads(record)
+            # 短时间内从不同地区登录
+            if data["ip"] != current_ip:
+                # 可以通过IP地理位置判断
+                return True
+
+        return False
+```
+
+```dart
+/// 生物识别认证
+class BiometricAuth {
+  static final _auth = LocalAuthentication();
+
+  static Future<bool> isAvailable() async {
+    final canCheck = await _auth.canCheckBiometrics;
+    final isDeviceSupported = await _auth.isDeviceSupported();
+    return canCheck && isDeviceSupported;
+  }
+
+  static Future<bool> authenticate({String reason = '请验证身份'}) async {
+    try {
+      return await _auth.authenticate(
+        localizedReason: reason,
+        options: AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: false,  // 允许PIN/密码作为后备
+        ),
+      );
+    } on PlatformException {
+      return false;
+    }
+  }
+}
+
+/// 应用锁
+class AppLock {
+  static const _lockTimeoutKey = 'app_lock_timeout';
+  static const _lastActiveKey = 'last_active_time';
+
+  /// 检查是否需要重新认证
+  static Future<bool> needsAuthentication() async {
+    final prefs = await SharedPreferences.getInstance();
+    final timeout = prefs.getInt(_lockTimeoutKey) ?? 300000; // 默认5分钟
+    final lastActive = prefs.getInt(_lastActiveKey) ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    return (now - lastActive) > timeout;
+  }
+
+  /// 更新活跃时间
+  static Future<void> updateLastActive() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_lastActiveKey, DateTime.now().millisecondsSinceEpoch);
+  }
+}
+```
+
+### 27.5 API安全
+
+```python
+from fastapi import Security, HTTPException
+from fastapi.security import APIKeyHeader
+import hmac
+import hashlib
+import time
+
+# 请求签名验证
+class RequestSigner:
+    def __init__(self, secret_key: str):
+        self.secret_key = secret_key
+
+    def sign(self, method: str, path: str, timestamp: int, body: str = "") -> str:
+        """生成请求签名"""
+        message = f"{method}\n{path}\n{timestamp}\n{body}"
+        signature = hmac.new(
+            self.secret_key.encode(),
+            message.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        return signature
+
+    def verify(self, signature: str, method: str, path: str, timestamp: int, body: str = "") -> bool:
+        """验证签名"""
+        # 检查时间戳（5分钟有效期）
+        if abs(time.time() - timestamp) > 300:
+            return False
+
+        expected = self.sign(method, path, timestamp, body)
+        return hmac.compare_digest(signature, expected)
+
+
+# API限流
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+
+@app.get("/api/v1/transactions")
+@limiter.limit("100/minute")  # 每分钟100次
+async def get_transactions(request: Request):
+    pass
+
+@app.post("/api/v1/auth/login")
+@limiter.limit("5/minute")  # 登录接口更严格
+async def login(request: Request):
+    pass
+
+
+# SQL注入防护 - 使用参数化查询
+from sqlalchemy import text
+
+# ❌ 危险写法
+# query = f"SELECT * FROM users WHERE id = '{user_id}'"
+
+# ✅ 安全写法
+query = text("SELECT * FROM users WHERE id = :user_id")
+result = await session.execute(query, {"user_id": user_id})
+
+
+# XSS防护 - 输出编码
+from markupsafe import escape
+
+@app.get("/api/v1/user/profile")
+async def get_profile(user_id: str):
+    user = await get_user(user_id)
+    return {
+        "name": escape(user.name),  # HTML实体编码
+        "bio": escape(user.bio),
+    }
+
+
+# CORS配置
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://aibook.app"],  # 严格限制来源
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"],
+)
+```
+
+### 27.6 隐私保护
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        隐私保护措施                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  📋 数据收集原则                                                 │
+│  ├── 最小必要: 只收集业务必需的数据                               │
+│  ├── 明确告知: 在隐私政策中清晰说明                               │
+│  ├── 用户授权: 敏感权限必须用户同意                               │
+│  └── 可控可删: 用户可查看和删除自己的数据                         │
+│                                                                  │
+│  🔐 数据分类                                                     │
+│  ├── 公开数据: 用户名、头像                                       │
+│  ├── 私密数据: 交易记录、余额（仅用户可见）                        │
+│  ├── 敏感数据: 手机号、邮箱、银行卡（加密存储）                    │
+│  └── 核心数据: 密码、Token（不可逆加密）                          │
+│                                                                  │
+│  🚫 禁止行为                                                     │
+│  ├── 禁止出售用户数据                                            │
+│  ├── 禁止未授权分享给第三方                                       │
+│  ├── 禁止用于用户画像营销                                         │
+│  └── 禁止过度收集与业务无关的信息                                 │
+│                                                                  │
+│  ⚖️ 合规要求                                                     │
+│  ├── 《个人信息保护法》                                          │
+│  ├── 《数据安全法》                                              │
+│  ├── 《网络安全法》                                              │
+│  └── App Store / Google Play 隐私政策                            │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+```python
+# 用户数据导出 (GDPR合规)
+class DataExportService:
+    async def export_user_data(self, user_id: UUID) -> dict:
+        """导出用户所有数据"""
+        user = await self.user_repo.get(user_id)
+        transactions = await self.transaction_repo.get_all_by_user(user_id)
+        accounts = await self.account_repo.get_all_by_user(user_id)
+
+        return {
+            "export_date": datetime.utcnow().isoformat(),
+            "user_info": {
+                "id": str(user.id),
+                "phone": DataMasker.mask_phone(user.phone),
+                "email": user.email,
+                "created_at": user.created_at.isoformat(),
+            },
+            "accounts": [acc.to_export_dict() for acc in accounts],
+            "transactions": [tx.to_export_dict() for tx in transactions],
+        }
+
+
+# 用户数据删除 (注销账户)
+class AccountDeletionService:
+    async def delete_account(self, user_id: UUID):
+        """彻底删除用户数据"""
+        async with self.db.begin():
+            # 1. 删除交易记录
+            await self.transaction_repo.delete_all_by_user(user_id)
+
+            # 2. 删除账户
+            await self.account_repo.delete_all_by_user(user_id)
+
+            # 3. 删除用户（软删除，保留30天）
+            await self.user_repo.soft_delete(user_id)
+
+            # 4. 清除缓存
+            await self.cache.invalidate_pattern(f"user:{user_id}:*")
+
+        # 5. 异步清理（30天后彻底删除）
+        schedule_permanent_deletion.delay(str(user_id), days=30)
+```
+
+---
+
+## 二十八、用户协议系统
+
+### 28.1 协议类型
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        用户协议体系                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  📜 必签协议                                                     │
+│  ├── 用户服务协议 (Terms of Service)                             │
+│  ├── 隐私政策 (Privacy Policy)                                   │
+│  └── 儿童隐私保护声明 (如适用)                                    │
+│                                                                  │
+│  📋 可选协议                                                     │
+│  ├── 会员服务协议 (购买会员时)                                    │
+│  ├── 第三方支付协议 (使用支付功能时)                              │
+│  └── 营销信息接收同意书                                          │
+│                                                                  │
+│  🔄 协议更新机制                                                 │
+│  ├── 重大更新需重新确认                                          │
+│  ├── 更新公告提前7天通知                                         │
+│  └── 不同意可选择注销账户                                        │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 28.2 用户服务协议内容
+
+```markdown
+# AI智能记账用户服务协议
+
+更新日期：2025年1月1日
+生效日期：2025年1月1日
+
+## 一、协议的接受与修改
+
+1.1 欢迎使用AI智能记账（以下简称"本应用"）。本协议是您与[公司名称]之间关于使用本应用服务的法律协议。
+
+1.2 您在注册、登录或使用本应用时，即表示您已阅读、理解并同意接受本协议的全部条款。
+
+1.3 我们保留随时修改本协议的权利，修改后的协议将通过应用内通知或其他方式告知您。
+
+## 二、服务内容
+
+2.1 本应用提供以下服务：
+- 手动记账功能
+- 图片识别记账
+- 语音记账
+- 邮箱账单解析
+- 统计报表分析
+- 预算管理
+- 多账本管理
+- 数据同步与备份
+
+2.2 部分功能需要付费会员才能使用，具体以应用内标识为准。
+
+## 三、用户账户
+
+3.1 您需要注册账户才能使用完整功能。注册时需提供真实、准确的信息。
+
+3.2 您有责任妥善保管账户信息，因账户泄露导致的损失由您自行承担。
+
+3.3 每位用户只能注册一个账户，禁止转让、出借账户。
+
+## 四、用户行为规范
+
+4.1 您同意不会利用本应用：
+- 从事任何违法活动
+- 上传虚假、欺诈性内容
+- 侵犯他人知识产权
+- 传播恶意软件或病毒
+- 干扰或破坏应用正常运行
+- 未经授权访问他人账户
+
+4.2 违反上述规范，我们有权暂停或终止您的账户。
+
+## 五、知识产权
+
+5.1 本应用的所有内容（包括但不限于文字、图片、代码、商标）均受知识产权法保护。
+
+5.2 您在使用本应用过程中产生的数据，其所有权归您所有，但您授权我们为提供服务而必要的使用权。
+
+## 六、隐私保护
+
+6.1 我们重视您的隐私保护，详细信息请参阅《隐私政策》。
+
+6.2 未经您同意，我们不会向第三方披露您的个人信息，法律要求除外。
+
+## 七、服务的中断与终止
+
+7.1 我们可能因维护、升级或不可抗力暂停服务，将尽量提前通知。
+
+7.2 您可随时注销账户，注销后数据将按隐私政策处理。
+
+7.3 如您严重违反本协议，我们有权终止服务并不予退款。
+
+## 八、免责声明
+
+8.1 本应用提供的AI识别功能可能存在误差，请您核实后确认。
+
+8.2 我们不对因网络中断、系统故障等导致的服务中断承担责任。
+
+8.3 本应用仅为记账工具，不提供投资建议，您的财务决策由您自行负责。
+
+## 九、付费服务
+
+9.1 会员服务采用订阅制，具体价格以应用内展示为准。
+
+9.2 订阅自动续费，您可随时在账户设置中取消。
+
+9.3 已购买的服务，除法律规定外，一般不予退款。
+
+## 十、争议解决
+
+10.1 本协议适用中华人民共和国法律。
+
+10.2 因本协议产生的争议，双方应协商解决；协商不成，提交[仲裁机构]仲裁。
+
+## 十一、联系我们
+
+如有疑问，请通过以下方式联系：
+- 邮箱：support@aibook.app
+- 应用内反馈功能
+
+---
+[公司名称] 保留本协议的最终解释权。
+```
+
+### 28.3 隐私政策内容
+
+```markdown
+# AI智能记账隐私政策
+
+更新日期：2025年1月1日
+生效日期：2025年1月1日
+
+## 引言
+
+[公司名称]（以下简称"我们"）深知个人信息对您的重要性，我们将按照法律法规要求，采取相应安全保护措施，保护您的个人信息安全可控。
+
+## 一、我们收集的信息
+
+### 1.1 您主动提供的信息
+| 信息类型 | 收集目的 | 是否必须 |
+|---------|---------|---------|
+| 手机号码 | 账户注册与登录 | 是 |
+| 邮箱地址 | 账单解析、通知 | 否 |
+| 头像、昵称 | 个人资料展示 | 否 |
+| 交易记录 | 核心记账功能 | 是 |
+
+### 1.2 自动收集的信息
+| 信息类型 | 收集目的 | 是否必须 |
+|---------|---------|---------|
+| 设备标识符 | 安全防护、账户保护 | 是 |
+| 操作系统版本 | 兼容性适配 | 是 |
+| 应用使用数据 | 产品优化改进 | 否（可关闭）|
+| 崩溃日志 | 问题排查修复 | 是 |
+
+### 1.3 敏感信息说明
+- **相机权限**：用于拍照记账，仅在您主动使用时调用
+- **麦克风权限**：用于语音记账，仅在您主动使用时调用
+- **相册权限**：用于选择图片识别，仅读取您选择的图片
+
+## 二、信息的使用
+
+我们收集的信息将用于：
+1. 提供、维护和改进我们的服务
+2. 处理您的请求和交易
+3. 发送服务相关通知
+4. 安全防护和欺诈检测
+5. 遵守法律义务
+
+**我们承诺不会**：
+- 出售您的个人信息
+- 将您的信息用于未经同意的营销
+- 与无关第三方分享您的数据
+
+## 三、信息的存储
+
+3.1 **存储地点**：您的数据存储在位于中国境内的服务器。
+
+3.2 **存储期限**：
+- 账户信息：账户存续期间及注销后30天
+- 交易记录：按照财务凭证保管要求保存
+- 日志数据：最长保存90天
+
+3.3 **数据加密**：敏感信息采用AES-256加密存储。
+
+## 四、信息的共享
+
+我们仅在以下情况共享您的信息：
+
+4.1 **经您同意**：获得您明确同意后的共享
+
+4.2 **服务提供商**：
+| 合作方 | 共享内容 | 用途 |
+|-------|---------|------|
+| 阿里云 | 加密存储数据 | 云服务托管 |
+| 微信/支付宝 | 订单信息 | 支付处理 |
+| 短信服务商 | 手机号 | 验证码发送 |
+
+4.3 **法律要求**：根据法律法规或政府要求
+
+## 五、您的权利
+
+您对个人信息享有以下权利：
+
+5.1 **查阅权**：查看您的个人信息
+   - 路径：设置 → 隐私 → 个人信息
+
+5.2 **更正权**：更正不准确的信息
+   - 路径：设置 → 账户 → 编辑资料
+
+5.3 **删除权**：删除您的信息
+   - 路径：设置 → 账户 → 注销账户
+
+5.4 **导出权**：导出您的数据
+   - 路径：设置 → 数据 → 导出我的数据
+
+5.5 **撤回同意**：撤回授权同意
+   - 路径：设置 → 隐私 → 权限管理
+
+## 六、未成年人保护
+
+6.1 本应用不面向14周岁以下儿童。
+
+6.2 如果我们发现在未经监护人同意的情况下收集了儿童信息，将尽快删除。
+
+6.3 监护人如有疑问，请通过文末方式联系我们。
+
+## 七、Cookie和类似技术
+
+7.1 我们使用Cookie和类似技术来：
+- 记住您的登录状态
+- 分析应用使用情况
+- 提供个性化体验
+
+7.2 您可以在设备设置中管理Cookie偏好。
+
+## 八、信息安全
+
+我们采取以下措施保护您的信息：
+- 数据传输全程HTTPS加密
+- 敏感数据加密存储
+- 严格的访问权限控制
+- 定期安全审计
+- 员工安全培训
+
+## 九、隐私政策的更新
+
+9.1 我们可能适时修订本政策，重大变更将通过应用内通知告知。
+
+9.2 继续使用服务即表示同意更新后的政策。
+
+## 十、联系我们
+
+如有隐私相关问题：
+- **隐私专员邮箱**：privacy@aibook.app
+- **客服热线**：400-XXX-XXXX
+- **办公地址**：[公司地址]
+
+我们将在15个工作日内回复您的请求。
+
+---
+© 2025 [公司名称] 版权所有
+```
+
+### 28.4 协议签署流程
+
+```dart
+/// 协议数据模型
+class Agreement {
+  final String id;
+  final String type;       // 'tos' | 'privacy' | 'membership'
+  final String version;
+  final String title;
+  final String contentUrl;
+  final bool isRequired;
+  final DateTime effectiveDate;
+}
+
+/// 协议管理服务
+class AgreementService {
+  final ApiClient _api;
+  final SecureStorageService _storage;
+
+  /// 检查是否需要签署协议
+  Future<List<Agreement>> checkPendingAgreements() async {
+    final response = await _api.get('/api/v1/agreements/pending');
+    return (response.data['agreements'] as List)
+        .map((a) => Agreement.fromJson(a))
+        .toList();
+  }
+
+  /// 签署协议
+  Future<void> signAgreement(String agreementId) async {
+    await _api.post('/api/v1/agreements/sign', data: {
+      'agreement_id': agreementId,
+      'signed_at': DateTime.now().toIso8601String(),
+      'device_info': await DeviceInfo.getInfo(),
+    });
+  }
+
+  /// 获取协议内容
+  Future<String> getAgreementContent(String url) async {
+    final response = await _api.get(url);
+    return response.data;
+  }
+
+  /// 检查本地缓存的协议版本
+  Future<bool> isAgreementUpToDate(String type, String version) async {
+    final cachedVersion = await _storage.readSecure('agreement_${type}_version');
+    return cachedVersion == version;
+  }
+}
+
+/// 协议签署页面
+class AgreementSignPage extends ConsumerStatefulWidget {
+  final List<Agreement> agreements;
+  final VoidCallback onComplete;
+
+  @override
+  _AgreementSignPageState createState() => _AgreementSignPageState();
+}
+
+class _AgreementSignPageState extends ConsumerState<AgreementSignPage> {
+  int _currentIndex = 0;
+  bool _isChecked = false;
+  bool _hasScrolledToBottom = false;
+  String? _content;
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadContent();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 50) {
+      setState(() => _hasScrolledToBottom = true);
+    }
+  }
+
+  Future<void> _loadContent() async {
+    final content = await ref.read(agreementServiceProvider)
+        .getAgreementContent(widget.agreements[_currentIndex].contentUrl);
+    setState(() => _content = content);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final agreement = widget.agreements[_currentIndex];
+    final isLast = _currentIndex == widget.agreements.length - 1;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(agreement.title),
+        automaticallyImplyLeading: false,
+      ),
+      body: Column(
+        children: [
+          // 进度指示
+          LinearProgressIndicator(
+            value: (_currentIndex + 1) / widget.agreements.length,
+          ),
+
+          // 协议内容
+          Expanded(
+            child: _content == null
+                ? Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    controller: _scrollController,
+                    padding: EdgeInsets.all(16),
+                    child: MarkdownBody(data: _content!),
+                  ),
+          ),
+
+          // 底部操作区
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              boxShadow: [BoxShadow(blurRadius: 4, color: Colors.black12)],
+            ),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 阅读提示
+                  if (!_hasScrolledToBottom)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        '请阅读完整协议内容',
+                        style: TextStyle(color: Colors.orange),
+                      ),
+                    ),
+
+                  // 同意勾选
+                  CheckboxListTile(
+                    value: _isChecked,
+                    onChanged: _hasScrolledToBottom
+                        ? (v) => setState(() => _isChecked = v!)
+                        : null,
+                    title: Text('我已阅读并同意${agreement.title}'),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+
+                  SizedBox(height: 12),
+
+                  // 操作按钮
+                  Row(
+                    children: [
+                      // 不同意按钮（非必须协议可跳过）
+                      if (!agreement.isRequired)
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _nextOrComplete,
+                            child: Text('跳过'),
+                          ),
+                        ),
+
+                      if (!agreement.isRequired) SizedBox(width: 12),
+
+                      // 同意按钮
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: _isChecked ? _signAndNext : null,
+                          child: Text(isLast ? '同意并开始使用' : '同意并继续'),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // 不同意退出（必须协议）
+                  if (agreement.isRequired)
+                    TextButton(
+                      onPressed: _showExitConfirmation,
+                      child: Text(
+                        '不同意并退出',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _signAndNext() async {
+    await ref.read(agreementServiceProvider)
+        .signAgreement(widget.agreements[_currentIndex].id);
+
+    _nextOrComplete();
+  }
+
+  void _nextOrComplete() {
+    if (_currentIndex < widget.agreements.length - 1) {
+      setState(() {
+        _currentIndex++;
+        _isChecked = false;
+        _hasScrolledToBottom = false;
+        _content = null;
+      });
+      _loadContent();
+      _scrollController.jumpTo(0);
+    } else {
+      widget.onComplete();
+    }
+  }
+
+  void _showExitConfirmation() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('确认退出？'),
+        content: Text('不同意协议将无法使用本应用。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => SystemNavigator.pop(),
+            child: Text('退出', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+```
+
+### 28.5 协议版本管理
+
+```python
+# 数据库模型
+class AgreementVersion(Base):
+    __tablename__ = "agreement_versions"
+
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
+    type = Column(String(50), nullable=False)  # tos, privacy, membership
+    version = Column(String(20), nullable=False)
+    title = Column(String(200), nullable=False)
+    content_url = Column(String(500), nullable=False)
+    is_required = Column(Boolean, default=True)
+    is_major_update = Column(Boolean, default=False)  # 重大更新需重新签署
+    effective_date = Column(Date, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('type', 'version', name='uq_agreement_version'),
+    )
+
+
+class UserAgreementSign(Base):
+    __tablename__ = "user_agreement_signs"
+
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID, ForeignKey("users.id"), nullable=False)
+    agreement_id = Column(UUID, ForeignKey("agreement_versions.id"), nullable=False)
+    signed_at = Column(DateTime, nullable=False)
+    ip_address = Column(String(50))
+    device_info = Column(JSONB)
+
+
+# API接口
+@router.get("/agreements/pending")
+async def get_pending_agreements(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取待签署的协议"""
+    # 获取所有生效的协议
+    active_agreements = await db.execute(
+        select(AgreementVersion)
+        .where(AgreementVersion.effective_date <= date.today())
+        .order_by(AgreementVersion.type, AgreementVersion.version.desc())
+    )
+
+    # 获取用户已签署的协议
+    signed = await db.execute(
+        select(UserAgreementSign.agreement_id)
+        .where(UserAgreementSign.user_id == current_user.id)
+    )
+    signed_ids = {row[0] for row in signed}
+
+    # 筛选待签署的协议
+    pending = []
+    latest_by_type = {}
+
+    for agreement in active_agreements.scalars():
+        if agreement.type not in latest_by_type:
+            latest_by_type[agreement.type] = agreement
+            if agreement.id not in signed_ids:
+                pending.append(agreement)
+            elif agreement.is_major_update:
+                # 检查是否在此版本后签署过
+                # ...
+                pass
+
+    return {"agreements": [a.to_dict() for a in pending]}
+
+
+@router.post("/agreements/sign")
+async def sign_agreement(
+    request: Request,
+    data: AgreementSignRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """签署协议"""
+    sign_record = UserAgreementSign(
+        user_id=current_user.id,
+        agreement_id=data.agreement_id,
+        signed_at=datetime.utcnow(),
+        ip_address=request.client.host,
+        device_info=data.device_info,
+    )
+
+    db.add(sign_record)
+    await db.commit()
+
+    return {"success": True}
+```
+
+### 28.6 协议API设计
+
+```
+#### 协议管理API
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/agreements/pending | 获取待签署协议 |
+| GET | /api/v1/agreements/{type}/latest | 获取最新协议版本 |
+| GET | /api/v1/agreements/{id}/content | 获取协议内容 |
+| POST | /api/v1/agreements/sign | 签署协议 |
+| GET | /api/v1/user/agreements | 获取用户签署记录 |
+
+#### 管理后台API
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/admin/agreements | 协议版本列表 |
+| POST | /api/v1/admin/agreements | 创建新版本 |
+| PUT | /api/v1/admin/agreements/{id} | 更新协议 |
+| GET | /api/v1/admin/agreements/stats | 签署统计 |
+```
+
+---
+
 以上是AI智能记账应用的完整架构设计，包含了所有确认的功能需求。如有需要调整的地方请提出。
