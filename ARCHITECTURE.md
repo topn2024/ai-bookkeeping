@@ -7382,4 +7382,1107 @@ if (ABTestManager().isInExperiment('new_home_layout', 'B')) {
 
 ---
 
+## 二十五、主题换肤系统
+
+### 25.1 主题系统概述
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        主题换肤系统                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🎨 核心功能                                                     │
+│  ├── 预设主题: 提供多套经典主题供用户选择                          │
+│  ├── 深色模式: 支持浅色/深色/跟随系统                             │
+│  ├── 主题预览: 切换前可预览效果                                   │
+│  ├── 实时切换: 无需重启即时生效                                   │
+│  └── 会员主题: 部分高级主题仅限会员使用                           │
+│                                                                  │
+│  📦 主题包含内容                                                 │
+│  ├── 颜色方案: 主色、辅助色、背景色、文字色等                      │
+│  ├── 图标样式: 匹配主题的图标风格                                 │
+│  ├── 字体配置: 字体大小、字重                                     │
+│  ├── 圆角样式: 组件圆角大小                                       │
+│  └── 动画效果: 主题特有的过渡动画                                 │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 25.2 预设经典主题
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        经典主题列表                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🌟 基础主题 (免费)                                              │
+│                                                                  │
+│  1. 默认蓝 (Default Blue)                                        │
+│     ├── 主色: #2196F3 (Material Blue)                            │
+│     ├── 辅助色: #64B5F6                                          │
+│     ├── 背景: #FFFFFF / #121212 (深色)                           │
+│     ├── 风格: 简洁专业，适合日常使用                               │
+│     └── 图标: 线性图标                                           │
+│                                                                  │
+│  2. 薄荷绿 (Mint Green)                                          │
+│     ├── 主色: #26A69A (Teal)                                     │
+│     ├── 辅助色: #80CBC4                                          │
+│     ├── 背景: #F5FFFA / #1A2F2A (深色)                           │
+│     ├── 风格: 清新自然，护眼舒适                                   │
+│     └── 图标: 圆润图标                                           │
+│                                                                  │
+│  3. 暖阳橙 (Warm Orange)                                         │
+│     ├── 主色: #FF9800 (Orange)                                   │
+│     ├── 辅助色: #FFB74D                                          │
+│     ├── 背景: #FFFAF0 / #2D2416 (深色)                           │
+│     ├── 风格: 温暖活力，积极向上                                   │
+│     └── 图标: 填充图标                                           │
+│                                                                  │
+│  4. 经典黑白 (Classic Mono)                                      │
+│     ├── 主色: #424242 (Grey)                                     │
+│     ├── 辅助色: #757575                                          │
+│     ├── 背景: #FAFAFA / #000000 (深色)                           │
+│     ├── 风格: 极简商务，低调稳重                                   │
+│     └── 图标: 细线图标                                           │
+│                                                                  │
+│  ⭐ 会员专属主题                                                  │
+│                                                                  │
+│  5. 樱花粉 (Sakura Pink)                                         │
+│     ├── 主色: #E91E63 (Pink)                                     │
+│     ├── 辅助色: #F48FB1                                          │
+│     ├── 背景: #FFF0F5 / #2D1A21 (深色)                           │
+│     ├── 风格: 浪漫温柔，少女心                                     │
+│     └── 图标: 可爱圆润图标                                        │
+│                                                                  │
+│  6. 深邃紫 (Royal Purple)                                        │
+│     ├── 主色: #673AB7 (Deep Purple)                              │
+│     ├── 辅助色: #9575CD                                          │
+│     ├── 背景: #F3E5F5 / #1A1625 (深色)                           │
+│     ├── 风格: 神秘高贵，个性独特                                   │
+│     └── 图标: 渐变图标                                           │
+│                                                                  │
+│  7. 海洋蓝 (Ocean Blue)                                          │
+│     ├── 主色: #0277BD (Light Blue)                               │
+│     ├── 辅助色: #4FC3F7                                          │
+│     ├── 背景: #E1F5FE / #0D1B2A (深色)                           │
+│     ├── 风格: 深沉宁静，专注高效                                   │
+│     └── 图标: 水波纹图标                                          │
+│                                                                  │
+│  8. 森林绿 (Forest Green)                                        │
+│     ├── 主色: #2E7D32 (Green)                                    │
+│     ├── 辅助色: #81C784                                          │
+│     ├── 背景: #E8F5E9 / #1B2E1B (深色)                           │
+│     ├── 风格: 自然生态，环保健康                                   │
+│     └── 图标: 自然风格图标                                        │
+│                                                                  │
+│  9. 中国红 (China Red)                                           │
+│     ├── 主色: #C62828 (Red)                                      │
+│     ├── 辅助色: #EF5350                                          │
+│     ├── 背景: #FFEBEE / #2D1616 (深色)                           │
+│     ├── 风格: 喜庆热情，节日氛围                                   │
+│     └── 图标: 传统风格图标                                        │
+│                                                                  │
+│  10. 星空紫 (Galaxy Purple)                                      │
+│      ├── 主色: 渐变 #667eea → #764ba2                            │
+│      ├── 辅助色: #B39DDB                                         │
+│      ├── 背景: 渐变 #0F0C29 → #302B63 → #24243E                  │
+│      ├── 风格: 梦幻科技，未来感                                    │
+│      └── 图标: 霓虹风格图标                                       │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 25.3 主题数据结构
+
+```dart
+/// 主题配置模型
+class AppThemeConfig {
+  final String id;              // 主题ID
+  final String name;            // 主题名称
+  final String nameEn;          // 英文名称
+  final String description;     // 主题描述
+  final bool isPremium;         // 是否会员专属
+  final String iconAsset;       // 主题图标
+  final String previewAsset;    // 预览图
+  final ThemeColors lightColors; // 浅色模式颜色
+  final ThemeColors darkColors;  // 深色模式颜色
+  final ThemeTypography typography; // 字体配置
+  final ThemeShapes shapes;     // 形状配置
+  final String iconStyle;       // 图标风格
+}
+
+/// 主题颜色配置
+class ThemeColors {
+  // 品牌色
+  final Color primary;          // 主色
+  final Color primaryLight;     // 主色浅
+  final Color primaryDark;      // 主色深
+  final Color secondary;        // 辅助色
+  final Color accent;           // 强调色
+
+  // 背景色
+  final Color background;       // 主背景
+  final Color surface;          // 卡片背景
+  final Color surfaceVariant;   // 次级背景
+
+  // 文字色
+  final Color textPrimary;      // 主文字
+  final Color textSecondary;    // 次要文字
+  final Color textHint;         // 提示文字
+  final Color textOnPrimary;    // 主色上的文字
+
+  // 功能色
+  final Color success;          // 成功/收入
+  final Color error;            // 错误/支出
+  final Color warning;          // 警告
+  final Color info;             // 信息
+
+  // 边框和分隔线
+  final Color border;           // 边框色
+  final Color divider;          // 分隔线
+
+  // 特殊
+  final Color shadow;           // 阴影色
+  final Color overlay;          // 遮罩层
+}
+
+/// 字体配置
+class ThemeTypography {
+  final String fontFamily;      // 字体族
+  final double fontSizeScale;   // 字体大小缩放
+  final FontWeight headingWeight; // 标题字重
+  final FontWeight bodyWeight;  // 正文字重
+}
+
+/// 形状配置
+class ThemeShapes {
+  final double borderRadiusSmall;  // 小圆角 4-8
+  final double borderRadiusMedium; // 中圆角 8-12
+  final double borderRadiusLarge;  // 大圆角 12-20
+  final double borderRadiusXL;     // 超大圆角 20-28
+  final double cardElevation;      // 卡片阴影
+}
+```
+
+### 25.4 预设主题配置
+
+```dart
+/// 预设主题列表
+class PresetThemes {
+  static final List<AppThemeConfig> themes = [
+    // 1. 默认蓝
+    AppThemeConfig(
+      id: 'default_blue',
+      name: '默认蓝',
+      nameEn: 'Default Blue',
+      description: '简洁专业，适合日常使用',
+      isPremium: false,
+      iconAsset: 'assets/themes/icons/default_blue.svg',
+      previewAsset: 'assets/themes/previews/default_blue.png',
+      lightColors: ThemeColors(
+        primary: Color(0xFF2196F3),
+        primaryLight: Color(0xFF64B5F6),
+        primaryDark: Color(0xFF1976D2),
+        secondary: Color(0xFF03A9F4),
+        accent: Color(0xFF00BCD4),
+        background: Color(0xFFFFFFFF),
+        surface: Color(0xFFF5F5F5),
+        surfaceVariant: Color(0xFFEEEEEE),
+        textPrimary: Color(0xFF212121),
+        textSecondary: Color(0xFF757575),
+        textHint: Color(0xFFBDBDBD),
+        textOnPrimary: Color(0xFFFFFFFF),
+        success: Color(0xFF4CAF50),
+        error: Color(0xFFF44336),
+        warning: Color(0xFFFF9800),
+        info: Color(0xFF2196F3),
+        border: Color(0xFFE0E0E0),
+        divider: Color(0xFFEEEEEE),
+        shadow: Color(0x1A000000),
+        overlay: Color(0x80000000),
+      ),
+      darkColors: ThemeColors(
+        primary: Color(0xFF64B5F6),
+        primaryLight: Color(0xFF90CAF9),
+        primaryDark: Color(0xFF42A5F5),
+        secondary: Color(0xFF4FC3F7),
+        accent: Color(0xFF4DD0E1),
+        background: Color(0xFF121212),
+        surface: Color(0xFF1E1E1E),
+        surfaceVariant: Color(0xFF2C2C2C),
+        textPrimary: Color(0xFFE0E0E0),
+        textSecondary: Color(0xFF9E9E9E),
+        textHint: Color(0xFF616161),
+        textOnPrimary: Color(0xFF000000),
+        success: Color(0xFF81C784),
+        error: Color(0xFFE57373),
+        warning: Color(0xFFFFB74D),
+        info: Color(0xFF64B5F6),
+        border: Color(0xFF424242),
+        divider: Color(0xFF303030),
+        shadow: Color(0x40000000),
+        overlay: Color(0xCC000000),
+      ),
+      typography: ThemeTypography(
+        fontFamily: 'System',
+        fontSizeScale: 1.0,
+        headingWeight: FontWeight.w600,
+        bodyWeight: FontWeight.w400,
+      ),
+      shapes: ThemeShapes(
+        borderRadiusSmall: 4,
+        borderRadiusMedium: 8,
+        borderRadiusLarge: 12,
+        borderRadiusXL: 20,
+        cardElevation: 2,
+      ),
+      iconStyle: 'outlined',
+    ),
+
+    // 2. 薄荷绿
+    AppThemeConfig(
+      id: 'mint_green',
+      name: '薄荷绿',
+      nameEn: 'Mint Green',
+      description: '清新自然，护眼舒适',
+      isPremium: false,
+      lightColors: ThemeColors(
+        primary: Color(0xFF26A69A),
+        primaryLight: Color(0xFF80CBC4),
+        primaryDark: Color(0xFF00897B),
+        // ... 完整颜色配置
+      ),
+      // ... 其他配置
+    ),
+
+    // 3-10. 其他主题配置...
+  ];
+
+  /// 获取主题
+  static AppThemeConfig? getTheme(String id) {
+    return themes.firstWhereOrNull((t) => t.id == id);
+  }
+
+  /// 获取免费主题
+  static List<AppThemeConfig> get freeThemes {
+    return themes.where((t) => !t.isPremium).toList();
+  }
+
+  /// 获取会员主题
+  static List<AppThemeConfig> get premiumThemes {
+    return themes.where((t) => t.isPremium).toList();
+  }
+}
+```
+
+### 25.5 主题Provider实现
+
+```dart
+/// 主题状态管理
+final themeProvider = StateNotifierProvider<ThemeNotifier, ThemeState>((ref) {
+  return ThemeNotifier(ref);
+});
+
+class ThemeState {
+  final String themeId;           // 当前主题ID
+  final ThemeMode themeMode;      // 浅色/深色/跟随系统
+  final AppThemeConfig config;    // 主题配置
+  final ThemeData lightTheme;     // Material浅色主题
+  final ThemeData darkTheme;      // Material深色主题
+
+  ThemeState({
+    required this.themeId,
+    required this.themeMode,
+    required this.config,
+    required this.lightTheme,
+    required this.darkTheme,
+  });
+}
+
+class ThemeNotifier extends StateNotifier<ThemeState> {
+  final Ref _ref;
+
+  ThemeNotifier(this._ref) : super(_loadInitialTheme());
+
+  /// 加载初始主题
+  static ThemeState _loadInitialTheme() {
+    final prefs = SharedPreferences.getInstance();
+    final themeId = prefs.getString('theme_id') ?? 'default_blue';
+    final themeMode = ThemeMode.values[prefs.getInt('theme_mode') ?? 0];
+    return _buildThemeState(themeId, themeMode);
+  }
+
+  /// 切换主题
+  Future<void> setTheme(String themeId) async {
+    // 检查会员权限
+    final config = PresetThemes.getTheme(themeId);
+    if (config == null) return;
+
+    if (config.isPremium) {
+      final isPremium = await _ref.read(membershipProvider).isPremium;
+      if (!isPremium) {
+        throw ThemePermissionException('此主题需要会员权限');
+      }
+    }
+
+    // 更新主题
+    state = _buildThemeState(themeId, state.themeMode);
+
+    // 持久化
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('theme_id', themeId);
+
+    // 埋点
+    AnalyticsSDK().track('theme_change', {
+      'theme_id': themeId,
+      'theme_name': config.name,
+      'is_premium': config.isPremium,
+    });
+  }
+
+  /// 切换深色模式
+  Future<void> setThemeMode(ThemeMode mode) async {
+    state = ThemeState(
+      themeId: state.themeId,
+      themeMode: mode,
+      config: state.config,
+      lightTheme: state.lightTheme,
+      darkTheme: state.darkTheme,
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('theme_mode', mode.index);
+  }
+
+  /// 构建主题状态
+  static ThemeState _buildThemeState(String themeId, ThemeMode mode) {
+    final config = PresetThemes.getTheme(themeId) ?? PresetThemes.themes.first;
+
+    return ThemeState(
+      themeId: themeId,
+      themeMode: mode,
+      config: config,
+      lightTheme: _buildMaterialTheme(config.lightColors, config),
+      darkTheme: _buildMaterialTheme(config.darkColors, config),
+    );
+  }
+
+  /// 构建Material主题
+  static ThemeData _buildMaterialTheme(ThemeColors colors, AppThemeConfig config) {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: colors.background.computeLuminance() > 0.5
+          ? Brightness.light
+          : Brightness.dark,
+      primaryColor: colors.primary,
+      colorScheme: ColorScheme(
+        brightness: colors.background.computeLuminance() > 0.5
+            ? Brightness.light
+            : Brightness.dark,
+        primary: colors.primary,
+        onPrimary: colors.textOnPrimary,
+        secondary: colors.secondary,
+        onSecondary: colors.textOnPrimary,
+        error: colors.error,
+        onError: Colors.white,
+        background: colors.background,
+        onBackground: colors.textPrimary,
+        surface: colors.surface,
+        onSurface: colors.textPrimary,
+      ),
+      scaffoldBackgroundColor: colors.background,
+      cardColor: colors.surface,
+      dividerColor: colors.divider,
+      appBarTheme: AppBarTheme(
+        backgroundColor: colors.surface,
+        foregroundColor: colors.textPrimary,
+        elevation: 0,
+      ),
+      cardTheme: CardTheme(
+        color: colors.surface,
+        elevation: config.shapes.cardElevation,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(config.shapes.borderRadiusMedium),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: colors.primary,
+          foregroundColor: colors.textOnPrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(config.shapes.borderRadiusMedium),
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: colors.surfaceVariant,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(config.shapes.borderRadiusSmall),
+          borderSide: BorderSide(color: colors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(config.shapes.borderRadiusSmall),
+          borderSide: BorderSide(color: colors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(config.shapes.borderRadiusSmall),
+          borderSide: BorderSide(color: colors.primary, width: 2),
+        ),
+      ),
+      // ... 更多组件主题配置
+    );
+  }
+}
+```
+
+### 25.6 主题选择界面
+
+```dart
+/// 主题选择页面
+class ThemeSettingsPage extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeProvider);
+    final membership = ref.watch(membershipProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: Text('主题设置')),
+      body: ListView(
+        padding: EdgeInsets.all(16),
+        children: [
+          // 深色模式设置
+          _buildDarkModeSection(context, ref, themeState),
+
+          SizedBox(height: 24),
+
+          // 免费主题
+          Text('基础主题', style: Theme.of(context).textTheme.titleMedium),
+          SizedBox(height: 12),
+          _buildThemeGrid(
+            context,
+            ref,
+            PresetThemes.freeThemes,
+            themeState.themeId,
+          ),
+
+          SizedBox(height: 24),
+
+          // 会员主题
+          Row(
+            children: [
+              Text('会员专属', style: Theme.of(context).textTheme.titleMedium),
+              SizedBox(width: 8),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('VIP', style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                )),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          _buildThemeGrid(
+            context,
+            ref,
+            PresetThemes.premiumThemes,
+            themeState.themeId,
+            isPremiumRequired: !membership.isPremium,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDarkModeSection(BuildContext context, WidgetRef ref, ThemeState state) {
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('深色模式', style: Theme.of(context).textTheme.titleSmall),
+            SizedBox(height: 12),
+            SegmentedButton<ThemeMode>(
+              segments: [
+                ButtonSegment(value: ThemeMode.light, label: Text('浅色')),
+                ButtonSegment(value: ThemeMode.dark, label: Text('深色')),
+                ButtonSegment(value: ThemeMode.system, label: Text('跟随系统')),
+              ],
+              selected: {state.themeMode},
+              onSelectionChanged: (modes) {
+                ref.read(themeProvider.notifier).setThemeMode(modes.first);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeGrid(
+    BuildContext context,
+    WidgetRef ref,
+    List<AppThemeConfig> themes,
+    String currentThemeId, {
+    bool isPremiumRequired = false,
+  }) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: themes.length,
+      itemBuilder: (context, index) {
+        final theme = themes[index];
+        final isSelected = theme.id == currentThemeId;
+
+        return _ThemeCard(
+          theme: theme,
+          isSelected: isSelected,
+          isLocked: isPremiumRequired,
+          onTap: () => _selectTheme(context, ref, theme, isPremiumRequired),
+        );
+      },
+    );
+  }
+
+  void _selectTheme(BuildContext context, WidgetRef ref, AppThemeConfig theme, bool isLocked) {
+    if (isLocked) {
+      // 显示会员引导
+      showModalBottomSheet(
+        context: context,
+        builder: (_) => PremiumUpgradeSheet(feature: '专属主题'),
+      );
+      return;
+    }
+
+    // 显示预览对话框
+    showDialog(
+      context: context,
+      builder: (_) => ThemePreviewDialog(
+        theme: theme,
+        onConfirm: () {
+          ref.read(themeProvider.notifier).setTheme(theme.id);
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+}
+
+/// 主题卡片
+class _ThemeCard extends StatelessWidget {
+  final AppThemeConfig theme;
+  final bool isSelected;
+  final bool isLocked;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: isSelected ? Border.all(
+            color: Theme.of(context).primaryColor,
+            width: 2,
+          ) : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            children: [
+              // 主题预览色块
+              Column(
+                children: [
+                  // 顶部主色
+                  Expanded(
+                    flex: 2,
+                    child: Container(color: theme.lightColors.primary),
+                  ),
+                  // 底部背景色
+                  Expanded(
+                    flex: 1,
+                    child: Container(
+                      color: theme.lightColors.background,
+                      padding: EdgeInsets.all(8),
+                      child: Row(
+                        children: [
+                          Text(
+                            theme.name,
+                            style: TextStyle(
+                              color: theme.lightColors.textPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // 选中标记
+              if (isSelected)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.check, size: 16, color: theme.lightColors.primary),
+                  ),
+                ),
+
+              // 锁定标记
+              if (isLocked)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withOpacity(0.3),
+                    child: Center(
+                      child: Icon(Icons.lock, color: Colors.white, size: 32),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+### 25.7 主题预览对话框
+
+```dart
+/// 主题预览对话框
+class ThemePreviewDialog extends StatelessWidget {
+  final AppThemeConfig theme;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    // 使用临时主题包装预览内容
+    return Theme(
+      data: ThemeNotifier._buildMaterialTheme(theme.lightColors, theme),
+      child: Dialog(
+        child: Container(
+          width: 320,
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 预览标题
+              Text(
+                '预览: ${theme.name}',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: theme.lightColors.textPrimary,
+                ),
+              ),
+
+              SizedBox(height: 20),
+
+              // 模拟界面预览
+              Container(
+                height: 280,
+                decoration: BoxDecoration(
+                  color: theme.lightColors.background,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.lightColors.border),
+                ),
+                child: Column(
+                  children: [
+                    // 模拟AppBar
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      color: theme.lightColors.surface,
+                      child: Row(
+                        children: [
+                          Icon(Icons.arrow_back, color: theme.lightColors.textPrimary, size: 20),
+                          SizedBox(width: 12),
+                          Text('记一笔', style: TextStyle(
+                            color: theme.lightColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          )),
+                        ],
+                      ),
+                    ),
+
+                    // 模拟金额
+                    Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                        '¥ 128.00',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: theme.lightColors.error,
+                        ),
+                      ),
+                    ),
+
+                    // 模拟分类按钮
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: ['餐饮', '交通', '购物', '娱乐'].map((cat) {
+                          return Container(
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: theme.lightColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(cat, style: TextStyle(
+                              color: theme.lightColors.primary,
+                              fontSize: 12,
+                            )),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+
+                    Spacer(),
+
+                    // 模拟保存按钮
+                    Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: theme.lightColors.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Text('保存', style: TextStyle(
+                            color: theme.lightColors.textOnPrimary,
+                            fontWeight: FontWeight.w600,
+                          )),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 20),
+
+              // 操作按钮
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('取消'),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: onConfirm,
+                      child: Text('应用'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+### 25.8 主题切换动画
+
+```dart
+/// 主题切换动画管理器
+class ThemeTransitionManager {
+  /// 执行主题切换动画
+  static Future<void> animateThemeChange({
+    required BuildContext context,
+    required VoidCallback onThemeChange,
+    TransitionType type = TransitionType.fade,
+  }) async {
+    final overlay = Overlay.of(context);
+
+    switch (type) {
+      case TransitionType.fade:
+        await _fadeTransition(overlay, onThemeChange);
+        break;
+      case TransitionType.circular:
+        await _circularRevealTransition(context, overlay, onThemeChange);
+        break;
+      case TransitionType.slide:
+        await _slideTransition(overlay, onThemeChange);
+        break;
+    }
+  }
+
+  /// 淡入淡出切换
+  static Future<void> _fadeTransition(
+    OverlayState overlay,
+    VoidCallback onThemeChange,
+  ) async {
+    final entry = OverlayEntry(
+      builder: (_) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.0, end: 1.0),
+        duration: Duration(milliseconds: 300),
+        builder: (_, value, __) => Container(
+          color: Colors.black.withOpacity(value * 0.3),
+        ),
+      ),
+    );
+
+    overlay.insert(entry);
+    await Future.delayed(Duration(milliseconds: 150));
+    onThemeChange();
+    await Future.delayed(Duration(milliseconds: 300));
+    entry.remove();
+  }
+
+  /// 圆形揭示动画
+  static Future<void> _circularRevealTransition(
+    BuildContext context,
+    OverlayState overlay,
+    VoidCallback onThemeChange,
+  ) async {
+    // 获取点击位置
+    final box = context.findRenderObject() as RenderBox;
+    final center = box.localToGlobal(box.size.center(Offset.zero));
+
+    // 创建圆形动画遮罩
+    // ... 实现圆形扩展动画
+  }
+}
+
+enum TransitionType { fade, circular, slide }
+```
+
+### 25.9 主题同步
+
+```dart
+/// 主题同步服务
+class ThemeSyncService {
+  /// 上传用户主题偏好
+  Future<void> uploadPreference(String themeId, ThemeMode mode) async {
+    if (!AuthService.isLoggedIn) return;
+
+    await apiClient.post('/api/v1/user/preferences', data: {
+      'theme_id': themeId,
+      'theme_mode': mode.index,
+    });
+  }
+
+  /// 下载用户主题偏好（登录后同步）
+  Future<ThemePreference?> downloadPreference() async {
+    if (!AuthService.isLoggedIn) return null;
+
+    final response = await apiClient.get('/api/v1/user/preferences');
+    if (response.data['theme_id'] != null) {
+      return ThemePreference(
+        themeId: response.data['theme_id'],
+        themeMode: ThemeMode.values[response.data['theme_mode'] ?? 0],
+      );
+    }
+    return null;
+  }
+}
+```
+
+### 25.10 节日主题
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        节日限定主题                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🎄 节日主题 (限时免费)                                          │
+│                                                                  │
+│  • 春节红: 1月-2月期间免费使用                                    │
+│  • 圣诞绿: 12月免费使用                                          │
+│  • 万圣节: 10月免费使用                                          │
+│  • 情人节: 2月14日前后一周                                       │
+│                                                                  │
+│  ⏰ 自动切换逻辑                                                 │
+│  ├── 节日期间首次打开App提示是否切换                              │
+│  ├── 节日结束后自动恢复之前主题                                   │
+│  └── 用户可在设置中关闭节日主题自动切换                           │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+```dart
+/// 节日主题管理
+class SeasonalThemeManager {
+  /// 检查当前是否有节日主题
+  static SeasonalTheme? getCurrentSeasonalTheme() {
+    final now = DateTime.now();
+
+    // 春节 (农历除夕前一周到正月十五)
+    if (_isSpringFestivalPeriod(now)) {
+      return SeasonalTheme(
+        id: 'spring_festival',
+        name: '新春红',
+        startDate: _getSpringFestivalStart(now.year),
+        endDate: _getSpringFestivalEnd(now.year),
+      );
+    }
+
+    // 圣诞节 (12月20日-12月26日)
+    if (now.month == 12 && now.day >= 20 && now.day <= 26) {
+      return SeasonalTheme(
+        id: 'christmas',
+        name: '圣诞绿',
+        startDate: DateTime(now.year, 12, 20),
+        endDate: DateTime(now.year, 12, 26),
+      );
+    }
+
+    return null;
+  }
+
+  /// 提示用户切换节日主题
+  static void promptSeasonalTheme(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final seasonal = getCurrentSeasonalTheme();
+    if (seasonal == null) return;
+
+    final prompted = prefs.getBool('seasonal_${seasonal.id}_prompted') ?? false;
+    if (prompted) return;
+
+    // 显示切换提示
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('🎉 ${seasonal.name}主题已上线'),
+        content: Text('节日期间免费使用，是否立即切换？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('暂不'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // 切换主题
+              context.read(themeProvider.notifier).setTheme(seasonal.id);
+              Navigator.pop(context);
+            },
+            child: Text('立即体验'),
+          ),
+        ],
+      ),
+    );
+
+    await prefs.setBool('seasonal_${seasonal.id}_prompted', true);
+  }
+}
+```
+
+### 25.11 数据库设计
+
+```sql
+-- 用户主题偏好表
+CREATE TABLE user_theme_preferences (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    theme_id VARCHAR(50) NOT NULL DEFAULT 'default_blue',
+    theme_mode SMALLINT NOT NULL DEFAULT 0, -- 0:light, 1:dark, 2:system
+    auto_seasonal BOOLEAN DEFAULT true,     -- 是否自动切换节日主题
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id)
+);
+
+-- 主题使用统计表（用于分析）
+CREATE TABLE theme_usage_stats (
+    id SERIAL PRIMARY KEY,
+    theme_id VARCHAR(50) NOT NULL,
+    usage_count INTEGER DEFAULT 0,
+    unique_users INTEGER DEFAULT 0,
+    stat_date DATE NOT NULL,
+    UNIQUE(theme_id, stat_date)
+);
+```
+
+### 25.12 API设计
+
+```
+#### 主题偏好API
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/user/theme-preference | 获取用户主题偏好 |
+| PUT | /api/v1/user/theme-preference | 更新主题偏好 |
+| GET | /api/v1/themes | 获取可用主题列表 |
+| GET | /api/v1/themes/seasonal | 获取当前节日主题 |
+
+#### 请求/响应示例
+
+# 更新主题偏好
+PUT /api/v1/user/theme-preference
+{
+  "theme_id": "ocean_blue",
+  "theme_mode": 2,
+  "auto_seasonal": true
+}
+
+# 获取主题列表
+GET /api/v1/themes
+{
+  "themes": [
+    {
+      "id": "default_blue",
+      "name": "默认蓝",
+      "name_en": "Default Blue",
+      "is_premium": false,
+      "preview_url": "https://cdn.example.com/themes/default_blue.png"
+    },
+    {
+      "id": "sakura_pink",
+      "name": "樱花粉",
+      "name_en": "Sakura Pink",
+      "is_premium": true,
+      "preview_url": "https://cdn.example.com/themes/sakura_pink.png"
+    }
+  ],
+  "seasonal": {
+    "id": "spring_festival",
+    "name": "新春红",
+    "start_date": "2025-01-22",
+    "end_date": "2025-02-12"
+  }
+}
+```
+
+---
+
 以上是AI智能记账应用的完整架构设计，包含了所有确认的功能需求。如有需要调整的地方请提出。
