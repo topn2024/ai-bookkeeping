@@ -993,136 +993,505 @@ class OfflineDataManager {
 
 ## 十五、会员系统设计
 
-### 15.1 会员等级
+### 15.1 用户类型与会员等级
+
+#### 用户类型定义
+
+| 类型 | 说明 | 获取方式 |
+|------|------|----------|
+| **注册用户** | 通过微信/Apple/手机号登录自动成为 | 登录即注册 |
+| **试用用户** | 注册用户申请AI试用 | 申请1次，30天有效 |
+| **付费会员** | 购买会员服务 | 微信/支付宝支付 |
+
+#### 会员等级
 
 | 等级 | 名称 | 价格 | 有效期 |
 |------|------|------|--------|
-| 0 | 免费用户 | 免费 | 永久 |
-| 1 | 月度会员 | ¥12/月 | 1个月 |
-| 2 | 年度会员 | ¥98/年 | 1年 |
-| 3 | 终身会员 | ¥298 | 永久 |
+| 0 | 注册用户 | 免费 | 永久 |
+| 1 | AI试用 | 免费(仅1次) | 30天 |
+| 2 | 月度会员 | ¥12/月 | 1个月 |
+| 3 | 季度会员 | ¥30/季 | 3个月 |
+| 4 | 年度会员 | ¥98/年 | 1年 |
+| 5 | 终身会员 | ¥298 | 永久 |
 
 ### 15.2 功能权益对比
 
-| 功能 | 免费用户 | VIP会员 |
-|------|----------|---------|
-| **基础记账** | | |
-| 手动记账 | ✅ 无限 | ✅ 无限 |
-| 账本数量 | 2个 | ✅ 无限 |
-| 账户数量 | 5个 | ✅ 无限 |
-| 成员协作 | 2人 | ✅ 10人 |
-| **AI功能** | | |
-| 图片识别记账 | 5次/月 | ✅ 无限 |
-| 语音记账 | 10次/月 | ✅ 无限 |
-| 邮箱账单解析 | ❌ | ✅ |
-| 智能分类建议 | ❌ | ✅ |
-| **统计报表** | | |
-| 基础统计 | ✅ | ✅ |
-| 趋势分析 | 最近3月 | ✅ 全部 |
-| 分类占比 | ✅ | ✅ |
-| 年度报告 | ❌ | ✅ |
-| 自定义报表 | ❌ | ✅ |
-| **数据功能** | | |
-| 数据导出(CSV) | ❌ | ✅ |
-| 数据导出(Excel) | ❌ | ✅ |
-| 云端备份 | 手动/月 | ✅ 自动/日 |
-| 历史备份保留 | 1份 | ✅ 30份 |
-| **高级功能** | | |
-| 定时记账 | ❌ | ✅ |
-| 桌面小组件 | 基础 | ✅ 全部 |
-| 自定义分类图标 | ❌ | ✅ |
-| 主题皮肤 | 2款 | ✅ 全部 |
-| 去广告 | ❌ | ✅ |
-| **专属服务** | | |
-| 客服支持 | 工单 | ✅ 专属客服 |
-| 新功能优先体验 | ❌ | ✅ |
+| 功能 | 注册用户 | AI试用(30天) | 付费会员 |
+|------|----------|--------------|----------|
+| **基础记账** | | | |
+| 手动记账 | ✅ 无限 | ✅ 无限 | ✅ 无限 |
+| 账本数量 | ✅ 无限 | ✅ 无限 | ✅ 无限 |
+| 账户数量 | ✅ 无限 | ✅ 无限 | ✅ 无限 |
+| 成员协作 | ✅ 10人 | ✅ 10人 | ✅ 10人 |
+| **AI功能** | | | |
+| 图片识别记账 | ❌ | ✅ 无限 | ✅ 无限 |
+| 语音记账 | ❌ | ✅ 无限 | ✅ 无限 |
+| 邮箱账单解析 | ❌ | ✅ | ✅ |
+| 智能分类建议 | ❌ | ✅ | ✅ |
+| **统计报表** | | | |
+| 基础统计 | ✅ | ✅ | ✅ |
+| 趋势分析 | ✅ 全部 | ✅ 全部 | ✅ 全部 |
+| 分类占比 | ✅ | ✅ | ✅ |
+| 年度报告 | ✅ | ✅ | ✅ |
+| 自定义报表 | ✅ | ✅ | ✅ |
+| **数据功能** | | | |
+| 数据导出(CSV) | ✅ | ✅ | ✅ |
+| 数据导出(Excel) | ✅ | ✅ | ✅ |
+| 云端备份 | ✅ 自动/日 | ✅ 自动/日 | ✅ 自动/日 |
+| 历史备份保留 | ✅ 30份 | ✅ 30份 | ✅ 30份 |
+| **高级功能** | | | |
+| 定时记账 | ✅ | ✅ | ✅ |
+| 桌面小组件 | ✅ 全部 | ✅ 全部 | ✅ 全部 |
+| 自定义分类图标 | ✅ | ✅ | ✅ |
+| 主题皮肤 | ✅ 全部 | ✅ 全部 | ✅ 全部 |
+| 去广告 | ✅ | ✅ | ✅ |
 
-### 15.3 会员数据表
+**总结**：注册用户 = 全功能(除AI) | AI试用 = 全功能(30天) | 付费会员 = 全功能(永久AI)
+
+### 15.3 AI试用申请机制
+
+```python
+class AITrialService:
+    """AI功能试用服务"""
+
+    TRIAL_DURATION_DAYS = 30  # 试用期30天
+
+    async def apply_trial(self, user_id: str) -> dict:
+        """申请AI试用"""
+        user = await self.get_user(user_id)
+
+        # 检查是否已经申请过试用
+        if user.has_used_trial:
+            return {
+                'success': False,
+                'message': '您已使用过AI试用机会，请升级会员享受完整功能'
+            }
+
+        # 检查是否是付费会员
+        if user.is_paid_member:
+            return {
+                'success': False,
+                'message': '您已是付费会员，无需申请试用'
+            }
+
+        # 激活试用
+        trial_expire = datetime.now() + timedelta(days=self.TRIAL_DURATION_DAYS)
+        await self.activate_trial(user_id, trial_expire)
+
+        return {
+            'success': True,
+            'message': f'AI功能试用已激活，有效期至 {trial_expire.strftime("%Y-%m-%d")}',
+            'expire_at': trial_expire
+        }
+
+    async def check_ai_access(self, user_id: str) -> tuple[bool, str]:
+        """检查用户是否有AI功能权限"""
+        user = await self.get_user(user_id)
+
+        # 付费会员
+        if user.is_paid_member:
+            return True, ""
+
+        # 试用期内
+        if user.trial_expire_at and user.trial_expire_at > datetime.now():
+            days_left = (user.trial_expire_at - datetime.now()).days
+            return True, f"试用期剩余{days_left}天"
+
+        # 未开通
+        if not user.has_used_trial:
+            return False, "您尚未开通AI功能，可申请30天免费试用"
+        else:
+            return False, "AI试用已过期，升级会员继续使用"
+```
+
+### 15.4 会员数据表
 
 ```sql
+-- 用户表（扩展字段）
+ALTER TABLE users ADD COLUMN user_type INT DEFAULT 0;        -- 0:注册用户 1:试用用户 2:付费会员
+ALTER TABLE users ADD COLUMN has_used_trial BOOLEAN DEFAULT FALSE;  -- 是否已使用试用
+ALTER TABLE users ADD COLUMN trial_expire_at TIMESTAMP;      -- 试用到期时间
+ALTER TABLE users ADD COLUMN member_level INT DEFAULT 0;     -- 会员等级 0:无 2:月度 3:季度 4:年度 5:终身
+ALTER TABLE users ADD COLUMN member_expire_at TIMESTAMP;     -- 会员到期时间
+ALTER TABLE users ADD COLUMN is_lifetime BOOLEAN DEFAULT FALSE;  -- 是否终身会员
+
 -- 会员订单表
 CREATE TABLE member_orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id),
     order_no VARCHAR(50) UNIQUE NOT NULL,
-    product_type INT NOT NULL,           -- 1:月度 2:年度 3:终身
-    amount DECIMAL(10,2) NOT NULL,
+    product_type INT NOT NULL,           -- 2:月度 3:季度 4:年度 5:终身
+    original_amount DECIMAL(10,2) NOT NULL,  -- 原价
+    discount_amount DECIMAL(10,2) DEFAULT 0, -- 优惠金额
+    pay_amount DECIMAL(10,2) NOT NULL,   -- 实付金额
     currency VARCHAR(3) DEFAULT 'CNY',
-    payment_method VARCHAR(20),          -- wechat, alipay, apple
-    payment_status INT DEFAULT 0,        -- 0:待支付 1:已支付 2:已退款
+    payment_method VARCHAR(20),          -- wechat_pay, alipay
+    payment_status INT DEFAULT 0,        -- 0:待支付 1:已支付 2:已取消 3:已退款
     paid_at TIMESTAMP,
-    expire_at TIMESTAMP,
+    member_start_at TIMESTAMP,           -- 会员开始时间
+    member_expire_at TIMESTAMP,          -- 会员到期时间
     transaction_id VARCHAR(100),         -- 第三方交易号
-    created_at TIMESTAMP DEFAULT NOW()
+    coupon_id UUID,                      -- 使用的优惠券
+    campaign_id UUID,                    -- 参与的活动
+    refund_amount DECIMAL(10,2),
+    refund_at TIMESTAMP,
+    refund_reason TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- 会员权益使用记录
-CREATE TABLE member_usage (
+-- 试用记录表
+CREATE TABLE trial_records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id),
-    feature_type VARCHAR(50) NOT NULL,   -- ocr, voice, export
-    usage_date DATE NOT NULL,
-    usage_count INT DEFAULT 1,
-    UNIQUE(user_id, feature_type, usage_date)
+    user_id UUID REFERENCES users(id) UNIQUE,
+    applied_at TIMESTAMP DEFAULT NOW(),
+    expire_at TIMESTAMP NOT NULL,
+    is_converted BOOLEAN DEFAULT FALSE,  -- 是否转化为付费
+    converted_at TIMESTAMP,
+    converted_order_id UUID
 );
-
--- 用户表扩展
-ALTER TABLE users ADD COLUMN member_type INT DEFAULT 0;
-ALTER TABLE users ADD COLUMN member_start_at TIMESTAMP;
-ALTER TABLE users ADD COLUMN member_expire_at TIMESTAMP;
-ALTER TABLE users ADD COLUMN is_lifetime BOOLEAN DEFAULT FALSE;
 ```
 
-### 15.4 会员功能限制检查
+---
+
+## 十五A、支付系统设计
+
+### 15A.1 支持的支付方式
+
+| 支付方式 | 场景 | 接入方案 |
+|----------|------|----------|
+| **微信支付** | App内支付 | 微信开放平台 APP支付 |
+| **支付宝** | App内支付 | 支付宝开放平台 APP支付 |
+| **Apple Pay** | iOS App内购 | StoreKit (IAP) |
+
+### 15A.2 支付流程
+
+```
+┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
+│  用户    │     │   App    │     │  后端    │     │ 支付平台  │
+│ 选择套餐 │     │ 创建订单 │     │ 生成参数 │     │ 发起支付  │
+└────┬─────┘     └────┬─────┘     └────┬─────┘     └────┬─────┘
+     │                │                │                │
+     │ 1.选择会员套餐  │                │                │
+     │───────────────►│                │                │
+     │                │ 2.请求创建订单  │                │
+     │                │───────────────►│                │
+     │                │                │ 3.生成订单号    │
+     │                │                │ 调用支付API     │
+     │                │                │───────────────►│
+     │                │                │◄───────────────│
+     │                │◄───────────────│ 4.返回支付参数  │
+     │                │ 5.调起支付SDK   │                │
+     │                │───────────────────────────────►│
+     │◄───────────────│                │                │
+     │ 6.用户完成支付  │                │                │
+     │                │                │◄───────────────│
+     │                │                │ 7.异步回调通知  │
+     │                │                │ 8.更新订单状态  │
+     │                │◄───────────────│ 开通会员权益    │
+     │◄───────────────│ 9.通知用户     │                │
+     │  支付成功       │                │                │
+```
+
+### 15A.3 微信支付接入
 
 ```python
-class MembershipService:
-    # 免费用户限制
-    FREE_LIMITS = {
-        'max_books': 2,
-        'max_accounts': 5,
-        'max_members': 2,
-        'ocr_monthly': 5,
-        'voice_monthly': 10,
-        'trend_months': 3,
-    }
+import hashlib
+import time
+from wechatpay import WeChatPay
 
-    async def check_feature_access(
+class WeChatPayService:
+    def __init__(self):
+        self.client = WeChatPay(
+            appid=settings.WECHAT_APP_ID,
+            mch_id=settings.WECHAT_MCH_ID,
+            api_key=settings.WECHAT_API_KEY,
+            cert_path=settings.WECHAT_CERT_PATH,
+            key_path=settings.WECHAT_KEY_PATH,
+        )
+
+    async def create_order(
         self,
-        user_id: str,
-        feature: str
-    ) -> tuple[bool, str]:
-        """
-        检查用户是否有权限使用某功能
-        返回: (是否允许, 提示消息)
-        """
-        user = await self.get_user(user_id)
+        order_no: str,
+        amount: int,  # 单位：分
+        description: str,
+        user_openid: str = None
+    ) -> dict:
+        """创建微信支付订单（APP支付）"""
 
-        if user.is_vip:
-            return True, ""
+        params = {
+            'body': description,
+            'out_trade_no': order_no,
+            'total_fee': amount,
+            'spbill_create_ip': '127.0.0.1',
+            'notify_url': f'{settings.API_BASE_URL}/api/v1/payment/wechat/notify',
+            'trade_type': 'APP',
+        }
 
-        # 检查限制
-        if feature == 'ocr':
-            used = await self.get_monthly_usage(user_id, 'ocr')
-            if used >= self.FREE_LIMITS['ocr_monthly']:
-                return False, "本月免费识别次数已用完，升级VIP享无限次数"
+        result = self.client.unified_order(**params)
 
-        return True, ""
+        if result['return_code'] == 'SUCCESS':
+            # 生成APP调起支付的参数
+            timestamp = str(int(time.time()))
+            nonce_str = self._generate_nonce()
+            prepay_id = result['prepay_id']
+
+            sign_params = {
+                'appid': settings.WECHAT_APP_ID,
+                'partnerid': settings.WECHAT_MCH_ID,
+                'prepayid': prepay_id,
+                'package': 'Sign=WXPay',
+                'noncestr': nonce_str,
+                'timestamp': timestamp,
+            }
+            sign = self._generate_sign(sign_params)
+
+            return {
+                'success': True,
+                'pay_params': {
+                    **sign_params,
+                    'sign': sign,
+                }
+            }
+
+        return {'success': False, 'message': result.get('return_msg')}
+
+    async def handle_notify(self, xml_data: str) -> dict:
+        """处理微信支付回调"""
+        result = self.client.parse_notify(xml_data)
+
+        if result['return_code'] == 'SUCCESS' and result['result_code'] == 'SUCCESS':
+            order_no = result['out_trade_no']
+            transaction_id = result['transaction_id']
+
+            # 更新订单状态
+            await self._complete_order(order_no, transaction_id)
+
+            return {'return_code': 'SUCCESS', 'return_msg': 'OK'}
+
+        return {'return_code': 'FAIL', 'return_msg': 'Verification failed'}
 ```
 
-### 15.5 促销活动支持
+### 15A.4 支付宝接入
+
+```python
+from alipay import AliPay
+
+class AlipayService:
+    def __init__(self):
+        self.client = AliPay(
+            appid=settings.ALIPAY_APP_ID,
+            app_private_key_string=settings.ALIPAY_PRIVATE_KEY,
+            alipay_public_key_string=settings.ALIPAY_PUBLIC_KEY,
+            sign_type='RSA2',
+        )
+
+    async def create_order(
+        self,
+        order_no: str,
+        amount: str,  # 单位：元
+        subject: str,
+    ) -> dict:
+        """创建支付宝订单（APP支付）"""
+
+        order_string = self.client.api_alipay_trade_app_pay(
+            out_trade_no=order_no,
+            total_amount=amount,
+            subject=subject,
+            notify_url=f'{settings.API_BASE_URL}/api/v1/payment/alipay/notify',
+        )
+
+        return {
+            'success': True,
+            'order_string': order_string,  # 直接传给支付宝SDK
+        }
+
+    async def handle_notify(self, data: dict) -> str:
+        """处理支付宝回调"""
+        # 验签
+        signature = data.pop('sign')
+        if self.client.verify(data, signature):
+            if data['trade_status'] in ('TRADE_SUCCESS', 'TRADE_FINISHED'):
+                order_no = data['out_trade_no']
+                transaction_id = data['trade_no']
+
+                await self._complete_order(order_no, transaction_id)
+
+                return 'success'
+
+        return 'fail'
+```
+
+### 15A.5 支付相关数据表
 
 ```sql
+-- 支付流水表
+CREATE TABLE payment_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID REFERENCES member_orders(id),
+    payment_method VARCHAR(20) NOT NULL,     -- wechat_pay, alipay, apple_iap
+    transaction_id VARCHAR(100),             -- 第三方交易号
+    amount DECIMAL(10,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'CNY',
+    status INT DEFAULT 0,                    -- 0:待支付 1:成功 2:失败 3:已退款
+    raw_notify TEXT,                         -- 原始回调数据
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 退款记录表
+CREATE TABLE refund_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID REFERENCES member_orders(id),
+    payment_transaction_id UUID REFERENCES payment_transactions(id),
+    refund_no VARCHAR(50) UNIQUE NOT NULL,
+    refund_amount DECIMAL(10,2) NOT NULL,
+    reason TEXT,
+    status INT DEFAULT 0,                    -- 0:处理中 1:成功 2:失败
+    operator_id UUID,                        -- 操作人（管理员）
+    third_party_refund_id VARCHAR(100),
+    created_at TIMESTAMP DEFAULT NOW(),
+    completed_at TIMESTAMP
+);
+```
+
+---
+
+## 十五B、管理后台设计
+
+### 15B.1 管理后台功能模块
+
+```
+管理后台
+├── 首页仪表盘
+│   ├── 今日数据概览（新增用户、活跃用户、收入）
+│   ├── 趋势图表
+│   └── 待处理事项
+├── 用户管理
+│   ├── 用户列表（搜索、筛选、导出）
+│   ├── 用户详情（基本信息、会员状态、操作记录）
+│   ├── 会员管理（开通、延期、取消）
+│   └── 用户封禁/解封
+├── 订单管理
+│   ├── 订单列表
+│   ├── 订单详情
+│   ├── 退款处理
+│   └── 订单统计
+├── 营销活动
+│   ├── 活动管理（创建、编辑、上下线）
+│   ├── 优惠券管理
+│   ├── 活动数据分析
+│   └── 活动模板库
+├── 内容管理
+│   ├── 公告管理
+│   ├── 推送管理
+│   └── Banner管理
+├── 数据统计
+│   ├── 用户统计
+│   ├── 收入统计
+│   ├── 转化漏斗
+│   └── 留存分析
+└── 系统设置
+    ├── 管理员管理
+    ├── 角色权限
+    ├── 操作日志
+    └── 系统配置
+```
+
+### 15B.2 营销活动类型模板
+
+#### 活动类型一览
+
+| 活动类型 | 说明 | 适用场景 |
+|----------|------|----------|
+| **新用户专享** | 首次付费特价 | 拉新转化 |
+| **限时折扣** | 指定时间段折扣 | 促销冲量 |
+| **满减活动** | 满足条件减免 | 提升客单价 |
+| **买赠活动** | 购买赠送时长 | 提升付费率 |
+| **邀请有礼** | 邀请好友双方受益 | 裂变拉新 |
+| **续费优惠** | 老用户续费折扣 | 提升续费率 |
+| **节日活动** | 节假日特别优惠 | 节日营销 |
+| **会员日** | 固定日期特惠 | 培养消费习惯 |
+| **积分兑换** | 积分换优惠券/时长 | 用户激励 |
+| **抽奖活动** | 随机奖励 | 增加趣味性 |
+
+### 15B.3 活动配置数据表
+
+```sql
+-- 营销活动表
+CREATE TABLE campaigns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
+    campaign_type VARCHAR(50) NOT NULL,      -- 活动类型
+    description TEXT,
+    rules JSONB NOT NULL,                    -- 活动规则配置
+    start_at TIMESTAMP NOT NULL,
+    end_at TIMESTAMP NOT NULL,
+    target_users JSONB,                      -- 目标用户条件
+    budget DECIMAL(10,2),                    -- 预算上限
+    used_budget DECIMAL(10,2) DEFAULT 0,
+    max_participants INT,                    -- 最大参与人数
+    current_participants INT DEFAULT 0,
+    status INT DEFAULT 0,                    -- 0:草稿 1:待开始 2:进行中 3:已结束 4:已取消
+    created_by UUID,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 活动规则示例 (rules JSONB)
+-- 新用户专享:
+-- {
+--   "type": "new_user_discount",
+--   "discount_type": "percent",    -- percent/fixed
+--   "discount_value": 50,          -- 5折 或 固定减免金额
+--   "applicable_products": [2,3,4], -- 适用的会员类型
+--   "limit_per_user": 1
+-- }
+
+-- 限时折扣:
+-- {
+--   "type": "time_limited_discount",
+--   "discount_type": "percent",
+--   "discount_value": 70,          -- 7折
+--   "applicable_products": [4],    -- 仅年度会员
+--   "flash_sale_times": [          -- 秒杀时段
+--     {"start": "10:00", "end": "12:00"},
+--     {"start": "20:00", "end": "22:00"}
+--   ]
+-- }
+
+-- 买赠活动:
+-- {
+--   "type": "buy_get_free",
+--   "buy_product": 4,              -- 购买年度会员
+--   "gift_days": 60,               -- 赠送60天
+--   "gift_description": "买一年送两个月"
+-- }
+
+-- 邀请有礼:
+-- {
+--   "type": "referral",
+--   "inviter_reward": {"type": "days", "value": 7},    -- 邀请人获得7天
+--   "invitee_reward": {"type": "days", "value": 7},    -- 被邀请人获得7天
+--   "invitee_must_pay": true,      -- 被邀请人需付费才算有效
+--   "max_invites": 10              -- 每人最多邀请10人
+-- }
+
 -- 优惠券表
 CREATE TABLE coupons (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id UUID REFERENCES campaigns(id),
     code VARCHAR(20) UNIQUE NOT NULL,
-    coupon_type INT NOT NULL,            -- 1:折扣 2:满减 3:免费时长
-    discount_value DECIMAL(10,2),        -- 折扣值或金额
-    min_amount DECIMAL(10,2),            -- 最低消费
-    applicable_products INT[],           -- 适用产品
-    total_count INT,                     -- 总数量
-    used_count INT DEFAULT 0,
+    name VARCHAR(100) NOT NULL,
+    coupon_type INT NOT NULL,                -- 1:折扣券 2:满减券 3:代金券 4:免费时长券
+    discount_value DECIMAL(10,2) NOT NULL,   -- 折扣比例/减免金额/免费天数
+    min_amount DECIMAL(10,2),                -- 最低消费（满减券用）
+    applicable_products INT[],               -- 适用产品
+    total_count INT,                         -- 发放总量
+    claimed_count INT DEFAULT 0,             -- 已领取数量
+    used_count INT DEFAULT 0,                -- 已使用数量
+    claim_limit_per_user INT DEFAULT 1,      -- 每人限领
+    valid_days INT,                          -- 领取后有效天数
     start_at TIMESTAMP,
     expire_at TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
@@ -1134,9 +1503,247 @@ CREATE TABLE user_coupons (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id),
     coupon_id UUID REFERENCES coupons(id),
-    status INT DEFAULT 0,                -- 0:未使用 1:已使用 2:已过期
+    status INT DEFAULT 0,                    -- 0:未使用 1:已使用 2:已过期
+    claimed_at TIMESTAMP DEFAULT NOW(),
+    expire_at TIMESTAMP NOT NULL,
     used_at TIMESTAMP,
+    used_order_id UUID,
+    UNIQUE(user_id, coupon_id)
+);
+
+-- 邀请记录表
+CREATE TABLE referral_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id UUID REFERENCES campaigns(id),
+    inviter_user_id UUID REFERENCES users(id),
+    invitee_user_id UUID REFERENCES users(id),
+    inviter_reward_type VARCHAR(20),         -- days, coupon
+    inviter_reward_value INT,
+    inviter_rewarded BOOLEAN DEFAULT FALSE,
+    invitee_reward_type VARCHAR(20),
+    invitee_reward_value INT,
+    invitee_rewarded BOOLEAN DEFAULT FALSE,
+    invitee_paid BOOLEAN DEFAULT FALSE,      -- 被邀请人是否已付费
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 活动参与记录
+CREATE TABLE campaign_participations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id UUID REFERENCES campaigns(id),
+    user_id UUID REFERENCES users(id),
+    participation_type VARCHAR(50),          -- claim_coupon, place_order, invite
     order_id UUID,
+    discount_amount DECIMAL(10,2),
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(campaign_id, user_id, participation_type)
+);
+```
+
+### 15B.4 预置活动模板
+
+```python
+CAMPAIGN_TEMPLATES = {
+    # 新用户专享
+    'new_user_50off': {
+        'name': '新用户首单5折',
+        'campaign_type': 'new_user_discount',
+        'description': '新用户首次购买会员享5折优惠',
+        'rules': {
+            'type': 'new_user_discount',
+            'discount_type': 'percent',
+            'discount_value': 50,
+            'applicable_products': [2, 3, 4, 5],
+            'limit_per_user': 1
+        },
+        'target_users': {'is_new': True, 'has_paid': False}
+    },
+
+    # 限时秒杀
+    'flash_sale': {
+        'name': '限时秒杀',
+        'campaign_type': 'time_limited_discount',
+        'description': '整点秒杀，年度会员低至6折',
+        'rules': {
+            'type': 'time_limited_discount',
+            'discount_type': 'percent',
+            'discount_value': 60,
+            'applicable_products': [4],
+            'flash_sale_times': [
+                {'start': '10:00', 'end': '10:30'},
+                {'start': '14:00', 'end': '14:30'},
+                {'start': '20:00', 'end': '20:30'}
+            ]
+        }
+    },
+
+    # 买一年送两月
+    'buy_year_get_bonus': {
+        'name': '买一年送两月',
+        'campaign_type': 'buy_get_free',
+        'description': '购买年度会员，额外赠送2个月',
+        'rules': {
+            'type': 'buy_get_free',
+            'buy_product': 4,
+            'gift_days': 60,
+            'gift_description': '买12个月送2个月，实际享受14个月'
+        }
+    },
+
+    # 邀请有礼
+    'invite_friends': {
+        'name': '邀请好友，双方各得7天',
+        'campaign_type': 'referral',
+        'description': '邀请好友注册并付费，双方各得7天会员',
+        'rules': {
+            'type': 'referral',
+            'inviter_reward': {'type': 'days', 'value': 7},
+            'invitee_reward': {'type': 'days', 'value': 7},
+            'invitee_must_pay': True,
+            'max_invites': 20
+        }
+    },
+
+    # 老用户续费
+    'renewal_discount': {
+        'name': '老用户续费8折',
+        'campaign_type': 'renewal_discount',
+        'description': '会员到期前30天内续费享8折',
+        'rules': {
+            'type': 'renewal_discount',
+            'discount_type': 'percent',
+            'discount_value': 80,
+            'days_before_expire': 30,
+            'applicable_products': [2, 3, 4]
+        },
+        'target_users': {'is_member': True, 'expire_within_days': 30}
+    },
+
+    # 节日活动 - 双11
+    'double_11': {
+        'name': '双11狂欢',
+        'campaign_type': 'festival',
+        'description': '双11特惠，年度会员立减111元',
+        'rules': {
+            'type': 'festival_discount',
+            'discount_type': 'fixed',
+            'discount_value': 111,
+            'applicable_products': [4, 5],
+            'festival': 'double_11'
+        }
+    },
+
+    # 会员日
+    'member_day': {
+        'name': '每月8号会员日',
+        'campaign_type': 'member_day',
+        'description': '每月8号，全场88折',
+        'rules': {
+            'type': 'member_day',
+            'day_of_month': 8,
+            'discount_type': 'percent',
+            'discount_value': 88,
+            'applicable_products': [2, 3, 4, 5]
+        }
+    },
+
+    # 首充返现
+    'first_charge_bonus': {
+        'name': '首充多送30天',
+        'campaign_type': 'first_charge',
+        'description': '首次充值任意套餐，额外赠送30天',
+        'rules': {
+            'type': 'first_charge_bonus',
+            'bonus_days': 30,
+            'applicable_products': [2, 3, 4, 5]
+        },
+        'target_users': {'has_paid': False}
+    },
+
+    # 连续包月优惠
+    'subscription': {
+        'name': '连续包月优惠',
+        'campaign_type': 'subscription',
+        'description': '开通自动续费，每月仅需9.9元',
+        'rules': {
+            'type': 'subscription',
+            'monthly_price': 9.9,
+            'original_price': 12,
+            'auto_renew': True
+        }
+    },
+
+    # 签到领积分
+    'daily_checkin': {
+        'name': '签到领积分',
+        'campaign_type': 'checkin',
+        'description': '每日签到领积分，积分可兑换会员',
+        'rules': {
+            'type': 'checkin',
+            'daily_points': 10,
+            'consecutive_bonus': [
+                {'days': 7, 'bonus': 50},
+                {'days': 30, 'bonus': 200}
+            ],
+            'exchange_rate': 1000  # 1000积分=1天会员
+        }
+    }
+}
+```
+
+### 15B.5 管理后台技术栈
+
+| 组件 | 技术选型 | 说明 |
+|------|----------|------|
+| 前端框架 | **Vue 3 + Element Plus** | 成熟的后台UI方案 |
+| 状态管理 | **Pinia** | Vue 3推荐 |
+| 图表 | **ECharts** | 丰富的数据可视化 |
+| 权限 | **RBAC** | 基于角色的权限控制 |
+| 后端 | 复用主API + 管理专用接口 | 减少重复开发 |
+
+### 15B.6 管理员权限设计
+
+```sql
+-- 管理员表
+CREATE TABLE admins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(50),
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    role_id UUID REFERENCES admin_roles(id),
+    is_active BOOLEAN DEFAULT TRUE,
+    last_login_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 角色表
+CREATE TABLE admin_roles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(50) NOT NULL,
+    description TEXT,
+    permissions JSONB NOT NULL,           -- 权限列表
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 预置角色
+-- 超级管理员: ["*"]
+-- 运营: ["user:view", "user:edit", "campaign:*", "content:*", "stats:view"]
+-- 客服: ["user:view", "order:view", "order:refund"]
+-- 数据分析: ["stats:*", "user:view"]
+
+-- 操作日志表
+CREATE TABLE admin_operation_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_id UUID REFERENCES admins(id),
+    operation VARCHAR(100) NOT NULL,
+    target_type VARCHAR(50),              -- user, order, campaign
+    target_id UUID,
+    old_value JSONB,
+    new_value JSONB,
+    ip_address VARCHAR(50),
+    user_agent TEXT,
     created_at TIMESTAMP DEFAULT NOW()
 );
 ```
