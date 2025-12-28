@@ -1,0 +1,295 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/template.dart';
+import '../models/transaction.dart';
+import '../providers/template_provider.dart';
+import '../providers/transaction_provider.dart';
+import '../theme/app_theme.dart';
+import 'template_management_page.dart';
+
+class QuickEntryPage extends ConsumerStatefulWidget {
+  const QuickEntryPage({super.key});
+
+  @override
+  ConsumerState<QuickEntryPage> createState() => _QuickEntryPageState();
+}
+
+class _QuickEntryPageState extends ConsumerState<QuickEntryPage> {
+  @override
+  Widget build(BuildContext context) {
+    final templates = ref.watch(templateProvider);
+    final frequentlyUsed = ref.watch(templateProvider.notifier).getFrequentlyUsed();
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('快速记账'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TemplateManagementPage(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: templates.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.flash_on,
+                    size: 64,
+                    color: theme.colorScheme.outline,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '暂无记账模板',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TemplateManagementPage(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('创建模板'),
+                  ),
+                ],
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Quick action grid
+                  if (frequentlyUsed.isNotEmpty) ...[
+                    Text(
+                      '常用模板',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        childAspectRatio: 1,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                      ),
+                      itemCount: frequentlyUsed.length,
+                      itemBuilder: (context, index) {
+                        return _buildTemplateCard(frequentlyUsed[index]);
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // All templates list
+                  Text(
+                    '全部模板',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: templates.length,
+                    itemBuilder: (context, index) {
+                      return _buildTemplateListItem(templates[index]);
+                    },
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildTemplateCard(TransactionTemplate template) {
+    return Card(
+      child: InkWell(
+        onTap: () => _useTemplate(template),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: template.color.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  template.icon,
+                  color: template.color,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                template.name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (template.amount != null)
+                Text(
+                  '¥${template.amount!.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    color: template.type == TransactionType.income
+                        ? AppColors.income
+                        : AppColors.expense,
+                    fontSize: 12,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTemplateListItem(TransactionTemplate template) {
+    final theme = Theme.of(context);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: template.color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(template.icon, color: template.color),
+        ),
+        title: Text(template.name),
+        subtitle: Text(
+          '${template.typeName} · ${template.category}',
+          style: TextStyle(color: theme.colorScheme.outline),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (template.amount != null)
+              Text(
+                '¥${template.amount!.toStringAsFixed(2)}',
+                style: TextStyle(
+                  color: template.type == TransactionType.income
+                      ? AppColors.income
+                      : AppColors.expense,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.flash_on),
+              color: theme.primaryColor,
+              onPressed: () => _useTemplate(template),
+            ),
+          ],
+        ),
+        onTap: () => _useTemplate(template),
+      ),
+    );
+  }
+
+  void _useTemplate(TransactionTemplate template) {
+    if (template.amount != null) {
+      // Has preset amount, directly create transaction
+      _createTransaction(template, template.amount!);
+    } else {
+      // Need to input amount
+      _showAmountDialog(template);
+    }
+  }
+
+  void _showAmountDialog(TransactionTemplate template) {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('输入金额 - ${template.name}'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '金额',
+            prefixText: '¥ ',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              final amount = double.tryParse(controller.text);
+              if (amount != null && amount > 0) {
+                Navigator.pop(context);
+                _createTransaction(template, amount);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请输入有效金额')),
+                );
+              }
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _createTransaction(TransactionTemplate template, double amount) async {
+    final transaction = template.toTransaction(overrideAmount: amount);
+
+    await ref.read(transactionProvider.notifier).addTransaction(transaction);
+    await ref.read(templateProvider.notifier).useTemplate(template.id);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已记录: ${template.name} ¥${amount.toStringAsFixed(2)}'),
+          backgroundColor: Colors.green,
+          action: SnackBarAction(
+            label: '撤销',
+            textColor: Colors.white,
+            onPressed: () {
+              ref.read(transactionProvider.notifier).deleteTransaction(transaction.id);
+            },
+          ),
+        ),
+      );
+    }
+  }
+}

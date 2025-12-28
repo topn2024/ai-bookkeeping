@@ -1,0 +1,335 @@
+"""AI service for image/text recognition."""
+import re
+import json
+import base64
+import logging
+from decimal import Decimal
+from typing import Optional
+import httpx
+
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+class AIService:
+    """AI service for recognizing transactions from images and text."""
+
+    def __init__(self):
+        self.qwen_api_key = settings.QWEN_API_KEY
+        self.zhipu_api_key = settings.ZHIPU_API_KEY
+
+    async def recognize_image(self, image_content: bytes) -> dict:
+        """Recognize transaction from receipt/bill image using Qwen VL."""
+        # Encode image to base64
+        image_base64 = base64.b64encode(image_content).decode("utf-8")
+
+        # Use Qwen VL for image understanding
+        prompt = """请分析这张图片（小票/收据/账单），提取以下信息：
+1. 消费金额（数字）
+2. 商户名称
+3. 消费类型（餐饮/交通/购物/娱乐/住房/医疗/教育/其他）
+4. 消费日期
+5. 商品明细摘要
+
+请以JSON格式返回，格式如下：
+{
+    "amount": 金额数字,
+    "merchant": "商户名称",
+    "category": "消费类型",
+    "date": "日期",
+    "note": "商品明细摘要"
+}
+
+如果无法识别某项，请设为null。"""
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+                    headers={
+                        "Authorization": f"Bearer {self.qwen_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": "qwen-vl-plus",
+                        "input": {
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"image": f"data:image/jpeg;base64,{image_base64}"},
+                                        {"text": prompt}
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    timeout=30.0,
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    text = result.get("output", {}).get("choices", [{}])[0].get("message", {}).get("content", "")
+                    return self._parse_ai_response(text)
+                else:
+                    return self._empty_result()
+
+        except Exception as e:
+            logger.error(f"AI recognition error: {e}", exc_info=True)
+            return self._empty_result()
+
+    async def parse_voice_text(self, text: str) -> dict:
+        """Parse transaction from voice/text input."""
+        # Use Zhipu GLM for text understanding
+        prompt = f"""请分析以下记账语音/文字，提取交易信息：
+
+"{text}"
+
+请提取：
+1. 金额（数字）
+2. 消费类型（餐饮/交通/购物/娱乐/住房/医疗/教育/工资/奖金/兼职/理财/其他）
+3. 是支出还是收入（expense/income）
+4. 备注描述
+
+请以JSON格式返回：
+{{
+    "amount": 金额数字,
+    "category": "消费类型",
+    "type": "expense或income",
+    "note": "备注"
+}}"""
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self.zhipu_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": "glm-4-flash",
+                        "messages": [
+                            {"role": "user", "content": prompt}
+                        ]
+                    },
+                    timeout=30.0,
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    return self._parse_ai_response(text, is_voice=True)
+                else:
+                    # Fallback to simple parsing
+                    return self._simple_parse(text)
+
+        except Exception as e:
+            logger.error(f"AI parsing error: {e}", exc_info=True)
+            return self._simple_parse(text)
+
+    def _parse_ai_response(self, text: str, is_voice: bool = False) -> dict:
+        """Parse AI response JSON."""
+        try:
+            # Extract JSON from response
+            json_match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+
+                result = {
+                    "amount": Decimal(str(data.get("amount"))) if data.get("amount") else None,
+                    "category_name": data.get("category"),
+                    "category_type": 2 if data.get("type") == "income" else 1,
+                    "note": data.get("note") or data.get("merchant"),
+                    "merchant": data.get("merchant"),
+                    "date": data.get("date"),
+                    "confidence": 0.85,
+                    "raw_text": text,
+                }
+                return result
+        except Exception as e:
+            logger.warning(f"Parse error: {e}")
+
+        return self._empty_result()
+
+    def _simple_parse(self, text: str) -> dict:
+        """Simple regex-based parsing as fallback."""
+        result = self._empty_result()
+
+        # Extract amount
+        amount_match = re.search(r'(\d+(?:\.\d{1,2})?)\s*(?:元|块|￥)?', text)
+        if amount_match:
+            result["amount"] = Decimal(amount_match.group(1))
+
+        # Detect income keywords
+        income_keywords = ["工资", "收入", "到账", "进账", "收到", "赚"]
+        is_income = any(kw in text for kw in income_keywords)
+        result["category_type"] = 2 if is_income else 1
+
+        # Simple category detection
+        category_map = {
+            "餐": "餐饮", "饭": "餐饮", "吃": "餐饮", "外卖": "餐饮", "咖啡": "餐饮",
+            "车": "交通", "地铁": "交通", "公交": "交通", "打车": "交通", "滴滴": "交通",
+            "买": "购物", "购": "购物", "淘宝": "购物", "京东": "购物",
+            "电影": "娱乐", "游戏": "娱乐", "ktv": "娱乐",
+            "房租": "住房", "水电": "住房",
+            "医": "医疗", "药": "医疗",
+            "书": "教育", "课": "教育",
+            "工资": "工资", "奖金": "奖金",
+        }
+
+        for keyword, category in category_map.items():
+            if keyword in text.lower():
+                result["category_name"] = category
+                break
+
+        if not result["category_name"]:
+            result["category_name"] = "工资" if is_income else "其他"
+
+        result["note"] = text
+        result["confidence"] = 0.6
+
+        return result
+
+    def _empty_result(self) -> dict:
+        """Return empty result."""
+        return {
+            "amount": None,
+            "category_name": None,
+            "category_type": 1,
+            "note": None,
+            "merchant": None,
+            "date": None,
+            "confidence": None,
+            "raw_text": None,
+        }
+
+    async def parse_bill_email(self, email_content: str, email_subject: str = "", sender: str = "") -> dict:
+        """Parse credit card bill from email content.
+
+        Args:
+            email_content: The email body content (HTML or plain text)
+            email_subject: Email subject line
+            sender: Email sender address
+
+        Returns:
+            Parsed bill information including transactions
+        """
+        prompt = f"""请分析这封信用卡账单邮件，提取账单信息。
+
+邮件主题: {email_subject}
+发件人: {sender}
+邮件内容:
+{email_content[:8000]}  # Limit content length
+
+请提取以下信息并以JSON格式返回：
+{{
+    "bank_name": "银行名称",
+    "card_number_last4": "卡号后四位",
+    "bill_date": "账单日期 (YYYY-MM-DD)",
+    "due_date": "还款日期 (YYYY-MM-DD)",
+    "total_amount": 账单总金额(数字),
+    "min_payment": 最低还款额(数字),
+    "previous_balance": 上期余额(数字),
+    "current_balance": 本期余额(数字),
+    "transactions": [
+        {{
+            "date": "交易日期 (YYYY-MM-DD)",
+            "description": "交易描述/商户名称",
+            "amount": 交易金额(数字),
+            "category": "消费类型(餐饮/交通/购物/娱乐/住房/医疗/教育/其他)"
+        }}
+    ],
+    "is_bill": true/false表示是否为有效账单邮件,
+    "confidence": 0.0-1.0之间的置信度
+}}
+
+如果这不是账单邮件或无法解析，请返回 {{"is_bill": false, "confidence": 0}}"""
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self.zhipu_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": "glm-4-flash",
+                        "messages": [
+                            {"role": "user", "content": prompt}
+                        ]
+                    },
+                    timeout=60.0,
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    return self._parse_bill_response(text)
+                else:
+                    logger.error(f"AI bill parsing failed: {response.status_code}")
+                    return self._empty_bill_result()
+
+        except Exception as e:
+            logger.error(f"AI bill parsing error: {e}", exc_info=True)
+            return self._empty_bill_result()
+
+    def _parse_bill_response(self, text: str) -> dict:
+        """Parse AI response for bill parsing."""
+        try:
+            # Extract JSON from response
+            json_match = re.search(r'\{[\s\S]*\}', text)
+            if json_match:
+                data = json.loads(json_match.group())
+
+                # Validate and normalize the response
+                result = {
+                    "bank_name": data.get("bank_name"),
+                    "card_number_last4": data.get("card_number_last4"),
+                    "bill_date": data.get("bill_date"),
+                    "due_date": data.get("due_date"),
+                    "total_amount": Decimal(str(data.get("total_amount", 0))) if data.get("total_amount") else None,
+                    "min_payment": Decimal(str(data.get("min_payment", 0))) if data.get("min_payment") else None,
+                    "previous_balance": Decimal(str(data.get("previous_balance", 0))) if data.get("previous_balance") else None,
+                    "current_balance": Decimal(str(data.get("current_balance", 0))) if data.get("current_balance") else None,
+                    "transactions": [],
+                    "is_bill": data.get("is_bill", False),
+                    "confidence": float(data.get("confidence", 0)),
+                    "raw_text": text,
+                }
+
+                # Parse transactions
+                for tx in data.get("transactions", []):
+                    if tx.get("amount"):
+                        result["transactions"].append({
+                            "date": tx.get("date"),
+                            "description": tx.get("description"),
+                            "amount": Decimal(str(tx.get("amount"))),
+                            "category": tx.get("category", "其他"),
+                        })
+
+                return result
+
+        except Exception as e:
+            logger.warning(f"Bill parse error: {e}")
+
+        return self._empty_bill_result()
+
+    def _empty_bill_result(self) -> dict:
+        """Return empty bill result."""
+        return {
+            "bank_name": None,
+            "card_number_last4": None,
+            "bill_date": None,
+            "due_date": None,
+            "total_amount": None,
+            "min_payment": None,
+            "previous_balance": None,
+            "current_balance": None,
+            "transactions": [],
+            "is_bill": False,
+            "confidence": 0,
+            "raw_text": None,
+        }

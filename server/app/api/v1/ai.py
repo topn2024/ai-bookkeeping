@@ -1,0 +1,142 @@
+"""AI recognition endpoints."""
+from typing import Optional, List
+from decimal import Decimal
+
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from pydantic import BaseModel
+
+from app.models.user import User
+from app.api.deps import get_current_user
+from app.services.ai_service import AIService
+
+
+router = APIRouter(prefix="/ai", tags=["AI Recognition"])
+
+
+class RecognitionResult(BaseModel):
+    """Schema for AI recognition result."""
+    amount: Optional[Decimal] = None
+    category_name: Optional[str] = None
+    category_type: Optional[int] = None  # 1: expense, 2: income
+    note: Optional[str] = None
+    merchant: Optional[str] = None
+    date: Optional[str] = None
+    confidence: Optional[float] = None
+    raw_text: Optional[str] = None
+
+
+@router.post("/recognize-image", response_model=RecognitionResult)
+async def recognize_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Recognize receipt/bill from image."""
+    # Validate file type
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an image",
+        )
+
+    # Read file content
+    content = await file.read()
+
+    # Use AI service to recognize
+    ai_service = AIService()
+    result = await ai_service.recognize_image(content)
+
+    return result
+
+
+@router.post("/recognize-voice", response_model=RecognitionResult)
+async def recognize_voice(
+    text: str = Form(..., description="Voice transcription text"),
+    current_user: User = Depends(get_current_user),
+):
+    """Parse transaction from voice text."""
+    ai_service = AIService()
+    result = await ai_service.parse_voice_text(text)
+
+    return result
+
+
+@router.post("/parse-text", response_model=RecognitionResult)
+async def parse_text(
+    text: str = Form(..., description="Text to parse for transaction"),
+    current_user: User = Depends(get_current_user),
+):
+    """Parse transaction from text input."""
+    ai_service = AIService()
+    result = await ai_service.parse_voice_text(text)
+
+    return result
+
+
+class BillTransaction(BaseModel):
+    """Schema for a single bill transaction."""
+    date: Optional[str] = None
+    description: Optional[str] = None
+    amount: Optional[Decimal] = None
+    category: Optional[str] = None
+
+
+class BillParseResult(BaseModel):
+    """Schema for bill parsing result."""
+    bank_name: Optional[str] = None
+    card_number_last4: Optional[str] = None
+    bill_date: Optional[str] = None
+    due_date: Optional[str] = None
+    total_amount: Optional[Decimal] = None
+    min_payment: Optional[Decimal] = None
+    previous_balance: Optional[Decimal] = None
+    current_balance: Optional[Decimal] = None
+    transactions: List[BillTransaction] = []
+    is_bill: bool = False
+    confidence: float = 0
+
+
+@router.post("/parse-bill", response_model=BillParseResult)
+async def parse_bill(
+    content: str = Form(..., description="Email content (HTML or plain text)"),
+    subject: str = Form("", description="Email subject"),
+    sender: str = Form("", description="Email sender address"),
+    current_user: User = Depends(get_current_user),
+):
+    """Parse credit card bill from email content.
+
+    This endpoint analyzes email content and extracts:
+    - Bank and card information
+    - Bill dates and amounts
+    - Individual transactions with categories
+    """
+    ai_service = AIService()
+    result = await ai_service.parse_bill_email(
+        email_content=content,
+        email_subject=subject,
+        sender=sender,
+    )
+
+    # Convert transactions to proper schema
+    transactions = [
+        BillTransaction(
+            date=tx.get("date"),
+            description=tx.get("description"),
+            amount=tx.get("amount"),
+            category=tx.get("category"),
+        )
+        for tx in result.get("transactions", [])
+    ]
+
+    return BillParseResult(
+        bank_name=result.get("bank_name"),
+        card_number_last4=result.get("card_number_last4"),
+        bill_date=result.get("bill_date"),
+        due_date=result.get("due_date"),
+        total_amount=result.get("total_amount"),
+        min_payment=result.get("min_payment"),
+        previous_balance=result.get("previous_balance"),
+        current_balance=result.get("current_balance"),
+        transactions=transactions,
+        is_bill=result.get("is_bill", False),
+        confidence=result.get("confidence", 0),
+    )
