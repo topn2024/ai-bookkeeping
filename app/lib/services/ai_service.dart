@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
-import 'package:dio/dio.dart';
-import 'http_service.dart';
+import 'qwen_service.dart';
 
 /// AI识别结果模型
 class AIRecognitionResult {
@@ -11,6 +9,7 @@ class AIRecognitionResult {
   final String? date;
   final String? description;
   final String? type; // expense/income
+  final List<ReceiptItem>? items; // 小票商品列表
   final double confidence;
   final bool success;
   final String? errorMessage;
@@ -22,10 +21,26 @@ class AIRecognitionResult {
     this.date,
     this.description,
     this.type,
+    this.items,
     this.confidence = 0.0,
     this.success = true,
     this.errorMessage,
   });
+
+  factory AIRecognitionResult.fromQwenResult(QwenRecognitionResult qwenResult) {
+    return AIRecognitionResult(
+      amount: qwenResult.amount,
+      merchant: qwenResult.merchant,
+      category: _mapCategory(qwenResult.category),
+      date: qwenResult.date,
+      description: qwenResult.description,
+      type: qwenResult.type,
+      items: qwenResult.items,
+      confidence: qwenResult.confidence,
+      success: qwenResult.success,
+      errorMessage: qwenResult.errorMessage,
+    );
+  }
 
   factory AIRecognitionResult.fromJson(Map<String, dynamic> json) {
     return AIRecognitionResult(
@@ -49,20 +64,11 @@ class AIRecognitionResult {
     );
   }
 
-  @override
-  String toString() {
-    return 'AIRecognitionResult(amount: $amount, merchant: $merchant, category: $category, type: $type, confidence: $confidence)';
+  /// 分类映射
+  static String _mapCategory(String? category) {
+    if (category == null) return 'other';
+    return categoryMap[category] ?? category.toLowerCase();
   }
-}
-
-/// AI服务类
-class AIService {
-  static final AIService _instance = AIService._internal();
-  final HttpService _http = HttpService();
-
-  factory AIService() => _instance;
-
-  AIService._internal();
 
   /// 分类映射表
   static const Map<String, String> categoryMap = {
@@ -80,107 +86,73 @@ class AIService {
     '理财': 'investment',
   };
 
+  @override
+  String toString() {
+    return 'AIRecognitionResult(amount: $amount, merchant: $merchant, category: $category, type: $type, confidence: $confidence)';
+  }
+}
+
+/// AI服务类
+/// 使用阿里云通义千问模型进行智能记账
+class AIService {
+  static final AIService _instance = AIService._internal();
+  final QwenService _qwenService = QwenService();
+
+  factory AIService() => _instance;
+
+  AIService._internal();
+
   /// 图片识别记账
-  /// 上传小票/收据图片，AI自动识别交易信息
+  /// 上传小票/收据图片，使用千问视觉模型自动识别交易信息
   Future<AIRecognitionResult> recognizeImage(File imageFile) async {
     try {
-      // 将图片转为Base64
-      final bytes = await imageFile.readAsBytes();
-      final base64Image = base64Encode(bytes);
-
-      final response = await _http.post('/ai/recognize-image', data: {
-        'image_base64': base64Image,
-      });
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-        return AIRecognitionResult(
-          amount: data['amount']?.toDouble(),
-          merchant: data['merchant'],
-          category: _mapCategory(data['category']),
-          date: data['date'],
-          description: data['summary'] ?? data['description'],
-          type: 'expense', // 图片识别主要是消费小票
-          confidence: (data['confidence'] ?? 0.85).toDouble(),
-          success: true,
-        );
-      } else {
-        return AIRecognitionResult.error('识别失败: ${response.statusCode}');
-      }
-    } on DioException catch (e) {
-      return AIRecognitionResult.error(_handleDioError(e));
+      final qwenResult = await _qwenService.recognizeReceipt(imageFile);
+      return AIRecognitionResult.fromQwenResult(qwenResult);
     } catch (e) {
-      return AIRecognitionResult.error('识别失败: $e');
+      return AIRecognitionResult.error('图片识别失败: $e');
     }
   }
 
   /// 语音识别记账
-  /// 解析语音转文本结果，提取交易信息
+  /// 解析语音转文本结果，使用千问模型提取交易信息
   Future<AIRecognitionResult> recognizeVoice(String transcribedText) async {
-    try {
-      final response = await _http.post('/ai/recognize-voice', data: {
-        'text': transcribedText,
-      });
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-        return AIRecognitionResult(
-          amount: data['amount']?.toDouble(),
-          category: _mapCategory(data['category']),
-          type: data['type'] ?? 'expense',
-          description: data['note'] ?? data['description'],
-          confidence: (data['confidence'] ?? 0.85).toDouble(),
-          success: true,
-        );
-      } else {
-        return AIRecognitionResult.error('识别失败: ${response.statusCode}');
-      }
-    } on DioException catch (e) {
-      return AIRecognitionResult.error(_handleDioError(e));
-    } catch (e) {
-      return AIRecognitionResult.error('识别失败: $e');
-    }
+    return parseText(transcribedText);
   }
 
   /// 文本解析记账
-  /// 从自然语言描述中提取交易信息
+  /// 从自然语言描述中提取交易信息，使用千问模型
   Future<AIRecognitionResult> parseText(String text) async {
     try {
-      final response = await _http.post('/ai/parse-text', data: {
-        'text': text,
-      });
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-        return AIRecognitionResult(
-          amount: data['amount']?.toDouble(),
-          category: _mapCategory(data['category']),
-          type: data['type'] ?? 'expense',
-          description: data['note'] ?? data['description'],
-          confidence: (data['confidence'] ?? 0.85).toDouble(),
-          success: true,
-        );
-      } else {
-        return AIRecognitionResult.error('解析失败: ${response.statusCode}');
-      }
-    } on DioException catch (e) {
-      return AIRecognitionResult.error(_handleDioError(e));
+      final qwenResult = await _qwenService.parseBookkeepingText(text);
+      return AIRecognitionResult.fromQwenResult(qwenResult);
     } catch (e) {
-      return AIRecognitionResult.error('解析失败: $e');
+      return AIRecognitionResult.error('文本解析失败: $e');
     }
   }
 
   /// 智能分类建议
-  /// 根据交易描述推荐最可能的分类
+  /// 根据交易描述推荐最可能的分类，使用千问模型
   Future<String?> suggestCategory(String description) async {
     try {
-      final result = await parseText(description);
-      if (result.success && result.category != null) {
-        return result.category;
+      final category = await _qwenService.suggestCategory(description);
+      if (category != null) {
+        return AIRecognitionResult.categoryMap[category] ?? category.toLowerCase();
       }
-      return null;
+      return localSuggestCategory(description);
     } catch (e) {
-      return null;
+      // 如果API失败，回退到本地分类
+      return localSuggestCategory(description);
+    }
+  }
+
+  /// 邮箱账单解析
+  /// 从信用卡账单邮件中提取多条交易记录
+  Future<List<AIRecognitionResult>> parseEmailBill(String emailContent) async {
+    try {
+      final qwenResults = await _qwenService.parseEmailBill(emailContent);
+      return qwenResults.map((r) => AIRecognitionResult.fromQwenResult(r)).toList();
+    } catch (e) {
+      return [AIRecognitionResult.error('账单解析失败: $e')];
     }
   }
 
@@ -245,27 +217,5 @@ class AIService {
       }
     }
     return false;
-  }
-
-  String _mapCategory(String? category) {
-    if (category == null) return 'other';
-    return categoryMap[category] ?? category.toLowerCase();
-  }
-
-  String _handleDioError(DioException e) {
-    switch (e.type) {
-      case DioExceptionType.connectionTimeout:
-        return '连接超时，请检查网络';
-      case DioExceptionType.sendTimeout:
-        return '发送超时，请稍后重试';
-      case DioExceptionType.receiveTimeout:
-        return '接收超时，请稍后重试';
-      case DioExceptionType.connectionError:
-        return '网络连接失败，请检查服务器是否运行';
-      case DioExceptionType.badResponse:
-        return '服务器响应错误: ${e.response?.statusCode}';
-      default:
-        return '网络错误: ${e.message}';
-    }
   }
 }

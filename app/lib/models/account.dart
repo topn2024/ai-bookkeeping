@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'currency.dart';
 
 enum AccountType {
   cash,
@@ -17,6 +18,7 @@ class Account {
   final Color color;
   final bool isDefault;
   final DateTime createdAt;
+  final CurrencyType currency; // 账户货币类型
 
   const Account({
     required this.id,
@@ -27,6 +29,7 @@ class Account {
     required this.color,
     this.isDefault = false,
     required this.createdAt,
+    this.currency = CurrencyType.cny, // 默认人民币
   });
 
   Account copyWith({
@@ -37,6 +40,7 @@ class Account {
     IconData? icon,
     Color? color,
     bool? isDefault,
+    CurrencyType? currency,
   }) {
     return Account(
       id: id ?? this.id,
@@ -47,8 +51,15 @@ class Account {
       color: color ?? this.color,
       isDefault: isDefault ?? this.isDefault,
       createdAt: createdAt,
+      currency: currency ?? this.currency,
     );
   }
+
+  /// 获取货币信息
+  CurrencyInfo get currencyInfo => Currencies.get(currency);
+
+  /// 格式化账户余额
+  String get formattedBalance => currencyInfo.format(balance);
 }
 
 // Default accounts

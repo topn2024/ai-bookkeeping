@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/account.dart';
+import '../models/currency.dart';
+import '../models/exchange_rate.dart';
 import '../services/database_service.dart';
+import 'currency_provider.dart';
 
 class AccountNotifier extends Notifier<List<Account>> {
   final DatabaseService _db = DatabaseService();
@@ -55,8 +58,37 @@ class AccountNotifier extends Notifier<List<Account>> {
     }
   }
 
+  /// 获取单一货币总余额（不进行汇率转换）
   double get totalBalance {
     return state.fold(0.0, (sum, a) => sum + a.balance);
+  }
+
+  /// 获取多币种余额汇总
+  MultiCurrencyAmount get multiCurrencyBalance {
+    var total = const MultiCurrencyAmount({});
+    for (final account in state) {
+      total = total.add(account.currency, account.balance);
+    }
+    return total;
+  }
+
+  /// 按货币分组获取余额
+  Map<CurrencyType, double> get balanceByCurrency {
+    final result = <CurrencyType, double>{};
+    for (final account in state) {
+      result[account.currency] = (result[account.currency] ?? 0) + account.balance;
+    }
+    return result;
+  }
+
+  /// 获取使用特定货币的账户
+  List<Account> getAccountsByCurrency(CurrencyType currency) {
+    return state.where((a) => a.currency == currency).toList();
+  }
+
+  /// 获取所有使用的货币类型
+  List<CurrencyType> get usedCurrencies {
+    return state.map((a) => a.currency).toSet().toList();
   }
 
   Future<void> updateBalance(String accountId, double amount, bool isExpense) async {
@@ -91,11 +123,59 @@ class AccountNotifier extends Notifier<List<Account>> {
     }
     state = updated;
   }
+
+  /// 跨币种转账（带汇率转换）
+  Future<void> transferWithConversion(
+    String fromId,
+    String toId,
+    double fromAmount,
+    double exchangeRate,
+  ) async {
+    final toAmount = fromAmount * exchangeRate;
+
+    final updated = state.map((a) {
+      if (a.id == fromId) {
+        return a.copyWith(balance: a.balance - fromAmount);
+      }
+      if (a.id == toId) {
+        return a.copyWith(balance: a.balance + toAmount);
+      }
+      return a;
+    }).toList();
+
+    for (final account in updated) {
+      await _db.updateAccount(account);
+    }
+    state = updated;
+  }
 }
 
 final accountProvider =
     NotifierProvider<AccountNotifier, List<Account>>(AccountNotifier.new);
 
+/// 单一货币总余额（不推荐用于多币种场景）
 final totalBalanceProvider = Provider<double>((ref) {
   return ref.watch(accountProvider.notifier).totalBalance;
+});
+
+/// 多币种余额汇总
+final multiCurrencyBalanceProvider = Provider<MultiCurrencyAmount>((ref) {
+  return ref.watch(accountProvider.notifier).multiCurrencyBalance;
+});
+
+/// 按货币分组的余额
+final balanceByCurrencyProvider = Provider<Map<CurrencyType, double>>((ref) {
+  return ref.watch(accountProvider.notifier).balanceByCurrency;
+});
+
+/// 转换为默认货币的总余额
+final convertedTotalBalanceProvider = Provider<double>((ref) {
+  final multiBalance = ref.watch(multiCurrencyBalanceProvider);
+  final currencyNotifier = ref.watch(currencyProvider.notifier);
+  return currencyNotifier.convertToDefault(multiBalance);
+});
+
+/// 已使用的货币类型列表
+final usedCurrenciesProvider = Provider<List<CurrencyType>>((ref) {
+  return ref.watch(accountProvider.notifier).usedCurrencies;
 });
