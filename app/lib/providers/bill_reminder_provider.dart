@@ -1,40 +1,47 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/bill_reminder.dart';
 import '../services/database_service.dart';
+import 'base/crud_notifier.dart';
 
-class BillReminderNotifier extends Notifier<List<BillReminder>> {
-  final DatabaseService _db = DatabaseService();
+/// 账单提醒管理 Notifier
+///
+/// 继承 SimpleCrudNotifier 基类，消除重复的 CRUD 代码
+class BillReminderNotifier extends SimpleCrudNotifier<BillReminder, String> {
+  @override
+  String get tableName => 'bill_reminders';
 
   @override
-  List<BillReminder> build() {
-    _loadReminders();
-    return [];
-  }
+  String getId(BillReminder entity) => entity.id;
 
-  Future<void> _loadReminders() async {
-    final reminders = await _db.getBillReminders();
-    state = reminders;
-  }
+  @override
+  Future<List<BillReminder>> fetchAll() => db.getBillReminders();
 
-  Future<void> addReminder(BillReminder reminder) async {
-    await _db.insertBillReminder(reminder);
-    state = [...state, reminder];
-  }
+  @override
+  Future<void> insertOne(BillReminder entity) => db.insertBillReminder(entity);
 
-  Future<void> updateReminder(BillReminder reminder) async {
-    await _db.updateBillReminder(reminder);
-    state = state.map((r) => r.id == reminder.id ? reminder : r).toList();
-  }
+  @override
+  Future<void> updateOne(BillReminder entity) => db.updateBillReminder(entity);
 
-  Future<void> deleteReminder(String id) async {
-    await _db.deleteBillReminder(id);
-    state = state.where((r) => r.id != id).toList();
-  }
+  @override
+  Future<void> deleteOne(String id) => db.deleteBillReminder(id);
 
+  // ==================== 业务特有方法（保留原有接口）====================
+
+  /// 添加账单提醒（保持原有方法名兼容）
+  Future<void> addReminder(BillReminder reminder) => add(reminder);
+
+  /// 更新账单提醒（保持原有方法名兼容）
+  Future<void> updateReminder(BillReminder reminder) => update(reminder);
+
+  /// 删除账单提醒（保持原有方法名兼容）
+  Future<void> deleteReminder(String id) => delete(id);
+
+  /// 切换账单提醒启用状态
   Future<void> toggleReminder(String id) async {
-    final reminder = state.firstWhere((r) => r.id == id);
+    final reminder = getById(id);
+    if (reminder == null) return;
     final updated = reminder.copyWith(isEnabled: !reminder.isEnabled);
-    await updateReminder(updated);
+    await update(updated);
   }
 
   /// 标记为已提醒

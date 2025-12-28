@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/category.dart';
-import '../services/database_service.dart';
+import 'base/crud_notifier.dart';
 
 /// 带子分类的分类结构
 class CategoryWithChildren {
@@ -15,17 +15,19 @@ class CategoryWithChildren {
   bool get hasChildren => children.isNotEmpty;
 }
 
-class CategoryNotifier extends Notifier<List<Category>> {
-  final DatabaseService _db = DatabaseService();
+/// 分类管理 Notifier
+///
+/// 继承 SimpleCrudNotifier 基类，消除重复的 CRUD 代码
+class CategoryNotifier extends SimpleCrudNotifier<Category, String> {
+  @override
+  String get tableName => 'categories';
 
   @override
-  List<Category> build() {
-    _loadCategories();
-    return [];
-  }
+  String getId(Category entity) => entity.id;
 
-  Future<void> _loadCategories() async {
-    final categories = await _db.getCategories();
+  @override
+  Future<List<Category>> fetchAll() async {
+    final categories = await db.getCategories();
     if (categories.isEmpty) {
       // Initialize with default categories
       final defaults = [
@@ -33,28 +35,32 @@ class CategoryNotifier extends Notifier<List<Category>> {
         ...DefaultCategories.incomeCategories,
       ];
       for (final category in defaults) {
-        await _db.insertCategory(category);
+        await db.insertCategory(category);
       }
-      state = defaults;
-    } else {
-      state = categories;
+      return defaults;
     }
+    return categories;
   }
 
-  Future<void> addCategory(Category category) async {
-    await _db.insertCategory(category);
-    state = [...state, category];
-  }
+  @override
+  Future<void> insertOne(Category entity) => db.insertCategory(entity);
 
-  Future<void> updateCategory(Category category) async {
-    await _db.updateCategory(category);
-    state = state.map((c) => c.id == category.id ? category : c).toList();
-  }
+  @override
+  Future<void> updateOne(Category entity) => db.updateCategory(entity);
 
-  Future<void> deleteCategory(String id) async {
-    await _db.deleteCategory(id);
-    state = state.where((c) => c.id != id).toList();
-  }
+  @override
+  Future<void> deleteOne(String id) => db.deleteCategory(id);
+
+  // ==================== 业务特有方法（保留原有接口）====================
+
+  /// 添加分类（保持原有方法名兼容）
+  Future<void> addCategory(Category category) => add(category);
+
+  /// 更新分类（保持原有方法名兼容）
+  Future<void> updateCategory(Category category) => update(category);
+
+  /// 删除分类（保持原有方法名兼容）
+  Future<void> deleteCategory(String id) => delete(id);
 
   List<Category> getExpenseCategories() {
     return state.where((c) => c.isExpense).toList()
@@ -106,27 +112,22 @@ class CategoryNotifier extends Notifier<List<Category>> {
     // 首先删除所有子分类
     final children = getChildCategories(id);
     for (final child in children) {
-      await _db.deleteCategory(child.id);
+      await db.deleteCategory(child.id);
     }
     // 然后删除分类本身
-    await _db.deleteCategory(id);
+    await db.deleteCategory(id);
     // 更新状态
     state = state.where((c) => c.id != id && c.parentId != id).toList();
   }
 
-  Category? getCategoryById(String id) {
-    try {
-      return state.firstWhere((c) => c.id == id);
-    } catch (e) {
-      return null;
-    }
-  }
+  /// 根据ID获取分类（使用基类方法）
+  Category? getCategoryById(String id) => getById(id);
 
   Future<void> reorderCategories(List<Category> categories) async {
     for (int i = 0; i < categories.length; i++) {
       final category = categories[i];
       final updated = category.copyWith(sortOrder: i);
-      await _db.updateCategory(updated);
+      await db.updateCategory(updated);
       state = state.map((c) {
         if (c.id == category.id) {
           return updated;

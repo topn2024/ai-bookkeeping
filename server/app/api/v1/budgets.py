@@ -13,51 +13,12 @@ from app.models.user import User
 from app.models.book import Book
 from app.models.category import Category
 from app.models.budget import Budget
-from app.models.transaction import Transaction
 from app.schemas.budget import BudgetCreate, BudgetUpdate, BudgetResponse, BudgetList
 from app.api.deps import get_current_user
+from app.services.stats_service import stats_service
 
 
 router = APIRouter(prefix="/budgets", tags=["Budgets"])
-
-
-async def calculate_budget_spent(
-    db: AsyncSession,
-    user_id: UUID,
-    book_id: UUID,
-    category_id: Optional[UUID],
-    year: int,
-    month: Optional[int],
-) -> Decimal:
-    """Calculate spent amount for a budget period."""
-    if month:
-        # Monthly budget
-        start_date = date(year, month, 1)
-        if month == 12:
-            end_date = date(year + 1, 1, 1)
-        else:
-            end_date = date(year, month + 1, 1)
-    else:
-        # Yearly budget
-        start_date = date(year, 1, 1)
-        end_date = date(year + 1, 1, 1)
-
-    query = select(func.coalesce(func.sum(Transaction.amount), Decimal(0))).where(
-        and_(
-            Transaction.user_id == user_id,
-            Transaction.book_id == book_id,
-            Transaction.transaction_type == 1,  # Expense only
-            Transaction.transaction_date >= start_date,
-            Transaction.transaction_date < end_date,
-            Transaction.is_exclude_stats == False,
-        )
-    )
-
-    if category_id:
-        query = query.where(Transaction.category_id == category_id)
-
-    result = await db.execute(query)
-    return result.scalar() or Decimal(0)
 
 
 @router.get("", response_model=BudgetList)
@@ -83,10 +44,10 @@ async def get_budgets(
     result = await db.execute(query)
     budgets = result.scalars().all()
 
-    # Calculate spent for each budget
+    # Calculate spent for each budget using stats_service
     items = []
     for budget in budgets:
-        spent = await calculate_budget_spent(
+        spent = await stats_service.calculate_budget_spent(
             db, current_user.id, budget.book_id, budget.category_id, budget.year, budget.month
         )
         remaining = budget.amount - spent
@@ -184,8 +145,8 @@ async def create_budget(
     await db.commit()
     await db.refresh(budget)
 
-    # Calculate spent
-    spent = await calculate_budget_spent(
+    # Calculate spent using stats_service
+    spent = await stats_service.calculate_budget_spent(
         db, current_user.id, budget.book_id, budget.category_id, budget.year, budget.month
     )
     remaining = budget.amount - spent
@@ -225,8 +186,8 @@ async def get_budget(
             detail="Budget not found",
         )
 
-    # Calculate spent
-    spent = await calculate_budget_spent(
+    # Calculate spent using stats_service
+    spent = await stats_service.calculate_budget_spent(
         db, current_user.id, budget.book_id, budget.category_id, budget.year, budget.month
     )
     remaining = budget.amount - spent
@@ -274,8 +235,8 @@ async def update_budget(
     await db.commit()
     await db.refresh(budget)
 
-    # Calculate spent
-    spent = await calculate_budget_spent(
+    # Calculate spent using stats_service
+    spent = await stats_service.calculate_budget_spent(
         db, current_user.id, budget.book_id, budget.category_id, budget.year, budget.month
     )
     remaining = budget.amount - spent

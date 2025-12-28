@@ -1,40 +1,47 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/credit_card.dart';
 import '../services/database_service.dart';
+import 'base/crud_notifier.dart';
 
-class CreditCardNotifier extends Notifier<List<CreditCard>> {
-  final DatabaseService _db = DatabaseService();
+/// 信用卡管理 Notifier
+///
+/// 继承 SimpleCrudNotifier 基类，消除重复的 CRUD 代码
+class CreditCardNotifier extends SimpleCrudNotifier<CreditCard, String> {
+  @override
+  String get tableName => 'credit_cards';
 
   @override
-  List<CreditCard> build() {
-    _loadCreditCards();
-    return [];
-  }
+  String getId(CreditCard entity) => entity.id;
 
-  Future<void> _loadCreditCards() async {
-    final cards = await _db.getCreditCards();
-    state = cards;
-  }
+  @override
+  Future<List<CreditCard>> fetchAll() => db.getCreditCards();
 
-  Future<void> addCreditCard(CreditCard card) async {
-    await _db.insertCreditCard(card);
-    state = [...state, card];
-  }
+  @override
+  Future<void> insertOne(CreditCard entity) => db.insertCreditCard(entity);
 
-  Future<void> updateCreditCard(CreditCard card) async {
-    await _db.updateCreditCard(card);
-    state = state.map((c) => c.id == card.id ? card : c).toList();
-  }
+  @override
+  Future<void> updateOne(CreditCard entity) => db.updateCreditCard(entity);
 
-  Future<void> deleteCreditCard(String id) async {
-    await _db.deleteCreditCard(id);
-    state = state.where((c) => c.id != id).toList();
-  }
+  @override
+  Future<void> deleteOne(String id) => db.deleteCreditCard(id);
 
+  // ==================== 业务特有方法（保留原有接口）====================
+
+  /// 添加信用卡（保持原有方法名兼容）
+  Future<void> addCreditCard(CreditCard card) => add(card);
+
+  /// 更新信用卡（保持原有方法名兼容）
+  Future<void> updateCreditCard(CreditCard card) => update(card);
+
+  /// 删除信用卡（保持原有方法名兼容）
+  Future<void> deleteCreditCard(String id) => delete(id);
+
+  /// 切换信用卡启用状态
   Future<void> toggleCreditCard(String id) async {
-    final card = state.firstWhere((c) => c.id == id);
+    final card = getById(id);
+    if (card == null) return;
     final updated = card.copyWith(isEnabled: !card.isEnabled);
-    await updateCreditCard(updated);
+    await update(updated);
   }
 
   /// 更新已用额度

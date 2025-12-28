@@ -1,35 +1,40 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/debt.dart';
 import '../services/database_service.dart';
+import 'base/crud_notifier.dart';
 
-class DebtNotifier extends Notifier<List<Debt>> {
-  final DatabaseService _db = DatabaseService();
+/// 债务管理 Notifier
+///
+/// 继承 SimpleCrudNotifier 基类，消除重复的 CRUD 代码
+class DebtNotifier extends SimpleCrudNotifier<Debt, String> {
+  @override
+  String get tableName => 'debts';
 
   @override
-  List<Debt> build() {
-    _loadDebts();
-    return [];
-  }
+  String getId(Debt entity) => entity.id;
 
-  Future<void> _loadDebts() async {
-    final debts = await _db.getDebts();
-    state = debts;
-  }
+  @override
+  Future<List<Debt>> fetchAll() => db.getDebts();
 
-  Future<void> addDebt(Debt debt) async {
-    await _db.insertDebt(debt);
-    state = [...state, debt];
-  }
+  @override
+  Future<void> insertOne(Debt entity) => db.insertDebt(entity);
 
-  Future<void> updateDebt(Debt debt) async {
-    await _db.updateDebt(debt);
-    state = state.map((d) => d.id == debt.id ? debt : d).toList();
-  }
+  @override
+  Future<void> updateOne(Debt entity) => db.updateDebt(entity);
 
-  Future<void> deleteDebt(String id) async {
-    await _db.deleteDebt(id);
-    state = state.where((d) => d.id != id).toList();
-  }
+  @override
+  Future<void> deleteOne(String id) => db.deleteDebt(id);
+
+  // ==================== 业务特有方法（保留原有接口）====================
+
+  /// 添加债务（保持原有方法名兼容）
+  Future<void> addDebt(Debt debt) => add(debt);
+
+  /// 更新债务（保持原有方法名兼容）
+  Future<void> updateDebt(Debt debt) => update(debt);
+
+  /// 删除债务（保持原有方法名兼容）
+  Future<void> deleteDebt(String id) => delete(id);
 
   /// 记录还款
   Future<void> makePayment(String debtId, double amount, {String? note}) async {
@@ -50,7 +55,7 @@ class DebtNotifier extends Notifier<List<Debt>> {
     await updateDebt(updated);
 
     // 记录还款历史
-    await _db.insertDebtPayment(DebtPayment(
+    await db.insertDebtPayment(DebtPayment(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       debtId: debtId,
       amount: amount,
@@ -76,7 +81,7 @@ class DebtNotifier extends Notifier<List<Debt>> {
 
   /// 获取还款历史
   Future<List<DebtPayment>> getPaymentHistory(String debtId) async {
-    return await _db.getDebtPayments(debtId);
+    return await db.getDebtPayments(debtId);
   }
 
   /// 获取活跃债务（未还清）

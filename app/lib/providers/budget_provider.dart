@@ -2,51 +2,53 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/budget.dart';
 import '../models/transaction.dart';
 import '../services/database_service.dart';
+import 'base/crud_notifier.dart';
 import 'transaction_provider.dart';
 import 'ledger_provider.dart';
 
-class BudgetNotifier extends Notifier<List<Budget>> {
-  final DatabaseService _db = DatabaseService();
+/// 预算管理 Notifier
+///
+/// 继承 SimpleCrudNotifier 基类，消除重复的 CRUD 代码
+class BudgetNotifier extends SimpleCrudNotifier<Budget, String> {
+  @override
+  String get tableName => 'budgets';
 
   @override
-  List<Budget> build() {
-    _loadBudgets();
-    return [];
-  }
+  String getId(Budget entity) => entity.id;
 
-  Future<void> _loadBudgets() async {
-    final budgets = await _db.getBudgets();
-    state = budgets;
-  }
+  @override
+  Future<List<Budget>> fetchAll() => db.getBudgets();
 
-  Future<void> addBudget(Budget budget) async {
-    await _db.insertBudget(budget);
-    state = [...state, budget];
-  }
+  @override
+  Future<void> insertOne(Budget entity) => db.insertBudget(entity);
 
-  Future<void> updateBudget(Budget budget) async {
-    await _db.updateBudget(budget);
-    state = state.map((b) => b.id == budget.id ? budget : b).toList();
-  }
+  @override
+  Future<void> updateOne(Budget entity) => db.updateBudget(entity);
 
-  Future<void> deleteBudget(String id) async {
-    await _db.deleteBudget(id);
-    state = state.where((b) => b.id != id).toList();
-  }
+  @override
+  Future<void> deleteOne(String id) => db.deleteBudget(id);
 
+  // ==================== 业务特有方法（保留原有接口）====================
+
+  /// 添加预算（保持原有方法名兼容）
+  Future<void> addBudget(Budget budget) => add(budget);
+
+  /// 更新预算（保持原有方法名兼容）
+  Future<void> updateBudget(Budget budget) => update(budget);
+
+  /// 删除预算（保持原有方法名兼容）
+  Future<void> deleteBudget(String id) => delete(id);
+
+  /// 切换预算启用状态
   Future<void> toggleBudget(String id) async {
-    final budget = state.firstWhere((b) => b.id == id);
+    final budget = getById(id);
+    if (budget == null) return;
     final updated = budget.copyWith(isEnabled: !budget.isEnabled);
-    await updateBudget(updated);
+    await update(updated);
   }
 
-  Budget? getBudgetById(String id) {
-    try {
-      return state.firstWhere((b) => b.id == id);
-    } catch (e) {
-      return null;
-    }
-  }
+  /// 根据ID获取预算（使用基类方法）
+  Budget? getBudgetById(String id) => getById(id);
 
   List<Budget> getBudgetsForLedger(String ledgerId) {
     return state.where((b) => b.ledgerId == ledgerId && b.isEnabled).toList();
@@ -58,12 +60,12 @@ class BudgetNotifier extends Notifier<List<Budget>> {
 
   /// 获取预算的结转记录
   Future<List<BudgetCarryover>> getCarryovers(String budgetId) async {
-    return await _db.getBudgetCarryovers(budgetId);
+    return await db.getBudgetCarryovers(budgetId);
   }
 
   /// 获取指定月份的结转金额
   Future<double> getCarryoverAmountForMonth(String budgetId, int year, int month) async {
-    final carryover = await _db.getBudgetCarryoverForMonth(budgetId, year, month);
+    final carryover = await db.getBudgetCarryoverForMonth(budgetId, year, month);
     return carryover?.carryoverAmount ?? 0;
   }
 
@@ -103,7 +105,7 @@ class BudgetNotifier extends Notifier<List<Budget>> {
       createdAt: DateTime.now(),
     );
 
-    await _db.insertBudgetCarryover(carryover);
+    await db.insertBudgetCarryover(carryover);
   }
 }
 
@@ -205,7 +207,7 @@ final allBudgetUsagesProvider = Provider<List<BudgetUsage>>((ref) {
 
 /// 零基预算分配管理器
 class ZeroBasedBudgetNotifier extends Notifier<Map<String, ZeroBasedAllocation>> {
-  final DatabaseService _db = DatabaseService();
+  DatabaseService get db => DatabaseService();
 
   @override
   Map<String, ZeroBasedAllocation> build() {
@@ -218,7 +220,7 @@ class ZeroBasedBudgetNotifier extends Notifier<Map<String, ZeroBasedAllocation>>
     if (state.containsKey(key)) {
       return state[key]!.allocatedAmount;
     }
-    final allocation = await _db.getZeroBasedAllocationForMonth(budgetId, year, month);
+    final allocation = await db.getZeroBasedAllocationForMonth(budgetId, year, month);
     if (allocation != null) {
       state = {...state, key: allocation};
       return allocation.allocatedAmount;
@@ -232,7 +234,7 @@ class ZeroBasedBudgetNotifier extends Notifier<Map<String, ZeroBasedAllocation>>
     final key = '$budgetId-${now.year}-${now.month}';
 
     // 检查是否已有分配记录
-    final existing = await _db.getZeroBasedAllocationForMonth(budgetId, now.year, now.month);
+    final existing = await db.getZeroBasedAllocationForMonth(budgetId, now.year, now.month);
 
     if (existing != null) {
       // 更新现有记录
@@ -244,7 +246,7 @@ class ZeroBasedBudgetNotifier extends Notifier<Map<String, ZeroBasedAllocation>>
         month: now.month,
         createdAt: existing.createdAt,
       );
-      await _db.updateZeroBasedAllocation(updated);
+      await db.updateZeroBasedAllocation(updated);
       state = {...state, key: updated};
     } else {
       // 创建新记录
@@ -256,7 +258,7 @@ class ZeroBasedBudgetNotifier extends Notifier<Map<String, ZeroBasedAllocation>>
         month: now.month,
         createdAt: DateTime.now(),
       );
-      await _db.insertZeroBasedAllocation(allocation);
+      await db.insertZeroBasedAllocation(allocation);
       state = {...state, key: allocation};
     }
   }

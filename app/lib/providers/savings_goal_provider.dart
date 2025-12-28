@@ -2,36 +2,41 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/savings_goal.dart';
 import '../models/transaction.dart';
 import '../services/database_service.dart';
+import 'base/crud_notifier.dart';
 import 'transaction_provider.dart';
 
-class SavingsGoalNotifier extends Notifier<List<SavingsGoal>> {
-  final DatabaseService _db = DatabaseService();
+/// 储蓄目标管理 Notifier
+///
+/// 继承 SimpleCrudNotifier 基类，消除重复的 CRUD 代码
+class SavingsGoalNotifier extends SimpleCrudNotifier<SavingsGoal, String> {
+  @override
+  String get tableName => 'savings_goals';
 
   @override
-  List<SavingsGoal> build() {
-    _loadGoals();
-    return [];
-  }
+  String getId(SavingsGoal entity) => entity.id;
 
-  Future<void> _loadGoals() async {
-    final goals = await _db.getSavingsGoals();
-    state = goals;
-  }
+  @override
+  Future<List<SavingsGoal>> fetchAll() => db.getSavingsGoals();
 
-  Future<void> addGoal(SavingsGoal goal) async {
-    await _db.insertSavingsGoal(goal);
-    state = [...state, goal];
-  }
+  @override
+  Future<void> insertOne(SavingsGoal entity) => db.insertSavingsGoal(entity);
 
-  Future<void> updateGoal(SavingsGoal goal) async {
-    await _db.updateSavingsGoal(goal);
-    state = state.map((g) => g.id == goal.id ? goal : g).toList();
-  }
+  @override
+  Future<void> updateOne(SavingsGoal entity) => db.updateSavingsGoal(entity);
 
-  Future<void> deleteGoal(String id) async {
-    await _db.deleteSavingsGoal(id);
-    state = state.where((g) => g.id != id).toList();
-  }
+  @override
+  Future<void> deleteOne(String id) => db.deleteSavingsGoal(id);
+
+  // ==================== 业务特有方法（保留原有接口）====================
+
+  /// 添加储蓄目标（保持原有方法名兼容）
+  Future<void> addGoal(SavingsGoal goal) => add(goal);
+
+  /// 更新储蓄目标（保持原有方法名兼容）
+  Future<void> updateGoal(SavingsGoal goal) => update(goal);
+
+  /// 删除储蓄目标（保持原有方法名兼容）
+  Future<void> deleteGoal(String id) => delete(id);
 
   /// 添加存款到目标
   Future<void> addDeposit(String goalId, double amount, {String? note}) async {
@@ -55,7 +60,7 @@ class SavingsGoalNotifier extends Notifier<List<SavingsGoal>> {
     await updateGoal(updated);
 
     // 记录存款历史
-    await _db.insertSavingsDeposit(SavingsDeposit(
+    await db.insertSavingsDeposit(SavingsDeposit(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       goalId: goalId,
       amount: amount,
@@ -104,7 +109,7 @@ class SavingsGoalNotifier extends Notifier<List<SavingsGoal>> {
 
   /// 获取存款历史
   Future<List<SavingsDeposit>> getDepositHistory(String goalId) async {
-    return await _db.getSavingsDeposits(goalId);
+    return await db.getSavingsDeposits(goalId);
   }
 
   /// 获取活跃目标（未归档）

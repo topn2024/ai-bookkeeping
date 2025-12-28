@@ -3,60 +3,62 @@ import '../models/account.dart';
 import '../models/currency.dart';
 import '../models/exchange_rate.dart';
 import '../services/database_service.dart';
+import 'base/crud_notifier.dart';
 import 'currency_provider.dart';
 
-class AccountNotifier extends Notifier<List<Account>> {
-  final DatabaseService _db = DatabaseService();
+/// 账户管理 Notifier
+///
+/// 继承 SimpleCrudNotifier 基类，消除重复的 CRUD 代码
+class AccountNotifier extends SimpleCrudNotifier<Account, String> {
+  @override
+  String get tableName => 'accounts';
 
   @override
-  List<Account> build() {
-    _loadAccounts();
-    return [];
-  }
+  String getId(Account entity) => entity.id;
 
-  Future<void> _loadAccounts() async {
-    final accounts = await _db.getAccounts();
+  @override
+  Future<List<Account>> fetchAll() async {
+    final accounts = await db.getAccounts();
     if (accounts.isEmpty) {
       // Initialize with default accounts
       for (final account in DefaultAccounts.accounts) {
-        await _db.insertAccount(account);
+        await db.insertAccount(account);
       }
-      state = DefaultAccounts.accounts;
-    } else {
-      state = accounts;
+      return DefaultAccounts.accounts;
     }
+    return accounts;
   }
 
-  Future<void> addAccount(Account account) async {
-    await _db.insertAccount(account);
-    state = [...state, account];
-  }
+  @override
+  Future<void> insertOne(Account entity) => db.insertAccount(entity);
 
-  Future<void> updateAccount(Account account) async {
-    await _db.updateAccount(account);
-    state = state.map((a) => a.id == account.id ? account : a).toList();
-  }
+  @override
+  Future<void> updateOne(Account entity) => db.updateAccount(entity);
 
-  Future<void> deleteAccount(String id) async {
-    await _db.deleteAccount(id);
-    state = state.where((a) => a.id != id).toList();
-  }
+  @override
+  Future<void> deleteOne(String id) => db.deleteAccount(id);
+
+  // ==================== 业务特有方法（保留原有接口）====================
+
+  /// 添加账户（保持原有方法名兼容）
+  Future<void> addAccount(Account account) => add(account);
+
+  /// 更新账户（保持原有方法名兼容）
+  Future<void> updateAccount(Account account) => update(account);
+
+  /// 删除账户（保持原有方法名兼容）
+  Future<void> deleteAccount(String id) => delete(id);
 
   Future<void> setDefaultAccount(String id) async {
     for (final account in state) {
       final updated = account.copyWith(isDefault: account.id == id);
-      await _db.updateAccount(updated);
+      await db.updateAccount(updated);
     }
     state = state.map((a) => a.copyWith(isDefault: a.id == id)).toList();
   }
 
-  Account? getAccountById(String id) {
-    try {
-      return state.firstWhere((a) => a.id == id);
-    } catch (e) {
-      return null;
-    }
-  }
+  /// 根据ID获取账户（使用基类方法）
+  Account? getAccountById(String id) => getById(id);
 
   /// 获取单一货币总余额（不进行汇率转换）
   double get totalBalance {
@@ -102,7 +104,7 @@ class AccountNotifier extends Notifier<List<Account>> {
     }).toList();
 
     for (final account in updated) {
-      await _db.updateAccount(account);
+      await db.updateAccount(account);
     }
     state = updated;
   }
@@ -119,7 +121,7 @@ class AccountNotifier extends Notifier<List<Account>> {
     }).toList();
 
     for (final account in updated) {
-      await _db.updateAccount(account);
+      await db.updateAccount(account);
     }
     state = updated;
   }
@@ -144,7 +146,7 @@ class AccountNotifier extends Notifier<List<Account>> {
     }).toList();
 
     for (final account in updated) {
-      await _db.updateAccount(account);
+      await db.updateAccount(account);
     }
     state = updated;
   }
