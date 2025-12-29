@@ -9,24 +9,12 @@
 - **丰富报表**：收支统计、趋势分析、分类占比、预算管理
 - **跨平台**：支持iOS和Android
 
-千问key ：sk-f0a85d3e56a746509ec435af2446c67a
-智谱key：d6ac02f8c1f6f443cf81f3dae86fb095.7Qe6KOWcVDlDlqDJ
+## 配置说明
 
-服务器：
-160.202.238.29
-root/65QLkJ0CogNI
+敏感配置信息（API密钥、数据库密码等）应通过环境变量配置，不要提交到代码仓库。
 
-用户名:ai-bookkeeping
-密码:AiBookkeeping@2024
-
-  1. PostgreSQL 数据库
-    - 数据库: ai_bookkeeping
-    - 用户: ai_bookkeeping
-    - 密码: AiBookkeeping@2024
-  2. Redis
-    - 密码: AiBookkeeping@2024
-    - 端口: 6379
-
+- 后端配置：复制 `server/.env.example` 为 `server/.env` 并填入实际值
+- 前端配置：构建时通过 `--dart-define` 传入配置值
 
 ## 技术栈
 
@@ -42,9 +30,8 @@ root/65QLkJ0CogNI
 - Redis
 
 ### AI服务
-- PaddleOCR (图片识别)
-- Whisper (语音识别)
-- Claude API (智能解析)
+- 通义千问 Qwen (主要) - 图片识别、文本解析、账单解析
+- 智谱 GLM (备选) - 当千问不可用时自动切换
 
 ## 项目结构
 

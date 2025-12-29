@@ -5,6 +5,7 @@ import '../models/transaction.dart';
 import '../providers/template_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/duplicate_transaction_dialog.dart';
 import 'template_management_page.dart';
 
 class QuickEntryPage extends ConsumerStatefulWidget {
@@ -130,41 +131,53 @@ class _QuickEntryPageState extends ConsumerState<QuickEntryPage> {
         onTap: () => _useTemplate(template),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: template.color.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  template.icon,
-                  color: template.color,
-                  size: 24,
+              Flexible(
+                flex: 2,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: template.color.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    template.icon,
+                    color: template.color,
+                    size: 20,
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                template.name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
+              const SizedBox(height: 4),
+              Flexible(
+                flex: 1,
+                child: Text(
+                  template.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
               if (template.amount != null)
-                Text(
-                  '¥${template.amount!.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    color: template.type == TransactionType.income
-                        ? AppColors.income
-                        : AppColors.expense,
-                    fontSize: 12,
+                Flexible(
+                  flex: 1,
+                  child: Text(
+                    '¥${template.amount!.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      color: template.type == TransactionType.income
+                          ? AppColors.income
+                          : AppColors.expense,
+                      fontSize: 11,
+                    ),
+                    maxLines: 1,
                   ),
                 ),
             ],
@@ -184,7 +197,7 @@ class _QuickEntryPageState extends ConsumerState<QuickEntryPage> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: template.color.withOpacity(0.2),
+            color: template.color.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(template.icon, color: template.color),
@@ -273,19 +286,49 @@ class _QuickEntryPageState extends ConsumerState<QuickEntryPage> {
   void _createTransaction(TransactionTemplate template, double amount) async {
     final transaction = template.toTransaction(overrideAmount: amount);
 
-    await ref.read(transactionProvider.notifier).addTransaction(transaction);
-    await ref.read(templateProvider.notifier).useTemplate(template.id);
+    // 先获取 notifier 引用，确保在回调中可用
+    final transactionNotifier = ref.read(transactionProvider.notifier);
+    final templateNotifier = ref.read(templateProvider.notifier);
+    final transactionId = transaction.id;
+
+    // 检查重复
+    final checkResult = transactionNotifier.checkDuplicate(transaction);
+
+    if (checkResult.hasPotentialDuplicate) {
+      // 显示重复确认对话框
+      final confirmed = await DuplicateTransactionDialog.show(
+        context,
+        newTransaction: transaction,
+        checkResult: checkResult,
+      );
+
+      if (confirmed != true) {
+        return; // 用户取消
+      }
+    }
+
+    await transactionNotifier.forceAddTransaction(transaction);
+    await templateNotifier.useTemplate(template.id);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('已记录: ${template.name} ¥${amount.toStringAsFixed(2)}'),
           backgroundColor: Colors.green,
+          duration: const Duration(seconds: 4), // 延长显示时间
           action: SnackBarAction(
             label: '撤销',
             textColor: Colors.white,
             onPressed: () {
-              ref.read(transactionProvider.notifier).deleteTransaction(transaction.id);
+              // 使用预先捕获的 notifier 和 ID
+              transactionNotifier.deleteTransaction(transactionId);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('已撤销'),
+                  backgroundColor: AppColors.transfer,
+                  duration: Duration(seconds: 2),
+                ),
+              );
             },
           ),
         ),

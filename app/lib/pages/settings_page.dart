@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
 import '../providers/theme_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/locale_provider.dart';
 import '../providers/currency_provider.dart';
+import '../core/logger.dart';
 import 'account_management_page.dart';
 import 'category_management_page.dart';
 import 'ledger_management_page.dart';
@@ -487,7 +489,7 @@ class SettingsPage extends ConsumerWidget {
             iconColor: AppColors.primary,
             title: '数据备份',
             subtitle: '上次备份: 从未',
-            onTap: () {},
+            onTap: () => _showBackupDialog(context),
           ),
           _buildDivider(),
           _buildMenuItem(
@@ -593,21 +595,29 @@ class SettingsPage extends ConsumerWidget {
             icon: Icons.notifications,
             iconColor: AppColors.transfer,
             title: '通知设置',
-            onTap: () {},
+            onTap: () => _showNotificationSettingsDialog(context),
           ),
           _buildDivider(),
           _buildMenuItem(
             icon: Icons.lock,
             iconColor: AppColors.expense,
             title: '安全设置',
-            onTap: () {},
+            onTap: () => _showSecuritySettingsDialog(context),
+          ),
+          _buildDivider(),
+          _buildMenuItem(
+            icon: Icons.bug_report,
+            iconColor: const Color(0xFF795548),
+            title: '日志管理',
+            subtitle: '查看和清理应用日志',
+            onTap: () => _showLogManagementDialog(context),
           ),
           _buildDivider(),
           _buildMenuItem(
             icon: Icons.help_outline,
             iconColor: AppColors.textSecondary,
             title: '帮助与反馈',
-            onTap: () {},
+            onTap: () => _showHelpDialog(context),
           ),
           _buildDivider(),
           _buildMenuItem(
@@ -615,7 +625,7 @@ class SettingsPage extends ConsumerWidget {
             iconColor: AppColors.textSecondary,
             title: '关于我们',
             subtitle: 'v1.0.0',
-            onTap: () {},
+            onTap: () => _showAboutDialog(context),
           ),
         ],
       ),
@@ -776,6 +786,297 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showBackupDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('数据备份'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('备份您的数据到云端，确保数据安全。'),
+            SizedBox(height: 16),
+            Text('此功能即将上线，敬请期待！',
+              style: TextStyle(color: AppColors.textSecondary)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNotificationSettingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('通知设置'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('管理应用通知提醒。'),
+            SizedBox(height: 16),
+            Text('此功能即将上线，敬请期待！',
+              style: TextStyle(color: AppColors.textSecondary)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSecuritySettingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('安全设置'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('设置应用锁、指纹解锁等安全选项。'),
+            SizedBox(height: 16),
+            Text('此功能即将上线，敬请期待！',
+              style: TextStyle(color: AppColors.textSecondary)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('帮助与反馈'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: Icon(Icons.email, color: AppColors.primary),
+              title: Text('联系邮箱'),
+              subtitle: Text('support@ai-bookkeeping.com'),
+              contentPadding: EdgeInsets.zero,
+            ),
+            ListTile(
+              leading: Icon(Icons.bug_report, color: AppColors.expense),
+              title: Text('问题反馈'),
+              subtitle: Text('如遇问题，请发邮件联系我们'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AboutDialog(
+        applicationName: 'AI智能记账',
+        applicationVersion: 'v1.0.0',
+        applicationIcon: Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 40),
+        ),
+        children: const [
+          SizedBox(height: 16),
+          Text('AI智能记账是一款基于人工智能的智能记账应用，'
+              '帮助您轻松管理个人财务。'),
+          SizedBox(height: 8),
+          Text('支持语音记账、拍照记账、智能分类等功能。',
+            style: TextStyle(color: AppColors.textSecondary)),
+        ],
+      ),
+    );
+  }
+
+  void _showLogManagementDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const _LogManagementDialog(),
+    );
+  }
+}
+
+/// Log management dialog widget
+class _LogManagementDialog extends StatefulWidget {
+  const _LogManagementDialog();
+
+  @override
+  State<_LogManagementDialog> createState() => _LogManagementDialogState();
+}
+
+class _LogManagementDialogState extends State<_LogManagementDialog> {
+  int _logSize = 0;
+  int _fileCount = 0;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLogInfo();
+  }
+
+  Future<void> _loadLogInfo() async {
+    setState(() => _loading = true);
+    try {
+      final size = await logger.getLogSize();
+      final files = await logger.getLogFiles();
+      setState(() {
+        _logSize = size;
+        _fileCount = files.length;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() => _loading = false);
+    }
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / 1024 / 1024).toStringAsFixed(2)} MB';
+  }
+
+  Future<void> _clearLogs() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认清理'),
+        content: const Text('确定要清理所有日志文件吗？此操作不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('清理', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await logger.clearAllLogs();
+      await _loadLogInfo();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('日志已清理')),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportLogs() async {
+    try {
+      final file = await logger.exportLogs();
+      if (file != null && mounted) {
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          subject: 'AI记账日志导出',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导出失败: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('日志管理'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_loading)
+            const Center(child: CircularProgressIndicator())
+          else ...[
+            ListTile(
+              leading: const Icon(Icons.storage, color: AppColors.primary),
+              title: const Text('日志大小'),
+              subtitle: Text(_formatSize(_logSize)),
+              contentPadding: EdgeInsets.zero,
+            ),
+            ListTile(
+              leading: const Icon(Icons.insert_drive_file, color: AppColors.income),
+              title: const Text('日志文件数'),
+              subtitle: Text('$_fileCount 个文件'),
+              contentPadding: EdgeInsets.zero,
+            ),
+            const Divider(),
+            const Text(
+              '日志自动清理策略：',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '• 保留最近 7 天的日志\n'
+              '• 单个文件最大 5MB\n'
+              '• 总大小上限 50MB',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton.icon(
+          onPressed: _loading ? null : _exportLogs,
+          icon: const Icon(Icons.share, size: 18),
+          label: const Text('导出'),
+        ),
+        TextButton.icon(
+          onPressed: _loading ? null : _clearLogs,
+          icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+          label: const Text('清理', style: TextStyle(color: Colors.red)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('关闭'),
+        ),
+      ],
     );
   }
 }

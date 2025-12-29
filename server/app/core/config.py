@@ -1,38 +1,46 @@
-"""Application configuration."""
+"""Application configuration.
+
+All sensitive configuration values should be set via environment variables
+or .env file. Never commit real credentials to the repository.
+"""
 import os
 from functools import lru_cache
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Application settings."""
+    """Application settings.
+
+    All sensitive values should be configured via environment variables.
+    See .env.example for required variables.
+    """
 
     # App
     APP_NAME: str = "AI Bookkeeping"
     DEBUG: bool = False
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    SECRET_KEY: str = ""  # Required: Set via environment variable
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://ai_bookkeeping:AiBookkeeping@2024@localhost:5432/ai_bookkeeping"
+    DATABASE_URL: str = ""  # Required: Set via environment variable
 
     # Redis
-    REDIS_URL: str = "redis://:AiBookkeeping@2024@localhost:6379/0"
+    REDIS_URL: str = ""  # Required: Set via environment variable
 
     # JWT
-    JWT_SECRET_KEY: str = "jwt-secret-key-change-in-production"
+    JWT_SECRET_KEY: str = ""  # Required: Set via environment variable
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
     # MinIO
     MINIO_ENDPOINT: str = "localhost:9000"
-    MINIO_ACCESS_KEY: str = "minioadmin"
-    MINIO_SECRET_KEY: str = "AiBookkeeping@2024"
+    MINIO_ACCESS_KEY: str = ""  # Required: Set via environment variable
+    MINIO_SECRET_KEY: str = ""  # Required: Set via environment variable
     MINIO_BUCKET: str = "ai-bookkeeping"
     MINIO_SECURE: bool = False
 
     # AI APIs
-    QWEN_API_KEY: str = ""
-    ZHIPU_API_KEY: str = ""
+    QWEN_API_KEY: str = ""  # Required: Set via environment variable
+    ZHIPU_API_KEY: str = ""  # Optional: Set via environment variable
 
     # OAuth - WeChat
     WECHAT_APP_ID: str = ""
@@ -48,6 +56,9 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = ""
+
+    # Logging
+    LOG_LEVEL: str = "INFO"
 
     class Config:
         env_file = ".env"

@@ -1,41 +1,63 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import '../core/config.dart';
+import '../core/logger.dart';
 
 /// 千问API服务
-/// 使用阿里云通义千问模型进行图片识别和文本解析
+/// 使用阿里云通义千问模型进行图片识别、文本解析和音频识别
 class QwenService {
   static final QwenService _instance = QwenService._internal();
-
-  // 千问API密钥
-  static const String _apiKey = 'sk-f0a85d3e56a746509ec435af2446c67a';
+  static final _logger = Logger.getLogger('QwenService');
 
   // API端点
-  static const String _textApiUrl = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation';
-  static const String _visionApiUrl = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
+  static const String _textApiUrl =
+      'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation';
+  static const String _visionApiUrl =
+      'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
+  static const String _audioApiUrl =
+      'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
 
   late final Dio _dio;
+  bool _initialized = false;
 
   factory QwenService() => _instance;
 
-  QwenService._internal() {
+  QwenService._internal();
+
+  /// Initialize the service with API key from config
+  void _ensureInitialized() {
+    if (_initialized) return;
+
+    final apiKey = appConfig.qwenApiKey;
+    if (apiKey.isEmpty) {
+      _logger.warning('Qwen API key not configured');
+    }
+
     _dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 60),
       headers: {
-        'Authorization': 'Bearer $_apiKey',
+        'Authorization': 'Bearer $apiKey',
         'Content-Type': 'application/json',
       },
     ));
+    _initialized = true;
+    _logger.info('QwenService initialized');
   }
 
   /// 图片识别 - 识别小票/收据
   /// 使用 qwen-vl-plus 视觉模型
   Future<QwenRecognitionResult> recognizeReceipt(File imageFile) async {
+    _ensureInitialized();
+    _logger.info('Recognizing receipt: ${imageFile.path}');
+
     try {
       // 读取图片并转为Base64
       final bytes = await imageFile.readAsBytes();
       final base64Image = base64Encode(bytes);
+      _logger.debug('Image size: ${bytes.length} bytes');
 
       // 获取图片MIME类型
       final extension = imageFile.path.split('.').last.toLowerCase();
@@ -78,8 +100,10 @@ class QwenService {
 
       return _parseVisionResponse(response.data);
     } on DioException catch (e) {
+      _logger.error('Receipt recognition failed', error: e);
       return QwenRecognitionResult.error(_handleDioError(e));
-    } catch (e) {
+    } catch (e, stack) {
+      _logger.error('Receipt recognition failed', error: e, stack: stack);
       return QwenRecognitionResult.error('图片识别失败: $e');
     }
   }
@@ -87,6 +111,9 @@ class QwenService {
   /// 文本解析 - 从自然语言提取记账信息
   /// 使用 qwen-turbo 文本模型
   Future<QwenRecognitionResult> parseBookkeepingText(String text) async {
+    _ensureInitialized();
+    _logger.info('Parsing bookkeeping text: ${text.length} chars');
+
     try {
       final response = await _dio.post(
         _textApiUrl,
@@ -121,14 +148,98 @@ class QwenService {
 
       return _parseTextResponse(response.data);
     } on DioException catch (e) {
+      _logger.error('Text parsing failed', error: e);
       return QwenRecognitionResult.error(_handleDioError(e));
-    } catch (e) {
+    } catch (e, stack) {
+      _logger.error('Text parsing failed', error: e, stack: stack);
       return QwenRecognitionResult.error('文本解析失败: $e');
+    }
+  }
+
+  /// 音频识别记账 - 直接从音频中提取记账信息
+  /// 使用 qwen-audio-turbo 音频模型
+  Future<QwenRecognitionResult> recognizeAudio(Uint8List audioData,
+      {String format = 'wav'}) async {
+    _ensureInitialized();
+    _logger.info('Recognizing audio: ${audioData.length} bytes, format: $format');
+
+    try {
+      // 将音频数据转为Base64
+      final base64Audio = base64Encode(audioData);
+
+      // 获取音频MIME类型
+      final mimeType = _getAudioMimeType(format);
+
+      final response = await _dio.post(
+        _audioApiUrl,
+        data: {
+          'model': 'qwen-audio-turbo',
+          'input': {
+            'messages': [
+              {
+                'role': 'user',
+                'content': [
+                  {
+                    'audio': 'data:$mimeType;base64,$base64Audio',
+                  },
+                  {
+                    'text': '''请分析这段语音，提取记账信息。
+
+请识别语音内容，并提取：
+1. amount: 金额（数字）
+2. type: 类型（expense表示支出，income表示收入）
+3. category: 消费分类（餐饮/交通/购物/娱乐/住房/医疗/教育/其他）或收入分类（工资/奖金/兼职/理财/其他）
+4. description: 备注描述
+
+请以JSON格式返回：
+{
+    "transcription": "语音转写文本",
+    "amount": 金额数字,
+    "type": "expense或income",
+    "category": "分类",
+    "description": "备注"
+}
+
+只返回JSON，不要其他文字。'''
+                  }
+                ]
+              }
+            ]
+          },
+          'parameters': {
+            'result_format': 'message',
+          }
+        },
+      );
+
+      return _parseAudioResponse(response.data);
+    } on DioException catch (e) {
+      _logger.error('Audio recognition failed', error: e);
+      return QwenRecognitionResult.error(_handleDioError(e));
+    } catch (e, stack) {
+      _logger.error('Audio recognition failed', error: e, stack: stack);
+      return QwenRecognitionResult.error('音频识别失败: $e');
+    }
+  }
+
+  /// 从音频文件识别记账信息
+  Future<QwenRecognitionResult> recognizeAudioFile(File audioFile) async {
+    _logger.info('Recognizing audio file: ${audioFile.path}');
+    try {
+      final bytes = await audioFile.readAsBytes();
+      final extension = audioFile.path.split('.').last.toLowerCase();
+      return recognizeAudio(bytes, format: extension);
+    } catch (e, stack) {
+      _logger.error('Read audio file failed', error: e, stack: stack);
+      return QwenRecognitionResult.error('读取音频文件失败: $e');
     }
   }
 
   /// 智能分类建议
   Future<String?> suggestCategory(String description) async {
+    _ensureInitialized();
+    _logger.debug('Suggesting category for: $description');
+
     try {
       final response = await _dio.post(
         _textApiUrl,
@@ -159,17 +270,23 @@ class QwenService {
         final choices = result['output']['choices'] as List;
         if (choices.isNotEmpty) {
           final content = choices[0]['message']['content'] as String;
-          return content.trim();
+          final category = content.trim();
+          _logger.debug('Suggested category: $category');
+          return category;
         }
       }
       return null;
-    } catch (e) {
+    } catch (e, stack) {
+      _logger.warning('Category suggestion failed', error: e, stack: stack);
       return null;
     }
   }
 
   /// 邮箱账单解析
   Future<List<QwenRecognitionResult>> parseEmailBill(String emailContent) async {
+    _ensureInitialized();
+    _logger.info('Parsing email bill: ${emailContent.length} chars');
+
     try {
       final response = await _dio.post(
         _textApiUrl,
@@ -202,10 +319,14 @@ class QwenService {
         },
       );
 
-      return _parseEmailResponse(response.data);
+      final results = _parseEmailResponse(response.data);
+      _logger.info('Parsed ${results.length} transactions from email');
+      return results;
     } on DioException catch (e) {
+      _logger.error('Email bill parsing failed', error: e);
       return [QwenRecognitionResult.error(_handleDioError(e))];
-    } catch (e) {
+    } catch (e, stack) {
+      _logger.error('Email bill parsing failed', error: e, stack: stack);
       return [QwenRecognitionResult.error('账单解析失败: $e')];
     }
   }
@@ -340,6 +461,77 @@ class QwenService {
         return 'image/webp';
       default:
         return 'image/jpeg';
+    }
+  }
+
+  String _getAudioMimeType(String extension) {
+    switch (extension) {
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'wav':
+        return 'audio/wav';
+      case 'aac':
+        return 'audio/aac';
+      case 'm4a':
+        return 'audio/m4a';
+      case 'ogg':
+        return 'audio/ogg';
+      case 'flac':
+        return 'audio/flac';
+      default:
+        return 'audio/wav';
+    }
+  }
+
+  QwenRecognitionResult _parseAudioResponse(Map<String, dynamic> response) {
+    try {
+      if (response['output'] != null && response['output']['choices'] != null) {
+        final choices = response['output']['choices'] as List;
+        if (choices.isNotEmpty) {
+          final message = choices[0]['message'];
+          var content = message['content'];
+
+          // 音频模型可能返回字符串或数组
+          String textContent = '';
+          if (content is String) {
+            textContent = content;
+          } else if (content is List) {
+            for (final item in content) {
+              if (item is Map && item['text'] != null) {
+                textContent = item['text'];
+                break;
+              }
+            }
+          }
+
+          if (textContent.isNotEmpty) {
+            return _extractAudioJsonResult(textContent);
+          }
+        }
+      }
+      return QwenRecognitionResult.error('无法解析音频响应');
+    } catch (e) {
+      return QwenRecognitionResult.error('解析音频响应失败: $e');
+    }
+  }
+
+  QwenRecognitionResult _extractAudioJsonResult(String content) {
+    try {
+      final jsonStr = _extractJsonString(content);
+      if (jsonStr != null) {
+        final data = jsonDecode(jsonStr);
+        return QwenRecognitionResult(
+          amount: (data['amount'] as num?)?.toDouble(),
+          category: data['category'] as String?,
+          description: data['description'] as String? ?? data['transcription'] as String?,
+          type: data['type'] as String? ?? 'expense',
+          success: true,
+          confidence: 0.9,
+        );
+      }
+      return QwenRecognitionResult.error('无法提取JSON');
+    } catch (e) {
+      return QwenRecognitionResult.error('JSON解析失败: $e');
     }
   }
 

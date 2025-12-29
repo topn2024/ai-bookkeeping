@@ -4,8 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
 import '../providers/ai_provider.dart';
+import '../providers/transaction_provider.dart';
 import '../services/ai_service.dart';
+import '../services/qwen_service.dart' show ReceiptItem;
 import '../models/category.dart';
+import '../models/transaction.dart';
+import '../widgets/duplicate_transaction_dialog.dart';
 
 /// 图片识别记账页面
 class ImageRecognitionPage extends ConsumerStatefulWidget {
@@ -86,10 +90,79 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
     );
   }
 
-  void _confirmAndCreateTransaction() {
+  /// 解析日期字符串
+  DateTime _parseDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty || dateStr == '今天') {
+      return DateTime.now();
+    }
+
+    try {
+      // 尝试多种日期格式
+      final patterns = [
+        RegExp(r'(\d{4})-(\d{1,2})-(\d{1,2})'),  // 2024-12-30
+        RegExp(r'(\d{4})/(\d{1,2})/(\d{1,2})'),  // 2024/12/30
+        RegExp(r'(\d{4})年(\d{1,2})月(\d{1,2})日'), // 2024年12月30日
+        RegExp(r'(\d{1,2})-(\d{1,2})'),           // 12-30
+        RegExp(r'(\d{1,2})/(\d{1,2})'),           // 12/30
+        RegExp(r'(\d{1,2})月(\d{1,2})日'),        // 12月30日
+      ];
+
+      for (final pattern in patterns) {
+        final match = pattern.firstMatch(dateStr);
+        if (match != null) {
+          final groups = match.groups([1, 2, 3]).whereType<String>().toList();
+          if (groups.length >= 3) {
+            // 完整日期
+            return DateTime(
+              int.parse(groups[0]),
+              int.parse(groups[1]),
+              int.parse(groups[2]),
+            );
+          } else if (groups.length == 2) {
+            // 只有月日，使用当前年份
+            return DateTime(
+              DateTime.now().year,
+              int.parse(groups[0]),
+              int.parse(groups[1]),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      // 解析失败，使用当前日期
+    }
+    return DateTime.now();
+  }
+
+  Future<void> _confirmAndCreateTransaction() async {
     if (_recognitionResult == null || !_recognitionResult!.success) return;
 
-    // 返回识别结果给上一个页面
+    // 解析识别出的日期
+    final transactionDate = _parseDate(_recognitionResult!.date);
+
+    // 创建交易记录
+    final transaction = Transaction(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      type: _recognitionResult!.type == 'income'
+          ? TransactionType.income
+          : TransactionType.expense,
+      amount: _recognitionResult!.amount ?? 0,
+      category: _recognitionResult!.category ?? 'other',
+      note: _recognitionResult!.description ?? _recognitionResult!.merchant,
+      date: transactionDate,
+      accountId: 'cash',
+    );
+
+    // 使用重复检测保存交易
+    final confirmed = await DuplicateTransactionHelper.checkAndConfirm(
+      context: context,
+      transaction: transaction,
+      transactionNotifier: ref.read(transactionProvider.notifier),
+    );
+
+    if (!confirmed) return; // 用户取消
+
+    // 返回上一页
     Navigator.pop(context, _recognitionResult);
   }
 
@@ -239,54 +312,223 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
       );
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.check_circle, color: AppColors.income, size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                '识别成功',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.income,
+    return GestureDetector(
+      onTap: () => _showDetailDialog(),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.check_circle, color: AppColors.income, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  '识别成功',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.income,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '置信度: ${(_recognitionResult!.confidence * 100).toStringAsFixed(0)}%',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
+              ],
+            ),
+            const Divider(height: 20),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _buildResultItem('金额', '¥ ${_recognitionResult!.amount?.toStringAsFixed(2) ?? '未识别'}'),
+                    _buildResultItem('商户', _recognitionResult!.merchant ?? '未识别'),
+                    _buildResultItem('分类', _getCategoryName(_recognitionResult!.category)),
+                    _buildResultItem('日期', _recognitionResult!.date ?? '今天'),
+                    if (_recognitionResult!.items != null && _recognitionResult!.items!.isNotEmpty)
+                      _buildResultItem('明细', '${_recognitionResult!.items!.length}项商品 (点击查看)'),
+                  ],
                 ),
               ),
-              const Spacer(),
-              Text(
-                '置信度: ${(_recognitionResult!.confidence * 100).toStringAsFixed(0)}%',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 显示账单详情对话框
+  void _showDetailDialog() {
+    if (_recognitionResult == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.5,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // 拖拽指示器
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // 标题
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    const Text(
+                      '账单详情',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              // 详情内容
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    // 基本信息卡片
+                    _buildDetailCard('基本信息', [
+                      _buildDetailRow('总金额', '¥ ${_recognitionResult!.amount?.toStringAsFixed(2) ?? '未识别'}',
+                          valueColor: AppColors.expense),
+                      _buildDetailRow('商户名称', _recognitionResult!.merchant ?? '未识别'),
+                      _buildDetailRow('交易类型', _recognitionResult!.type == 'income' ? '收入' : '支出'),
+                      _buildDetailRow('分类', _getCategoryName(_recognitionResult!.category)),
+                      _buildDetailRow('交易日期', _recognitionResult!.date ?? '今天'),
+                      if (_recognitionResult!.description != null)
+                        _buildDetailRow('摘要', _recognitionResult!.description!),
+                    ]),
+                    const SizedBox(height: 16),
+                    // 商品明细列表
+                    if (_recognitionResult!.items != null && _recognitionResult!.items!.isNotEmpty) ...[
+                      _buildDetailCard('商品明细 (${_recognitionResult!.items!.length}项)', [
+                        for (final item in _recognitionResult!.items!)
+                          _buildItemRow(item),
+                      ]),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
-          const Divider(height: 20),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  _buildResultItem('金额', '¥ ${_recognitionResult!.amount?.toStringAsFixed(2) ?? '未识别'}'),
-                  _buildResultItem('商户', _recognitionResult!.merchant ?? '未识别'),
-                  _buildResultItem('分类', _getCategoryName(_recognitionResult!.category)),
-                  _buildResultItem('日期', _recognitionResult!.date ?? '今天'),
-                  if (_recognitionResult!.description != null)
-                    _buildResultItem('摘要', _recognitionResult!.description!),
-                ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailCard(String title, List<Widget> children) {
+    return Card(
+      elevation: 0,
+      color: Colors.grey[50],
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
+            ),
+            const SizedBox(height: 12),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              label,
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: valueColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemRow(ReceiptItem item) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              item.name,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+          Text(
+            '¥${item.price.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -355,7 +597,7 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
