@@ -36,7 +36,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 11,
+      version: 12,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -416,6 +416,58 @@ class DatabaseService {
         respondedAt INTEGER
       )
     ''');
+
+    // Sync metadata table - tracks sync status for each entity
+    await db.execute('''
+      CREATE TABLE sync_metadata (
+        id TEXT PRIMARY KEY,
+        entityType TEXT NOT NULL,
+        localId TEXT NOT NULL,
+        serverId TEXT,
+        syncStatus INTEGER NOT NULL DEFAULT 0,
+        localUpdatedAt INTEGER NOT NULL,
+        serverUpdatedAt INTEGER,
+        lastSyncAt INTEGER,
+        version INTEGER DEFAULT 1,
+        isDeleted INTEGER DEFAULT 0,
+        UNIQUE(entityType, localId)
+      )
+    ''');
+
+    // Sync queue table - stores pending sync operations for offline support
+    await db.execute('''
+      CREATE TABLE sync_queue (
+        id TEXT PRIMARY KEY,
+        entityType TEXT NOT NULL,
+        entityId TEXT NOT NULL,
+        operation TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        createdAt INTEGER NOT NULL,
+        retryCount INTEGER DEFAULT 0,
+        lastError TEXT,
+        status INTEGER DEFAULT 0
+      )
+    ''');
+
+    // ID mapping table - maps local IDs to server IDs
+    await db.execute('''
+      CREATE TABLE id_mapping (
+        id TEXT PRIMARY KEY,
+        entityType TEXT NOT NULL,
+        localId TEXT NOT NULL,
+        serverId TEXT NOT NULL,
+        createdAt INTEGER NOT NULL,
+        UNIQUE(entityType, localId),
+        UNIQUE(entityType, serverId)
+      )
+    ''');
+
+    // Create indexes for sync tables
+    await db.execute('CREATE INDEX idx_sync_metadata_entity ON sync_metadata(entityType, localId)');
+    await db.execute('CREATE INDEX idx_sync_metadata_status ON sync_metadata(syncStatus)');
+    await db.execute('CREATE INDEX idx_sync_queue_status ON sync_queue(status)');
+    await db.execute('CREATE INDEX idx_id_mapping_local ON id_mapping(entityType, localId)');
+    await db.execute('CREATE INDEX idx_id_mapping_server ON id_mapping(entityType, serverId)');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -666,6 +718,107 @@ class DatabaseService {
         )
       ''');
     }
+
+    if (oldVersion < 12) {
+      // Create sync tables for data synchronization
+
+      // Sync metadata table - tracks sync status for each entity
+      await db.execute('''
+        CREATE TABLE sync_metadata (
+          id TEXT PRIMARY KEY,
+          entityType TEXT NOT NULL,
+          localId TEXT NOT NULL,
+          serverId TEXT,
+          syncStatus INTEGER NOT NULL DEFAULT 0,
+          localUpdatedAt INTEGER NOT NULL,
+          serverUpdatedAt INTEGER,
+          lastSyncAt INTEGER,
+          version INTEGER DEFAULT 1,
+          isDeleted INTEGER DEFAULT 0,
+          UNIQUE(entityType, localId)
+        )
+      ''');
+
+      // Sync queue table - stores pending sync operations for offline support
+      await db.execute('''
+        CREATE TABLE sync_queue (
+          id TEXT PRIMARY KEY,
+          entityType TEXT NOT NULL,
+          entityId TEXT NOT NULL,
+          operation TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          retryCount INTEGER DEFAULT 0,
+          lastError TEXT,
+          status INTEGER DEFAULT 0
+        )
+      ''');
+
+      // ID mapping table - maps local IDs to server IDs
+      await db.execute('''
+        CREATE TABLE id_mapping (
+          id TEXT PRIMARY KEY,
+          entityType TEXT NOT NULL,
+          localId TEXT NOT NULL,
+          serverId TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          UNIQUE(entityType, localId),
+          UNIQUE(entityType, serverId)
+        )
+      ''');
+
+      // Create indexes for sync tables
+      await db.execute('CREATE INDEX idx_sync_metadata_entity ON sync_metadata(entityType, localId)');
+      await db.execute('CREATE INDEX idx_sync_metadata_status ON sync_metadata(syncStatus)');
+      await db.execute('CREATE INDEX idx_sync_queue_status ON sync_queue(status)');
+      await db.execute('CREATE INDEX idx_id_mapping_local ON id_mapping(entityType, localId)');
+      await db.execute('CREATE INDEX idx_id_mapping_server ON id_mapping(entityType, serverId)');
+    }
+  }
+
+  // ==================== 事务支持 ====================
+
+  /// 在数据库事务中执行操作
+  ///
+  /// 如果操作抛出异常，所有更改都会回滚
+  /// 使用示例：
+  /// ```dart
+  /// await db.runInTransaction(() async {
+  ///   await db.updateAccount(fromAccount);
+  ///   await db.updateAccount(toAccount);
+  /// });
+  /// ```
+  Future<T> runInTransaction<T>(Future<T> Function() action) async {
+    final db = await database;
+    return await db.transaction((txn) async {
+      // 临时替换数据库实例以使用事务
+      _database = txn as Database;
+      try {
+        final result = await action();
+        return result;
+      } finally {
+        // 恢复原始数据库连接
+        _database = db;
+      }
+    });
+  }
+
+  /// 批量执行操作（性能优化）
+  ///
+  /// 使用示例：
+  /// ```dart
+  /// await db.runBatch((batch) {
+  ///   for (final account in accounts) {
+  ///     batch.update('accounts', account.toMap(),
+  ///       where: 'id = ?', whereArgs: [account.id]);
+  ///   }
+  /// });
+  /// ```
+  Future<List<Object?>> runBatch(void Function(Batch batch) operations) async {
+    final db = await database;
+    final batch = db.batch();
+    operations(batch);
+    return await batch.commit();
   }
 
   // Transaction CRUD
@@ -1682,5 +1835,287 @@ class DatabaseService {
       // Insert default ledger
       await insertLedger(DefaultLedgers.defaultLedger);
     }
+  }
+
+  // ==================== Sync Metadata CRUD ====================
+
+  /// Insert or update sync metadata for an entity
+  Future<int> upsertSyncMetadata({
+    required String entityType,
+    required String localId,
+    String? serverId,
+    required int syncStatus,
+    required int localUpdatedAt,
+    int? serverUpdatedAt,
+    int? lastSyncAt,
+    int version = 1,
+    bool isDeleted = false,
+  }) async {
+    final db = await database;
+    final id = '${entityType}_$localId';
+
+    return await db.insert(
+      'sync_metadata',
+      {
+        'id': id,
+        'entityType': entityType,
+        'localId': localId,
+        'serverId': serverId,
+        'syncStatus': syncStatus,
+        'localUpdatedAt': localUpdatedAt,
+        'serverUpdatedAt': serverUpdatedAt,
+        'lastSyncAt': lastSyncAt,
+        'version': version,
+        'isDeleted': isDeleted ? 1 : 0,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Get sync metadata for a specific entity
+  Future<Map<String, dynamic>?> getSyncMetadata(String entityType, String localId) async {
+    final db = await database;
+    final maps = await db.query(
+      'sync_metadata',
+      where: 'entityType = ? AND localId = ?',
+      whereArgs: [entityType, localId],
+    );
+    return maps.isNotEmpty ? maps.first : null;
+  }
+
+  /// Get all entities pending sync
+  Future<List<Map<String, dynamic>>> getPendingSyncMetadata() async {
+    final db = await database;
+    return await db.query(
+      'sync_metadata',
+      where: 'syncStatus = ?',
+      whereArgs: [0], // 0 = pending
+      orderBy: 'localUpdatedAt ASC',
+    );
+  }
+
+  /// Get all synced entities older than a given date (for cleanup)
+  Future<List<Map<String, dynamic>>> getSyncedEntitiesOlderThan(
+    String entityType,
+    int cutoffTimestamp,
+  ) async {
+    final db = await database;
+    return await db.query(
+      'sync_metadata',
+      where: 'entityType = ? AND syncStatus = ? AND lastSyncAt < ?',
+      whereArgs: [entityType, 1, cutoffTimestamp], // 1 = synced
+    );
+  }
+
+  /// Update sync status after successful sync
+  Future<int> updateSyncStatus(
+    String entityType,
+    String localId, {
+    required int syncStatus,
+    String? serverId,
+    int? serverUpdatedAt,
+    int? lastSyncAt,
+  }) async {
+    final db = await database;
+    final updates = <String, dynamic>{
+      'syncStatus': syncStatus,
+    };
+    if (serverId != null) updates['serverId'] = serverId;
+    if (serverUpdatedAt != null) updates['serverUpdatedAt'] = serverUpdatedAt;
+    if (lastSyncAt != null) updates['lastSyncAt'] = lastSyncAt;
+
+    return await db.update(
+      'sync_metadata',
+      updates,
+      where: 'entityType = ? AND localId = ?',
+      whereArgs: [entityType, localId],
+    );
+  }
+
+  /// Delete sync metadata
+  Future<int> deleteSyncMetadata(String entityType, String localId) async {
+    final db = await database;
+    return await db.delete(
+      'sync_metadata',
+      where: 'entityType = ? AND localId = ?',
+      whereArgs: [entityType, localId],
+    );
+  }
+
+  // ==================== Sync Queue CRUD ====================
+
+  /// Add operation to sync queue
+  Future<int> enqueueSyncOperation({
+    required String id,
+    required String entityType,
+    required String entityId,
+    required String operation,
+    required String payload,
+  }) async {
+    final db = await database;
+    return await db.insert('sync_queue', {
+      'id': id,
+      'entityType': entityType,
+      'entityId': entityId,
+      'operation': operation,
+      'payload': payload,
+      'createdAt': DateTime.now().millisecondsSinceEpoch,
+      'retryCount': 0,
+      'status': 0, // pending
+    });
+  }
+
+  /// Get pending sync operations
+  Future<List<Map<String, dynamic>>> getPendingSyncQueue() async {
+    final db = await database;
+    return await db.query(
+      'sync_queue',
+      where: 'status = ?',
+      whereArgs: [0], // pending
+      orderBy: 'createdAt ASC',
+    );
+  }
+
+  /// Update sync queue item status
+  Future<int> updateSyncQueueStatus(
+    String id, {
+    required int status,
+    int? retryCount,
+    String? lastError,
+  }) async {
+    final db = await database;
+    final updates = <String, dynamic>{'status': status};
+    if (retryCount != null) updates['retryCount'] = retryCount;
+    if (lastError != null) updates['lastError'] = lastError;
+
+    return await db.update(
+      'sync_queue',
+      updates,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Delete completed sync queue items
+  Future<int> deleteCompletedSyncQueue() async {
+    final db = await database;
+    return await db.delete(
+      'sync_queue',
+      where: 'status = ?',
+      whereArgs: [2], // completed
+    );
+  }
+
+  /// Clear all sync queue
+  Future<int> clearSyncQueue() async {
+    final db = await database;
+    return await db.delete('sync_queue');
+  }
+
+  // ==================== ID Mapping CRUD ====================
+
+  /// Insert ID mapping
+  Future<int> insertIdMapping({
+    required String entityType,
+    required String localId,
+    required String serverId,
+  }) async {
+    final db = await database;
+    final id = '${entityType}_$localId';
+    return await db.insert(
+      'id_mapping',
+      {
+        'id': id,
+        'entityType': entityType,
+        'localId': localId,
+        'serverId': serverId,
+        'createdAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Get server ID by local ID
+  Future<String?> getServerIdByLocalId(String entityType, String localId) async {
+    final db = await database;
+    final maps = await db.query(
+      'id_mapping',
+      columns: ['serverId'],
+      where: 'entityType = ? AND localId = ?',
+      whereArgs: [entityType, localId],
+    );
+    return maps.isNotEmpty ? maps.first['serverId'] as String : null;
+  }
+
+  /// Get local ID by server ID
+  Future<String?> getLocalIdByServerId(String entityType, String serverId) async {
+    final db = await database;
+    final maps = await db.query(
+      'id_mapping',
+      columns: ['localId'],
+      where: 'entityType = ? AND serverId = ?',
+      whereArgs: [entityType, serverId],
+    );
+    return maps.isNotEmpty ? maps.first['localId'] as String : null;
+  }
+
+  /// Get all ID mappings for an entity type
+  Future<List<Map<String, dynamic>>> getIdMappings(String entityType) async {
+    final db = await database;
+    return await db.query(
+      'id_mapping',
+      where: 'entityType = ?',
+      whereArgs: [entityType],
+    );
+  }
+
+  /// Delete ID mapping
+  Future<int> deleteIdMapping(String entityType, String localId) async {
+    final db = await database;
+    return await db.delete(
+      'id_mapping',
+      where: 'entityType = ? AND localId = ?',
+      whereArgs: [entityType, localId],
+    );
+  }
+
+  // ==================== Sync Statistics ====================
+
+  /// Get sync statistics
+  Future<Map<String, int>> getSyncStatistics() async {
+    final db = await database;
+
+    final pendingCount = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM sync_metadata WHERE syncStatus = 0'),
+    ) ?? 0;
+
+    final syncedCount = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM sync_metadata WHERE syncStatus = 1'),
+    ) ?? 0;
+
+    final conflictCount = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM sync_metadata WHERE syncStatus = 2'),
+    ) ?? 0;
+
+    final queueCount = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM sync_queue WHERE status = 0'),
+    ) ?? 0;
+
+    return {
+      'pending': pendingCount,
+      'synced': syncedCount,
+      'conflict': conflictCount,
+      'queue': queueCount,
+    };
+  }
+
+  /// Get last sync time
+  Future<DateTime?> getLastSyncTime() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT MAX(lastSyncAt) as lastSync FROM sync_metadata WHERE lastSyncAt IS NOT NULL',
+    );
+    final lastSync = result.first['lastSync'] as int?;
+    return lastSync != null ? DateTime.fromMillisecondsSinceEpoch(lastSync) : null;
   }
 }

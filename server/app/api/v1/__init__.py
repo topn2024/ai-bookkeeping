@@ -13,6 +13,7 @@ from app.api.v1.stats import router as stats_router
 from app.api.v1.ai import router as ai_router
 from app.api.v1.email_bindings import router as email_bindings_router
 from app.api.v1.expense_targets import router as expense_targets_router
+from app.api.v1.sync import router as sync_router
 
 api_router = APIRouter()
 
@@ -28,3 +29,4 @@ api_router.include_router(stats_router)
 api_router.include_router(ai_router)
 api_router.include_router(email_bindings_router)
 api_router.include_router(expense_targets_router)
+api_router.include_router(sync_router)

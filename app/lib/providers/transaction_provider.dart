@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/transaction.dart';
 import '../utils/aggregations.dart';
 import '../utils/date_utils.dart';
+import '../services/duplicate_detection_service.dart';
 import 'base/crud_notifier.dart';
 
 /// 交易管理 Notifier
@@ -40,6 +41,33 @@ class TransactionNotifier extends SimpleCrudNotifier<Transaction, String> {
 
   /// 删除交易（保持原有方法名兼容）
   Future<void> deleteTransaction(String id) => delete(id);
+
+  // ==================== 重复检测方法 ====================
+
+  /// 检查交易是否重复
+  DuplicateCheckResult checkDuplicate(Transaction transaction) {
+    return DuplicateDetectionService.checkDuplicate(transaction, state);
+  }
+
+  /// 快速检查是否需要详细的重复检测
+  bool needsDuplicateCheck(Transaction transaction) {
+    return DuplicateDetectionService.needsDetailedCheck(transaction, state);
+  }
+
+  /// 添加交易（带重复检测）
+  /// 返回检测结果，UI层根据结果决定是否显示确认对话框
+  Future<DuplicateCheckResult> addTransactionWithCheck(Transaction transaction) async {
+    final checkResult = checkDuplicate(transaction);
+    if (!checkResult.hasPotentialDuplicate) {
+      await addTransaction(transaction);
+    }
+    return checkResult;
+  }
+
+  /// 强制添加交易（跳过重复检测）
+  Future<void> forceAddTransaction(Transaction transaction) async {
+    await addTransaction(transaction);
+  }
 
   // ==================== 使用工具类简化的聚合方法 ====================
 

@@ -544,3 +544,237 @@ class WebDAVConfig {
     );
   }
 }
+
+// ==================== Server Sync Models ====================
+
+/// 同步元数据状态
+class SyncMetadataStatus {
+  static const int pending = 0;
+  static const int synced = 1;
+  static const int conflict = 2;
+  static const int failed = 3;
+}
+
+/// 实体同步元数据
+class SyncMetadata {
+  final String entityType;
+  final String localId;
+  final String? serverId;
+  final int syncStatus;
+  final DateTime localUpdatedAt;
+  final DateTime? serverUpdatedAt;
+  final DateTime? lastSyncAt;
+  final int version;
+  final bool isDeleted;
+
+  const SyncMetadata({
+    required this.entityType,
+    required this.localId,
+    this.serverId,
+    required this.syncStatus,
+    required this.localUpdatedAt,
+    this.serverUpdatedAt,
+    this.lastSyncAt,
+    this.version = 1,
+    this.isDeleted = false,
+  });
+
+  bool get isPending => syncStatus == SyncMetadataStatus.pending;
+  bool get isSynced => syncStatus == SyncMetadataStatus.synced;
+  bool get hasConflict => syncStatus == SyncMetadataStatus.conflict;
+  bool get isFailed => syncStatus == SyncMetadataStatus.failed;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'entityType': entityType,
+      'localId': localId,
+      'serverId': serverId,
+      'syncStatus': syncStatus,
+      'localUpdatedAt': localUpdatedAt.millisecondsSinceEpoch,
+      'serverUpdatedAt': serverUpdatedAt?.millisecondsSinceEpoch,
+      'lastSyncAt': lastSyncAt?.millisecondsSinceEpoch,
+      'version': version,
+      'isDeleted': isDeleted ? 1 : 0,
+    };
+  }
+
+  factory SyncMetadata.fromMap(Map<String, dynamic> map) {
+    return SyncMetadata(
+      entityType: map['entityType'] as String,
+      localId: map['localId'] as String,
+      serverId: map['serverId'] as String?,
+      syncStatus: map['syncStatus'] as int,
+      localUpdatedAt: DateTime.fromMillisecondsSinceEpoch(map['localUpdatedAt'] as int),
+      serverUpdatedAt: map['serverUpdatedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['serverUpdatedAt'] as int)
+          : null,
+      lastSyncAt: map['lastSyncAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['lastSyncAt'] as int)
+          : null,
+      version: map['version'] as int? ?? 1,
+      isDeleted: (map['isDeleted'] as int?) == 1,
+    );
+  }
+}
+
+/// ID映射
+class IdMapping {
+  final String entityType;
+  final String localId;
+  final String serverId;
+  final DateTime createdAt;
+
+  const IdMapping({
+    required this.entityType,
+    required this.localId,
+    required this.serverId,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'entityType': entityType,
+      'localId': localId,
+      'serverId': serverId,
+      'createdAt': createdAt.millisecondsSinceEpoch,
+    };
+  }
+
+  factory IdMapping.fromMap(Map<String, dynamic> map) {
+    return IdMapping(
+      entityType: map['entityType'] as String,
+      localId: map['localId'] as String,
+      serverId: map['serverId'] as String,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
+    );
+  }
+}
+
+/// 同步队列项
+class SyncQueueItem {
+  final String id;
+  final String entityType;
+  final String entityId;
+  final String operation;
+  final String payload;
+  final DateTime createdAt;
+  final int retryCount;
+  final String? lastError;
+  final int status;
+
+  const SyncQueueItem({
+    required this.id,
+    required this.entityType,
+    required this.entityId,
+    required this.operation,
+    required this.payload,
+    required this.createdAt,
+    this.retryCount = 0,
+    this.lastError,
+    this.status = 0,
+  });
+
+  bool get isPending => status == 0;
+  bool get isProcessing => status == 1;
+  bool get isCompleted => status == 2;
+  bool get isFailed => status == 3;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'entityType': entityType,
+      'entityId': entityId,
+      'operation': operation,
+      'payload': payload,
+      'createdAt': createdAt.millisecondsSinceEpoch,
+      'retryCount': retryCount,
+      'lastError': lastError,
+      'status': status,
+    };
+  }
+
+  factory SyncQueueItem.fromMap(Map<String, dynamic> map) {
+    return SyncQueueItem(
+      id: map['id'] as String,
+      entityType: map['entityType'] as String,
+      entityId: map['entityId'] as String,
+      operation: map['operation'] as String,
+      payload: map['payload'] as String,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
+      retryCount: map['retryCount'] as int? ?? 0,
+      lastError: map['lastError'] as String?,
+      status: map['status'] as int? ?? 0,
+    );
+  }
+}
+
+/// 服务器同步统计
+class ServerSyncStats {
+  final int pendingCount;
+  final int syncedCount;
+  final int conflictCount;
+  final int queueCount;
+  final DateTime? lastSyncTime;
+
+  const ServerSyncStats({
+    this.pendingCount = 0,
+    this.syncedCount = 0,
+    this.conflictCount = 0,
+    this.queueCount = 0,
+    this.lastSyncTime,
+  });
+
+  int get totalCount => pendingCount + syncedCount + conflictCount;
+  bool get hasPendingSync => pendingCount > 0 || queueCount > 0;
+  bool get hasConflicts => conflictCount > 0;
+
+  factory ServerSyncStats.fromMap(Map<String, dynamic> map) {
+    return ServerSyncStats(
+      pendingCount: map['pending'] as int? ?? 0,
+      syncedCount: map['synced'] as int? ?? 0,
+      conflictCount: map['conflict'] as int? ?? 0,
+      queueCount: map['queue'] as int? ?? 0,
+    );
+  }
+}
+
+/// 清理配置
+class CleanupSettings {
+  final int keepMonths;
+  final bool autoCleanup;
+  final bool cleanupAfterSync;
+
+  const CleanupSettings({
+    this.keepMonths = 1,
+    this.autoCleanup = true,
+    this.cleanupAfterSync = true,
+  });
+
+  CleanupSettings copyWith({
+    int? keepMonths,
+    bool? autoCleanup,
+    bool? cleanupAfterSync,
+  }) {
+    return CleanupSettings(
+      keepMonths: keepMonths ?? this.keepMonths,
+      autoCleanup: autoCleanup ?? this.autoCleanup,
+      cleanupAfterSync: cleanupAfterSync ?? this.cleanupAfterSync,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'keepMonths': keepMonths,
+      'autoCleanup': autoCleanup,
+      'cleanupAfterSync': cleanupAfterSync,
+    };
+  }
+
+  factory CleanupSettings.fromMap(Map<String, dynamic> map) {
+    return CleanupSettings(
+      keepMonths: map['keepMonths'] as int? ?? 1,
+      autoCleanup: map['autoCleanup'] as bool? ?? true,
+      cleanupAfterSync: map['cleanupAfterSync'] as bool? ?? true,
+    );
+  }
+}

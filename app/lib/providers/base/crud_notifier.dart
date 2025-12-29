@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/result.dart';
 import '../../services/database_service.dart';
+import '../../services/offline_queue_service.dart';
 
 /// CRUD 操作的统一状态
 class CrudState<T> {
@@ -60,6 +61,7 @@ class CrudState<T> {
 abstract class CrudNotifier<T, ID> extends Notifier<CrudState<T>> {
   /// 数据库服务实例
   DatabaseService get db => DatabaseService();
+  OfflineQueueService get _offlineQueue => OfflineQueueService();
 
   /// 表名（用于日志和错误信息）
   String get tableName;
@@ -84,6 +86,14 @@ abstract class CrudNotifier<T, ID> extends Notifier<CrudState<T>> {
 
   /// 删除数据（子类需要实现）
   Future<void> deleteOne(ID id);
+
+  /// 同步实体类型名称（默认使用tableName去掉复数s）
+  String get syncEntityType => tableName.endsWith('s')
+      ? tableName.substring(0, tableName.length - 1)
+      : tableName;
+
+  /// 是否启用同步（子类可覆盖）
+  bool get syncEnabled => true;
 
   @override
   CrudState<T> build() {
@@ -121,6 +131,8 @@ abstract class CrudNotifier<T, ID> extends Notifier<CrudState<T>> {
         items: [...state.items, entity],
         lastUpdated: DateTime.now(),
       );
+      // 同步钩子
+      await _markForSync(getId(entity).toString(), QueueOperation.create, entity);
       return Result.success(entity);
     } catch (e, st) {
       final error = ErrorMapper.mapException(e, st);
@@ -139,6 +151,8 @@ abstract class CrudNotifier<T, ID> extends Notifier<CrudState<T>> {
         }).toList(),
         lastUpdated: DateTime.now(),
       );
+      // 同步钩子
+      await _markForSync(getId(entity).toString(), QueueOperation.update, entity);
       return Result.success(entity);
     } catch (e, st) {
       final error = ErrorMapper.mapException(e, st);
@@ -155,11 +169,40 @@ abstract class CrudNotifier<T, ID> extends Notifier<CrudState<T>> {
         items: state.items.where((item) => getId(item) != id).toList(),
         lastUpdated: DateTime.now(),
       );
+      // 同步钩子
+      await _markForSync(id.toString(), QueueOperation.delete, null);
       return Result.success(true);
     } catch (e, st) {
       final error = ErrorMapper.mapException(e, st);
       state = state.copyWith(error: error);
       return Result.failure(error);
+    }
+  }
+
+  /// 标记实体为待同步
+  Future<void> _markForSync(String entityId, String operation, T? entity) async {
+    if (!syncEnabled) return;
+
+    try {
+      // 更新sync_metadata表
+      await db.upsertSyncMetadata(
+        entityType: syncEntityType,
+        localId: entityId,
+        syncStatus: 0, // pending
+        localUpdatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      // 如果离线，入队sync_queue
+      if (!_offlineQueue.isOnline) {
+        await _offlineQueue.enqueue(
+          entityType: syncEntityType,
+          entityId: entityId,
+          operation: operation,
+          entity: entity,
+        );
+      }
+    } catch (e) {
+      // 同步标记失败不影响主流程
     }
   }
 
@@ -196,6 +239,8 @@ abstract class CrudNotifier<T, ID> extends Notifier<CrudState<T>> {
     try {
       for (final entity in entities) {
         await insertOne(entity);
+        // 同步钩子
+        await _markForSync(getId(entity).toString(), QueueOperation.create, entity);
       }
       state = state.copyWith(
         items: [...state.items, ...entities],
@@ -215,6 +260,8 @@ abstract class CrudNotifier<T, ID> extends Notifier<CrudState<T>> {
     try {
       for (final item in toDelete) {
         await deleteOne(getId(item));
+        // 同步钩子
+        await _markForSync(getId(item).toString(), QueueOperation.delete, null);
       }
       state = state.copyWith(
         items: state.items.where((item) => !test(item)).toList(),
@@ -232,8 +279,10 @@ abstract class CrudNotifier<T, ID> extends Notifier<CrudState<T>> {
 /// 简化版 CRUD Notifier（使用 List 作为状态）
 ///
 /// 适用于不需要 isLoading/error 状态的简单场景
+/// 自动集成同步钩子，所有CRUD操作都会标记为待同步
 abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
   DatabaseService get db => DatabaseService();
+  OfflineQueueService get _offlineQueue => OfflineQueueService();
 
   String get tableName;
   ID getId(T entity);
@@ -241,6 +290,14 @@ abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
   Future<void> insertOne(T entity);
   Future<void> updateOne(T entity);
   Future<void> deleteOne(ID id);
+
+  /// 同步实体类型名称（默认使用tableName去掉复数s）
+  String get syncEntityType => tableName.endsWith('s')
+      ? tableName.substring(0, tableName.length - 1)
+      : tableName;
+
+  /// 是否启用同步（子类可覆盖）
+  bool get syncEnabled => true;
 
   @override
   List<T> build() {
@@ -259,6 +316,8 @@ abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
   Future<void> add(T entity) async {
     await insertOne(entity);
     state = [...state, entity];
+    // 同步钩子：标记为待同步
+    await _markForSync(getId(entity).toString(), QueueOperation.create, entity);
   }
 
   Future<void> update(T entity) async {
@@ -266,11 +325,42 @@ abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
     state = state.map((item) {
       return getId(item) == getId(entity) ? entity : item;
     }).toList();
+    // 同步钩子：标记为待同步
+    await _markForSync(getId(entity).toString(), QueueOperation.update, entity);
   }
 
   Future<void> delete(ID id) async {
     await deleteOne(id);
     state = state.where((item) => getId(item) != id).toList();
+    // 同步钩子：标记为待同步
+    await _markForSync(id.toString(), QueueOperation.delete, null);
+  }
+
+  /// 标记实体为待同步
+  Future<void> _markForSync(String entityId, String operation, T? entity) async {
+    if (!syncEnabled) return;
+
+    try {
+      // 更新sync_metadata表
+      await db.upsertSyncMetadata(
+        entityType: syncEntityType,
+        localId: entityId,
+        syncStatus: 0, // pending
+        localUpdatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      // 如果离线，入队sync_queue
+      if (!_offlineQueue.isOnline) {
+        await _offlineQueue.enqueue(
+          entityType: syncEntityType,
+          entityId: entityId,
+          operation: operation,
+          entity: entity,
+        );
+      }
+    } catch (e) {
+      // 同步标记失败不影响主流程
+    }
   }
 
   T? getById(ID id) {
@@ -280,4 +370,61 @@ abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
       return null;
     }
   }
+
+  /// 根据条件查找项目
+  List<T> where(bool Function(T) test) => state.where(test).toList();
+
+  /// 查找第一个匹配项
+  T? firstWhereOrNull(bool Function(T) test) {
+    try {
+      return state.firstWhere(test);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// 批量添加
+  Future<void> addAll(List<T> entities) async {
+    for (final entity in entities) {
+      await insertOne(entity);
+      // 同步钩子
+      await _markForSync(getId(entity).toString(), QueueOperation.create, entity);
+    }
+    state = [...state, ...entities];
+  }
+
+  /// 批量更新
+  Future<void> updateAll(List<T> entities) async {
+    for (final entity in entities) {
+      await updateOne(entity);
+      // 同步钩子
+      await _markForSync(getId(entity).toString(), QueueOperation.update, entity);
+    }
+    state = state.map((item) {
+      final updated = entities.firstWhere(
+        (e) => getId(e) == getId(item),
+        orElse: () => item,
+      );
+      return updated;
+    }).toList();
+  }
+
+  /// 批量删除
+  Future<void> deleteWhere(bool Function(T) test) async {
+    final toDelete = state.where(test).toList();
+    for (final item in toDelete) {
+      await deleteOne(getId(item));
+      // 同步钩子
+      await _markForSync(getId(item).toString(), QueueOperation.delete, null);
+    }
+    state = state.where((item) => !test(item)).toList();
+  }
+
+  /// 判断是否存在
+  bool exists(ID id) => state.any((item) => getId(item) == id);
+
+  /// 获取数量
+  int get length => state.length;
+  bool get isEmpty => state.isEmpty;
+  bool get isNotEmpty => state.isNotEmpty;
 }
