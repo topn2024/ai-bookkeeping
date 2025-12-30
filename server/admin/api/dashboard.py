@@ -149,7 +149,7 @@ async def get_dashboard_stats(
 
 @router.get("/trend/users", response_model=UserGrowthTrendResponse)
 async def get_user_growth_trend(
-    period: str = Query("7d", regex="^(7d|30d|90d)$"),
+    period: str = Query("7d", pattern="^(7d|30d|90d)$"),
     current_admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(has_permission("dashboard:view")),
@@ -181,7 +181,7 @@ async def get_user_growth_trend(
 
 @router.get("/trend/transactions", response_model=TransactionTrendResponse)
 async def get_transaction_trend(
-    period: str = Query("7d", regex="^(7d|30d|90d)$"),
+    period: str = Query("7d", pattern="^(7d|30d|90d)$"),
     current_admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(has_permission("dashboard:view")),
@@ -211,7 +211,7 @@ async def get_transaction_trend(
 
 @router.get("/distribution/transaction-type", response_model=TransactionTypeDistribution)
 async def get_transaction_type_distribution(
-    period: str = Query("30d", regex="^(7d|30d|90d|all)$"),
+    period: str = Query("30d", pattern="^(7d|30d|90d|all)$"),
     current_admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(has_permission("dashboard:view")),
@@ -274,7 +274,7 @@ async def get_transaction_type_distribution(
 @router.get("/top-users", response_model=TopUsersResponse)
 async def get_top_users(
     limit: int = Query(10, ge=1, le=50),
-    period: str = Query("30d", regex="^(7d|30d|90d|all)$"),
+    period: str = Query("30d", pattern="^(7d|30d|90d|all)$"),
     current_admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(has_permission("dashboard:view")),

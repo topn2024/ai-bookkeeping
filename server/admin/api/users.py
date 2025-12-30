@@ -48,8 +48,8 @@ async def list_users(
     page_size: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None, max_length=100),
     is_active: Optional[bool] = None,
-    sort_by: str = Query("created_at", regex="^(created_at|last_login_at|transaction_count)$"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    sort_by: str = Query("created_at", pattern="^(created_at|last_login_at|transaction_count)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     current_admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(has_permission("user:list")),
@@ -480,7 +480,7 @@ class UserDeleteResponse(BaseModel):
 @router.get("/export")
 async def export_users(
     request: Request,
-    format: str = Query("csv", regex="^(csv|xlsx)$"),
+    format: str = Query("csv", pattern="^(csv|xlsx)$"),
     include_stats: bool = Query(False),
     is_active: Optional[bool] = None,
     current_admin: AdminUser = Depends(get_current_admin),

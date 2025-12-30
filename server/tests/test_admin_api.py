@@ -460,8 +460,8 @@ class TestPermissions:
 # Pytest fixtures
 @pytest.fixture
 def client():
-    """Create test client"""
-    from app.main import app
+    """Create test client for admin API"""
+    from admin.main import app
     return TestClient(app)
 
 
