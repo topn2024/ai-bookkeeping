@@ -227,9 +227,6 @@ class QwenService {
       // 将音频数据转为Base64
       final base64Audio = base64Encode(audioData);
 
-      // 获取音频MIME类型
-      final mimeType = _getAudioMimeType(format);
-
       final response = await _dio.post(
         _audioApiUrl,
         data: {
@@ -240,9 +237,14 @@ class QwenService {
                 'role': 'user',
                 'content': [
                   {
-                    'audio': 'data:$mimeType;base64,$base64Audio',
+                    'type': 'input_audio',
+                    'input_audio': {
+                      'data': base64Audio,
+                      'format': format,
+                    },
                   },
                   {
+                    'type': 'text',
                     'text': '''请仔细听这段语音，准确转写并提取记账信息。
 
 【分类规则 - 请根据语音内容准确分类】
