@@ -175,6 +175,13 @@ class CategoryLocalizationService {
       'ja': 'その他',
       'ko': '기타',
     },
+    // 兼容AI返回的 'other' 分类
+    'other': {
+      'zh': '其他',
+      'en': 'Other',
+      'ja': 'その他',
+      'ko': '기타',
+    },
 
     // ============ 餐饮子分类 ============
     'food_breakfast': {

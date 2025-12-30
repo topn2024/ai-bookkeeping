@@ -63,44 +63,91 @@ async def create_backup(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new backup of user's data."""
+    """Create a new backup of user's data.
 
-    # Fetch all user data
-    transactions_result = await db.execute(
-        select(Transaction).where(Transaction.user_id == current_user.id)
-    )
-    transactions = transactions_result.scalars().all()
+    支持两种模式：
+    1. 客户端模式（request.data有值）：直接保存客户端上传的完整数据
+    2. 服务器模式（request.data为空）：从服务器数据库获取数据（仅基础数据）
+    """
 
-    accounts_result = await db.execute(
-        select(Account).where(Account.user_id == current_user.id)
-    )
-    accounts = accounts_result.scalars().all()
+    if request.data:
+        # 客户端模式：直接使用客户端上传的数据
+        client_data = request.data.model_dump()
+        backup_data = {
+            **client_data,
+            "backup_version": "2.0",  # 新版本支持完整数据
+            "created_at": datetime.utcnow().isoformat(),
+        }
 
-    categories_result = await db.execute(
-        select(Category).where(Category.user_id == current_user.id)
-    )
-    categories = categories_result.scalars().all()
+        # 统计各类数据数量
+        transaction_count = len(client_data.get("transactions", []))
+        account_count = len(client_data.get("accounts", []))
+        category_count = len(client_data.get("categories", []))
+        book_count = len(client_data.get("books", []))
+        budget_count = len(client_data.get("budgets", []))
+        credit_card_count = len(client_data.get("credit_cards", []))
+        debt_count = len(client_data.get("debts", []))
+        savings_goal_count = len(client_data.get("savings_goals", []))
+        bill_reminder_count = len(client_data.get("bill_reminders", []))
+        recurring_count = len(client_data.get("recurring_transactions", []))
 
-    books_result = await db.execute(
-        select(Book).where(Book.user_id == current_user.id)
-    )
-    books = books_result.scalars().all()
+    else:
+        # 服务器模式：从数据库获取数据
+        transactions_result = await db.execute(
+            select(Transaction).where(Transaction.user_id == current_user.id)
+        )
+        transactions = transactions_result.scalars().all()
 
-    budgets_result = await db.execute(
-        select(Budget).where(Budget.user_id == current_user.id)
-    )
-    budgets = budgets_result.scalars().all()
+        accounts_result = await db.execute(
+            select(Account).where(Account.user_id == current_user.id)
+        )
+        accounts = accounts_result.scalars().all()
 
-    # Prepare backup data
-    backup_data = {
-        "transactions": [_entity_to_dict(t) for t in transactions],
-        "accounts": [_entity_to_dict(a) for a in accounts],
-        "categories": [_entity_to_dict(c) for c in categories],
-        "books": [_entity_to_dict(b) for b in books],
-        "budgets": [_entity_to_dict(b) for b in budgets],
-        "backup_version": "1.0",
-        "created_at": datetime.utcnow().isoformat(),
-    }
+        categories_result = await db.execute(
+            select(Category).where(Category.user_id == current_user.id)
+        )
+        categories = categories_result.scalars().all()
+
+        books_result = await db.execute(
+            select(Book).where(Book.user_id == current_user.id)
+        )
+        books = books_result.scalars().all()
+
+        budgets_result = await db.execute(
+            select(Budget).where(Budget.user_id == current_user.id)
+        )
+        budgets = budgets_result.scalars().all()
+
+        backup_data = {
+            "transactions": [_entity_to_dict(t) for t in transactions],
+            "accounts": [_entity_to_dict(a) for a in accounts],
+            "categories": [_entity_to_dict(c) for c in categories],
+            "books": [_entity_to_dict(b) for b in books],
+            "budgets": [_entity_to_dict(b) for b in budgets],
+            # 服务器模式下扩展数据为空
+            "credit_cards": [],
+            "debts": [],
+            "debt_payments": [],
+            "savings_goals": [],
+            "savings_deposits": [],
+            "bill_reminders": [],
+            "recurring_transactions": [],
+            "budget_carryovers": [],
+            "zero_based_allocations": [],
+            "backup_version": "2.0",
+            "created_at": datetime.utcnow().isoformat(),
+        }
+
+        transaction_count = len(transactions)
+        account_count = len(accounts)
+        category_count = len(categories)
+        book_count = len(books)
+        budget_count = len(budgets)
+        credit_card_count = 0
+        debt_count = 0
+        savings_goal_count = 0
+        bill_reminder_count = 0
+        recurring_count = 0
 
     # Serialize to JSON
     data_json = json.dumps(backup_data, ensure_ascii=False)
@@ -112,11 +159,16 @@ async def create_backup(
         description=request.description,
         backup_type=request.backup_type,
         data=data_json,
-        transaction_count=len(transactions),
-        account_count=len(accounts),
-        category_count=len(categories),
-        book_count=len(books),
-        budget_count=len(budgets),
+        transaction_count=transaction_count,
+        account_count=account_count,
+        category_count=category_count,
+        book_count=book_count,
+        budget_count=budget_count,
+        credit_card_count=credit_card_count,
+        debt_count=debt_count,
+        savings_goal_count=savings_goal_count,
+        bill_reminder_count=bill_reminder_count,
+        recurring_count=recurring_count,
         size=len(data_json.encode('utf-8')),
         device_name=request.device_name,
         device_id=request.device_id,
@@ -174,11 +226,22 @@ async def get_backup(
     # Parse backup data
     data = json.loads(backup.data)
     backup_data = BackupData(
+        # 基础数据
         transactions=data.get("transactions", []),
         accounts=data.get("accounts", []),
         categories=data.get("categories", []),
         books=data.get("books", []),
         budgets=data.get("budgets", []),
+        # 扩展数据
+        credit_cards=data.get("credit_cards", []),
+        debts=data.get("debts", []),
+        debt_payments=data.get("debt_payments", []),
+        savings_goals=data.get("savings_goals", []),
+        savings_deposits=data.get("savings_deposits", []),
+        bill_reminders=data.get("bill_reminders", []),
+        recurring_transactions=data.get("recurring_transactions", []),
+        budget_carryovers=data.get("budget_carryovers", []),
+        zero_based_allocations=data.get("zero_based_allocations", []),
     )
 
     return BackupDetailResponse(
@@ -193,6 +256,11 @@ async def get_backup(
         category_count=backup.category_count,
         book_count=backup.book_count,
         budget_count=backup.budget_count,
+        credit_card_count=backup.credit_card_count or 0,
+        debt_count=backup.debt_count or 0,
+        savings_goal_count=backup.savings_goal_count or 0,
+        bill_reminder_count=backup.bill_reminder_count or 0,
+        recurring_count=backup.recurring_count or 0,
         size=backup.size,
         device_name=backup.device_name,
         device_id=backup.device_id,

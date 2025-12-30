@@ -25,12 +25,19 @@ class Backup(Base):
     # Backup content (JSON)
     data = Column(Text, nullable=False)  # JSON格式的备份数据
 
-    # Statistics
+    # Statistics - 基础数据
     transaction_count = Column(Integer, default=0)
     account_count = Column(Integer, default=0)
     category_count = Column(Integer, default=0)
     book_count = Column(Integer, default=0)
     budget_count = Column(Integer, default=0)
+
+    # Statistics - 扩展数据（新增）
+    credit_card_count = Column(Integer, default=0)
+    debt_count = Column(Integer, default=0)
+    savings_goal_count = Column(Integer, default=0)
+    bill_reminder_count = Column(Integer, default=0)
+    recurring_count = Column(Integer, default=0)
 
     # File size in bytes
     size = Column(BigInteger, default=0)

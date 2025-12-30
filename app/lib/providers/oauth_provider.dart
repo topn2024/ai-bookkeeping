@@ -1,10 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/oauth_service.dart';
-import '../services/http_service.dart';
 import '../models/user.dart';
 import 'auth_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 
 /// OAuth state for managing third-party login
 class OAuthState {
@@ -42,7 +39,6 @@ class OAuthState {
 /// OAuth notifier for managing OAuth state
 class OAuthNotifier extends Notifier<OAuthState> {
   final OAuthService _oauthService = OAuthService();
-  final HttpService _httpService = HttpService();
 
   @override
   OAuthState build() {
@@ -95,26 +91,13 @@ class OAuthNotifier extends Notifier<OAuthState> {
 
       // Save token
       final token = result['access_token'] as String;
-      _httpService.setAuthToken(token);
 
       // Save user data
       final userData = result['user'] as Map<String, dynamic>;
-      final user = User(
-        id: userData['id'],
-        email: userData['email'],
-        displayName: userData['nickname'],
-        avatarUrl: userData['avatar_url'],
-        createdAt: DateTime.parse(userData['created_at']),
-        lastLoginAt: DateTime.now(),
-      );
+      final user = User.fromJson(userData);
 
-      // Store locally
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('current_user', jsonEncode(user.toJson()));
-      await prefs.setString('auth_token', token);
-
-      // Update auth provider
-      ref.read(authProvider.notifier).setUserFromOAuth(user);
+      // Update auth provider (this also saves token and user data)
+      await ref.read(authProvider.notifier).setUserFromOAuth(user, token);
 
       state = state.copyWith(isLoading: false);
       return true;

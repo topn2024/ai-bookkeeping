@@ -1,9 +1,7 @@
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 import '../models/user.dart';
-import '../services/encryption_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/http_service.dart';
 
@@ -41,212 +39,196 @@ class AuthState {
 }
 
 class AuthNotifier extends Notifier<AuthState> {
-  static const String _userKey = 'current_user';
-  static const String _usersKey = 'registered_users';
-
-  final EncryptionService _encryption = EncryptionService();
   final SecureStorageService _secureStorage = SecureStorageService();
   final HttpService _http = HttpService();
 
   @override
   AuthState build() {
-    // Use Future.microtask to delay loading until state is initialized
     Future.microtask(() => _loadUser());
     return const AuthState(status: AuthStatus.loading);
   }
 
+  /// 从本地存储加载用户（用于离线访问）
   Future<void> _loadUser() async {
-    // 首先尝试从安全存储加载用户
-    final userJson = await _secureStorage.read('current_user_data');
+    try {
+      // 初始化 HTTP 服务（加载已保存的 token）
+      await _http.initialize();
 
-    if (userJson != null) {
-      try {
-        final user = User.fromJson(jsonDecode(userJson));
-        state = AuthState(
-          status: AuthStatus.authenticated,
-          user: user,
-        );
-        return;
-      } catch (e) {
-        // 安全存储失败，尝试从SharedPreferences迁移
-      }
-    }
+      // 从安全存储加载用户数据
+      final userJson = await _secureStorage.read('current_user_data');
 
-    // 兼容旧版本：从SharedPreferences加载
-    final prefs = await SharedPreferences.getInstance();
-    final legacyUserJson = prefs.getString(_userKey);
+      if (userJson != null) {
+        try {
+          final user = User.fromLocalJson(jsonDecode(userJson));
 
-    if (legacyUserJson != null) {
-      try {
-        final user = User.fromJson(jsonDecode(legacyUserJson));
-        // 迁移到安全存储
-        await _secureStorage.write('current_user_data', legacyUserJson);
-        state = AuthState(
-          status: AuthStatus.authenticated,
-          user: user,
-        );
-      } catch (e) {
+          // 检查是否有有效 token
+          final hasToken = await _http.hasValidToken();
+
+          if (hasToken) {
+            // 有 token，尝试验证并刷新用户信息
+            try {
+              final response = await _http.get('/auth/me');
+              if (response.statusCode == 200) {
+                final serverUser = User.fromJson(response.data);
+                // 更新本地缓存
+                await _secureStorage.write(
+                    'current_user_data', jsonEncode(serverUser.toJson()));
+                state = AuthState(
+                  status: AuthStatus.authenticated,
+                  user: serverUser,
+                );
+                return;
+              }
+            } catch (e) {
+              // 网络错误，使用本地缓存
+              state = AuthState(
+                status: AuthStatus.authenticated,
+                user: user,
+              );
+              return;
+            }
+          }
+
+          // 没有有效 token，需要重新登录
+          state = const AuthState(status: AuthStatus.unauthenticated);
+        } catch (e) {
+          state = const AuthState(status: AuthStatus.unauthenticated);
+        }
+      } else {
         state = const AuthState(status: AuthStatus.unauthenticated);
       }
-    } else {
+    } catch (e) {
       state = const AuthState(status: AuthStatus.unauthenticated);
     }
   }
 
+  /// 注册新用户
   Future<bool> register({
-    required String email,
+    String? email,
+    String? phone,
     required String password,
-    String? displayName,
+    String? nickname,
   }) async {
-    state = state.copyWith(status: AuthStatus.loading);
-
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    final prefs = await SharedPreferences.getInstance();
-
-    // Get existing users
-    final usersJson = prefs.getString(_usersKey);
-    final Map<String, dynamic> users = usersJson != null
-        ? jsonDecode(usersJson)
-        : {};
-
-    // Check if email already exists
-    if (users.containsKey(email)) {
+    if (email == null && phone == null) {
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
-        error: '该邮箱已被注册',
+        error: '请输入邮箱或手机号',
       );
       return false;
     }
 
-    // Create new user
-    final userId = const Uuid().v4();
-    final user = User(
-      id: userId,
-      email: email,
-      displayName: displayName,
-      createdAt: DateTime.now(),
-      lastLoginAt: DateTime.now(),
-    );
-
-    // 生成密码盐值
-    final salt = _encryption.generateSalt();
-    // 使用盐值对密码进行哈希
-    final hashedPassword = _encryption.hashPassword(password, salt: salt);
-
-    // 存储用户凭证（密码已哈希）
-    users[email] = {
-      'passwordHash': hashedPassword,  // 存储哈希后的密码
-      'salt': salt,                     // 存储盐值
-      'user': user.toJson(),
-    };
-
-    await prefs.setString(_usersKey, jsonEncode(users));
-
-    // 用户数据存储到安全存储
-    await _secureStorage.write('current_user_data', jsonEncode(user.toJson()));
-    await _secureStorage.saveUserId(userId);
-
-    state = AuthState(
-      status: AuthStatus.authenticated,
-      user: user,
-    );
-
-    return true;
-  }
-
-  Future<bool> login({
-    required String email,
-    required String password,
-  }) async {
-    state = state.copyWith(status: AuthStatus.loading);
+    state = state.copyWith(status: AuthStatus.loading, error: null);
 
     try {
-      // Simulate network delay
-      await Future.delayed(const Duration(milliseconds: 500));
+      final response = await _http.post('/auth/register', data: {
+        if (email != null) 'email': email,
+        if (phone != null) 'phone': phone,
+        'password': password,
+        if (nickname != null) 'nickname': nickname,
+      });
 
-      final prefs = await SharedPreferences.getInstance();
+      if (response.statusCode == 200) {
+        final data = response.data;
+        final accessToken = data['access_token'] as String;
+        final userData = data['user'] as Map<String, dynamic>;
 
-      // Get existing users
-      final usersJson = prefs.getString(_usersKey);
-      if (usersJson == null) {
+        // 保存 token
+        await _http.setAuthToken(accessToken);
+
+        // 解析用户信息
+        final user = User.fromJson(userData);
+
+        // 保存用户信息到本地
+        await _secureStorage.write('current_user_data', jsonEncode(user.toJson()));
+        await _secureStorage.saveUserId(user.id);
+
+        state = AuthState(
+          status: AuthStatus.authenticated,
+          user: user,
+        );
+
+        return true;
+      } else {
         state = state.copyWith(
           status: AuthStatus.unauthenticated,
-          error: '账号不存在，请先注册',
+          error: '注册失败',
         );
         return false;
       }
-
-      final Map<String, dynamic> users = jsonDecode(usersJson);
-
-    // Check if user exists
-    if (!users.containsKey(email)) {
+    } on DioException catch (e) {
+      final errorMessage = _parseError(e);
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
-        error: '账号不存在，请先注册',
+        error: errorMessage,
+      );
+      return false;
+    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        error: '注册失败: $e',
+      );
+      return false;
+    }
+  }
+
+  /// 登录
+  Future<bool> login({
+    String? email,
+    String? phone,
+    required String password,
+  }) async {
+    if (email == null && phone == null) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        error: '请输入邮箱或手机号',
       );
       return false;
     }
 
-    final userData = users[email] as Map<String, dynamic>;
+    state = state.copyWith(status: AuthStatus.loading, error: null);
 
-    // 验证密码 - 支持新旧两种格式
-    bool passwordValid = false;
+    try {
+      final response = await _http.post('/auth/login', data: {
+        if (email != null) 'email': email,
+        if (phone != null) 'phone': phone,
+        'password': password,
+      });
 
-    if (userData.containsKey('passwordHash') && userData.containsKey('salt')) {
-      // 新格式：使用盐值验证哈希密码
-      final salt = userData['salt'] as String;
-      passwordValid = _encryption.verifyPassword(
-        password,
-        userData['passwordHash'] as String,
-        salt: salt,
-      );
-    } else if (userData.containsKey('password')) {
-      // 旧格式：明文密码比较（兼容迁移）
-      passwordValid = userData['password'] == password;
+      if (response.statusCode == 200) {
+        final data = response.data;
+        final accessToken = data['access_token'] as String;
+        final userData = data['user'] as Map<String, dynamic>;
 
-      // 如果验证成功，迁移到新格式
-      if (passwordValid) {
-        final salt = _encryption.generateSalt();
-        final hashedPassword = _encryption.hashPassword(password, salt: salt);
-        userData['passwordHash'] = hashedPassword;
-        userData['salt'] = salt;
-        userData.remove('password');  // 删除明文密码
-        users[email] = userData;
-        await prefs.setString(_usersKey, jsonEncode(users));
+        // 保存 token
+        await _http.setAuthToken(accessToken);
+
+        // 解析用户信息
+        final user = User.fromJson(userData);
+
+        // 保存用户信息到本地
+        await _secureStorage.write('current_user_data', jsonEncode(user.toJson()));
+        await _secureStorage.saveUserId(user.id);
+
+        state = AuthState(
+          status: AuthStatus.authenticated,
+          user: user,
+        );
+
+        return true;
+      } else {
+        state = state.copyWith(
+          status: AuthStatus.unauthenticated,
+          error: '登录失败',
+        );
+        return false;
       }
-    }
-
-    if (!passwordValid) {
+    } on DioException catch (e) {
+      final errorMessage = _parseError(e);
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
-        error: '密码错误',
+        error: errorMessage,
       );
       return false;
-    }
-
-    // Load user and update last login
-    final user = User.fromJson(userData['user']).copyWith(
-      lastLoginAt: DateTime.now(),
-    );
-
-    // Update stored user
-    userData['user'] = user.toJson();
-    users[email] = userData;
-
-    await prefs.setString(_usersKey, jsonEncode(users));
-
-    // 用户数据存储到安全存储
-    await _secureStorage.write('current_user_data', jsonEncode(user.toJson()));
-    await _secureStorage.saveUserId(user.id);
-
-    state = AuthState(
-      status: AuthStatus.authenticated,
-      user: user,
-    );
-
-    return true;
     } catch (e) {
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
@@ -256,104 +238,174 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  /// 登出
   Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_userKey);
+    // 清除 token
+    await _http.clearTokens();
 
-    // 清除安全存储中的用户数据
+    // 清除本地用户数据
     await _secureStorage.clearOnLogout();
     await _secureStorage.delete('current_user_data');
-
-    // 清除HTTP服务中的Token
-    await _http.clearTokens();
 
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
-  Future<void> updateProfile({
-    String? displayName,
+  /// 更新用户资料
+  Future<bool> updateProfile({
+    String? nickname,
     String? avatarUrl,
   }) async {
-    if (state.user == null) return;
+    if (state.user == null) return false;
 
-    final updatedUser = state.user!.copyWith(
-      displayName: displayName,
-      avatarUrl: avatarUrl,
-    );
+    try {
+      final response = await _http.patch('/users/me', data: {
+        if (nickname != null) 'nickname': nickname,
+        if (avatarUrl != null) 'avatar_url': avatarUrl,
+      });
 
-    final prefs = await SharedPreferences.getInstance();
+      if (response.statusCode == 200) {
+        final user = User.fromJson(response.data);
 
-    // Update stored user in secure storage
-    await _secureStorage.write('current_user_data', jsonEncode(updatedUser.toJson()));
+        // 更新本地缓存
+        await _secureStorage.write('current_user_data', jsonEncode(user.toJson()));
 
-    // Also update in users database
-    final usersJson = prefs.getString(_usersKey);
-    if (usersJson != null) {
-      final Map<String, dynamic> users = jsonDecode(usersJson);
-      if (users.containsKey(state.user!.email)) {
-        final userData = users[state.user!.email] as Map<String, dynamic>;
-        userData['user'] = updatedUser.toJson();
-        users[state.user!.email] = userData;
-        await prefs.setString(_usersKey, jsonEncode(users));
+        state = state.copyWith(user: user);
+        return true;
       }
+    } catch (e) {
+      // 网络错误，本地更新
+      final updatedUser = state.user!.copyWith(
+        nickname: nickname,
+        avatarUrl: avatarUrl,
+      );
+      await _secureStorage.write(
+          'current_user_data', jsonEncode(updatedUser.toJson()));
+      state = state.copyWith(user: updatedUser);
     }
-
-    state = state.copyWith(user: updatedUser);
+    return false;
   }
 
+  /// 清除错误
   void clearError() {
     state = state.copyWith(error: null);
   }
 
-  /// 设置OAuth登录用户（供OAuth Provider调用）
-  void setUserFromOAuth(User user) {
+  /// 设置 OAuth 登录用户（供 OAuth Provider 调用）
+  Future<void> setUserFromOAuth(User user, String accessToken) async {
+    await _http.setAuthToken(accessToken);
+    await _secureStorage.write('current_user_data', jsonEncode(user.toJson()));
+    await _secureStorage.saveUserId(user.id);
+
     state = AuthState(
       status: AuthStatus.authenticated,
       user: user,
     );
   }
 
-  /// Check if an email is registered
-  Future<bool> checkEmailExists({required String email}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final usersJson = prefs.getString(_usersKey);
+  /// 解析错误信息
+  String _parseError(DioException e) {
+    if (e.type == DioExceptionType.connectionError ||
+        e.type == DioExceptionType.connectionTimeout) {
+      return '网络连接失败，请检查网络设置';
+    }
 
-    if (usersJson == null) return false;
+    if (e.response != null) {
+      final statusCode = e.response!.statusCode;
+      final data = e.response!.data;
 
-    final Map<String, dynamic> users = jsonDecode(usersJson);
-    return users.containsKey(email);
+      if (data is Map && data.containsKey('detail')) {
+        final detail = data['detail'];
+        // 翻译常见错误
+        switch (detail) {
+          case 'Incorrect credentials':
+            return '邮箱或密码错误';
+          case 'Email already registered':
+            return '该邮箱已被注册';
+          case 'Phone number already registered':
+            return '该手机号已被注册';
+          case 'Phone or email is required':
+            return '请输入邮箱或手机号';
+          case 'User is inactive':
+            return '账号已被禁用';
+          default:
+            return detail.toString();
+        }
+      }
+
+      switch (statusCode) {
+        case 400:
+          return '请求参数错误';
+        case 401:
+          return '认证失败';
+        case 403:
+          return '没有权限';
+        case 404:
+          return '账号不存在';
+        case 422:
+          return '数据验证失败';
+        case 500:
+          return '服务器错误，请稍后重试';
+        default:
+          return '请求失败 ($statusCode)';
+      }
+    }
+
+    return '请求失败: ${e.message}';
   }
 
-  /// Reset password for a registered email
+  /// 刷新用户信息
+  Future<void> refreshUser() async {
+    if (!state.isAuthenticated) return;
+
+    try {
+      final response = await _http.get('/auth/me');
+      if (response.statusCode == 200) {
+        final user = User.fromJson(response.data);
+        await _secureStorage.write('current_user_data', jsonEncode(user.toJson()));
+        state = state.copyWith(user: user);
+      }
+    } catch (e) {
+      // 忽略刷新错误
+    }
+  }
+
+  /// 检查邮箱是否已注册
+  /// TODO: 实现服务器端 API
+  Future<bool> checkEmailExists({required String email}) async {
+    try {
+      // 尝试调用服务器 API 检查邮箱
+      final response = await _http.post('/auth/check-email', data: {
+        'email': email,
+      });
+      return response.data['exists'] == true;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        // API 不存在，功能暂不可用
+        throw Exception('密码重置功能暂不可用');
+      }
+      rethrow;
+    }
+  }
+
+  /// 重置密码
+  /// TODO: 实现服务器端 API
   Future<bool> resetPassword({
     required String email,
     required String newPassword,
   }) async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    final prefs = await SharedPreferences.getInstance();
-    final usersJson = prefs.getString(_usersKey);
-
-    if (usersJson == null) return false;
-
-    final Map<String, dynamic> users = jsonDecode(usersJson);
-
-    if (!users.containsKey(email)) return false;
-
-    // 使用哈希更新密码
-    final userData = users[email] as Map<String, dynamic>;
-    final salt = _encryption.generateSalt();
-    final hashedPassword = _encryption.hashPassword(newPassword, salt: salt);
-
-    userData['passwordHash'] = hashedPassword;
-    userData['salt'] = salt;
-    userData.remove('password');  // 确保删除任何旧的明文密码
-    users[email] = userData;
-
-    await prefs.setString(_usersKey, jsonEncode(users));
-
-    return true;
+    try {
+      final response = await _http.post('/auth/reset-password', data: {
+        'email': email,
+        'new_password': newPassword,
+      });
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        // API 不存在，功能暂不可用
+        throw Exception('密码重置功能暂不可用');
+      }
+      rethrow;
+    }
   }
 }
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'home_page.dart';
-import 'statistics_page.dart';
 import 'settings_page.dart';
 import 'add_transaction_page.dart';
 
@@ -17,7 +16,6 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _pages = const [
     HomePage(),
-    StatisticsPage(),
     SettingsPage(),
   ];
 
@@ -50,11 +48,6 @@ class _MainNavigationState extends State<MainNavigation> {
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
               label: '首页',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.bar_chart_outlined),
-              activeIcon: Icon(Icons.bar_chart),
-              label: '统计',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

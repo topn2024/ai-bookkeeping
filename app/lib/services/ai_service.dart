@@ -34,7 +34,7 @@ class AIRecognitionResult {
     return AIRecognitionResult(
       amount: qwenResult.amount,
       merchant: qwenResult.merchant,
-      category: _mapCategory(qwenResult.category),
+      category: _mapCategory(qwenResult.category, qwenResult.type),
       date: qwenResult.date,
       description: qwenResult.description,
       type: qwenResult.type,
@@ -69,8 +69,11 @@ class AIRecognitionResult {
   }
 
   /// 分类映射 - 支持多种中文表达方式
-  static String _mapCategory(String? category) {
-    if (category == null || category.isEmpty) return 'other';
+  /// [type] 用于确定 'other' 应该映射到 'other_expense' 还是 'other_income'
+  static String _mapCategory(String? category, String? type) {
+    if (category == null || category.isEmpty) {
+      return _getOtherCategory(type);
+    }
 
     // 先尝试精确匹配
     final lowerCategory = category.toLowerCase().trim();
@@ -78,7 +81,10 @@ class AIRecognitionResult {
       return categoryMap[category]!;
     }
 
-    // 如果已经是英文ID，直接返回
+    // 如果已经是英文ID，直接返回（处理 other 的特殊情况）
+    if (lowerCategory == 'other') {
+      return _getOtherCategory(type);
+    }
     if (validCategoryIds.contains(lowerCategory)) {
       return lowerCategory;
     }
@@ -92,13 +98,22 @@ class AIRecognitionResult {
       }
     }
 
-    return 'other';
+    return _getOtherCategory(type);
+  }
+
+  /// 根据类型返回正确的 "其他" 分类
+  static String _getOtherCategory(String? type) {
+    if (type == 'income') {
+      return 'other_income';
+    }
+    return 'other_expense';
   }
 
   /// 有效的分类ID列表
   static const Set<String> validCategoryIds = {
     'food', 'transport', 'shopping', 'entertainment', 'housing',
-    'medical', 'education', 'other', 'salary', 'bonus', 'parttime', 'investment',
+    'medical', 'education', 'other_expense', 'other_income',
+    'salary', 'bonus', 'parttime', 'investment',
   };
 
   /// 分类映射表 - 精确匹配
@@ -125,7 +140,7 @@ class AIRecognitionResult {
     '教育': 'education',
     '学习': 'education',
     '培训': 'education',
-    '其他': 'other',
+    '其他': 'other_expense',  // 默认映射为支出的其他，收入的其他会在_mapCategory中处理
     // 收入分类
     '工资': 'salary',
     '薪水': 'salary',
@@ -285,7 +300,12 @@ class AIService {
     try {
       final category = await _qwenService.suggestCategory(description);
       if (category != null) {
-        return AIRecognitionResult.categoryMap[category] ?? category.toLowerCase();
+        final mapped = AIRecognitionResult.categoryMap[category] ?? category.toLowerCase();
+        // 处理 'other' 分类，根据描述判断是收入还是支出
+        if (mapped == 'other') {
+          return isIncomeType(description) ? 'other_income' : 'other_expense';
+        }
+        return mapped;
       }
       return localSuggestCategory(description);
     } catch (e) {
@@ -422,7 +442,7 @@ class AIService {
       return 'salary';  // 默认收入分类
     }
 
-    return 'other';
+    return 'other_expense';  // 默认为支出的其他分类
   }
 
   /// 判断是否是收入类型

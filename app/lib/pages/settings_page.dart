@@ -109,7 +109,7 @@ class SettingsPage extends ConsumerWidget {
                 children: [
                   Text(
                     authState.isAuthenticated
-                        ? authState.user!.name
+                        ? authState.user!.displayName
                         : '点击登录',
                     style: const TextStyle(
                       color: Colors.white,
@@ -120,7 +120,7 @@ class SettingsPage extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Text(
                     authState.isAuthenticated
-                        ? authState.user!.email
+                        ? authState.user!.accountIdentifier
                         : '登录后可同步数据到云端',
                     style: const TextStyle(
                       color: Colors.white70,
@@ -179,7 +179,7 @@ class SettingsPage extends ConsumerWidget {
     final user = ref.read(authProvider).user;
     if (user == null) return;
 
-    final nameController = TextEditingController(text: user.displayName ?? '');
+    final nameController = TextEditingController(text: user.nickname ?? '');
 
     showDialog(
       context: context,
@@ -200,7 +200,7 @@ class SettingsPage extends ConsumerWidget {
           TextButton(
             onPressed: () {
               ref.read(authProvider.notifier).updateProfile(
-                displayName: nameController.text.trim().isNotEmpty
+                nickname: nameController.text.trim().isNotEmpty
                     ? nameController.text.trim()
                     : null,
               );
