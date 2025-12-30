@@ -412,6 +412,43 @@ async def get_activity_heatmap(
     }
 
 
+@router.get("/recent-users")
+async def get_recent_users(
+    limit: int = Query(10, ge=1, le=50),
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("dashboard:view")),
+):
+    """获取最近注册用户 (DB-012补充)"""
+    result = await db.execute(
+        select(User)
+        .order_by(User.created_at.desc())
+        .limit(limit)
+    )
+    users = result.scalars().all()
+
+    items = []
+    for user in users:
+        # 获取用户交易数
+        tx_count = await db.execute(
+            select(func.count(Transaction.id))
+            .where(Transaction.user_id == user.id)
+        )
+        transaction_count = tx_count.scalar() or 0
+
+        items.append({
+            "id": str(user.id),
+            "display_name": user.display_name or "未设置",
+            "email_masked": _mask_email(user.email),
+            "avatar_url": user.avatar_url,
+            "is_active": user.is_active if hasattr(user, 'is_active') else True,
+            "transaction_count": transaction_count,
+            "created_at": user.created_at,
+        })
+
+    return {"items": items}
+
+
 @router.get("/recent-transactions", response_model=RecentTransactionsResponse)
 async def get_recent_transactions(
     limit: int = Query(10, ge=1, le=50),

@@ -14,10 +14,9 @@
           <el-input v-model="filters.keyword" placeholder="手机号/昵称" clearable @keyup.enter="handleSearch" />
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="filters.status" placeholder="全部" clearable>
-            <el-option label="正常" value="active" />
-            <el-option label="禁用" value="disabled" />
-            <el-option label="已删除" value="deleted" />
+          <el-select v-model="filters.is_active" placeholder="全部" clearable>
+            <el-option label="正常" :value="true" />
+            <el-option label="禁用" :value="false" />
           </el-select>
         </el-form-item>
         <el-form-item label="注册时间">
@@ -49,28 +48,30 @@
       >
         <el-table-column type="selection" width="50" />
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="nickname" label="用户信息" min-width="180">
+        <el-table-column prop="display_name" label="用户信息" min-width="180">
           <template #default="{ row }">
             <div class="user-info-cell">
               <el-avatar :size="40" :src="row.avatar_url">
-                {{ row.nickname?.charAt(0) || '?' }}
+                {{ row.display_name?.charAt(0) || '?' }}
               </el-avatar>
               <div class="user-details">
-                <div class="user-name">{{ row.nickname || '-' }}</div>
-                <div class="user-phone">{{ row.phone }}</div>
+                <div class="user-name">{{ row.display_name || '-' }}</div>
+                <div class="user-email">{{ row.email_masked }}</div>
               </div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="email" label="邮箱" min-width="180">
+        <el-table-column prop="is_premium" label="会员" width="80">
           <template #default="{ row }">
-            {{ row.email || '-' }}
+            <el-tag :type="row.is_premium ? 'warning' : 'info'" size="small">
+              {{ row.is_premium ? '会员' : '普通' }}
+            </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="is_active" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)" size="small">
-              {{ getStatusText(row.status) }}
+            <el-tag :type="row.is_active ? 'success' : 'danger'" size="small">
+              {{ row.is_active ? '正常' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -89,7 +90,7 @@
           <template #default="{ row }">
             <el-button type="primary" text size="small" @click="handleView(row)">查看</el-button>
             <el-button
-              v-if="row.status === 'active'"
+              v-if="row.is_active"
               type="warning"
               text
               size="small"
@@ -98,7 +99,7 @@
               禁用
             </el-button>
             <el-button
-              v-else-if="row.status === 'disabled'"
+              v-else
               type="success"
               text
               size="small"
@@ -107,7 +108,6 @@
               启用
             </el-button>
             <el-button
-              v-if="row.status !== 'deleted'"
               type="danger"
               text
               size="small"
@@ -163,7 +163,7 @@ const users = ref<AppUser[]>([])
 const selectedUsers = ref<AppUser[]>([])
 const filters = reactive({
   keyword: '',
-  status: '',
+  is_active: null as boolean | null,
   dateRange: null as [string, string] | null,
 })
 const pagination = reactive({
@@ -180,8 +180,8 @@ const fetchUsers = async () => {
       page: pagination.page,
       page_size: pagination.pageSize,
     }
-    if (filters.keyword) params.keyword = filters.keyword
-    if (filters.status) params.status = filters.status
+    if (filters.keyword) params.search = filters.keyword
+    if (filters.is_active !== null) params.is_active = filters.is_active
     if (filters.dateRange) {
       params.start_date = filters.dateRange[0]
       params.end_date = filters.dateRange[1]
@@ -205,7 +205,7 @@ const handleSearch = () => {
 
 const handleReset = () => {
   filters.keyword = ''
-  filters.status = ''
+  filters.is_active = null
   filters.dateRange = null
   handleSearch()
 }
@@ -231,7 +231,7 @@ const handleView = (user: AppUser) => {
 
 const handleDisable = async (user: AppUser) => {
   try {
-    await ElMessageBox.confirm(`确定要禁用用户 "${user.nickname || user.phone}" 吗？`, '确认禁用', {
+    await ElMessageBox.confirm(`确定要禁用用户 "${user.display_name || user.email_masked}" 吗？`, '确认禁用', {
       type: 'warning',
     })
     await usersApi.disableUser(user.id)
@@ -256,7 +256,7 @@ const handleEnable = async (user: AppUser) => {
 
 const handleDelete = async (user: AppUser) => {
   try {
-    await ElMessageBox.confirm(`确定要删除用户 "${user.nickname || user.phone}" 吗？此操作不可恢复！`, '确认删除', {
+    await ElMessageBox.confirm(`确定要删除用户 "${user.display_name || user.email_masked}" 吗？此操作不可恢复！`, '确认删除', {
       type: 'warning',
     })
     await usersApi.deleteUser(user.id)
@@ -276,7 +276,7 @@ const handleBatchDisable = async () => {
     })
     await usersApi.batchOperation({
       user_ids: selectedUsers.value.map(u => u.id),
-      action: 'disable',
+      operation: 'disable',
     })
     ElMessage.success('批量禁用成功')
     fetchUsers()
@@ -291,7 +291,7 @@ const handleBatchEnable = async () => {
   try {
     await usersApi.batchOperation({
       user_ids: selectedUsers.value.map(u => u.id),
-      action: 'enable',
+      operation: 'enable',
     })
     ElMessage.success('批量启用成功')
     fetchUsers()
@@ -307,7 +307,7 @@ const handleBatchDelete = async () => {
     })
     await usersApi.batchOperation({
       user_ids: selectedUsers.value.map(u => u.id),
-      action: 'delete',
+      operation: 'delete',
     })
     ElMessage.success('批量删除成功')
     fetchUsers()
@@ -322,7 +322,7 @@ const handleExport = async () => {
   try {
     const blob = await usersApi.exportUsers({
       format: 'xlsx',
-      status: filters.status || undefined,
+      is_active: filters.is_active ?? undefined,
     })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -334,26 +334,6 @@ const handleExport = async () => {
   } catch (e) {
     ElMessage.error('导出失败')
   }
-}
-
-// Formatters - use shared utilities for formatDateTime
-
-const getStatusType = (status: string) => {
-  const map: Record<string, string> = {
-    active: 'success',
-    disabled: 'warning',
-    deleted: 'danger',
-  }
-  return map[status] || 'info'
-}
-
-const getStatusText = (status: string) => {
-  const map: Record<string, string> = {
-    active: '正常',
-    disabled: '禁用',
-    deleted: '已删除',
-  }
-  return map[status] || status
 }
 
 // Init
@@ -378,7 +358,7 @@ onMounted(() => {
         color: #333;
       }
 
-      .user-phone {
+      .user-email {
         font-size: 12px;
         color: #999;
       }

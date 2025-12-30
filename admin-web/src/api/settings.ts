@@ -3,11 +3,11 @@ import type { PaginatedResponse, AdminUser } from '@/types'
 
 // System settings
 export const getSystemInfo = (): Promise<any> => {
-  return get('/settings/system')
+  return get('/settings/system-info')
 }
 
 export const updateSystemInfo = (data: any): Promise<any> => {
-  return put('/settings/system', data)
+  return put('/settings/system-info', data)
 }
 
 // Registration settings
@@ -21,67 +21,67 @@ export const updateRegistrationConfig = (data: any): Promise<any> => {
 
 // Email settings
 export const getEmailConfig = (): Promise<any> => {
-  return get('/settings/email')
+  return get('/settings/email-service')
 }
 
 export const updateEmailConfig = (data: any): Promise<any> => {
-  return put('/settings/email', data)
+  return put('/settings/email-service', data)
 }
 
 export const testEmailConfig = (): Promise<any> => {
-  return post('/settings/email/test')
+  return post('/settings/email-service/test')
 }
 
 // SMS settings
 export const getSMSConfig = (): Promise<any> => {
-  return get('/settings/sms')
+  return get('/settings/sms-service')
 }
 
 export const updateSMSConfig = (data: any): Promise<any> => {
-  return put('/settings/sms', data)
+  return put('/settings/sms-service', data)
 }
 
 // AI settings
 export const getAIConfig = (): Promise<any> => {
-  return get('/settings/ai')
+  return get('/settings/ai-service')
 }
 
 export const updateAIConfig = (data: any): Promise<any> => {
-  return put('/settings/ai', data)
+  return put('/settings/ai-service', data)
 }
 
 // Quota settings
 export const getQuotaConfig = (): Promise<any> => {
-  return get('/settings/quota')
+  return get('/settings/ai-quota')
 }
 
 export const updateQuotaConfig = (data: any): Promise<any> => {
-  return put('/settings/quota', data)
+  return put('/settings/ai-quota', data)
 }
 
 // Security settings
 export const getLoginSecurityConfig = (): Promise<any> => {
-  return get('/settings/security/login')
+  return get('/settings/login-security')
 }
 
 export const updateLoginSecurityConfig = (data: any): Promise<any> => {
-  return put('/settings/security/login', data)
+  return put('/settings/login-security', data)
 }
 
 export const getIPWhitelist = (): Promise<any> => {
-  return get('/settings/security/ip-whitelist')
+  return get('/settings/ip-whitelist')
 }
 
 export const updateIPWhitelist = (data: any): Promise<any> => {
-  return put('/settings/security/ip-whitelist', data)
+  return put('/settings/ip-whitelist', data)
 }
 
 export const getOperationConfirmConfig = (): Promise<any> => {
-  return get('/settings/security/operation-confirm')
+  return get('/settings/operation-confirm')
 }
 
 export const updateOperationConfirmConfig = (data: any): Promise<any> => {
-  return put('/settings/security/operation-confirm', data)
+  return put('/settings/operation-confirm', data)
 }
 
 // Admin management
