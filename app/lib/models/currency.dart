@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 /// 支持的货币类型
 enum CurrencyType {
   cny, // 人民币

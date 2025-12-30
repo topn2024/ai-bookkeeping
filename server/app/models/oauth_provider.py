@@ -3,8 +3,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Integer, DateTime, Boolean, ForeignKey, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import String, Integer, DateTime, Boolean, ForeignKey, Text, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -26,7 +26,7 @@ class OAuthProvider(Base):
     provider_username: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # nickname
     provider_avatar: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # avatar url
     provider_email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # email from provider
-    provider_raw_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)  # full user info from provider
+    provider_raw_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # full user info from provider
 
     # OAuth tokens (encrypted in production)
     access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

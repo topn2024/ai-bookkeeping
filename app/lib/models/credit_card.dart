@@ -140,7 +140,7 @@ class CreditCard {
       'minPayment': minPayment,
       'lastBillDate': lastBillDate?.millisecondsSinceEpoch,
       'iconCode': icon.codePoint,
-      'colorValue': color.value,
+      'colorValue': color.toARGB32(),
       'bankName': bankName,
       'cardNumber': cardNumber,
       'isEnabled': isEnabled ? 1 : 0,

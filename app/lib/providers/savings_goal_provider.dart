@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/savings_goal.dart';
 import '../models/transaction.dart';
-import '../services/database_service.dart';
 import 'base/crud_notifier.dart';
 import 'transaction_provider.dart';
 
@@ -164,6 +163,7 @@ class SavingsGoalNotifier extends SimpleCrudNotifier<SavingsGoal, String> {
   double get overallProgress =>
       totalTargetAmount > 0 ? totalCurrentAmount / totalTargetAmount : 0;
 
+  @override
   SavingsGoal? getById(String id) {
     try {
       return state.firstWhere((g) => g.id == id);

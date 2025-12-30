@@ -255,7 +255,7 @@ class _SplitTransactionPageState extends ConsumerState<SplitTransactionPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.2) : Colors.white,
+          color: isSelected ? color.withValues(alpha:0.2) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: isSelected ? Border.all(color: color, width: 2) : null,
         ),
@@ -317,7 +317,7 @@ class _SplitTransactionPageState extends ConsumerState<SplitTransactionPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -332,7 +332,7 @@ class _SplitTransactionPageState extends ConsumerState<SplitTransactionPage> {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha:0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -372,7 +372,7 @@ class _SplitTransactionPageState extends ConsumerState<SplitTransactionPage> {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: selectedCat.color.withOpacity(0.1),
+                        color: selectedCat.color.withValues(alpha:0.1),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(selectedCat.icon, color: selectedCat.color, size: 18),
@@ -497,7 +497,7 @@ class _SplitTransactionPageState extends ConsumerState<SplitTransactionPage> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, -4),
           ),
@@ -549,7 +549,7 @@ class _SplitTransactionPageState extends ConsumerState<SplitTransactionPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.expense.withOpacity(0.1),
+                  color: AppColors.expense.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -617,7 +617,7 @@ class _SplitTransactionPageState extends ConsumerState<SplitTransactionPage> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: account.color.withOpacity(0.1),
+                      color: account.color.withValues(alpha:0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(account.icon, color: account.color),
@@ -814,15 +814,15 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                       Container(
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? category.color.withOpacity(0.2)
+                              ? category.color.withValues(alpha:0.2)
                               : isExpanded
-                                  ? category.color.withOpacity(0.1)
+                                  ? category.color.withValues(alpha:0.1)
                                   : AppColors.background,
                           borderRadius: BorderRadius.circular(12),
                           border: isSelected
                               ? Border.all(color: category.color, width: 2)
                               : isExpanded
-                                  ? Border.all(color: category.color.withOpacity(0.5), width: 2)
+                                  ? Border.all(color: category.color.withValues(alpha:0.5), width: 2)
                                   : null,
                         ),
                         child: Column(
@@ -831,14 +831,14 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: category.color.withOpacity(0.1),
+                                color: category.color.withValues(alpha:0.1),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(category.icon, color: category.color, size: 22),
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              category.name,
+                              category.localizedName,
                               style: TextStyle(
                                 fontSize: 11,
                                 color: isSelected || isExpanded ? category.color : AppColors.textPrimary,
@@ -880,7 +880,7 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: parentCategory?.color.withOpacity(0.3) ?? Colors.grey),
+        border: Border.all(color: parentCategory?.color.withValues(alpha:0.3) ?? Colors.grey),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -929,7 +929,7 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? child.color.withOpacity(0.2)
+                        ? child.color.withValues(alpha:0.2)
                         : AppColors.background,
                     borderRadius: BorderRadius.circular(20),
                     border: isSelected

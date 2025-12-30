@@ -123,8 +123,7 @@ async def test_book(db_session: AsyncSession, test_user: User) -> Book:
     book = Book(
         id=uuid4(),
         name="Test Book",
-        description="Test book description",
-        owner_id=test_user.id,
+        user_id=test_user.id,
         is_default=True,
     )
     db_session.add(book)

@@ -240,7 +240,7 @@ class _MemberCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: member.role.color.withOpacity(0.2),
+          backgroundColor: member.role.color.withValues(alpha:0.2),
           backgroundImage: member.userAvatar != null
               ? NetworkImage(member.userAvatar!)
               : null,
@@ -258,7 +258,7 @@ class _MemberCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: member.role.color.withOpacity(0.1),
+                color: member.role.color.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -278,7 +278,7 @@ class _MemberCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: Colors.grey.withValues(alpha:0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text(
@@ -451,7 +451,7 @@ class _InviteCard extends StatelessWidget {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: invite.role.color.withOpacity(0.2),
+                  backgroundColor: invite.role.color.withValues(alpha:0.2),
                   child: Icon(invite.role.icon, color: invite.role.color, size: 20),
                 ),
                 const SizedBox(width: 12),
@@ -473,7 +473,7 @@ class _InviteCard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: invite.status.color.withOpacity(0.1),
+                              color: invite.status.color.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -634,7 +634,7 @@ class _ApprovalCard extends StatelessWidget {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: approval.status.color.withOpacity(0.2),
+                  backgroundColor: approval.status.color.withValues(alpha:0.2),
                   child: Icon(approval.status.icon, color: approval.status.color, size: 20),
                 ),
                 const SizedBox(width: 12),
@@ -659,7 +659,7 @@ class _ApprovalCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: approval.status.color.withOpacity(0.1),
+                    color: approval.status.color.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -685,7 +685,7 @@ class _ApprovalCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(

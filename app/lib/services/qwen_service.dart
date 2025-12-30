@@ -157,7 +157,10 @@ class QwenService {
   }
 
   /// 音频识别记账 - 直接从音频中提取记账信息
-  /// 使用 qwen-audio-turbo 音频模型
+  /// 使用 qwen-omni-turbo 全模态模型（支持音频理解）
+  ///
+  /// 注意: qwen-audio-turbo 为体验版本，免费额度用完后不可用
+  /// 推荐使用 qwen-omni-turbo 作为生产级替代方案
   Future<QwenRecognitionResult> recognizeAudio(Uint8List audioData,
       {String format = 'wav'}) async {
     _ensureInitialized();
@@ -173,7 +176,7 @@ class QwenService {
       final response = await _dio.post(
         _audioApiUrl,
         data: {
-          'model': 'qwen-audio-turbo',
+          'model': 'qwen-omni-turbo',  // 使用全模态模型，支持音频理解
           'input': {
             'messages': [
               {
@@ -183,23 +186,21 @@ class QwenService {
                     'audio': 'data:$mimeType;base64,$base64Audio',
                   },
                   {
-                    'text': '''请分析这段语音，提取记账信息。
+                    'text': '''请仔细听这段语音，先转写成文字，然后提取记账信息。
 
-请识别语音内容，并提取：
-1. amount: 金额（数字）
-2. type: 类型（expense表示支出，income表示收入）
-3. category: 消费分类（餐饮/交通/购物/娱乐/住房/医疗/教育/其他）或收入分类（工资/奖金/兼职/理财/其他）
-4. description: 备注描述
+步骤1: 将语音准确转写为文字
+步骤2: 从转写文字中提取金额、类型、分类
 
 请以JSON格式返回：
 {
-    "transcription": "语音转写文本",
-    "amount": 金额数字,
-    "type": "expense或income",
-    "category": "分类",
-    "description": "备注"
+    "transcription": "语音转写的完整文字",
+    "amount": 金额数字（如：10、35.5），
+    "type": "expense"或"income",
+    "category": "餐饮/交通/购物/娱乐/住房/医疗/教育/工资/奖金/其他",
+    "description": "简短描述"
 }
 
+重要：金额必须是数字，请准确识别语音中的金额数字。
 只返回JSON，不要其他文字。'''
                   }
                 ]
@@ -211,6 +212,11 @@ class QwenService {
           }
         },
       );
+
+      // 打印原始响应用于调试
+      print('=== QWEN AUDIO API RESPONSE ===');
+      print(response.data.toString());
+      print('=== END RESPONSE ===');
 
       return _parseAudioResponse(response.data);
     } on DioException catch (e) {
@@ -485,6 +491,8 @@ class QwenService {
 
   QwenRecognitionResult _parseAudioResponse(Map<String, dynamic> response) {
     try {
+      _logger.debug('Audio API response: $response');
+
       if (response['output'] != null && response['output']['choices'] != null) {
         final choices = response['output']['choices'] as List;
         if (choices.isNotEmpty) {
@@ -504,15 +512,95 @@ class QwenService {
             }
           }
 
+          _logger.info('Audio response text: $textContent');
+
           if (textContent.isNotEmpty) {
-            return _extractAudioJsonResult(textContent);
+            // 先尝试 JSON 解析
+            final jsonResult = _extractAudioJsonResult(textContent);
+            if (jsonResult.success && jsonResult.amount != null) {
+              return jsonResult;
+            }
+
+            // JSON 解析失败或无金额，尝试从文本中提取信息
+            return _extractFromPlainText(textContent);
           }
         }
       }
       return QwenRecognitionResult.error('无法解析音频响应');
     } catch (e) {
+      _logger.error('Parse audio response failed', error: e);
       return QwenRecognitionResult.error('解析音频响应失败: $e');
     }
+  }
+
+  /// 从纯文本中提取记账信息（当模型没有返回 JSON 时的备用方案）
+  QwenRecognitionResult _extractFromPlainText(String text) {
+    _logger.info('Trying to extract from plain text: $text');
+
+    // 提取金额 - 匹配各种金额格式
+    double? amount;
+    final amountPatterns = [
+      RegExp(r'(\d+(?:\.\d{1,2})?)\s*[元块]'),  // 35元, 35.5块
+      RegExp(r'[¥￥]\s*(\d+(?:\.\d{1,2})?)'),    // ¥35, ￥35.5
+      RegExp(r'金额[是为：:]\s*(\d+(?:\.\d{1,2})?)'),  // 金额是35
+      RegExp(r'(\d+(?:\.\d{1,2})?)\s*(?:块钱|人民币)'),  // 35块钱
+      RegExp(r'花了?\s*(\d+(?:\.\d{1,2})?)'),   // 花了35
+      RegExp(r'(\d+(?:\.\d{1,2})?)'),           // 最后尝试匹配任意数字
+    ];
+
+    for (final pattern in amountPatterns) {
+      final match = pattern.firstMatch(text);
+      if (match != null) {
+        final parsed = double.tryParse(match.group(1)!);
+        if (parsed != null && parsed > 0) {
+          amount = parsed;
+          break;
+        }
+      }
+    }
+
+    // 判断收入/支出
+    String type = 'expense';
+    if (text.contains(RegExp(r'收入|工资|奖金|收到|进账|到账'))) {
+      type = 'income';
+    }
+
+    // 提取分类 - 使用英文ID
+    String category = 'other';
+    final categoryPatterns = {
+      'food': RegExp(r'餐饮|吃饭|午餐|晚餐|早餐|夜宵|外卖|饭|餐|食|咖啡|奶茶|零食|水果|喝'),
+      'transport': RegExp(r'交通|打车|出租|地铁|公交|滴滴|加油|停车|高铁|火车|飞机|机票|车费|路费'),
+      'shopping': RegExp(r'购物|买|超市|商场|淘宝|京东|网购|衣服|鞋'),
+      'entertainment': RegExp(r'娱乐|电影|游戏|KTV|唱歌|旅游|景点|门票'),
+      'housing': RegExp(r'住房|房租|水电|物业|装修|家具|家电'),
+      'medical': RegExp(r'医疗|医院|药|看病|体检|牙'),
+      'education': RegExp(r'教育|学费|培训|书|课程'),
+      'salary': RegExp(r'工资|薪水|月薪|薪资'),
+      'bonus': RegExp(r'奖金|年终奖|提成|年终'),
+      'parttime': RegExp(r'兼职|副业|外快'),
+      'investment': RegExp(r'理财|投资|收益|利息|分红'),
+    };
+
+    for (final entry in categoryPatterns.entries) {
+      if (entry.value.hasMatch(text)) {
+        category = entry.key;
+        break;
+      }
+    }
+
+    if (amount != null) {
+      return QwenRecognitionResult(
+        amount: amount,
+        category: category,
+        description: text.length > 50 ? text.substring(0, 50) : text,
+        type: type,
+        success: true,
+        confidence: 0.7,  // 纯文本提取置信度较低
+      );
+    }
+
+    // 无法提取金额，返回错误
+    return QwenRecognitionResult.error('无法从语音中识别金额，请重试或手动输入');
   }
 
   QwenRecognitionResult _extractAudioJsonResult(String content) {

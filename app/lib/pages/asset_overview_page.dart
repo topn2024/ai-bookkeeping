@@ -109,7 +109,7 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
               gradient: LinearGradient(
                 colors: [
                   theme.colorScheme.primary,
-                  theme.colorScheme.primary.withOpacity(0.8),
+                  theme.colorScheme.primary.withValues(alpha:0.8),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -117,7 +117,7 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: theme.colorScheme.primary.withOpacity(0.3),
+                  color: theme.colorScheme.primary.withValues(alpha:0.3),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -189,7 +189,7 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
                 margin: const EdgeInsets.only(top: 8),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: (investmentSummary.totalProfit >= 0 ? Colors.green : Colors.red).withOpacity(0.1),
+                  color: (investmentSummary.totalProfit >= 0 ? Colors.green : Colors.red).withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -265,7 +265,7 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: Colors.purple.withOpacity(0.2),
+            color: Colors.purple.withValues(alpha:0.2),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(_getInvestmentIcon(investment.type), color: Colors.purple),
@@ -278,7 +278,7 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: (isProfit ? Colors.green : Colors.red).withOpacity(0.1),
+                color: (isProfit ? Colors.green : Colors.red).withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -409,7 +409,7 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: account.color.withOpacity(0.2),
+            color: account.color.withValues(alpha:0.2),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(account.icon, color: account.color),
@@ -442,7 +442,7 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha:0.2),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: color),
@@ -512,7 +512,7 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: healthColor.withOpacity(0.2),
+                    color: healthColor.withValues(alpha:0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(healthIcon, color: healthColor, size: 32),
@@ -698,8 +698,8 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
                   height: height,
                   decoration: BoxDecoration(
                     color: item.totalNetWorth >= 0
-                        ? Colors.green.withOpacity(0.7)
-                        : Colors.red.withOpacity(0.7),
+                        ? Colors.green.withValues(alpha:0.7)
+                        : Colors.red.withValues(alpha:0.7),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -882,41 +882,6 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
     );
   }
 
-  Widget _buildSimplePieChart(
-    List<MapEntry<AccountType, double>> data,
-    double total,
-    List<Color> colors,
-  ) {
-    if (data.isEmpty || total == 0) {
-      return const Center(child: Text('暂无数据'));
-    }
-
-    return Center(
-      child: SizedBox(
-        width: 180,
-        height: 180,
-        child: CustomPaint(
-          painter: _PieChartPainter(
-            data.map((e) => e.value / total).toList(),
-            colors,
-          ),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('总资产', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                Text(
-                  '¥${total.toStringAsFixed(0)}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildSimplePieChartString(
     List<MapEntry<String, double>> data,
     double total,
@@ -998,7 +963,7 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: account.color.withOpacity(0.2),
+                  color: account.color.withValues(alpha:0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(account.icon, color: account.color, size: 20),
@@ -1038,7 +1003,7 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
               value: percent / 100,
               minHeight: 4,
               backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation<Color>(account.color.withOpacity(0.7)),
+              valueColor: AlwaysStoppedAnimation<Color>(account.color.withValues(alpha:0.7)),
             ),
           ),
         ],

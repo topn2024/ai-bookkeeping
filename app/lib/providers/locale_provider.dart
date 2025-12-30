@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
+import '../services/category_localization_service.dart';
 
 /// 语言设置状态
 class LocaleState {
@@ -77,12 +78,36 @@ class LocaleNotifier extends Notifier<LocaleState> {
         selectedLanguage: selected,
         effectiveLanguage: selected,
       );
+      _syncCategoryLocalization(selected);
     } else {
       // 跟随系统
+      final systemLanguage = getSystemLanguage();
       state = LocaleState(
         selectedLanguage: null,
-        effectiveLanguage: getSystemLanguage(),
+        effectiveLanguage: systemLanguage,
       );
+      _syncCategoryLocalization(systemLanguage);
+    }
+  }
+
+  /// 同步分类本地化服务
+  void _syncCategoryLocalization(AppLanguage language) {
+    final localeCode = _appLanguageToLocaleCode(language);
+    CategoryLocalizationService.instance.setLocale(localeCode);
+  }
+
+  /// 将AppLanguage转换为语言代码
+  String _appLanguageToLocaleCode(AppLanguage language) {
+    switch (language) {
+      case AppLanguage.zhCN:
+      case AppLanguage.zhTW:
+        return 'zh';
+      case AppLanguage.en:
+        return 'en';
+      case AppLanguage.ja:
+        return 'ja';
+      case AppLanguage.ko:
+        return 'ko';
     }
   }
 
@@ -101,15 +126,18 @@ class LocaleNotifier extends Notifier<LocaleState> {
       selectedLanguage: language,
       effectiveLanguage: language,
     );
+    _syncCategoryLocalization(language);
     await _saveSettings();
   }
 
   /// 设置跟随系统
   Future<void> setFollowSystem() async {
+    final systemLanguage = getSystemLanguage();
     state = LocaleState(
       selectedLanguage: null,
-      effectiveLanguage: getSystemLanguage(),
+      effectiveLanguage: systemLanguage,
     );
+    _syncCategoryLocalization(systemLanguage);
     await _saveSettings();
   }
 

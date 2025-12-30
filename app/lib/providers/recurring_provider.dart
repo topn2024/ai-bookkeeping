@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/recurring_transaction.dart';
-import '../services/database_service.dart';
 import 'base/crud_notifier.dart';
 import 'transaction_provider.dart';
 

@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/expense_target.dart';
 import '../services/http_service.dart';
-import 'ledger_provider.dart';
 
 /// Expense Target Notifier - 管理月度开支目标
 class ExpenseTargetNotifier extends Notifier<List<ExpenseTarget>> {

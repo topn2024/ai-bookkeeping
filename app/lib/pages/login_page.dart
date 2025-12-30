@@ -329,13 +329,27 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final success = await ref.read(authProvider.notifier).login(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
+    try {
+      final success = await ref.read(authProvider.notifier).login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-    if (success && mounted) {
-      Navigator.pop(context);
+      if (mounted) {
+        if (success) {
+          Navigator.pop(context);
+        }
+        // 如果失败，error 会通过 ref.listen 显示
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('登录异常: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

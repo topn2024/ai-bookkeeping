@@ -204,7 +204,7 @@ class BillReminder {
       'linkedAccountId': linkedAccountId,
       'note': note,
       'iconCode': icon.codePoint,
-      'colorValue': color.value,
+      'colorValue': color.toARGB32(),
       'isEnabled': isEnabled ? 1 : 0,
       'lastRemindedAt': lastRemindedAt?.millisecondsSinceEpoch,
       'nextReminderDate': nextReminderDate?.millisecondsSinceEpoch,

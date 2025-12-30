@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/debt.dart';
-import '../services/database_service.dart';
 import 'base/crud_notifier.dart';
 
 /// 债务管理 Notifier
@@ -136,6 +135,7 @@ class DebtNotifier extends SimpleCrudNotifier<Debt, String> {
     );
   }
 
+  @override
   Debt? getById(String id) {
     try {
       return state.firstWhere((d) => d.id == id);

@@ -108,7 +108,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog>
   }
 
   String _colorToHex(Color color) {
-    return color.value.toRadixString(16).padLeft(8, '0').toUpperCase().substring(2);
+    return color.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2);
   }
 
   Color? _hexToColor(String hex) {
@@ -211,7 +211,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog>
       itemCount: presetColors.length,
       itemBuilder: (context, index) {
         final color = presetColors[index];
-        final isSelected = color.value == _selectedColor.value;
+        final isSelected = color.toARGB32() == _selectedColor.toARGB32();
         return GestureDetector(
           onTap: () {
             setState(() {
@@ -344,7 +344,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog>
               activeTrackColor: Colors.transparent,
               inactiveTrackColor: Colors.transparent,
               thumbColor: Colors.white,
-              overlayColor: Colors.white.withOpacity(0.2),
+              overlayColor: Colors.white.withValues(alpha:0.2),
             ),
             child: Slider(
               value: value,
@@ -392,9 +392,14 @@ class _ColorPickerDialogState extends State<ColorPickerDialog>
           Row(
             children: [
               Expanded(
-                child: _buildRGBField('R', _selectedColor.red, (v) {
+                child: _buildRGBField('R', (_selectedColor.r * 255).round(), (v) {
                   setState(() {
-                    _selectedColor = _selectedColor.withRed(v);
+                    _selectedColor = Color.fromARGB(
+                      (_selectedColor.a * 255).round(),
+                      v,
+                      (_selectedColor.g * 255).round(),
+                      (_selectedColor.b * 255).round(),
+                    );
                     _hexController.text = _colorToHex(_selectedColor);
                     _updateHSL();
                   });
@@ -403,9 +408,14 @@ class _ColorPickerDialogState extends State<ColorPickerDialog>
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _buildRGBField('G', _selectedColor.green, (v) {
+                child: _buildRGBField('G', (_selectedColor.g * 255).round(), (v) {
                   setState(() {
-                    _selectedColor = _selectedColor.withGreen(v);
+                    _selectedColor = Color.fromARGB(
+                      (_selectedColor.a * 255).round(),
+                      (_selectedColor.r * 255).round(),
+                      v,
+                      (_selectedColor.b * 255).round(),
+                    );
                     _hexController.text = _colorToHex(_selectedColor);
                     _updateHSL();
                   });
@@ -414,9 +424,14 @@ class _ColorPickerDialogState extends State<ColorPickerDialog>
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _buildRGBField('B', _selectedColor.blue, (v) {
+                child: _buildRGBField('B', (_selectedColor.b * 255).round(), (v) {
                   setState(() {
-                    _selectedColor = _selectedColor.withBlue(v);
+                    _selectedColor = Color.fromARGB(
+                      (_selectedColor.a * 255).round(),
+                      (_selectedColor.r * 255).round(),
+                      (_selectedColor.g * 255).round(),
+                      v,
+                    );
                     _hexController.text = _colorToHex(_selectedColor);
                     _updateHSL();
                   });
@@ -483,7 +498,7 @@ class ColorPickerButton extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.4),
+              color: color.withValues(alpha:0.4),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),

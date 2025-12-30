@@ -96,15 +96,30 @@ class BuildInfo {
   buildInfoFile.writeAsStringSync(buildInfoContent);
   print('✓ 已生成 build_info.dart');
 
+  // 5. 读取构建配置
+  final buildConfig = _loadBuildConfig();
+
   print('\n=== 构建信息 ===');
   print('版本: $newVersion');
   print('编译时间: $buildTimeFormatted');
+  print('API配置: ${buildConfig['QWEN_API_KEY'] != null ? '已配置' : '未配置'}');
   print('\n准备构建APK...\n');
 
-  // 5. 构建APK
+  // 6. 构建APK
+  final dartDefines = <String>[];
+  if (buildConfig['QWEN_API_KEY'] != null) {
+    dartDefines.add('--dart-define=QWEN_API_KEY=${buildConfig['QWEN_API_KEY']}');
+  }
+  if (buildConfig['API_BASE_URL'] != null) {
+    dartDefines.add('--dart-define=API_BASE_URL=${buildConfig['API_BASE_URL']}');
+  }
+  if (buildConfig['ZHIPU_API_KEY'] != null) {
+    dartDefines.add('--dart-define=ZHIPU_API_KEY=${buildConfig['ZHIPU_API_KEY']}');
+  }
+
   final result = await Process.run(
     'D:/flutter/bin/flutter.bat',
-    ['build', 'apk', '--debug'],
+    ['build', 'apk', '--debug', ...dartDefines],
     workingDirectory: 'app',
     runInShell: true,
   );
@@ -124,3 +139,34 @@ class BuildInfo {
 }
 
 String _pad(int n) => n.toString().padLeft(2, '0');
+
+/// 加载构建配置
+/// 优先从 scripts/build.env 读取，如果不存在则从环境变量读取
+Map<String, String?> _loadBuildConfig() {
+  final config = <String, String?>{};
+
+  // 尝试从 build.env 文件读取
+  final envFile = File('scripts/build.env');
+  if (envFile.existsSync()) {
+    print('✓ 从 scripts/build.env 读取配置');
+    final lines = envFile.readAsLinesSync();
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
+      final parts = trimmed.split('=');
+      if (parts.length >= 2) {
+        final key = parts[0].trim();
+        final value = parts.sublist(1).join('=').trim();
+        config[key] = value;
+      }
+    }
+  } else {
+    print('! scripts/build.env 不存在，使用环境变量');
+    // 从环境变量读取
+    config['QWEN_API_KEY'] = Platform.environment['QWEN_API_KEY'];
+    config['API_BASE_URL'] = Platform.environment['API_BASE_URL'];
+    config['ZHIPU_API_KEY'] = Platform.environment['ZHIPU_API_KEY'];
+  }
+
+  return config;
+}

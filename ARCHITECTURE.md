@@ -81,11 +81,15 @@
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                       AI 服务层                                  │
+│                       AI 服务层 (阿里云百炼)                      │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐            │
-│  │ Claude API   │ │ Whisper API  │ │ OCR Service  │            │
-│  │ (文本理解)   │ │ (语音识别)   │ │ (图片识别)   │            │
+│  │ qwen-omni    │ │ qwen-vl-plus │ │ qwen-turbo   │            │
+│  │ (语音理解)   │ │ (图片识别)   │ │ (文本解析)   │            │
 │  └──────────────┘ └──────────────┘ └──────────────┘            │
+│  ┌──────────────┐ ┌──────────────┐                             │
+│  │ qwen-plus    │ │ GLM-4-flash  │                             │
+│  │ (账单解析)   │ │ (备用服务)   │                             │
+│  └──────────────┘ └──────────────┘                             │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -117,10 +121,11 @@
 #### AI服务
 | 功能 | 技术方案 | 说明 |
 |------|----------|------|
-| 图片识别(OCR) | **PaddleOCR** + Claude | 本地OCR + AI理解 |
-| 语音识别 | **Whisper API** | OpenAI语音转文字 |
-| 智能分类 | **Claude API** | 自动识别消费类型 |
-| 账单解析 | **Claude API** | 解析邮件中的账单 |
+| 图片识别(OCR) | **通义千问 qwen-vl-plus** | 多模态视觉模型，小票/发票识别 |
+| 语音识别 | **通义千问 qwen-omni-turbo** | 全模态模型，语音理解+记账解析 |
+| 智能分类 | **通义千问 qwen-turbo** | 文本理解，自动识别消费类型 |
+| 账单解析 | **通义千问 qwen-plus** | 邮件账单智能解析 |
+| 备用服务 | **智谱 GLM-4-flash** | 千问不可用时的降级方案 |
 
 ---
 
@@ -791,7 +796,9 @@ CREATE TABLE oauth_bindings (
 | THB | 泰铢 | ฿ | 泰国 |
 | MYR | 马来西亚令吉 | RM | 马来西亚 |
 
-### 13.2 汇率管理
+### 13.2 汇率管理（手动设置）
+
+本系统采用手动汇率设置方式，用户在进行跨币种转账时手动输入汇率。
 
 ```sql
 -- 货币表
@@ -804,16 +811,15 @@ CREATE TABLE currencies (
     is_active BOOLEAN DEFAULT TRUE
 );
 
--- 汇率表（每日更新）
-CREATE TABLE exchange_rates (
+-- 用户自定义汇率表（手动设置）
+CREATE TABLE user_exchange_rates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    base_currency VARCHAR(3) DEFAULT 'USD',
-    target_currency VARCHAR(3) NOT NULL,
+    user_id UUID NOT NULL REFERENCES users(id),
+    from_currency VARCHAR(3) NOT NULL,
+    to_currency VARCHAR(3) NOT NULL,
     rate DECIMAL(20,10) NOT NULL,
-    rate_date DATE NOT NULL,
-    source VARCHAR(50),                 -- 数据来源
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(base_currency, target_currency, rate_date)
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, from_currency, to_currency)
 );
 
 -- 用户货币设置
@@ -837,14 +843,15 @@ ALTER TABLE accounts ADD COLUMN currency VARCHAR(3) DEFAULT 'CNY';
 ### 13.4 货币转换逻辑
 
 ```python
-# 货币转换服务
+# 货币转换服务（手动汇率）
 class CurrencyService:
     async def convert(
         self,
         amount: Decimal,
         from_currency: str,
         to_currency: str,
-        date: date = None
+        user_id: UUID,
+        manual_rate: Decimal = None
     ) -> tuple[Decimal, Decimal]:
         """
         返回: (转换后金额, 汇率)
@@ -852,14 +859,23 @@ class CurrencyService:
         if from_currency == to_currency:
             return amount, Decimal('1')
 
-        rate = await self.get_rate(from_currency, to_currency, date)
+        # 使用手动传入的汇率，或从用户自定义汇率表获取
+        if manual_rate:
+            rate = manual_rate
+        else:
+            rate = await self.get_user_rate(user_id, from_currency, to_currency)
+
         converted = amount * rate
         return converted.quantize(Decimal('0.01')), rate
 
-    async def get_rate(self, from_curr: str, to_curr: str, date: date = None):
-        # 1. 优先从缓存获取
-        # 2. 从数据库获取
-        # 3. 调用汇率API更新
+    async def get_user_rate(self, user_id: UUID, from_curr: str, to_curr: str):
+        """从用户自定义汇率表获取汇率"""
+        # 从 user_exchange_rates 表查询用户设置的汇率
+        pass
+
+    async def set_user_rate(self, user_id: UUID, from_curr: str, to_curr: str, rate: Decimal):
+        """用户手动设置汇率"""
+        # 更新或插入 user_exchange_rates 表
         pass
 ```
 
@@ -2364,8 +2380,8 @@ CACHE_KEYS = {
     # 分类列表 (TTL: 1小时)
     'categories:{user_id}': 'category_list',
 
-    # 汇率 (TTL: 1小时)
-    'exchange_rate:{from}:{to}:{date}': 'rate',
+    # 用户自定义汇率 (TTL: 1小时)
+    'user_rate:{user_id}:{from}:{to}': 'rate',
 }
 ```
 

@@ -91,7 +91,7 @@ class RecurringManagementPage extends ConsumerWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: recurring.color.withOpacity(recurring.isEnabled ? 0.2 : 0.1),
+                    color: recurring.color.withValues(alpha:recurring.isEnabled ? 0.2 : 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
@@ -412,7 +412,7 @@ class _RecurringDialogState extends ConsumerState<_RecurringDialog> {
 
             // Category
             DropdownButtonFormField<String>(
-              value: _selectedCategory,
+              initialValue: _selectedCategory,
               decoration: const InputDecoration(labelText: '分类'),
               items: filteredCategories.map((category) {
                 return DropdownMenuItem(
@@ -421,7 +421,7 @@ class _RecurringDialogState extends ConsumerState<_RecurringDialog> {
                     children: [
                       Icon(category.icon, size: 20, color: category.color),
                       const SizedBox(width: 8),
-                      Text(category.name),
+                      Text(category.localizedName),
                     ],
                   ),
                 );
@@ -432,7 +432,7 @@ class _RecurringDialogState extends ConsumerState<_RecurringDialog> {
 
             // Account
             DropdownButtonFormField<String>(
-              value: _selectedAccountId,
+              initialValue: _selectedAccountId,
               decoration: const InputDecoration(labelText: '账户'),
               items: accounts.map((account) {
                 return DropdownMenuItem(
@@ -454,7 +454,7 @@ class _RecurringDialogState extends ConsumerState<_RecurringDialog> {
             Text('重复周期', style: theme.textTheme.bodySmall),
             const SizedBox(height: 8),
             DropdownButtonFormField<RecurringFrequency>(
-              value: _selectedFrequency,
+              initialValue: _selectedFrequency,
               items: RecurringFrequency.values.map((freq) {
                 String label;
                 switch (freq) {
@@ -500,7 +500,7 @@ class _RecurringDialogState extends ConsumerState<_RecurringDialog> {
               Text('每月几号', style: theme.textTheme.bodySmall),
               const SizedBox(height: 8),
               DropdownButtonFormField<int>(
-                value: _dayOfMonth,
+                initialValue: _dayOfMonth,
                 items: List.generate(31, (index) {
                   return DropdownMenuItem(
                     value: index + 1,
@@ -519,7 +519,7 @@ class _RecurringDialogState extends ConsumerState<_RecurringDialog> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<int>(
-                      value: _monthOfYear,
+                      initialValue: _monthOfYear,
                       decoration: const InputDecoration(labelText: '月份'),
                       items: List.generate(12, (index) {
                         return DropdownMenuItem(
@@ -535,7 +535,7 @@ class _RecurringDialogState extends ConsumerState<_RecurringDialog> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: DropdownButtonFormField<int>(
-                      value: _dayOfMonth,
+                      initialValue: _dayOfMonth,
                       decoration: const InputDecoration(labelText: '日期'),
                       items: List.generate(31, (index) {
                         return DropdownMenuItem(

@@ -217,7 +217,7 @@ class Debt {
       'paymentDay': paymentDay,
       'linkedAccountId': linkedAccountId,
       'iconCode': icon.codePoint,
-      'colorValue': color.value,
+      'colorValue': color.toARGB32(),
       'isCompleted': isCompleted ? 1 : 0,
       'completedAt': completedAt?.millisecondsSinceEpoch,
       'createdAt': createdAt.millisecondsSinceEpoch,
@@ -558,9 +558,6 @@ class DebtCalculator {
     int month = 0;
     double totalInterest = 0;
     final startDate = DateTime.now();
-
-    // 所有最低还款的总额
-    double totalMinPayment = sortedDebts.fold(0.0, (sum, d) => sum + d.minimumPayment);
 
     while (balances.values.any((b) => b > 0) && month < 1200) {
       month++;

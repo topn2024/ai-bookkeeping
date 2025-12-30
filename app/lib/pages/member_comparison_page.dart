@@ -269,7 +269,7 @@ class _MemberComparisonPageState extends ConsumerState<MemberComparisonPage> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha:0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: color, size: 20),
@@ -320,7 +320,7 @@ class _MemberComparisonPageState extends ConsumerState<MemberComparisonPage> {
                         children: [
                           CircleAvatar(
                             radius: 14,
-                            backgroundColor: stats.role.color.withOpacity(0.2),
+                            backgroundColor: stats.role.color.withValues(alpha:0.2),
                             child: Text(
                               stats.memberName.isNotEmpty
                                   ? stats.memberName[0].toUpperCase()
@@ -349,7 +349,7 @@ class _MemberComparisonPageState extends ConsumerState<MemberComparisonPage> {
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
                           value: stats.totalExpense / maxExpense,
-                          backgroundColor: Colors.grey.withOpacity(0.2),
+                          backgroundColor: Colors.grey.withValues(alpha:0.2),
                           valueColor: AlwaysStoppedAnimation(stats.role.color),
                           minHeight: 8,
                         ),
@@ -591,8 +591,8 @@ class _MemberComparisonPageState extends ConsumerState<MemberComparisonPage> {
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: isOver
-                                ? Colors.red.withOpacity(0.1)
-                                : Colors.green.withOpacity(0.1),
+                                ? Colors.red.withValues(alpha:0.1)
+                                : Colors.green.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -613,7 +613,7 @@ class _MemberComparisonPageState extends ConsumerState<MemberComparisonPage> {
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
                               value: (stats.budgetPercent / 100).clamp(0.0, 1.0),
-                              backgroundColor: Colors.grey.withOpacity(0.2),
+                              backgroundColor: Colors.grey.withValues(alpha:0.2),
                               valueColor: AlwaysStoppedAnimation(
                                 isOver
                                     ? Colors.red

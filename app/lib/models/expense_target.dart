@@ -144,7 +144,7 @@ class ExpenseTarget {
       'year': year,
       'month': month,
       'icon_code': icon.codePoint,
-      'color_value': color.value,
+      'color_value': color.toARGB32(),
       'alert_threshold': alertThreshold,
       'enable_notifications': enableNotifications,
       'is_active': isActive,

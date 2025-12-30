@@ -217,14 +217,14 @@ class BackupRestoreService {
         'type': a.type.index,
         'balance': a.balance,
         'iconCode': a.icon.codePoint,
-        'colorValue': a.color.value,
+        'colorValue': a.color.toARGB32(),
         'isDefault': a.isDefault,
       }).toList(),
       'categories': categories.map((c) => {
         'id': c.id,
         'name': c.name,
         'iconCode': c.icon.codePoint,
-        'colorValue': c.color.value,
+        'colorValue': c.color.toARGB32(),
         'isExpense': c.isExpense,
         'parentId': c.parentId,
         'sortOrder': c.sortOrder,
@@ -238,7 +238,7 @@ class BackupRestoreService {
         'categoryId': b.categoryId,
         'ledgerId': b.ledgerId,
         'iconCode': b.icon.codePoint,
-        'colorValue': b.color.value,
+        'colorValue': b.color.toARGB32(),
         'isEnabled': b.isEnabled,
       }).toList(),
       'ledgers': ledgers.map((l) => {
@@ -246,7 +246,7 @@ class BackupRestoreService {
         'name': l.name,
         'description': l.description,
         'iconCode': l.icon.codePoint,
-        'colorValue': l.color.value,
+        'colorValue': l.color.toARGB32(),
         'isDefault': l.isDefault,
       }).toList(),
       'templates': templates.length,
@@ -357,7 +357,7 @@ class SyncManager {
   SyncSettings _settings = const SyncSettings();
   SyncStatus _status = SyncStatus.idle;
   List<SyncRecord> _history = [];
-  List<SyncConflict> _conflicts = [];
+  final List<SyncConflict> _conflicts = [];
 
   SyncSettings get settings => _settings;
   SyncStatus get status => _status;

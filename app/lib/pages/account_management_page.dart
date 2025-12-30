@@ -53,7 +53,7 @@ class AccountManagementPage extends ConsumerWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
+            color: AppColors.primary.withValues(alpha:0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -94,7 +94,7 @@ class AccountManagementPage extends ConsumerWidget {
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: account.color.withOpacity(0.1),
+            color: account.color.withValues(alpha:0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(account.icon, color: account.color),
@@ -110,7 +110,7 @@ class AccountManagementPage extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(
@@ -336,7 +336,7 @@ class AccountManagementPage extends ConsumerWidget {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: isSelected ? selectedColor.withOpacity(0.2) : AppColors.background,
+                              color: isSelected ? selectedColor.withValues(alpha:0.2) : AppColors.background,
                               borderRadius: BorderRadius.circular(8),
                               border: isSelected
                                   ? Border.all(color: selectedColor, width: 2)

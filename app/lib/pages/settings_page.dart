@@ -737,59 +737,63 @@ class SettingsPage extends ConsumerWidget {
   }
 
   void _showThemeDialog(BuildContext context, WidgetRef ref) {
-    final currentState = ref.read(themeProvider);
-
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('选择主题'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('外观模式', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              RadioListTile<AppThemeMode>(
-                title: const Text('浅色模式'),
-                secondary: const Icon(Icons.light_mode),
-                value: AppThemeMode.light,
-                groupValue: currentState.mode,
-                onChanged: (value) {
-                  ref.read(themeProvider.notifier).setThemeMode(AppThemeMode.light);
-                },
-              ),
-              RadioListTile<AppThemeMode>(
-                title: const Text('深色模式'),
-                secondary: const Icon(Icons.dark_mode),
-                value: AppThemeMode.dark,
-                groupValue: currentState.mode,
-                onChanged: (value) {
-                  ref.read(themeProvider.notifier).setThemeMode(AppThemeMode.dark);
-                },
-              ),
-              RadioListTile<AppThemeMode>(
-                title: const Text('跟随系统'),
-                secondary: const Icon(Icons.brightness_auto),
-                value: AppThemeMode.system,
-                groupValue: currentState.mode,
-                onChanged: (value) {
-                  ref.read(themeProvider.notifier).setThemeMode(AppThemeMode.system);
-                },
-              ),
-              const SizedBox(height: 16),
-              const Text('主题色', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: AppColorTheme.values.map((colorTheme) {
-                  final themeData = AppColorThemes.getTheme(colorTheme);
-                  final isSelected = currentState.colorTheme == colorTheme;
-                  return GestureDetector(
-                    onTap: () {
-                      ref.read(themeProvider.notifier).setColorTheme(colorTheme);
+      builder: (context) => Consumer(
+        builder: (context, ref, child) {
+          final currentState = ref.watch(themeProvider);
+          return AlertDialog(
+            title: const Text('选择主题'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('外观模式', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  RadioListTile<AppThemeMode>(
+                    title: const Text('浅色模式'),
+                    secondary: const Icon(Icons.light_mode),
+                    value: AppThemeMode.light,
+                    groupValue: currentState.mode,
+                    onChanged: (value) {
+                      ref.read(themeProvider.notifier).setThemeMode(AppThemeMode.light);
                     },
+                  ),
+                  RadioListTile<AppThemeMode>(
+                    title: const Text('深色模式'),
+                    secondary: const Icon(Icons.dark_mode),
+                    value: AppThemeMode.dark,
+                    groupValue: currentState.mode,
+                    onChanged: (value) {
+                      ref.read(themeProvider.notifier).setThemeMode(AppThemeMode.dark);
+                    },
+                  ),
+                  RadioListTile<AppThemeMode>(
+                    title: const Text('跟随系统'),
+                    secondary: const Icon(Icons.brightness_auto),
+                    value: AppThemeMode.system,
+                    groupValue: currentState.mode,
+                    onChanged: (value) {
+                      ref.read(themeProvider.notifier).setThemeMode(AppThemeMode.system);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('主题色', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    // 过滤掉 custom，自定义主题有单独入口
+                    children: AppColorTheme.values
+                        .where((t) => t != AppColorTheme.custom)
+                        .map((colorTheme) {
+                      final themeData = AppColorThemes.getTheme(colorTheme);
+                      final isSelected = currentState.colorTheme == colorTheme;
+                      return GestureDetector(
+                        onTap: () {
+                          ref.read(themeProvider.notifier).setColorTheme(colorTheme);
+                        },
                     child: Column(
                       children: [
                         Container(
@@ -835,14 +839,16 @@ class SettingsPage extends ConsumerWidget {
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('关闭'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('关闭'),
+                  ),
+                ],
+              );
+            },
           ),
-        ],
-      ),
-    );
+        );
   }
 
   void _showBackupDialog(BuildContext context) {

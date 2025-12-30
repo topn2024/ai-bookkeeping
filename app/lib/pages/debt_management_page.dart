@@ -168,7 +168,7 @@ class DebtManagementPage extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -236,7 +236,7 @@ class DebtManagementPage extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha:0.3)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -318,7 +318,7 @@ class DebtManagementPage extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
@@ -365,7 +365,7 @@ class DebtManagementPage extends ConsumerWidget {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: debt.color.withOpacity(0.1),
+                      color: debt.color.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(debt.icon, color: debt.color),
@@ -439,8 +439,8 @@ class DebtManagementPage extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: debt.daysUntilPayment <= 3
-                        ? Colors.red.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
+                        ? Colors.red.withValues(alpha:0.1)
+                        : Colors.orange.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -556,7 +556,7 @@ class DebtManagementPage extends ConsumerWidget {
                               width: 40,
                               height: 40,
                               decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.1),
+                                color: Colors.green.withValues(alpha:0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Icon(Icons.check, color: Colors.green),
@@ -699,7 +699,7 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
                           width: 70,
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? (template['color'] as Color).withOpacity(0.1)
+                                ? (template['color'] as Color).withValues(alpha:0.1)
                                 : Colors.grey[100],
                             border: Border.all(
                               color: isSelected
@@ -997,7 +997,7 @@ class _DebtDetailPageState extends ConsumerState<DebtDetailPage> {
                     width: 64,
                     height: 64,
                     decoration: BoxDecoration(
-                      color: debt.color.withOpacity(0.1),
+                      color: debt.color.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Icon(debt.icon, color: debt.color, size: 32),
@@ -1150,7 +1150,7 @@ class _DebtDetailPageState extends ConsumerState<DebtDetailPage> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
+              color: Colors.green.withValues(alpha:0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.check, color: Colors.green, size: 20),

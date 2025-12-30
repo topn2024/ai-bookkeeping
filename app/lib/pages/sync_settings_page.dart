@@ -120,7 +120,7 @@ class _ServerSyncTab extends ConsumerWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: syncState.status.color.withOpacity(0.1),
+                color: syncState.status.color.withValues(alpha:0.1),
                 shape: BoxShape.circle,
               ),
               child: syncState.status == SyncStatus.syncing
@@ -179,7 +179,7 @@ class _ServerSyncTab extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -406,7 +406,7 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -660,7 +660,7 @@ class _CleanupTab extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
@@ -839,7 +839,7 @@ class _BackupTab extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
@@ -941,7 +941,7 @@ class _BackupCard extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: Colors.blue.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.backup, color: Colors.blue),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/theme_provider.dart';
 
 class AppColors {
   // Primary colors (default blue theme)
@@ -9,7 +11,7 @@ class AppColors {
   // Accent colors
   static const Color accent = Color(0xFF03A9F4);
 
-  // Semantic colors
+  // Semantic colors (默认值，实际使用时应通过 ThemeColors 获取)
   static const Color income = Color(0xFF4CAF50);
   static const Color expense = Color(0xFFF44336);
   static const Color transfer = Color(0xFFFF9800);
@@ -27,6 +29,78 @@ class AppColors {
   // Border colors
   static const Color border = Color(0xFFE0E0E0);
   static const Color divider = Color(0xFFEEEEEE);
+}
+
+/// 主题语义颜色 - 用于获取当前主题的收入/支出/转账颜色
+class ThemeColors {
+  final Color income;
+  final Color expense;
+  final Color transfer;
+  final Color primary;
+
+  const ThemeColors({
+    required this.income,
+    required this.expense,
+    required this.transfer,
+    required this.primary,
+  });
+
+  /// 默认颜色
+  static const ThemeColors defaults = ThemeColors(
+    income: AppColors.income,
+    expense: AppColors.expense,
+    transfer: AppColors.transfer,
+    primary: AppColors.primary,
+  );
+
+  /// 从 WidgetRef 获取当前主题颜色（监听变化，主题切换时自动更新）
+  static ThemeColors of(WidgetRef ref) {
+    // 监听 themeProvider 状态变化
+    ref.watch(themeProvider);
+    // 从 notifier 读取颜色值
+    final notifier = ref.read(themeProvider.notifier);
+    return ThemeColors(
+      income: notifier.incomeColor,
+      expense: notifier.expenseColor,
+      transfer: notifier.transferColor,
+      primary: notifier.primaryColor,
+    );
+  }
+
+  /// 从 WidgetRef 读取当前主题颜色（不监听变化）
+  static ThemeColors read(WidgetRef ref) {
+    final notifier = ref.read(themeProvider.notifier);
+    return ThemeColors(
+      income: notifier.incomeColor,
+      expense: notifier.expenseColor,
+      transfer: notifier.transferColor,
+      primary: notifier.primaryColor,
+    );
+  }
+}
+
+/// WidgetRef 扩展，方便获取主题颜色
+extension ThemeColorsExtension on WidgetRef {
+  /// 获取当前主题语义颜色（监听变化）
+  ThemeColors get themeColors => ThemeColors.of(this);
+
+  /// 获取收入颜色（监听变化）
+  Color get incomeColor {
+    watch(themeProvider);
+    return read(themeProvider.notifier).incomeColor;
+  }
+
+  /// 获取支出颜色（监听变化）
+  Color get expenseColor {
+    watch(themeProvider);
+    return read(themeProvider.notifier).expenseColor;
+  }
+
+  /// 获取转账颜色（监听变化）
+  Color get transferColor {
+    watch(themeProvider);
+    return read(themeProvider.notifier).transferColor;
+  }
 }
 
 class AppTheme {

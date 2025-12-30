@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/bill_reminder.dart';
-import '../services/database_service.dart';
 import 'base/crud_notifier.dart';
 
 /// 账单提醒管理 Notifier
@@ -149,6 +148,7 @@ class BillReminderNotifier extends SimpleCrudNotifier<BillReminder, String> {
     });
   }
 
+  @override
   BillReminder? getById(String id) {
     try {
       return state.firstWhere((r) => r.id == id);

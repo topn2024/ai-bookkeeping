@@ -190,16 +190,6 @@ class OAuthNotifier extends Notifier<OAuthState> {
   }
 }
 
-/// Extension to AuthNotifier to support OAuth login
-extension AuthNotifierOAuthExtension on AuthNotifier {
-  void setUserFromOAuth(User user) {
-    state = AuthState(
-      status: AuthStatus.authenticated,
-      user: user,
-    );
-  }
-}
-
 /// Provider for OAuth state
 final oauthProvider = NotifierProvider<OAuthNotifier, OAuthState>(OAuthNotifier.new);
 

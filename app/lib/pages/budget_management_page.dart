@@ -123,7 +123,7 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withValues(alpha:0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(statusIcon, color: statusColor, size: 32),
@@ -144,7 +144,7 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.1),
+                            color: statusColor.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -292,7 +292,7 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
             width: 60,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha:0.1),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
@@ -354,7 +354,7 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: budget.color.withOpacity(0.2),
+                    color: budget.color.withValues(alpha:0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(budget.icon, color: budget.color),
@@ -382,7 +382,7 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.purple.withOpacity(0.1),
+                                color: Colors.purple.withValues(alpha:0.1),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
@@ -400,7 +400,7 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.1),
+                                color: Colors.blue.withValues(alpha:0.1),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
@@ -704,7 +704,7 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
             Text('关联分类（可选）', style: theme.textTheme.bodySmall),
             const SizedBox(height: 8),
             DropdownButtonFormField<String?>(
-              value: _selectedCategoryId,
+              initialValue: _selectedCategoryId,
               decoration: const InputDecoration(
                 hintText: '全部分类',
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -720,7 +720,7 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
                     children: [
                       Icon(category.icon, size: 20, color: category.color),
                       const SizedBox(width: 8),
-                      Text(category.name),
+                      Text(category.localizedName),
                     ],
                   ),
                 )),
@@ -771,7 +771,7 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
                     height: 40,
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? _selectedColor.withOpacity(0.2)
+                          ? _selectedColor.withValues(alpha:0.2)
                           : theme.colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
                       border: isSelected

@@ -144,16 +144,16 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.insert_chart_outlined, size: 80, color: Colors.white.withOpacity(0.5)),
+          Icon(Icons.insert_chart_outlined, size: 80, color: Colors.white.withValues(alpha:0.5)),
           const SizedBox(height: 16),
           Text(
             '$_selectedYear年暂无数据',
-            style: TextStyle(fontSize: 18, color: Colors.white.withOpacity(0.7)),
+            style: TextStyle(fontSize: 18, color: Colors.white.withValues(alpha:0.7)),
           ),
           const SizedBox(height: 8),
           Text(
             '开始记账后查看年度报告',
-            style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.5)),
+            style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha:0.5)),
           ),
         ],
       ),
@@ -193,7 +193,7 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
             gradient: LinearGradient(
               colors: [
                 Theme.of(context).colorScheme.primary,
-                Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                Theme.of(context).colorScheme.primary.withValues(alpha:0.8),
               ],
             ),
           ),
@@ -547,7 +547,7 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha:0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -658,7 +658,7 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
               value: percent,
               minHeight: 4,
               backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation<Color>(color.withOpacity(0.7)),
+              valueColor: AlwaysStoppedAnimation<Color>(color.withValues(alpha:0.7)),
             ),
           ),
           const SizedBox(height: 2),
@@ -699,7 +699,7 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 5,
           ),
         ],
@@ -724,7 +724,7 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha:0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: color),
@@ -762,7 +762,7 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
             shape: BoxShape.circle,
             color: i == currentPage
                 ? Colors.white
-                : Colors.white.withOpacity(0.3),
+                : Colors.white.withValues(alpha:0.3),
           ),
         );
       }),

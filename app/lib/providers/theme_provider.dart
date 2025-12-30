@@ -147,6 +147,15 @@ class ThemeNotifier extends Notifier<ThemeState> {
   static const String _activeCustomThemeKey = 'active_custom_theme';
   static const String _memberKey = 'is_member';
 
+  /// 缓存的 SharedPreferences 实例，避免重复获取
+  SharedPreferences? _prefs;
+
+  /// 获取缓存的 SharedPreferences 实例
+  Future<SharedPreferences> get _sharedPrefs async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs!;
+  }
+
   @override
   ThemeState build() {
     _loadTheme();
@@ -154,7 +163,7 @@ class ThemeNotifier extends Notifier<ThemeState> {
   }
 
   Future<void> _loadTheme() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _sharedPrefs;
     final themeIndex = prefs.getInt(_themeKey) ?? 2; // Default to system
     final colorIndex = prefs.getInt(_colorKey) ?? 0; // Default to blue
     final isMember = prefs.getBool(_memberKey) ?? false;
@@ -193,25 +202,42 @@ class ThemeNotifier extends Notifier<ThemeState> {
     );
   }
 
-  Future<void> setThemeMode(AppThemeMode mode) async {
+  /// 设置主题模式（立即更新 UI，后台保存）
+  void setThemeMode(AppThemeMode mode) {
     state = state.copyWith(mode: mode);
-    final prefs = await SharedPreferences.getInstance();
+    // 后台保存，不阻塞 UI
+    _saveThemeMode(mode);
+  }
+
+  Future<void> _saveThemeMode(AppThemeMode mode) async {
+    final prefs = await _sharedPrefs;
     await prefs.setInt(_themeKey, mode.index);
   }
 
-  Future<void> setColorTheme(AppColorTheme colorTheme) async {
+  /// 设置颜色主题（立即更新 UI，后台保存）
+  void setColorTheme(AppColorTheme colorTheme) {
     state = state.copyWith(
       colorTheme: colorTheme,
       clearCustomTheme: colorTheme != AppColorTheme.custom,
     );
-    final prefs = await SharedPreferences.getInstance();
+    // 后台保存，不阻塞 UI
+    _saveColorTheme(colorTheme);
+  }
+
+  Future<void> _saveColorTheme(AppColorTheme colorTheme) async {
+    final prefs = await _sharedPrefs;
     await prefs.setInt(_colorKey, colorTheme.index);
   }
 
-  /// 设置会员状态
-  Future<void> setMemberStatus(bool isMember) async {
+  /// 设置会员状态（立即更新 UI，后台保存）
+  void setMemberStatus(bool isMember) {
     state = state.copyWith(isMember: isMember);
-    final prefs = await SharedPreferences.getInstance();
+    // 后台保存，不阻塞 UI
+    _saveMemberStatus(isMember);
+  }
+
+  Future<void> _saveMemberStatus(bool isMember) async {
+    final prefs = await _sharedPrefs;
     await prefs.setBool(_memberKey, isMember);
   }
 
@@ -256,7 +282,7 @@ class ThemeNotifier extends Notifier<ThemeState> {
   }
 
   /// 删除自定义主题
-  Future<void> deleteCustomTheme(String themeId) async {
+  void deleteCustomTheme(String themeId) {
     final updatedThemes = state.customThemes.where((t) => t.id != themeId).toList();
 
     // 如果删除的是当前激活的主题，切换到默认主题
@@ -266,24 +292,34 @@ class ThemeNotifier extends Notifier<ThemeState> {
         colorTheme: AppColorTheme.blue,
         clearCustomTheme: true,
       );
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_colorKey, AppColorTheme.blue.index);
-      await prefs.remove(_activeCustomThemeKey);
+      // 后台保存
+      _deleteActiveCustomTheme();
     } else {
       state = state.copyWith(customThemes: updatedThemes);
     }
 
-    await _saveCustomThemes();
+    _saveCustomThemes();
   }
 
-  /// 应用自定义主题
-  Future<void> applyCustomTheme(CustomTheme theme) async {
+  Future<void> _deleteActiveCustomTheme() async {
+    final prefs = await _sharedPrefs;
+    await prefs.setInt(_colorKey, AppColorTheme.blue.index);
+    await prefs.remove(_activeCustomThemeKey);
+  }
+
+  /// 应用自定义主题（立即更新 UI，后台保存）
+  void applyCustomTheme(CustomTheme theme) {
     state = state.copyWith(
       colorTheme: AppColorTheme.custom,
       activeCustomTheme: theme,
     );
 
-    final prefs = await SharedPreferences.getInstance();
+    // 后台保存，不阻塞 UI
+    _applyCustomThemeToPrefs(theme);
+  }
+
+  Future<void> _applyCustomThemeToPrefs(CustomTheme theme) async {
+    final prefs = await _sharedPrefs;
     await prefs.setInt(_colorKey, AppColorTheme.custom.index);
     await _saveActiveCustomTheme();
   }
@@ -303,13 +339,13 @@ class ThemeNotifier extends Notifier<ThemeState> {
   }
 
   Future<void> _saveCustomThemes() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _sharedPrefs;
     final themesJson = jsonEncode(state.customThemes.map((t) => t.toMap()).toList());
     await prefs.setString(_customThemesKey, themesJson);
   }
 
   Future<void> _saveActiveCustomTheme() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _sharedPrefs;
     if (state.activeCustomTheme != null) {
       await prefs.setString(
         _activeCustomThemeKey,
@@ -320,11 +356,11 @@ class ThemeNotifier extends Notifier<ThemeState> {
     }
   }
 
-  Future<void> toggleTheme() async {
+  void toggleTheme() {
     if (state.mode == AppThemeMode.light) {
-      await setThemeMode(AppThemeMode.dark);
+      setThemeMode(AppThemeMode.dark);
     } else {
-      await setThemeMode(AppThemeMode.light);
+      setThemeMode(AppThemeMode.light);
     }
   }
 

@@ -172,7 +172,7 @@ class ExportService {
         : DefaultCategories.incomeCategories;
 
     final category = categories.where((c) => c.id == categoryId).firstOrNull;
-    return category?.name ?? categoryId;
+    return category?.localizedName ?? categoryId;
   }
 
   String _getAccountName(String accountId) {

@@ -142,9 +142,13 @@ final categoryProvider =
     NotifierProvider<CategoryNotifier, List<Category>>(CategoryNotifier.new);
 
 final expenseCategoriesProvider = Provider<List<Category>>((ref) {
-  return ref.watch(categoryProvider.notifier).getExpenseCategories();
+  // 监听状态变化，确保UI刷新
+  ref.watch(categoryProvider);
+  return ref.read(categoryProvider.notifier).getExpenseCategories();
 });
 
 final incomeCategoriesProvider = Provider<List<Category>>((ref) {
-  return ref.watch(categoryProvider.notifier).getIncomeCategories();
+  // 监听状态变化，确保UI刷新
+  ref.watch(categoryProvider);
+  return ref.read(categoryProvider.notifier).getIncomeCategories();
 });

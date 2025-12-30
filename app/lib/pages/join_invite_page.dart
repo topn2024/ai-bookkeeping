@@ -131,7 +131,7 @@ class _JoinInvitePageState extends ConsumerState<JoinInvitePage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.1),
+                color: Colors.grey.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -279,7 +279,7 @@ class _InvitePreviewCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: invite.role.color.withOpacity(0.1),
+                color: invite.role.color.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(

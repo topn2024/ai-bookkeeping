@@ -162,7 +162,7 @@ class BillReminderPage extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -209,9 +209,9 @@ class BillReminderPage extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha:0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,7 +246,7 @@ class BillReminderPage extends ConsumerWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: reminder.color.withOpacity(0.2),
+              color: reminder.color.withValues(alpha:0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(reminder.icon, color: reminder.color, size: 20),
@@ -324,7 +324,7 @@ class BillReminderPage extends ConsumerWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: reminder.color.withOpacity(0.2),
+                  color: reminder.color.withValues(alpha:0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(reminder.icon, color: reminder.color, size: 28),
@@ -558,7 +558,7 @@ class _ReminderDetailSheet extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: reminder.color.withOpacity(0.2),
+                  color: reminder.color.withValues(alpha:0.2),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(reminder.icon, color: reminder.color, size: 32),
@@ -703,7 +703,7 @@ class _TypeSelectionSheet extends StatelessWidget {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.2),
+                        color: color.withValues(alpha:0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(icon, color: color),
@@ -842,7 +842,7 @@ class _BillReminderFormPageState extends ConsumerState<BillReminderFormPage> {
           children: [
             // Type selector
             DropdownButtonFormField<BillReminderType>(
-              value: _selectedType,
+              initialValue: _selectedType,
               decoration: const InputDecoration(
                 labelText: '账单类型',
                 prefixIcon: Icon(Icons.category),
@@ -910,7 +910,7 @@ class _BillReminderFormPageState extends ConsumerState<BillReminderFormPage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<ReminderFrequency>(
-              value: _frequency,
+              initialValue: _frequency,
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.repeat),
                 border: OutlineInputBorder(),

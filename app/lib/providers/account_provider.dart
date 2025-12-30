@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/account.dart';
 import '../models/currency.dart';
 import '../models/exchange_rate.dart';
-import '../services/database_service.dart';
 import 'base/crud_notifier.dart';
 import 'currency_provider.dart';
 
@@ -109,46 +108,54 @@ class AccountNotifier extends SimpleCrudNotifier<Account, String> {
     state = updated;
   }
 
+  /// 转账（使用事务保证原子性）
   Future<void> transfer(String fromId, String toId, double amount) async {
-    final updated = state.map((a) {
-      if (a.id == fromId) {
-        return a.copyWith(balance: a.balance - amount);
-      }
-      if (a.id == toId) {
-        return a.copyWith(balance: a.balance + amount);
-      }
+    final fromAccount = getById(fromId);
+    final toAccount = getById(toId);
+    if (fromAccount == null || toAccount == null) return;
+
+    final updatedFrom = fromAccount.copyWith(balance: fromAccount.balance - amount);
+    final updatedTo = toAccount.copyWith(balance: toAccount.balance + amount);
+
+    // 使用事务确保两个更新都成功或都失败
+    await db.runInTransaction(() async {
+      await db.updateAccount(updatedFrom);
+      await db.updateAccount(updatedTo);
+    });
+
+    state = state.map((a) {
+      if (a.id == fromId) return updatedFrom;
+      if (a.id == toId) return updatedTo;
       return a;
     }).toList();
-
-    for (final account in updated) {
-      await db.updateAccount(account);
-    }
-    state = updated;
   }
 
-  /// 跨币种转账（带汇率转换）
+  /// 跨币种转账（带汇率转换，使用事务保证原子性）
   Future<void> transferWithConversion(
     String fromId,
     String toId,
     double fromAmount,
     double exchangeRate,
   ) async {
-    final toAmount = fromAmount * exchangeRate;
+    final fromAccount = getById(fromId);
+    final toAccount = getById(toId);
+    if (fromAccount == null || toAccount == null) return;
 
-    final updated = state.map((a) {
-      if (a.id == fromId) {
-        return a.copyWith(balance: a.balance - fromAmount);
-      }
-      if (a.id == toId) {
-        return a.copyWith(balance: a.balance + toAmount);
-      }
+    final toAmount = fromAmount * exchangeRate;
+    final updatedFrom = fromAccount.copyWith(balance: fromAccount.balance - fromAmount);
+    final updatedTo = toAccount.copyWith(balance: toAccount.balance + toAmount);
+
+    // 使用事务确保两个更新都成功或都失败
+    await db.runInTransaction(() async {
+      await db.updateAccount(updatedFrom);
+      await db.updateAccount(updatedTo);
+    });
+
+    state = state.map((a) {
+      if (a.id == fromId) return updatedFrom;
+      if (a.id == toId) return updatedTo;
       return a;
     }).toList();
-
-    for (final account in updated) {
-      await db.updateAccount(account);
-    }
-    state = updated;
   }
 }
 

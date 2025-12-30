@@ -207,7 +207,7 @@ class _DebtSimulatorPageState extends ConsumerState<DebtSimulatorPage>
 
           // 节省对比
           Card(
-            color: Colors.green.withOpacity(0.1),
+            color: Colors.green.withValues(alpha:0.1),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -450,7 +450,7 @@ class _DebtSimulatorPageState extends ConsumerState<DebtSimulatorPage>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${payoffMonth}个月',
+                '$payoffMonth个月',
                 style: const TextStyle(fontWeight: FontWeight.w500),
               ),
               Text(
@@ -488,7 +488,7 @@ class _DebtSimulatorPageState extends ConsumerState<DebtSimulatorPage>
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: plan.debt.color.withOpacity(0.1),
+          color: plan.debt.color.withValues(alpha:0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(plan.debt.icon, color: plan.debt.color, size: 20),

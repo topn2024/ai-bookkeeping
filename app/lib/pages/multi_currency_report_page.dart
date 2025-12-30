@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/currency.dart';
-import '../models/exchange_rate.dart';
 import '../providers/account_provider.dart';
 import '../providers/currency_provider.dart';
 
@@ -203,7 +202,7 @@ class MultiCurrencyReportPage extends ConsumerWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: _getCurrencyColor(entry.key).withOpacity(0.1),
+                    color: _getCurrencyColor(entry.key).withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(22),
                   ),
                   child: Center(
@@ -302,7 +301,7 @@ class MultiCurrencyReportPage extends ConsumerWidget {
             children: currencyAccounts.map<Widget>((account) {
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: account.color.withOpacity(0.1),
+                  backgroundColor: account.color.withValues(alpha:0.1),
                   child: Icon(
                     account.icon,
                     color: account.color,

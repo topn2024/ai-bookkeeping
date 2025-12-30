@@ -174,7 +174,7 @@ class SavingsGoalPage extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
@@ -261,7 +261,7 @@ class SavingsGoalPage extends ConsumerWidget {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: goal.color.withOpacity(0.2),
+                      color: goal.color.withValues(alpha:0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(goal.icon, color: goal.color, size: 28),
@@ -401,7 +401,7 @@ class SavingsGoalPage extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: goal.color.withOpacity(0.1),
+                    color: goal.color.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -447,7 +447,7 @@ class SavingsGoalPage extends ConsumerWidget {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: goal.color.withOpacity(0.2),
+                      color: goal.color.withValues(alpha:0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(goal.icon, color: goal.color, size: 28),
@@ -580,8 +580,8 @@ class SavingsGoalPage extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: tracking.isOnTrack
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
+                        ? Colors.green.withValues(alpha:0.1)
+                        : Colors.orange.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -634,7 +634,7 @@ class SavingsGoalPage extends ConsumerWidget {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: goal.color.withOpacity(0.2),
+                      color: goal.color.withValues(alpha:0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(goal.icon, color: goal.color, size: 28),
@@ -770,8 +770,8 @@ class SavingsGoalPage extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: progress.isOnSchedule
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
+                        ? Colors.green.withValues(alpha:0.1)
+                        : Colors.orange.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -1046,7 +1046,7 @@ class SavingsGoalPage extends ConsumerWidget {
                               width: 40,
                               height: 40,
                               decoration: BoxDecoration(
-                                color: goal.color.withOpacity(0.2),
+                                color: goal.color.withValues(alpha:0.2),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Icon(goal.icon, color: goal.color, size: 24),
@@ -1133,7 +1133,7 @@ class _GoalDetailSheet extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: goal.color.withOpacity(0.2),
+                  color: goal.color.withValues(alpha:0.2),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(goal.icon, color: goal.color, size: 32),
@@ -1174,7 +1174,7 @@ class _GoalDetailSheet extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [goal.color, goal.color.withOpacity(0.7)],
+                colors: [goal.color, goal.color.withValues(alpha:0.7)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1347,7 +1347,7 @@ class _ExpenseGoalDetailSheet extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: goal.color.withOpacity(0.2),
+                  color: goal.color.withValues(alpha:0.2),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(goal.icon, color: goal.color, size: 32),
@@ -1373,7 +1373,7 @@ class _ExpenseGoalDetailSheet extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [goal.color, goal.color.withOpacity(0.7)],
+                  colors: [goal.color, goal.color.withValues(alpha:0.7)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -1566,7 +1566,7 @@ class _TemplateSelectionSheet extends StatelessWidget {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.2),
+                          color: color.withValues(alpha:0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(template['icon'] as IconData, color: color),
@@ -1609,7 +1609,7 @@ class _TemplateSelectionSheet extends StatelessWidget {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.2),
+                          color: color.withValues(alpha:0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(template['icon'] as IconData, color: color),
@@ -1634,7 +1634,7 @@ class _TemplateSelectionSheet extends StatelessWidget {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.2),
+                          color: color.withValues(alpha:0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(template['icon'] as IconData, color: color),
@@ -1768,7 +1768,7 @@ class _SavingsGoalFormPageState extends ConsumerState<SavingsGoalFormPage> {
           children: [
             // Goal type
             DropdownButtonFormField<SavingsGoalType>(
-              value: _selectedType,
+              initialValue: _selectedType,
               decoration: const InputDecoration(
                 labelText: '目标类型',
                 prefixIcon: Icon(Icons.category),
@@ -1870,7 +1870,7 @@ class _SavingsGoalFormPageState extends ConsumerState<SavingsGoalFormPage> {
                 const SizedBox(height: 16),
                 // 存款频率
                 DropdownButtonFormField<SavingsFrequency>(
-                  value: _recurringFrequency,
+                  initialValue: _recurringFrequency,
                   decoration: const InputDecoration(
                     labelText: '存款频率',
                     prefixIcon: Icon(Icons.repeat),
@@ -2047,7 +2047,7 @@ class _SavingsGoalFormPageState extends ConsumerState<SavingsGoalFormPage> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: isSelected ? _selectedColor.withOpacity(0.2) : Colors.white,
+                    color: isSelected ? _selectedColor.withValues(alpha:0.2) : Colors.white,
                     border: Border.all(
                       color: isSelected ? _selectedColor : Colors.grey[300]!,
                       width: isSelected ? 2 : 1,
@@ -2194,7 +2194,7 @@ class _SavingsGoalFormPageState extends ConsumerState<SavingsGoalFormPage> {
                   final category = categories[index];
                   return ListTile(
                     leading: Icon(category.icon, color: category.color),
-                    title: Text(category.name),
+                    title: Text(category.localizedName),
                     selected: _linkedCategoryId == category.id,
                     onTap: () {
                       setState(() => _linkedCategoryId = category.id);

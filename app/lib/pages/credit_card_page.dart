@@ -230,7 +230,7 @@ class CreditCardPage extends ConsumerWidget {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: card.color.withOpacity(0.2),
+                      color: card.color.withValues(alpha:0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(card.icon, color: card.color, size: 28),
@@ -390,7 +390,7 @@ class CreditCardPage extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -577,7 +577,7 @@ class _CreditCardDetailSheet extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: card.color.withOpacity(0.2),
+                  color: card.color.withValues(alpha:0.2),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(card.icon, color: card.color, size: 32),
@@ -610,7 +610,7 @@ class _CreditCardDetailSheet extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [card.color, card.color.withOpacity(0.7)],
+                colors: [card.color, card.color.withValues(alpha:0.7)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -806,7 +806,7 @@ class _CreditCardFormPageState extends ConsumerState<CreditCardFormPage> {
           children: [
             // Bank selection
             DropdownButtonFormField<String>(
-              value: _selectedBank,
+              initialValue: _selectedBank,
               decoration: const InputDecoration(
                 labelText: '发卡银行',
                 prefixIcon: Icon(Icons.account_balance),
@@ -1015,7 +1015,7 @@ class _CreditCardFormPageState extends ConsumerState<CreditCardFormPage> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: isSelected ? _selectedColor.withOpacity(0.2) : Colors.white,
+                    color: isSelected ? _selectedColor.withValues(alpha:0.2) : Colors.white,
                     border: Border.all(
                       color: isSelected ? _selectedColor : Colors.grey[300]!,
                       width: isSelected ? 2 : 1,

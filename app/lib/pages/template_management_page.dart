@@ -77,7 +77,7 @@ class TemplateManagementPage extends ConsumerWidget {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: template.color.withOpacity(0.2),
+            color: template.color.withValues(alpha:0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(template.icon, color: template.color),
@@ -327,7 +327,7 @@ class _TemplateDialogState extends ConsumerState<_TemplateDialog> {
 
             // Category
             DropdownButtonFormField<String>(
-              value: _selectedCategory,
+              initialValue: _selectedCategory,
               decoration: const InputDecoration(
                 labelText: '分类',
               ),
@@ -338,7 +338,7 @@ class _TemplateDialogState extends ConsumerState<_TemplateDialog> {
                     children: [
                       Icon(category.icon, size: 20, color: category.color),
                       const SizedBox(width: 8),
-                      Text(category.name),
+                      Text(category.localizedName),
                     ],
                   ),
                 );
@@ -351,7 +351,7 @@ class _TemplateDialogState extends ConsumerState<_TemplateDialog> {
 
             // Account
             DropdownButtonFormField<String>(
-              value: _selectedAccountId,
+              initialValue: _selectedAccountId,
               decoration: const InputDecoration(
                 labelText: '账户',
               ),
@@ -426,7 +426,7 @@ class _TemplateDialogState extends ConsumerState<_TemplateDialog> {
                     height: 40,
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? _selectedColor.withOpacity(0.2)
+                          ? _selectedColor.withValues(alpha:0.2)
                           : theme.colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
                       border: isSelected

@@ -72,6 +72,76 @@ async def parse_text(
     return result
 
 
+class AudioRecognitionResult(BaseModel):
+    """Schema for audio recognition result."""
+    transcription: Optional[str] = None
+    amount: Optional[Decimal] = None
+    category_name: Optional[str] = None
+    category_type: Optional[int] = None  # 1: expense, 2: income
+    note: Optional[str] = None
+    confidence: Optional[float] = None
+    raw_text: Optional[str] = None
+    success: bool = False
+    error: Optional[str] = None
+
+
+@router.post("/recognize-audio", response_model=AudioRecognitionResult)
+async def recognize_audio(
+    file: UploadFile = File(..., description="Audio file (mp3, wav, aac, m4a)"),
+    current_user: User = Depends(get_current_user),
+):
+    """Recognize transaction from audio using Qwen-Audio-Turbo.
+
+    This endpoint directly processes audio without pre-transcription,
+    using Qwen's audio understanding capability for better accuracy.
+
+    Supported formats: mp3, wav, aac, m4a, ogg, flac
+    """
+    # Validate file type
+    allowed_types = ["audio/mpeg", "audio/wav", "audio/aac", "audio/m4a", "audio/ogg", "audio/flac", "audio/x-wav", "audio/mp3"]
+    content_type = file.content_type or ""
+
+    # Also check by extension
+    filename = file.filename or ""
+    extension = filename.split(".")[-1].lower() if "." in filename else ""
+    allowed_extensions = ["mp3", "wav", "aac", "m4a", "ogg", "flac"]
+
+    if content_type not in allowed_types and extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported audio format. Allowed: {', '.join(allowed_extensions)}",
+        )
+
+    # Determine audio format for API
+    audio_format = extension if extension in allowed_extensions else "mp3"
+
+    # Read file content
+    content = await file.read()
+
+    # Validate file size (max 10MB)
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Audio file too large. Max size: 10MB",
+        )
+
+    # Use AI service to recognize
+    ai_service = AIService()
+    result = await ai_service.recognize_voice_audio(content, audio_format)
+
+    return AudioRecognitionResult(
+        transcription=result.get("transcription"),
+        amount=result.get("amount"),
+        category_name=result.get("category_name"),
+        category_type=result.get("category_type"),
+        note=result.get("note"),
+        confidence=result.get("confidence"),
+        raw_text=result.get("raw_text"),
+        success=result.get("success", False),
+        error=result.get("error"),
+    )
+
+
 class BillTransaction(BaseModel):
     """Schema for a single bill transaction."""
     date: Optional[str] = None

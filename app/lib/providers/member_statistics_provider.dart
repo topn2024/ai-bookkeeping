@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/member.dart';
-import '../models/transaction.dart';
 import 'member_provider.dart';
-import 'transaction_provider.dart';
 
 /// 成员消费统计数据
 class MemberSpendingStats {
@@ -193,7 +191,6 @@ class MemberStatisticsNotifier extends Notifier<MemberStatisticsState> {
     state = state.copyWith(isLoading: true);
 
     final memberState = ref.read(memberProvider);
-    final transactions = ref.read(transactionProvider);
 
     // 获取账本成员
     final members = memberState.members

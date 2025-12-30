@@ -112,7 +112,7 @@ class _CategoryManagementPageState
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: category.color.withOpacity(0.1),
+                color: category.color.withValues(alpha:0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(category.icon, color: category.color),
@@ -125,7 +125,7 @@ class _CategoryManagementPageState
                   const SizedBox(width: 4),
                 ],
                 Text(
-                  category.name,
+                  category.localizedName,
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
                 if (category.isCustom) ...[
@@ -134,7 +134,7 @@ class _CategoryManagementPageState
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
@@ -152,7 +152,7 @@ class _CategoryManagementPageState
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Colors.blue.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
@@ -343,7 +343,7 @@ class _CategoryManagementPageState
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.1),
+                          color: Colors.amber.withValues(alpha:0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Row(
@@ -415,7 +415,7 @@ class _CategoryManagementPageState
                             child: Container(
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? selectedColor.withOpacity(0.2)
+                                    ? selectedColor.withValues(alpha:0.2)
                                     : AppColors.background,
                                 borderRadius: BorderRadius.circular(8),
                                 border: isSelected
@@ -491,13 +491,13 @@ class _CategoryManagementPageState
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('确定要删除"${category.name}"吗？此操作不可恢复。'),
+              Text('确定要删除"${category.localizedName}"吗？此操作不可恢复。'),
               if (hasChildren) ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
+                    color: Colors.orange.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Row(

@@ -106,9 +106,9 @@ class RecurringTransaction {
       case RecurringFrequency.weekly:
         return '每周${_weekdayName(dayOfWeek)}';
       case RecurringFrequency.monthly:
-        return '每月${dayOfMonth}日';
+        return '每月$dayOfMonth日';
       case RecurringFrequency.yearly:
-        return '每年${monthOfYear}月${dayOfMonth}日';
+        return '每年$monthOfYear月$dayOfMonth日';
     }
   }
 

@@ -119,7 +119,7 @@ class _TagStatisticsPageState extends ConsumerState<TagStatisticsPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -165,17 +165,17 @@ class _TagStatisticsPageState extends ConsumerState<TagStatisticsPage> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(colorOpacity * 0.2),
+                    color: AppColors.primary.withValues(alpha:colorOpacity * 0.2),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: AppColors.primary.withOpacity(colorOpacity * 0.5),
+                      color: AppColors.primary.withValues(alpha:colorOpacity * 0.5),
                     ),
                   ),
                   child: Text(
                     '#${stats.tag}',
                     style: TextStyle(
                       fontSize: fontSize,
-                      color: AppColors.primary.withOpacity(colorOpacity),
+                      color: AppColors.primary.withValues(alpha:colorOpacity),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -222,7 +222,7 @@ class _TagStatisticsPageState extends ConsumerState<TagStatisticsPage> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha:0.05),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -234,7 +234,7 @@ class _TagStatisticsPageState extends ConsumerState<TagStatisticsPage> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: rankColor.withOpacity(0.1),
+                color: rankColor.withValues(alpha:0.1),
                 shape: BoxShape.circle,
               ),
               child: Center(
@@ -257,7 +257,7 @@ class _TagStatisticsPageState extends ConsumerState<TagStatisticsPage> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
+                          color: AppColors.primary.withValues(alpha:0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -344,7 +344,7 @@ class _TagStatisticsPageState extends ConsumerState<TagStatisticsPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -374,7 +374,7 @@ class _TagStatisticsPageState extends ConsumerState<TagStatisticsPage> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha:0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -475,7 +475,7 @@ class _TagStatisticsPageState extends ConsumerState<TagStatisticsPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -486,7 +486,7 @@ class _TagStatisticsPageState extends ConsumerState<TagStatisticsPage> {
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: (isExpense ? AppColors.expense : AppColors.income).withOpacity(0.1),
+            color: (isExpense ? AppColors.expense : AppColors.income).withValues(alpha:0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(
@@ -519,7 +519,7 @@ class _TagStatisticsPageState extends ConsumerState<TagStatisticsPage> {
                   margin: const EdgeInsets.only(top: 4),
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

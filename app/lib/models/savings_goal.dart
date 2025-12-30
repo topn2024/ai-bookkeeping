@@ -236,7 +236,7 @@ class SavingsGoal {
       'targetDate': targetDate?.millisecondsSinceEpoch,
       'linkedAccountId': linkedAccountId,
       'iconCode': icon.codePoint,
-      'colorValue': color.value,
+      'colorValue': color.toARGB32(),
       'isCompleted': isCompleted ? 1 : 0,
       'completedAt': completedAt?.millisecondsSinceEpoch,
       'isArchived': isArchived ? 1 : 0,

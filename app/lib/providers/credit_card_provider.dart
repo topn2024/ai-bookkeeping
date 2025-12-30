@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/credit_card.dart';
-import '../services/database_service.dart';
 import 'base/crud_notifier.dart';
 
 /// 信用卡管理 Notifier
@@ -85,6 +84,7 @@ class CreditCardNotifier extends SimpleCrudNotifier<CreditCard, String> {
   /// 总可用额度
   double get totalAvailableCredit => totalCreditLimit - totalUsedAmount;
 
+  @override
   CreditCard? getById(String id) {
     try {
       return state.firstWhere((c) => c.id == id);

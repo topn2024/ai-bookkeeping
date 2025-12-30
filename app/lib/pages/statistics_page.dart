@@ -19,6 +19,7 @@ class StatisticsPage extends ConsumerStatefulWidget {
 class _StatisticsPageState extends ConsumerState<StatisticsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late ThemeColors _themeColors;
   int _touchedIndex = -1;
   StatsPeriod _selectedPeriod = StatsPeriod.month;
   DateTime _currentDate = DateTime.now();
@@ -38,6 +39,8 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
   @override
   Widget build(BuildContext context) {
     final transactions = ref.watch(transactionProvider);
+    // 获取主题颜色（监听变化）
+    _themeColors = ref.themeColors;
 
     return Scaffold(
       appBar: AppBar(
@@ -91,7 +94,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
                   });
                 }
               },
-              selectedColor: AppColors.primary,
+              selectedColor: _themeColors.primary,
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : AppColors.textPrimary,
               ),
@@ -175,7 +178,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
     required double momChange,
     required double yoyChange,
   }) {
-    final color = isExpense ? AppColors.expense : AppColors.income;
+    final color = isExpense ? _themeColors.expense : _themeColors.income;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -185,7 +188,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -264,9 +267,9 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
     if (changePercent == 0) {
       changeColor = AppColors.textSecondary;
     } else if (isExpense) {
-      changeColor = isIncrease ? AppColors.expense : AppColors.income;
+      changeColor = isIncrease ? _themeColors.expense : _themeColors.income;
     } else {
-      changeColor = isIncrease ? AppColors.income : AppColors.expense;
+      changeColor = isIncrease ? _themeColors.income : _themeColors.expense;
     }
 
     IconData changeIcon;
@@ -530,7 +533,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -572,7 +575,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
             style: TextStyle(
               fontSize: 36,
               fontWeight: FontWeight.bold,
-              color: isExpense ? AppColors.expense : AppColors.income,
+              color: isExpense ? _themeColors.expense : _themeColors.income,
             ),
           ),
           // 快速对比指示器
@@ -619,9 +622,9 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
     if (change == 0) {
       changeColor = AppColors.textSecondary;
     } else if (isExpense) {
-      changeColor = isIncrease ? AppColors.expense : AppColors.income;
+      changeColor = isIncrease ? _themeColors.expense : _themeColors.income;
     } else {
-      changeColor = isIncrease ? AppColors.income : AppColors.expense;
+      changeColor = isIncrease ? _themeColors.income : _themeColors.expense;
     }
 
     IconData changeIcon;
@@ -668,7 +671,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -742,7 +745,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
                     barRods: [
                       BarChartRodData(
                         toY: entry.value.value,
-                        color: isExpense ? AppColors.expense : AppColors.income,
+                        color: isExpense ? _themeColors.expense : _themeColors.income,
                         width: _selectedPeriod == StatsPeriod.year ? 20 : 12,
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
                       ),
@@ -807,7 +810,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
                   t.date.isAfter(current.subtract(const Duration(days: 1))) &&
                   t.date.isBefore(weekEnd))
               .fold(0.0, (sum, t) => sum + t.amount);
-          map['第${week}周'] = weekTotal;
+          map['第$week周'] = weekTotal;
           week++;
           current = weekEnd;
         }
@@ -820,7 +823,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
               .where((t) =>
                   t.date.year == _currentDate.year && t.date.month == month)
               .fold(0.0, (sum, t) => sum + t.amount);
-          map['${month}月'] = monthTotal;
+          map['$month月'] = monthTotal;
         }
         return map;
     }
@@ -838,7 +841,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -914,7 +917,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -941,7 +944,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: (category?.color ?? Colors.grey).withOpacity(0.1),
+                  color: (category?.color ?? Colors.grey).withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -954,7 +957,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
                 children: [
                   Expanded(
                     child: Text(
-                      category?.name ?? entry.key,
+                      category?.localizedName ?? entry.key,
                       style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                   ),

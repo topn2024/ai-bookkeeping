@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'qwen_service.dart';
 
 /// AI识别结果模型
@@ -10,6 +11,7 @@ class AIRecognitionResult {
   final String? description;
   final String? type; // expense/income
   final List<ReceiptItem>? items; // 小票商品列表
+  final String? recognizedText; // 语音识别的原始文本
   final double confidence;
   final bool success;
   final String? errorMessage;
@@ -22,6 +24,7 @@ class AIRecognitionResult {
     this.description,
     this.type,
     this.items,
+    this.recognizedText,
     this.confidence = 0.0,
     this.success = true,
     this.errorMessage,
@@ -36,6 +39,7 @@ class AIRecognitionResult {
       description: qwenResult.description,
       type: qwenResult.type,
       items: qwenResult.items,
+      recognizedText: qwenResult.description, // 语音识别的原始文本
       confidence: qwenResult.confidence,
       success: qwenResult.success,
       errorMessage: qwenResult.errorMessage,
@@ -64,26 +68,90 @@ class AIRecognitionResult {
     );
   }
 
-  /// 分类映射
+  /// 分类映射 - 支持多种中文表达方式
   static String _mapCategory(String? category) {
-    if (category == null) return 'other';
-    return categoryMap[category] ?? category.toLowerCase();
+    if (category == null || category.isEmpty) return 'other';
+
+    // 先尝试精确匹配
+    final lowerCategory = category.toLowerCase().trim();
+    if (categoryMap.containsKey(category)) {
+      return categoryMap[category]!;
+    }
+
+    // 如果已经是英文ID，直接返回
+    if (validCategoryIds.contains(lowerCategory)) {
+      return lowerCategory;
+    }
+
+    // 模糊匹配 - 检查是否包含关键词
+    for (final entry in categoryKeywords.entries) {
+      for (final keyword in entry.value) {
+        if (category.contains(keyword)) {
+          return entry.key;
+        }
+      }
+    }
+
+    return 'other';
   }
 
-  /// 分类映射表
+  /// 有效的分类ID列表
+  static const Set<String> validCategoryIds = {
+    'food', 'transport', 'shopping', 'entertainment', 'housing',
+    'medical', 'education', 'other', 'salary', 'bonus', 'parttime', 'investment',
+  };
+
+  /// 分类映射表 - 精确匹配
   static const Map<String, String> categoryMap = {
+    // 支出分类
     '餐饮': 'food',
+    '食品': 'food',
+    '饮食': 'food',
+    '吃饭': 'food',
+    '美食': 'food',
     '交通': 'transport',
+    '出行': 'transport',
+    '打车': 'transport',
     '购物': 'shopping',
+    '网购': 'shopping',
     '娱乐': 'entertainment',
+    '休闲': 'entertainment',
     '住房': 'housing',
+    '房租': 'housing',
+    '居住': 'housing',
     '医疗': 'medical',
+    '健康': 'medical',
+    '看病': 'medical',
     '教育': 'education',
+    '学习': 'education',
+    '培训': 'education',
     '其他': 'other',
+    // 收入分类
     '工资': 'salary',
+    '薪水': 'salary',
+    '薪资': 'salary',
     '奖金': 'bonus',
+    '年终奖': 'bonus',
     '兼职': 'parttime',
+    '副业': 'parttime',
     '理财': 'investment',
+    '投资': 'investment',
+    '收益': 'investment',
+  };
+
+  /// 分类关键词映射 - 用于模糊匹配
+  static const Map<String, List<String>> categoryKeywords = {
+    'food': ['餐', '饭', '食', '吃', '喝', '咖啡', '奶茶', '外卖', '早餐', '午餐', '晚餐', '夜宵', '零食', '水果'],
+    'transport': ['车', '交通', '打车', '出租', '地铁', '公交', '滴滴', '加油', '停车', '高铁', '火车', '飞机', '机票'],
+    'shopping': ['购', '买', '超市', '商场', '淘宝', '京东', '网购', '衣服', '鞋'],
+    'entertainment': ['娱乐', '电影', '游戏', 'KTV', '唱歌', '旅游', '景点', '门票'],
+    'housing': ['房', '租', '水电', '物业', '装修', '家具', '家电'],
+    'medical': ['医', '药', '病', '健康', '体检', '牙'],
+    'education': ['教育', '学', '书', '课', '培训', '考试'],
+    'salary': ['工资', '薪', '月薪'],
+    'bonus': ['奖金', '奖', '年终', '提成'],
+    'parttime': ['兼职', '副业', '外快'],
+    'investment': ['理财', '投资', '收益', '利息', '分红', '股票', '基金'],
   };
 
   @override
@@ -113,10 +181,31 @@ class AIService {
     }
   }
 
-  /// 语音识别记账
+  /// 语音识别记账（文本方式）
   /// 解析语音转文本结果，使用千问模型提取交易信息
   Future<AIRecognitionResult> recognizeVoice(String transcribedText) async {
     return parseText(transcribedText);
+  }
+
+  /// 音频直接识别记账
+  /// 直接从音频数据中识别记账信息，使用千问音频模型
+  Future<AIRecognitionResult> recognizeAudio(Uint8List audioData, {String format = 'wav'}) async {
+    try {
+      final qwenResult = await _qwenService.recognizeAudio(audioData, format: format);
+      return AIRecognitionResult.fromQwenResult(qwenResult);
+    } catch (e) {
+      return AIRecognitionResult.error('音频识别失败: $e');
+    }
+  }
+
+  /// 从音频文件识别记账
+  Future<AIRecognitionResult> recognizeAudioFile(File audioFile) async {
+    try {
+      final qwenResult = await _qwenService.recognizeAudioFile(audioFile);
+      return AIRecognitionResult.fromQwenResult(qwenResult);
+    } catch (e) {
+      return AIRecognitionResult.error('音频文件识别失败: $e');
+    }
   }
 
   /// 文本解析记账

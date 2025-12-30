@@ -65,9 +65,9 @@ class BudgetAlertBanner extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha:0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,7 +103,7 @@ class BudgetAlertBanner extends ConsumerWidget {
                 ),
               IconButton(
                 icon: const Icon(Icons.close, size: 18),
-                color: color.withOpacity(0.7),
+                color: color.withValues(alpha:0.7),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: () {
@@ -123,7 +123,7 @@ class BudgetAlertBanner extends ConsumerWidget {
                   child: Text(
                     alert.message,
                     style: TextStyle(
-                      color: color.withOpacity(0.9),
+                      color: color.withValues(alpha:0.9),
                       fontSize: 13,
                     ),
                   ),
@@ -131,7 +131,7 @@ class BudgetAlertBanner extends ConsumerWidget {
                 Text(
                   '¥${alert.spent.toStringAsFixed(0)}/${alert.limit.toStringAsFixed(0)}',
                   style: TextStyle(
-                    color: color.withOpacity(0.7),
+                    color: color.withValues(alpha:0.7),
                     fontSize: 12,
                   ),
                 ),
@@ -144,7 +144,7 @@ class BudgetAlertBanner extends ConsumerWidget {
               child: Text(
                 '还有${alerts.length - 3}项...',
                 style: TextStyle(
-                  color: color.withOpacity(0.6),
+                  color: color.withValues(alpha:0.6),
                   fontSize: 12,
                 ),
               ),
@@ -284,9 +284,9 @@ class BudgetAlertIconButton extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(8),
-        border: alert.isRead ? null : Border.all(color: color.withOpacity(0.5)),
+        border: alert.isRead ? null : Border.all(color: color.withValues(alpha:0.5)),
       ),
       child: Row(
         children: [

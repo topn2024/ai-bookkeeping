@@ -238,7 +238,7 @@ class _CustomReportPageState extends ConsumerState<CustomReportPage> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+          colors: [AppColors.primary, AppColors.primary.withValues(alpha:0.8)],
         ),
         borderRadius: BorderRadius.circular(16),
       ),
@@ -304,7 +304,7 @@ class _CustomReportPageState extends ConsumerState<CustomReportPage> {
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primary.withOpacity(0.1) : null,
+                      color: isSelected ? AppColors.primary.withValues(alpha:0.1) : null,
                       border: Border.all(
                         color: isSelected ? AppColors.primary : AppColors.divider,
                       ),
@@ -362,7 +362,7 @@ class _CustomReportPageState extends ConsumerState<CustomReportPage> {
         return _buildReportItem(
           icon: category?.icon ?? Icons.help_outline,
           color: category?.color ?? Colors.grey,
-          title: category?.name ?? entry.key,
+          title: category?.localizedName ?? entry.key,
           amount: entry.value,
           percentage: percentage,
         );
@@ -511,7 +511,7 @@ class _CustomReportPageState extends ConsumerState<CustomReportPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: color, size: 20),
@@ -684,7 +684,7 @@ class _CustomReportPageState extends ConsumerState<CustomReportPage> {
                   },
                 ),
                 ...DefaultCategories.expenseCategories.take(10).map((category) => ChoiceChip(
-                  label: Text(category.name),
+                  label: Text(category.localizedName),
                   selected: _selectedCategory == category.id,
                   onSelected: (selected) {
                     if (selected) {

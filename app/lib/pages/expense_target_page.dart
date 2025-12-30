@@ -22,7 +22,6 @@ class _ExpenseTargetPageState extends ConsumerState<ExpenseTargetPage> {
     final targets = ref.watch(monthlyExpenseTargetsProvider(
       (year: _selectedYear, month: _selectedMonth),
     ));
-    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -153,7 +152,7 @@ class _ExpenseTargetPageState extends ConsumerState<ExpenseTargetPage> {
                 const SizedBox(height: 16),
                 LinearProgressIndicator(
                   value: (summary.overallPercentage / 100).clamp(0.0, 1.0),
-                  backgroundColor: theme.colorScheme.surfaceVariant,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
                   valueColor: AlwaysStoppedAnimation<Color>(summary.statusColor),
                 ),
                 const SizedBox(height: 8),
@@ -171,7 +170,7 @@ class _ExpenseTargetPageState extends ConsumerState<ExpenseTargetPage> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
+                              color: Colors.red.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -188,7 +187,7 @@ class _ExpenseTargetPageState extends ConsumerState<ExpenseTargetPage> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
+                              color: Colors.orange.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -208,7 +207,7 @@ class _ExpenseTargetPageState extends ConsumerState<ExpenseTargetPage> {
         );
       },
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 
@@ -290,7 +289,7 @@ class _ExpenseTargetPageState extends ConsumerState<ExpenseTargetPage> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: target.color.withOpacity(0.1),
+                      color: target.color.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(target.icon, color: target.color),
@@ -314,7 +313,7 @@ class _ExpenseTargetPageState extends ConsumerState<ExpenseTargetPage> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: target.statusColor.withOpacity(0.1),
+                                color: target.statusColor.withValues(alpha:0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
@@ -408,7 +407,7 @@ class _ExpenseTargetPageState extends ConsumerState<ExpenseTargetPage> {
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: (target.percentage / 100).clamp(0.0, 1.0),
-                  backgroundColor: theme.colorScheme.surfaceVariant,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
                   valueColor:
                       AlwaysStoppedAnimation<Color>(target.progressColor),
                   minHeight: 8,
@@ -548,7 +547,7 @@ class _ExpenseTargetPageState extends ConsumerState<ExpenseTargetPage> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String?>(
-                    value: selectedCategoryId,
+                    initialValue: selectedCategoryId,
                     decoration: const InputDecoration(
                       labelText: '关联分类（可选）',
                       border: OutlineInputBorder(),
@@ -697,7 +696,7 @@ class _ExpenseTargetPageState extends ConsumerState<ExpenseTargetPage> {
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
-                        color: target.color.withOpacity(0.1),
+                        color: target.color.withValues(alpha:0.1),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Icon(target.icon, color: target.color, size: 32),

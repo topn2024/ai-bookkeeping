@@ -1,4 +1,8 @@
-"""AI service for image/text recognition."""
+"""AI service for image/text recognition.
+
+Uses Qwen (通义千问) as primary AI provider for all parsing tasks.
+Zhipu (智谱) serves as fallback when Qwen is unavailable.
+"""
 import re
 import json
 import base64
@@ -13,11 +17,22 @@ logger = logging.getLogger(__name__)
 
 
 class AIService:
-    """AI service for recognizing transactions from images and text."""
+    """AI service for recognizing transactions from images and text.
+
+    Primary: Qwen (通义千问) - for image recognition, text parsing, and bill parsing
+    Fallback: Zhipu (智谱 GLM) - when Qwen API fails
+    """
 
     def __init__(self):
         self.qwen_api_key = settings.QWEN_API_KEY
         self.zhipu_api_key = settings.ZHIPU_API_KEY
+
+        # Qwen API endpoints
+        self.qwen_vl_url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
+        self.qwen_text_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+
+        # Zhipu API endpoint (fallback)
+        self.zhipu_url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 
     async def recognize_image(self, image_content: bytes) -> dict:
         """Recognize transaction from receipt/bill image using Qwen VL."""
@@ -80,8 +95,11 @@ class AIService:
             return self._empty_result()
 
     async def parse_voice_text(self, text: str) -> dict:
-        """Parse transaction from voice/text input."""
-        # Use Zhipu GLM for text understanding
+        """Parse transaction from voice/text input.
+
+        Primary: Qwen (通义千问)
+        Fallback: Zhipu (智谱) -> Simple regex parsing
+        """
         prompt = f"""请分析以下记账语音/文字，提取交易信息：
 
 "{text}"
@@ -100,34 +118,134 @@ class AIService:
     "note": "备注"
 }}"""
 
+        # Try Qwen first (primary)
+        try:
+            result = await self._call_qwen_text(prompt)
+            if result:
+                return self._parse_ai_response(result, is_voice=True)
+        except Exception as e:
+            logger.warning(f"Qwen text parsing failed: {e}")
+
+        # Fallback to Zhipu
+        try:
+            result = await self._call_zhipu_text(prompt)
+            if result:
+                return self._parse_ai_response(result, is_voice=True)
+        except Exception as e:
+            logger.warning(f"Zhipu text parsing failed: {e}")
+
+        # Final fallback to simple parsing
+        return self._simple_parse(text)
+
+    async def recognize_voice_audio(self, audio_content: bytes, audio_format: str = "mp3") -> dict:
+        """Recognize transaction from audio using Qwen-Omni-Turbo.
+
+        This method directly processes audio without pre-transcription,
+        using Qwen's multimodal understanding capability for better accuracy.
+
+        Note: qwen-audio-turbo is a preview version with limited free quota.
+        qwen-omni-turbo is recommended for production use.
+
+        Args:
+            audio_content: Raw audio bytes
+            audio_format: Audio format (mp3, wav, aac, m4a, etc.)
+
+        Returns:
+            Parsed transaction information
+        """
+        # Encode audio to base64
+        audio_base64 = base64.b64encode(audio_content).decode("utf-8")
+
+        prompt = """请分析这段语音，提取记账信息。
+
+请识别语音内容，并提取：
+1. 金额（数字）
+2. 消费类型（餐饮/交通/购物/娱乐/住房/医疗/教育/工资/奖金/兼职/理财/其他）
+3. 是支出还是收入（expense/income）
+4. 备注描述
+
+请以JSON格式返回：
+{
+    "transcription": "语音转写文本",
+    "amount": 金额数字,
+    "category": "消费类型",
+    "type": "expense或income",
+    "note": "备注"
+}"""
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                    self.qwen_vl_url,  # 使用多模态端点
                     headers={
-                        "Authorization": f"Bearer {self.zhipu_api_key}",
+                        "Authorization": f"Bearer {self.qwen_api_key}",
                         "Content-Type": "application/json",
                     },
                     json={
-                        "model": "glm-4-flash",
-                        "messages": [
-                            {"role": "user", "content": prompt}
-                        ]
+                        "model": "qwen-omni-turbo",  # 全模态模型，支持音频理解
+                        "input": {
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"audio": f"data:audio/{audio_format};base64,{audio_base64}"},
+                                        {"text": prompt}
+                                    ]
+                                }
+                            ]
+                        }
                     },
-                    timeout=30.0,
+                    timeout=60.0,
                 )
 
                 if response.status_code == 200:
                     result = response.json()
-                    text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-                    return self._parse_ai_response(text, is_voice=True)
+                    text = result.get("output", {}).get("choices", [{}])[0].get("message", {}).get("content", "")
+                    return self._parse_audio_response(text)
                 else:
-                    # Fallback to simple parsing
-                    return self._simple_parse(text)
+                    logger.error(f"Qwen Audio API error: {response.status_code} - {response.text}")
+                    return self._empty_audio_result(error=f"API error: {response.status_code}")
 
         except Exception as e:
-            logger.error(f"AI parsing error: {e}", exc_info=True)
-            return self._simple_parse(text)
+            logger.error(f"Qwen Audio recognition error: {e}", exc_info=True)
+            return self._empty_audio_result(error=str(e))
+
+    def _parse_audio_response(self, text: str) -> dict:
+        """Parse Qwen Audio response."""
+        try:
+            json_match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+
+                result = {
+                    "transcription": data.get("transcription", ""),
+                    "amount": Decimal(str(data.get("amount"))) if data.get("amount") else None,
+                    "category_name": data.get("category"),
+                    "category_type": 2 if data.get("type") == "income" else 1,
+                    "note": data.get("note"),
+                    "confidence": 0.9,
+                    "raw_text": text,
+                    "success": True,
+                }
+                return result
+        except Exception as e:
+            logger.warning(f"Audio parse error: {e}")
+
+        return self._empty_audio_result()
+
+    def _empty_audio_result(self, error: str = None) -> dict:
+        """Return empty audio result."""
+        return {
+            "transcription": None,
+            "amount": None,
+            "category_name": None,
+            "category_type": 1,
+            "note": None,
+            "confidence": None,
+            "raw_text": None,
+            "success": False,
+            "error": error,
+        }
 
     def _parse_ai_response(self, text: str, is_voice: bool = False) -> dict:
         """Parse AI response JSON."""
@@ -208,6 +326,9 @@ class AIService:
     async def parse_bill_email(self, email_content: str, email_subject: str = "", sender: str = "") -> dict:
         """Parse credit card bill from email content.
 
+        Primary: Qwen (通义千问)
+        Fallback: Zhipu (智谱)
+
         Args:
             email_content: The email body content (HTML or plain text)
             email_subject: Email subject line
@@ -221,7 +342,7 @@ class AIService:
 邮件主题: {email_subject}
 发件人: {sender}
 邮件内容:
-{email_content[:8000]}  # Limit content length
+{email_content[:8000]}
 
 请提取以下信息并以JSON格式返回：
 {{
@@ -247,34 +368,23 @@ class AIService:
 
 如果这不是账单邮件或无法解析，请返回 {{"is_bill": false, "confidence": 0}}"""
 
+        # Try Qwen first (primary)
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.zhipu_api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "glm-4-flash",
-                        "messages": [
-                            {"role": "user", "content": prompt}
-                        ]
-                    },
-                    timeout=60.0,
-                )
-
-                if response.status_code == 200:
-                    result = response.json()
-                    text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-                    return self._parse_bill_response(text)
-                else:
-                    logger.error(f"AI bill parsing failed: {response.status_code}")
-                    return self._empty_bill_result()
-
+            result = await self._call_qwen_text(prompt, timeout=60.0)
+            if result:
+                return self._parse_bill_response(result)
         except Exception as e:
-            logger.error(f"AI bill parsing error: {e}", exc_info=True)
-            return self._empty_bill_result()
+            logger.warning(f"Qwen bill parsing failed: {e}")
+
+        # Fallback to Zhipu
+        try:
+            result = await self._call_zhipu_text(prompt, timeout=60.0)
+            if result:
+                return self._parse_bill_response(result)
+        except Exception as e:
+            logger.error(f"Zhipu bill parsing failed: {e}")
+
+        return self._empty_bill_result()
 
     def _parse_bill_response(self, text: str) -> dict:
         """Parse AI response for bill parsing."""
@@ -333,3 +443,75 @@ class AIService:
             "confidence": 0,
             "raw_text": None,
         }
+
+    async def _call_qwen_text(self, prompt: str, timeout: float = 30.0) -> Optional[str]:
+        """Call Qwen text API (通义千问).
+
+        Args:
+            prompt: The prompt to send
+            timeout: Request timeout in seconds
+
+        Returns:
+            AI response text or None if failed
+        """
+        if not self.qwen_api_key:
+            return None
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                self.qwen_text_url,
+                headers={
+                    "Authorization": f"Bearer {self.qwen_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "qwen-plus",
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ]
+                },
+                timeout=timeout,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                return result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            else:
+                logger.error(f"Qwen API error: {response.status_code} - {response.text}")
+                return None
+
+    async def _call_zhipu_text(self, prompt: str, timeout: float = 30.0) -> Optional[str]:
+        """Call Zhipu text API (智谱 GLM) as fallback.
+
+        Args:
+            prompt: The prompt to send
+            timeout: Request timeout in seconds
+
+        Returns:
+            AI response text or None if failed
+        """
+        if not self.zhipu_api_key:
+            return None
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                self.zhipu_url,
+                headers={
+                    "Authorization": f"Bearer {self.zhipu_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "glm-4-flash",
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ]
+                },
+                timeout=timeout,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                return result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            else:
+                logger.error(f"Zhipu API error: {response.status_code} - {response.text}")
+                return None

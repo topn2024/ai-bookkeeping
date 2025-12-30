@@ -63,3 +63,4 @@ htmlcov/
 # Misc
 *.bak
 *.tmp
+scripts/build.env

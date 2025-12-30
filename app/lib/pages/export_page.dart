@@ -76,7 +76,7 @@ class _ExportPageState extends ConsumerState<ExportPage> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha:0.2),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -232,7 +232,7 @@ class _ExportPageState extends ConsumerState<ExportPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? chipColor.withOpacity(0.2) : AppColors.background,
+          color: isSelected ? chipColor.withValues(alpha:0.2) : AppColors.background,
           borderRadius: BorderRadius.circular(20),
           border: isSelected ? Border.all(color: chipColor, width: 2) : null,
         ),
@@ -288,7 +288,7 @@ class _ExportPageState extends ConsumerState<ExportPage> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.background,
+          color: isSelected ? AppColors.primary.withValues(alpha:0.1) : AppColors.background,
           borderRadius: BorderRadius.circular(12),
           border: isSelected ? Border.all(color: AppColors.primary, width: 2) : null,
         ),
@@ -449,9 +449,9 @@ class _ExportPageState extends ConsumerState<ExportPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.income.withOpacity(0.1),
+        color: AppColors.income.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.income.withOpacity(0.3)),
+        border: Border.all(color: AppColors.income.withValues(alpha:0.3)),
       ),
       child: Row(
         children: [
@@ -576,9 +576,11 @@ class _ExportPageState extends ConsumerState<ExportPage> {
 
   Future<void> _shareExport() async {
     if (_lastExportPath != null) {
-      await Share.shareXFiles(
-        [XFile(_lastExportPath!)],
-        subject: '账单导出',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(_lastExportPath!)],
+          subject: '账单导出',
+        ),
       );
     }
   }

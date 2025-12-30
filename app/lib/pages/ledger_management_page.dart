@@ -62,7 +62,7 @@ class LedgerManagementPage extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: ledger.color.withOpacity(0.1),
+                  color: ledger.color.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(ledger.icon, color: ledger.color, size: 28),
@@ -87,7 +87,7 @@ class LedgerManagementPage extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
+                              color: AppColors.primary.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
@@ -105,7 +105,7 @@ class LedgerManagementPage extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppColors.income.withOpacity(0.1),
+                              color: AppColors.income.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
@@ -322,7 +322,7 @@ class LedgerManagementPage extends ConsumerWidget {
                             height: 40,
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? selectedColor.withOpacity(0.2)
+                                  ? selectedColor.withValues(alpha:0.2)
                                   : AppColors.background,
                               borderRadius: BorderRadius.circular(8),
                               border: isSelected

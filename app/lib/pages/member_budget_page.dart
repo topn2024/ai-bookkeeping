@@ -101,7 +101,7 @@ class _MemberBudgetPageState extends ConsumerState<MemberBudgetPage> {
                     Text(
                       '总预算使用',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha:0.8),
                         fontSize: 12,
                       ),
                     ),
@@ -125,7 +125,7 @@ class _MemberBudgetPageState extends ConsumerState<MemberBudgetPage> {
                   children: [
                     CircularProgressIndicator(
                       value: summary.overallUsagePercent.clamp(0.0, 1.0),
-                      backgroundColor: Colors.white.withOpacity(0.3),
+                      backgroundColor: Colors.white.withValues(alpha:0.3),
                       valueColor: AlwaysStoppedAnimation(
                         summary.overallUsagePercent > 0.8 ? Colors.red : Colors.white,
                       ),
@@ -162,7 +162,7 @@ class _MemberBudgetPageState extends ConsumerState<MemberBudgetPage> {
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha:0.8),
             fontSize: 12,
           ),
         ),
@@ -261,7 +261,7 @@ class _MemberBudgetCard extends StatelessWidget {
               Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: member.role.color.withOpacity(0.2),
+                    backgroundColor: member.role.color.withValues(alpha:0.2),
                     child: Text(
                       member.userName.isNotEmpty ? member.userName[0].toUpperCase() : '?',
                       style: TextStyle(color: member.role.color),
@@ -359,7 +359,7 @@ class _MemberBudgetCard extends StatelessWidget {
                         children: [
                           CircularProgressIndicator(
                             value: progress.clamp(0.0, 1.0),
-                            backgroundColor: Colors.grey.withOpacity(0.2),
+                            backgroundColor: Colors.grey.withValues(alpha:0.2),
                             valueColor: AlwaysStoppedAnimation(
                               isOverBudget
                                   ? Colors.red
@@ -387,7 +387,7 @@ class _MemberBudgetCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: progress.clamp(0.0, 1.0),
-                    backgroundColor: Colors.grey.withOpacity(0.2),
+                    backgroundColor: Colors.grey.withValues(alpha:0.2),
                     valueColor: AlwaysStoppedAnimation(
                       isOverBudget
                           ? Colors.red
@@ -464,7 +464,7 @@ class _EditBudgetSheetState extends ConsumerState<_EditBudgetSheet> {
               Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: widget.member.role.color.withOpacity(0.2),
+                    backgroundColor: widget.member.role.color.withValues(alpha:0.2),
                     child: Text(
                       widget.member.userName.isNotEmpty
                           ? widget.member.userName[0].toUpperCase()
