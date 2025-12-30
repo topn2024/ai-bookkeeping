@@ -36,10 +36,13 @@ class UpgradeState {
 }
 
 /// 更新检查 Provider
-class UpgradeNotifier extends StateNotifier<UpgradeState> {
-  UpgradeNotifier() : super(const UpgradeState());
-
+class UpgradeNotifier extends Notifier<UpgradeState> {
   final _service = AppUpgradeService();
+
+  @override
+  UpgradeState build() {
+    return const UpgradeState();
+  }
 
   /// 检查更新
   Future<UpdateCheckResult?> checkUpdate({bool force = false}) async {
@@ -77,6 +80,4 @@ class UpgradeNotifier extends StateNotifier<UpgradeState> {
 
 /// 更新状态 Provider
 final upgradeProvider =
-    StateNotifierProvider<UpgradeNotifier, UpgradeState>((ref) {
-  return UpgradeNotifier();
-});
+    NotifierProvider<UpgradeNotifier, UpgradeState>(UpgradeNotifier.new);
