@@ -17,6 +17,7 @@ from app.api.v1.sync import router as sync_router
 from app.api.v1.files import router as files_router
 from app.api.v1.backup import router as backup_router
 from app.api.v1.config import router as config_router
+from app.api.v1.app_upgrade import router as app_upgrade_router
 
 api_router = APIRouter()
 
@@ -36,3 +37,4 @@ api_router.include_router(sync_router)
 api_router.include_router(files_router)
 api_router.include_router(backup_router)
 api_router.include_router(config_router)
+api_router.include_router(app_upgrade_router)

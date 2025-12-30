@@ -32,6 +32,9 @@ import 'custom_report_page.dart';
 import 'help_page.dart';
 import 'source_data_settings_page.dart';
 import 'backup_page.dart';
+import '../services/app_upgrade_service.dart';
+import '../widgets/app_update_dialog.dart';
+import '../providers/upgrade_provider.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -650,6 +653,14 @@ class SettingsPage extends ConsumerWidget {
           ),
           _buildDivider(),
           _buildMenuItem(
+            icon: Icons.system_update,
+            iconColor: AppColors.primary,
+            title: '检查更新',
+            subtitle: '当前版本 ${BuildInfo.displayVersion}',
+            onTap: () => _checkForUpdate(context, ref),
+          ),
+          _buildDivider(),
+          _buildMenuItem(
             icon: Icons.info_outline,
             iconColor: AppColors.textSecondary,
             title: '关于我们',
@@ -948,6 +959,38 @@ class SettingsPage extends ConsumerWidget {
       context: context,
       builder: (context) => const _LogManagementDialog(),
     );
+  }
+
+  void _checkForUpdate(BuildContext context, WidgetRef ref) async {
+    // 显示加载对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    final result = await ref.read(upgradeProvider.notifier).checkUpdate(force: true);
+
+    if (context.mounted) {
+      Navigator.pop(context); // 关闭加载对话框
+
+      if (result != null && result.hasUpdate && result.latestVersion != null) {
+        await AppUpdateDialog.show(
+          context,
+          versionInfo: result.latestVersion!,
+          isForceUpdate: result.isForceUpdate,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('当前已是最新版本'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
   }
 }
 

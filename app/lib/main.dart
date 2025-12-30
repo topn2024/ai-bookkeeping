@@ -12,6 +12,7 @@ import 'core/logger.dart';
 import 'services/cleanup_scheduler.dart';
 import 'services/app_config_service.dart';
 import 'services/http_service.dart';
+import 'services/app_upgrade_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,6 +57,19 @@ void main() async {
   } catch (e) {
     logger.warning('Failed to initialize cleanup scheduler: $e', tag: 'App');
   }
+
+  // Check for app updates (non-blocking)
+  AppUpgradeService().checkUpdate().then((result) {
+    if (result.hasUpdate) {
+      logger.info(
+        'App update available: ${result.latestVersion?.versionName ?? "unknown"}, '
+        'force=${result.isForceUpdate}',
+        tag: 'App',
+      );
+    }
+  }).catchError((e) {
+    logger.warning('Failed to check for updates: $e', tag: 'App');
+  });
 
   runApp(const ProviderScope(child: MyApp()));
 }

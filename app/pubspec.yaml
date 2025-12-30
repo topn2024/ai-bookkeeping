@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.1.14+16
+version: 1.2.1+18
 
 environment:
   sdk: ^3.10.0
@@ -70,6 +70,10 @@ dependencies:
   record: ^6.0.0  # Audio recording for Qwen Audio model
   just_audio: ^0.9.40  # Audio playback for source audio files
   http: ^1.2.2  # HTTP client for file sync
+
+  # App upgrade
+  open_filex: ^4.5.0  # Open APK files for installation
+  url_launcher: ^6.2.5  # Open URLs in browser
 
   # OAuth Third-party Login (uncomment when ready to integrate)
   # fluwx: ^4.6.6  # WeChat SDK - requires WeChat Open Platform registration

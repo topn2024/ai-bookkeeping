@@ -37,6 +37,7 @@ const SecuritySettings = () => import('@/views/settings/Security.vue')
 const AdminList = () => import('@/views/settings/Admins.vue')
 const AuditLogs = () => import('@/views/settings/Logs.vue')
 const Profile = () => import('@/views/settings/Profile.vue')
+const AppVersions = () => import('@/views/settings/AppVersions.vue')
 
 const routes: RouteRecordRaw[] = [
   {
@@ -157,6 +158,12 @@ const routes: RouteRecordRaw[] = [
         name: 'AuditLogs',
         component: AuditLogs,
         meta: { title: '审计日志', icon: 'Memo', permission: 'log:view' },
+      },
+      {
+        path: 'settings/versions',
+        name: 'AppVersions',
+        component: AppVersions,
+        meta: { title: '版本管理', icon: 'Upload', permission: 'settings:view' },
       },
       {
         path: 'profile',

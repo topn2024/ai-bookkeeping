@@ -143,6 +143,7 @@ const menuItems = computed(() => {
         { path: '/settings/security', title: '安全设置', permission: 'settings:security' },
         { path: '/settings/admins', title: '管理员', permission: 'admin:list' },
         { path: '/settings/logs', title: '审计日志', permission: 'log:view' },
+        { path: '/settings/versions', title: '版本管理', permission: 'settings:view' },
       ],
     },
   ]

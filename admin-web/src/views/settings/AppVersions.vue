@@ -1,0 +1,525 @@
+<template>
+  <div class="app-versions-page">
+    <div class="page-header">
+      <h2 class="page-title">APP版本管理</h2>
+      <el-button type="primary" @click="showCreateDialog">
+        <el-icon><Plus /></el-icon>新增版本
+      </el-button>
+    </div>
+
+    <!-- Filter Form -->
+    <div class="filter-form">
+      <el-form :model="filters" inline>
+        <el-form-item label="平台">
+          <el-select v-model="filters.platform" style="width: 120px;">
+            <el-option label="Android" value="android" />
+            <el-option label="iOS" value="ios" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="filters.status" placeholder="全部" clearable style="width: 120px;">
+            <el-option label="草稿" :value="0" />
+            <el-option label="已发布" :value="1" />
+            <el-option label="已废弃" :value="2" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="fetchVersions">
+            <el-icon><Search /></el-icon>搜索
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </div>
+
+    <!-- Version Table -->
+    <div class="table-container">
+      <el-table v-loading="loading" :data="versions" stripe>
+        <el-table-column prop="version_name" label="版本号" width="120">
+          <template #default="{ row }">
+            {{ row.version_name }}+{{ row.version_code }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="platform" label="平台" width="100">
+          <template #default="{ row }">
+            <el-tag size="small">{{ row.platform === 'android' ? 'Android' : 'iOS' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status_text" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.status)" size="small">{{ row.status_text }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="is_force_update" label="强制更新" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.is_force_update ? 'danger' : 'info'" size="small">
+              {{ row.is_force_update ? '是' : '否' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="file_size_formatted" label="文件大小" width="120" />
+        <el-table-column prop="published_at" label="发布时间" width="180">
+          <template #default="{ row }">
+            {{ row.published_at ? formatDateTime(row.published_at) : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_by" label="创建人" width="120" />
+        <el-table-column label="操作" width="280" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" text size="small" @click="showDetail(row)">详情</el-button>
+            <el-button
+              v-if="row.status === 0"
+              type="warning"
+              text
+              size="small"
+              @click="handleUploadApk(row)"
+            >
+              上传APK
+            </el-button>
+            <el-button
+              v-if="row.status === 0 && row.file_url"
+              type="success"
+              text
+              size="small"
+              @click="handlePublish(row)"
+            >
+              发布
+            </el-button>
+            <el-button
+              v-if="row.status === 1"
+              type="warning"
+              text
+              size="small"
+              @click="handleDeprecate(row)"
+            >
+              废弃
+            </el-button>
+            <el-button
+              v-if="row.status === 0"
+              type="danger"
+              text
+              size="small"
+              @click="handleDelete(row)"
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :page-sizes="[20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
+        />
+      </div>
+    </div>
+
+    <!-- Create Version Dialog -->
+    <el-dialog v-model="createDialogVisible" title="新增版本" width="600px">
+      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="120px">
+        <el-form-item label="版本号" prop="version_name">
+          <el-input v-model="createForm.version_name" placeholder="如 1.2.2" />
+        </el-form-item>
+        <el-form-item label="构建号" prop="version_code">
+          <el-input-number v-model="createForm.version_code" :min="1" />
+        </el-form-item>
+        <el-form-item label="平台" prop="platform">
+          <el-select v-model="createForm.platform">
+            <el-option label="Android" value="android" />
+            <el-option label="iOS" value="ios" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="更新说明" prop="release_notes">
+          <el-input
+            v-model="createForm.release_notes"
+            type="textarea"
+            :rows="4"
+            placeholder="支持Markdown格式"
+          />
+        </el-form-item>
+        <el-form-item label="英文更新说明">
+          <el-input
+            v-model="createForm.release_notes_en"
+            type="textarea"
+            :rows="4"
+          />
+        </el-form-item>
+        <el-form-item label="强制更新">
+          <el-switch v-model="createForm.is_force_update" />
+        </el-form-item>
+        <el-form-item label="最低支持版本">
+          <el-input
+            v-model="createForm.min_supported_version"
+            placeholder="如 1.0.0，低于此版本强制更新"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="creating" @click="handleCreate">创建</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Detail Dialog -->
+    <el-dialog v-model="detailDialogVisible" title="版本详情" width="600px">
+      <el-descriptions :column="2" border v-if="currentVersion">
+        <el-descriptions-item label="版本号">
+          {{ currentVersion.version_name }}+{{ currentVersion.version_code }}
+        </el-descriptions-item>
+        <el-descriptions-item label="平台">
+          {{ currentVersion.platform === 'android' ? 'Android' : 'iOS' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="getStatusType(currentVersion.status)" size="small">
+            {{ currentVersion.status_text }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="强制更新">
+          <el-tag :type="currentVersion.is_force_update ? 'danger' : 'info'" size="small">
+            {{ currentVersion.is_force_update ? '是' : '否' }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="文件大小">
+          {{ currentVersion.file_size_formatted }}
+        </el-descriptions-item>
+        <el-descriptions-item label="MD5">
+          {{ currentVersion.file_md5 || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="最低支持版本" :span="2">
+          {{ currentVersion.min_supported_version || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="更新说明" :span="2">
+          <pre class="release-notes">{{ currentVersion.release_notes }}</pre>
+        </el-descriptions-item>
+        <el-descriptions-item label="创建人">{{ currentVersion.created_by || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="创建时间">
+          {{ formatDateTime(currentVersion.created_at) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="发布时间" :span="2">
+          {{ currentVersion.published_at ? formatDateTime(currentVersion.published_at) : '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="下载地址" :span="2" v-if="currentVersion.file_url">
+          <el-link :href="currentVersion.file_url" target="_blank" type="primary">
+            {{ currentVersion.file_url }}
+          </el-link>
+        </el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button @click="detailDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Upload APK Dialog -->
+    <el-dialog v-model="uploadDialogVisible" title="上传APK" width="500px">
+      <el-upload
+        ref="uploadRef"
+        class="upload-apk"
+        drag
+        :auto-upload="false"
+        :limit="1"
+        accept=".apk"
+        :on-change="handleFileChange"
+        :on-exceed="handleExceed"
+      >
+        <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+        <div class="el-upload__text">
+          将APK文件拖到此处，或<em>点击上传</em>
+        </div>
+        <template #tip>
+          <div class="el-upload__tip">
+            只能上传 .apk 文件
+          </div>
+        </template>
+      </el-upload>
+      <template #footer>
+        <el-button @click="uploadDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="uploading" @click="confirmUpload">上传</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Search, UploadFilled } from '@element-plus/icons-vue'
+import type { FormInstance, UploadInstance, UploadFile } from 'element-plus'
+import dayjs from 'dayjs'
+import {
+  getAppVersions,
+  createAppVersion,
+  uploadApk,
+  publishVersion,
+  deprecateVersion,
+  deleteAppVersion,
+  type AppVersion,
+  type AppVersionCreate
+} from '@/api/appVersions'
+
+// State
+const loading = ref(false)
+const creating = ref(false)
+const uploading = ref(false)
+const versions = ref<AppVersion[]>([])
+const currentVersion = ref<AppVersion | null>(null)
+const selectedFile = ref<File | null>(null)
+const uploadVersionId = ref('')
+
+// Dialogs
+const createDialogVisible = ref(false)
+const detailDialogVisible = ref(false)
+const uploadDialogVisible = ref(false)
+
+// Refs
+const createFormRef = ref<FormInstance>()
+const uploadRef = ref<UploadInstance>()
+
+// Filters
+const filters = reactive({
+  platform: 'android',
+  status: null as number | null
+})
+
+// Pagination
+const pagination = reactive({
+  page: 1,
+  pageSize: 20,
+  total: 0
+})
+
+// Create form
+const createForm = reactive<AppVersionCreate>({
+  version_name: '',
+  version_code: 1,
+  platform: 'android',
+  release_notes: '',
+  release_notes_en: '',
+  is_force_update: false,
+  min_supported_version: ''
+})
+
+const createRules = {
+  version_name: [{ required: true, message: '请输入版本号', trigger: 'blur' }],
+  version_code: [{ required: true, message: '请输入构建号', trigger: 'blur' }],
+  platform: [{ required: true, message: '请选择平台', trigger: 'change' }],
+  release_notes: [{ required: true, message: '请输入更新说明', trigger: 'blur' }]
+}
+
+// Methods
+const fetchVersions = async () => {
+  loading.value = true
+  try {
+    const params: any = {
+      platform: filters.platform,
+      skip: (pagination.page - 1) * pagination.pageSize,
+      limit: pagination.pageSize
+    }
+    if (filters.status !== null) {
+      params.status = filters.status
+    }
+    const res = await getAppVersions(params)
+    versions.value = res.items
+    pagination.total = res.total
+  } catch (error: any) {
+    ElMessage.error(error.message || '获取版本列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+const formatDateTime = (dateStr: string) => {
+  return dayjs(dateStr).format('YYYY-MM-DD HH:mm:ss')
+}
+
+const getStatusType = (status: number) => {
+  switch (status) {
+    case 0: return 'info'
+    case 1: return 'success'
+    case 2: return 'warning'
+    default: return 'info'
+  }
+}
+
+const showCreateDialog = () => {
+  Object.assign(createForm, {
+    version_name: '',
+    version_code: 1,
+    platform: 'android',
+    release_notes: '',
+    release_notes_en: '',
+    is_force_update: false,
+    min_supported_version: ''
+  })
+  createDialogVisible.value = true
+}
+
+const handleCreate = async () => {
+  await createFormRef.value?.validate()
+  creating.value = true
+  try {
+    await createAppVersion(createForm)
+    ElMessage.success('版本创建成功')
+    createDialogVisible.value = false
+    fetchVersions()
+  } catch (error: any) {
+    ElMessage.error(error.message || '创建失败')
+  } finally {
+    creating.value = false
+  }
+}
+
+const showDetail = (row: AppVersion) => {
+  currentVersion.value = row
+  detailDialogVisible.value = true
+}
+
+const handleUploadApk = (row: AppVersion) => {
+  uploadVersionId.value = row.id
+  selectedFile.value = null
+  uploadRef.value?.clearFiles()
+  uploadDialogVisible.value = true
+}
+
+const handleFileChange = (file: UploadFile) => {
+  selectedFile.value = file.raw || null
+}
+
+const handleExceed = () => {
+  ElMessage.warning('只能上传一个APK文件')
+}
+
+const confirmUpload = async () => {
+  if (!selectedFile.value) {
+    ElMessage.warning('请选择APK文件')
+    return
+  }
+  uploading.value = true
+  try {
+    await uploadApk(uploadVersionId.value, selectedFile.value)
+    ElMessage.success('APK上传成功')
+    uploadDialogVisible.value = false
+    fetchVersions()
+  } catch (error: any) {
+    ElMessage.error(error.message || '上传失败')
+  } finally {
+    uploading.value = false
+  }
+}
+
+const handlePublish = async (row: AppVersion) => {
+  await ElMessageBox.confirm(
+    `确定要发布版本 ${row.version_name}+${row.version_code} 吗？发布后用户可以更新到此版本。`,
+    '确认发布',
+    { type: 'warning' }
+  )
+  try {
+    await publishVersion(row.id)
+    ElMessage.success('版本已发布')
+    fetchVersions()
+  } catch (error: any) {
+    ElMessage.error(error.message || '发布失败')
+  }
+}
+
+const handleDeprecate = async (row: AppVersion) => {
+  await ElMessageBox.confirm(
+    `确定要废弃版本 ${row.version_name}+${row.version_code} 吗？废弃后用户将无法更新到此版本。`,
+    '确认废弃',
+    { type: 'warning' }
+  )
+  try {
+    await deprecateVersion(row.id)
+    ElMessage.success('版本已废弃')
+    fetchVersions()
+  } catch (error: any) {
+    ElMessage.error(error.message || '废弃失败')
+  }
+}
+
+const handleDelete = async (row: AppVersion) => {
+  await ElMessageBox.confirm(
+    `确定要删除版本 ${row.version_name}+${row.version_code} 吗？此操作不可恢复。`,
+    '确认删除',
+    { type: 'error' }
+  )
+  try {
+    await deleteAppVersion(row.id)
+    ElMessage.success('版本已删除')
+    fetchVersions()
+  } catch (error: any) {
+    ElMessage.error(error.message || '删除失败')
+  }
+}
+
+const handleSizeChange = (size: number) => {
+  pagination.pageSize = size
+  fetchVersions()
+}
+
+const handlePageChange = (page: number) => {
+  pagination.page = page
+  fetchVersions()
+}
+
+onMounted(() => {
+  fetchVersions()
+})
+</script>
+
+<style scoped>
+.app-versions-page {
+  padding: 20px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.filter-form {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 4px;
+}
+
+.table-container {
+  background: #fff;
+  border-radius: 4px;
+  padding: 16px;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.release-notes {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  font-family: inherit;
+}
+
+.upload-apk {
+  width: 100%;
+}
+
+:deep(.el-upload-dragger) {
+  width: 100%;
+}
+</style>
