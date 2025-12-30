@@ -16,11 +16,23 @@ class QuickEntryPage extends ConsumerStatefulWidget {
 }
 
 class _QuickEntryPageState extends ConsumerState<QuickEntryPage> {
+  // 缓存主题颜色供回调使用
+  late ThemeColors _themeColors;
+
+  @override
+  void dispose() {
+    // 清除 SnackBar，避免返回首页后继续显示
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final templates = ref.watch(templateProvider);
     final frequentlyUsed = ref.watch(templateProvider.notifier).getFrequentlyUsed();
     final theme = Theme.of(context);
+    // 获取主题颜色（监听变化）
+    _themeColors = ref.themeColors;
 
     return Scaffold(
       appBar: AppBar(
@@ -173,8 +185,8 @@ class _QuickEntryPageState extends ConsumerState<QuickEntryPage> {
                     '¥${template.amount!.toStringAsFixed(0)}',
                     style: TextStyle(
                       color: template.type == TransactionType.income
-                          ? AppColors.income
-                          : AppColors.expense,
+                          ? _themeColors.income
+                          : _themeColors.expense,
                       fontSize: 11,
                     ),
                     maxLines: 1,
@@ -215,8 +227,8 @@ class _QuickEntryPageState extends ConsumerState<QuickEntryPage> {
                 '¥${template.amount!.toStringAsFixed(2)}',
                 style: TextStyle(
                   color: template.type == TransactionType.income
-                      ? AppColors.income
-                      : AppColors.expense,
+                      ? _themeColors.income
+                      : _themeColors.expense,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -323,10 +335,10 @@ class _QuickEntryPageState extends ConsumerState<QuickEntryPage> {
               // 使用预先捕获的 notifier 和 ID
               transactionNotifier.deleteTransaction(transactionId);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('已撤销'),
-                  backgroundColor: AppColors.transfer,
-                  duration: Duration(seconds: 2),
+                SnackBar(
+                  content: const Text('已撤销'),
+                  backgroundColor: _themeColors.transfer,
+                  duration: const Duration(seconds: 2),
                 ),
               );
             },
