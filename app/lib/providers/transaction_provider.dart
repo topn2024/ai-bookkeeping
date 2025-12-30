@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/transaction.dart';
+import '../models/account.dart';
 import '../utils/aggregations.dart';
 import '../utils/date_utils.dart';
 import '../services/duplicate_detection_service.dart';
 import 'base/crud_notifier.dart';
 import 'account_provider.dart';
+import 'credit_card_provider.dart';
 
 /// 交易管理 Notifier
 ///
@@ -61,6 +63,48 @@ class TransactionNotifier extends SimpleCrudNotifier<Transaction, String> {
     } else {
       // 正向：支出扣除余额，收入增加余额
       await accountNotifier.updateBalance(accountId, transaction.amount, isExpense);
+    }
+
+    // 同步更新信用卡额度（如果是信用卡账户）
+    await _updateCreditCardIfNeeded(transaction, isReverse: isReverse);
+  }
+
+  /// 检查并更新信用卡额度
+  /// 如果交易账户是信用卡类型，同步更新信用卡的已用额度
+  Future<void> _updateCreditCardIfNeeded(Transaction transaction, {bool isReverse = false}) async {
+    final accountNotifier = ref.read(accountProvider.notifier);
+    final creditCardNotifier = ref.read(creditCardProvider.notifier);
+    final account = accountNotifier.getAccountById(transaction.accountId);
+
+    // 检查账户是否是信用卡类型
+    if (account == null || account.type != AccountType.creditCard) {
+      return;
+    }
+
+    // 检查是否有对应的信用卡记录
+    final creditCard = creditCardNotifier.getById(transaction.accountId);
+    if (creditCard == null) {
+      return;
+    }
+
+    // 只有支出类型才影响信用卡额度
+    if (transaction.type == TransactionType.expense) {
+      if (isReverse) {
+        // 撤销：信用卡还款（减少已用额度）
+        await creditCardNotifier.makePayment(transaction.accountId, transaction.amount);
+      } else {
+        // 正向：信用卡消费（增加已用额度）
+        await creditCardNotifier.updateUsedAmount(transaction.accountId, transaction.amount);
+      }
+    } else if (transaction.type == TransactionType.income) {
+      // 收入到信用卡账户视为还款
+      if (isReverse) {
+        // 撤销还款：增加已用额度
+        await creditCardNotifier.updateUsedAmount(transaction.accountId, transaction.amount);
+      } else {
+        // 正向还款：减少已用额度
+        await creditCardNotifier.makePayment(transaction.accountId, transaction.amount);
+      }
     }
   }
 
