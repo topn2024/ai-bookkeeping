@@ -6,7 +6,9 @@ import '../providers/theme_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/locale_provider.dart';
 import '../providers/currency_provider.dart';
+import '../providers/app_info_provider.dart';
 import '../core/logger.dart';
+import '../core/build_info.dart';
 import 'account_management_page.dart';
 import 'category_management_page.dart';
 import 'ledger_management_page.dart';
@@ -27,6 +29,40 @@ import 'currency_settings_page.dart';
 import 'reimbursement_page.dart';
 import 'tag_statistics_page.dart';
 import 'custom_report_page.dart';
+import 'help_page.dart';
+
+/// 关于页面点击计数器状态
+class AboutClickState {
+  final int count;
+  final DateTime? lastClickTime;
+
+  const AboutClickState({this.count = 0, this.lastClickTime});
+
+  AboutClickState increment() {
+    final now = DateTime.now();
+    // 如果距离上次点击超过2秒，重置计数
+    if (lastClickTime != null && now.difference(lastClickTime!).inSeconds > 2) {
+      return AboutClickState(count: 1, lastClickTime: now);
+    }
+    return AboutClickState(count: count + 1, lastClickTime: now);
+  }
+}
+
+/// 关于页面点击计数器 Notifier
+class AboutClickNotifier extends Notifier<AboutClickState> {
+  @override
+  AboutClickState build() => const AboutClickState();
+
+  void increment() {
+    state = state.increment();
+  }
+
+  void reset() {
+    state = const AboutClickState();
+  }
+}
+
+final aboutClickProvider = NotifierProvider<AboutClickNotifier, AboutClickState>(AboutClickNotifier.new);
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -250,7 +286,7 @@ class SettingsPage extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.orange.withOpacity(0.3),
+            color: Colors.orange.withValues(alpha:0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -310,7 +346,7 @@ class SettingsPage extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -476,7 +512,7 @@ class SettingsPage extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -617,15 +653,21 @@ class SettingsPage extends ConsumerWidget {
             icon: Icons.help_outline,
             iconColor: AppColors.textSecondary,
             title: '帮助与反馈',
-            onTap: () => _showHelpDialog(context),
+            subtitle: '使用指南、常见问题',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const HelpPage()),
+              );
+            },
           ),
           _buildDivider(),
           _buildMenuItem(
             icon: Icons.info_outline,
             iconColor: AppColors.textSecondary,
             title: '关于我们',
-            subtitle: 'v1.0.0',
-            onTap: () => _showAboutDialog(context),
+            subtitle: ref.watch(appInfoSyncProvider).displayVersion,
+            onTap: () => _showAboutDialog(context, ref),
           ),
         ],
       ),
@@ -643,7 +685,7 @@ class SettingsPage extends ConsumerWidget {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.1),
+          color: iconColor.withValues(alpha:0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: iconColor, size: 22),
@@ -748,7 +790,7 @@ class SettingsPage extends ConsumerWidget {
                             boxShadow: isSelected
                                 ? [
                                     BoxShadow(
-                                      color: themeData.primaryColor.withOpacity(0.6),
+                                      color: themeData.primaryColor.withValues(alpha:0.6),
                                       blurRadius: 8,
                                       spreadRadius: 2,
                                     ),
@@ -864,27 +906,92 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  void _showHelpDialog(BuildContext context) {
+  void _showAboutDialog(BuildContext context, WidgetRef ref) {
+    // 更新点击计数
+    final clickNotifier = ref.read(aboutClickProvider.notifier);
+    clickNotifier.increment();
+    final currentCount = ref.read(aboutClickProvider).count;
+
+    // 检查是否显示开发者信息
+    final showDevInfo = currentCount >= 5;
+    if (showDevInfo) {
+      // 重置计数
+      clickNotifier.reset();
+    }
+
+    final appInfo = ref.read(appInfoSyncProvider);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('帮助与反馈'),
-        content: const Column(
+        title: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 28),
+            ),
+            const SizedBox(width: 12),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('AI智能记账', style: TextStyle(fontSize: 18)),
+                Text('智能财务管理助手', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
+          ],
+        ),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ListTile(
-              leading: Icon(Icons.email, color: AppColors.primary),
-              title: Text('联系邮箱'),
-              subtitle: Text('support@ai-bookkeeping.com'),
-              contentPadding: EdgeInsets.zero,
-            ),
-            ListTile(
-              leading: Icon(Icons.bug_report, color: AppColors.expense),
-              title: Text('问题反馈'),
-              subtitle: Text('如遇问题，请发邮件联系我们'),
-              contentPadding: EdgeInsets.zero,
-            ),
+            const Divider(),
+            const SizedBox(height: 8),
+            _buildAboutInfoRow('版本', appInfo.displayVersion),
+            _buildAboutInfoRow('包名', appInfo.packageName),
+            if (showDevInfo) ...[
+              const Divider(),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.developer_mode, color: Colors.amber, size: 18),
+                        SizedBox(width: 8),
+                        Text('开发者信息', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _buildDevInfoRow('编译时间', BuildInfo.buildTimeFormatted),
+                    _buildDevInfoRow('构建号', BuildInfo.buildNumber.toString()),
+                    _buildDevInfoRow('版本标识', BuildInfo.fullVersion),
+                  ],
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 16),
+              const Text(
+                'AI智能记账是一款基于人工智能的智能记账应用，帮助您轻松管理个人财务。',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '连续点击${5 - currentCount}次查看开发者信息',
+                style: const TextStyle(fontSize: 11, color: AppColors.textHint),
+              ),
+            ],
           ],
         ),
         actions: [
@@ -897,28 +1004,29 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  void _showAboutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AboutDialog(
-        applicationName: 'AI智能记账',
-        applicationVersion: 'v1.0.0',
-        applicationIcon: Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(12),
+  Widget _buildAboutInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Text('$label: ', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 13), textAlign: TextAlign.right),
           ),
-          child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 40),
-        ),
-        children: const [
-          SizedBox(height: 16),
-          Text('AI智能记账是一款基于人工智能的智能记账应用，'
-              '帮助您轻松管理个人财务。'),
-          SizedBox(height: 8),
-          Text('支持语音记账、拍照记账、智能分类等功能。',
-            style: TextStyle(color: AppColors.textSecondary)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDevInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Text('$label: ', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 12, fontFamily: 'monospace'), textAlign: TextAlign.right),
+          ),
         ],
       ),
     );
@@ -1006,9 +1114,11 @@ class _LogManagementDialogState extends State<_LogManagementDialog> {
     try {
       final file = await logger.exportLogs();
       if (file != null && mounted) {
-        await Share.shareXFiles(
-          [XFile(file.path)],
-          subject: 'AI记账日志导出',
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(file.path)],
+            subject: 'AI记账日志导出',
+          ),
         );
       }
     } catch (e) {

@@ -32,6 +32,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    // Watch oauth provider for state changes
     final oauthState = ref.watch(oauthProvider);
 
     // Listen for auth errors
@@ -383,8 +384,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Future<String?> _getOAuthAuthorizationCode(OAuthProviderType provider) async {
     // This method should be implemented with actual OAuth SDK integration
     // For now, show a dialog explaining the integration requirement
-
-    final oauthState = ref.read(oauthProvider);
 
     switch (provider) {
       case OAuthProviderType.wechat:

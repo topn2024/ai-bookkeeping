@@ -728,6 +728,11 @@ class ServerSyncStats {
   bool get hasPendingSync => pendingCount > 0 || queueCount > 0;
   bool get hasConflicts => conflictCount > 0;
 
+  // Alias getters for compatibility
+  int get pending => pendingCount;
+  int get synced => syncedCount;
+  int get queued => queueCount;
+
   factory ServerSyncStats.fromMap(Map<String, dynamic> map) {
     return ServerSyncStats(
       pendingCount: map['pending'] as int? ?? 0,
@@ -740,23 +745,26 @@ class ServerSyncStats {
 
 /// 清理配置
 class CleanupSettings {
-  final int keepMonths;
+  final int retentionDays;
   final bool autoCleanup;
   final bool cleanupAfterSync;
 
   const CleanupSettings({
-    this.keepMonths = 1,
+    this.retentionDays = 30,
     this.autoCleanup = true,
     this.cleanupAfterSync = true,
   });
 
+  /// 保留月数 (从 retentionDays 转换，向后兼容)
+  int get keepMonths => (retentionDays / 30).ceil();
+
   CleanupSettings copyWith({
-    int? keepMonths,
+    int? retentionDays,
     bool? autoCleanup,
     bool? cleanupAfterSync,
   }) {
     return CleanupSettings(
-      keepMonths: keepMonths ?? this.keepMonths,
+      retentionDays: retentionDays ?? this.retentionDays,
       autoCleanup: autoCleanup ?? this.autoCleanup,
       cleanupAfterSync: cleanupAfterSync ?? this.cleanupAfterSync,
     );
@@ -764,15 +772,20 @@ class CleanupSettings {
 
   Map<String, dynamic> toMap() {
     return {
-      'keepMonths': keepMonths,
+      'retentionDays': retentionDays,
       'autoCleanup': autoCleanup,
       'cleanupAfterSync': cleanupAfterSync,
     };
   }
 
   factory CleanupSettings.fromMap(Map<String, dynamic> map) {
+    // 兼容旧数据格式 (keepMonths)
+    int days = map['retentionDays'] as int? ?? 30;
+    if (map.containsKey('keepMonths') && !map.containsKey('retentionDays')) {
+      days = (map['keepMonths'] as int? ?? 1) * 30;
+    }
     return CleanupSettings(
-      keepMonths: map['keepMonths'] as int? ?? 1,
+      retentionDays: days,
       autoCleanup: map['autoCleanup'] as bool? ?? true,
       cleanupAfterSync: map['cleanupAfterSync'] as bool? ?? true,
     );

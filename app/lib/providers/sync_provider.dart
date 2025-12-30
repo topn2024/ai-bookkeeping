@@ -3,7 +3,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/sync.dart';
 import '../services/sync_service.dart';
-import '../services/server_sync_service.dart';
+import '../services/server_sync_service.dart' hide SyncStatus;
 import '../services/data_cleanup_service.dart';
 import '../services/offline_queue_service.dart';
 import '../services/database_service.dart';
@@ -150,10 +150,10 @@ class SyncNotifier extends Notifier<SyncState> {
       final stats = await _db.getSyncStatistics();
       state = state.copyWith(
         serverSyncStats: ServerSyncStats(
-          pending: stats['pending'] ?? 0,
-          synced: stats['synced'] ?? 0,
-          failed: stats['failed'] ?? 0,
-          queued: stats['queue'] ?? 0,
+          pendingCount: stats['pending'] ?? 0,
+          syncedCount: stats['synced'] ?? 0,
+          conflictCount: stats['failed'] ?? 0,
+          queueCount: stats['queue'] ?? 0,
         ),
       );
     } catch (e) {
@@ -301,7 +301,7 @@ class SyncNotifier extends Notifier<SyncState> {
         }
       } else {
         state = state.copyWith(
-          status: result.conflicts.isEmpty ? SyncStatus.failed : SyncStatus.hasConflicts,
+          status: result.conflicts == 0 ? SyncStatus.failed : SyncStatus.conflict,
           errorMessage: result.errorMessage,
           progress: null,
           progressMessage: null,

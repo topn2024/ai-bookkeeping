@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'database_service.dart';
-import 'server_sync_service.dart';
 
 /// Cleanup result summary
 class CleanupResult {
@@ -17,6 +16,9 @@ class CleanupResult {
     this.errorMessage,
     DateTime? cleanupTime,
   }) : cleanupTime = cleanupTime ?? DateTime.now();
+
+  /// Alias for UI compatibility
+  int get deletedCount => transactionsDeleted;
 }
 
 /// Cleanup preview showing what will be cleaned
@@ -34,6 +36,10 @@ class CleanupPreview {
   });
 
   bool get hasDataToClean => transactionsToDelete > 0;
+
+  /// Alias getters for UI compatibility
+  int get transactionCount => transactionsToDelete;
+  int get totalCount => transactionsToDelete;
 }
 
 /// Data cleanup configuration

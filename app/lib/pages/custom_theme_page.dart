@@ -23,9 +23,9 @@ class CustomThemePage extends ConsumerWidget {
           IconButton(
             icon: Icon(isMember ? Icons.star : Icons.star_border),
             tooltip: isMember ? '会员已激活' : '非会员',
-            onPressed: () async {
+            onPressed: () {
               // 开发测试用：切换会员状态
-              await ref.read(themeProvider.notifier).setMemberStatus(!isMember);
+              ref.read(themeProvider.notifier).setMemberStatus(!isMember);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -212,7 +212,7 @@ class CustomThemePage extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
-                    onPressed: () => _openThemeEditor(context, ref, activeTheme),
+                    onPressed: () => _openThemeEditor(context, ref, activeTheme!),
                     icon: const Icon(Icons.edit),
                     label: const Text('编辑'),
                   ),
@@ -272,7 +272,7 @@ class CustomThemePage extends ConsumerWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: presets.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final preset = presets[index];
           return _buildPresetThemeCard(context, ref, preset);
@@ -752,7 +752,7 @@ class _ThemeEditorPageState extends ConsumerState<ThemeEditorPage> {
 
   Future<void> _saveTheme() async {
     await ref.read(themeProvider.notifier).updateCustomTheme(_theme);
-    await ref.read(themeProvider.notifier).applyCustomTheme(_theme);
+    ref.read(themeProvider.notifier).applyCustomTheme(_theme);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('主题已保存并应用')),
