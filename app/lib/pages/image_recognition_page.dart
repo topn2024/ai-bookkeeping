@@ -29,9 +29,19 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
   AIRecognitionResult? _recognitionResult;
   bool _isProcessing = false;
   DateTime? _recognitionTimestamp;
+  // 缓存 ScaffoldMessenger 用于安全清除 SnackBar
+  ScaffoldMessengerState? _scaffoldMessenger;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+  }
 
   @override
   void dispose() {
+    // 清除 SnackBar，避免返回首页后继续显示
+    _scaffoldMessenger?.clearSnackBars();
     // 重置AI状态
     ref.read(aiBookkeepingProvider.notifier).reset();
     super.dispose();

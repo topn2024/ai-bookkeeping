@@ -40,6 +40,8 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
   bool _isReimbursable = false;  // 是否可报销
   final List<String> _tags = [];       // 标签列表
   final _tagController = TextEditingController();
+  // 缓存 ScaffoldMessenger 用于安全清除 SnackBar
+  ScaffoldMessengerState? _scaffoldMessenger;
 
   Color get _amountColor {
     switch (_type) {
@@ -87,6 +89,12 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
     _noteController.addListener(_onNoteChanged);
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+  }
+
   void _onNoteChanged() {
     final note = _noteController.text;
     if (note.isNotEmpty && _selectedCategory == null) {
@@ -110,6 +118,8 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
 
   @override
   void dispose() {
+    // 清除 SnackBar，避免返回首页后继续显示
+    _scaffoldMessenger?.clearSnackBars();
     _noteController.removeListener(_onNoteChanged);
     _tabController.dispose();
     _amountController.dispose();

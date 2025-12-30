@@ -18,11 +18,20 @@ class QuickEntryPage extends ConsumerStatefulWidget {
 class _QuickEntryPageState extends ConsumerState<QuickEntryPage> {
   // 缓存主题颜色供回调使用
   late ThemeColors _themeColors;
+  // 缓存 ScaffoldMessenger 用于安全清除 SnackBar
+  ScaffoldMessengerState? _scaffoldMessenger;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 在依赖变化时缓存 ScaffoldMessenger
+    _scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+  }
 
   @override
   void dispose() {
     // 清除 SnackBar，避免返回首页后继续显示
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    _scaffoldMessenger?.clearSnackBars();
     super.dispose();
   }
 

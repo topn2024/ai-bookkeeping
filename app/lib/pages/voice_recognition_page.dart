@@ -36,6 +36,14 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
   Duration _recordingDuration = Duration.zero;
   DateTime? _recordingStartTime;
   DateTime? _recognitionTimestamp;
+  // 缓存 ScaffoldMessenger 用于安全清除 SnackBar
+  ScaffoldMessengerState? _scaffoldMessenger;
+
+  // 可编辑字段的控制器
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  String _selectedType = 'expense';
+  String _selectedCategory = 'other';
 
   @override
   void initState() {
@@ -48,11 +56,36 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+  }
+
+  @override
   void dispose() {
+    // 清除 SnackBar，避免返回首页后继续显示
+    _scaffoldMessenger?.clearSnackBars();
     _animationController.dispose();
     _audioRecorder.dispose();
+    _amountController.dispose();
+    _descriptionController.dispose();
     ref.read(aiBookkeepingProvider.notifier).reset();
     super.dispose();
+  }
+
+  /// 将识别结果填充到编辑字段
+  void _populateFieldsFromResult(AIRecognitionResult result) {
+    _amountController.text = result.amount?.toStringAsFixed(2) ?? '';
+    _descriptionController.text = result.description ?? '';
+    _selectedType = result.type ?? 'expense';
+
+    // 确保分类在有效列表中
+    final category = result.category ?? 'other';
+    final validCategories = _selectedType == 'income'
+        ? ['salary', 'bonus', 'parttime', 'investment', 'other']
+        : ['food', 'transport', 'shopping', 'entertainment', 'housing', 'medical', 'education', 'other'];
+
+    _selectedCategory = validCategories.contains(category) ? category : 'other';
   }
 
   Future<void> _checkPermission() async {
@@ -88,7 +121,12 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
 
       setState(() {
         _isRecording = true;
+        // 清空之前的结果
         _recognitionResult = null;
+        _amountController.clear();
+        _descriptionController.clear();
+        _selectedType = 'expense';
+        _selectedCategory = 'other';
         _recordingStartTime = DateTime.now();
       });
 
@@ -156,6 +194,9 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
       setState(() {
         _recognitionResult = result;
         _isProcessing = false;
+        if (result.success) {
+          _populateFieldsFromResult(result);
+        }
       });
 
       if (!result.success) {
@@ -213,7 +254,12 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
   }
 
   Future<void> _confirmAndCreateTransaction() async {
-    if (_recognitionResult == null || !_recognitionResult!.success) return;
+    // 验证金额
+    final amount = double.tryParse(_amountController.text);
+    if (amount == null || amount <= 0) {
+      _showError('请输入有效金额');
+      return;
+    }
 
     // Generate transaction ID first
     final transactionId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -231,10 +277,10 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
       }
     }
 
-    // Prepare recognition raw data as JSON
+    // Prepare recognition raw data as JSON (保存原始识别结果和用户修改后的值)
     String? recognitionRawData;
-    if (_recognitionResult != null) {
-      final rawData = {
+    final rawData = {
+      'original': _recognitionResult != null ? {
         'type': _recognitionResult!.type,
         'amount': _recognitionResult!.amount,
         'category': _recognitionResult!.category,
@@ -242,31 +288,37 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
         'date': _recognitionResult!.date,
         'confidence': _recognitionResult!.confidence,
         'recognized_text': _recognitionResult!.recognizedText,
-        'timestamp': _recognitionTimestamp?.toIso8601String(),
-      };
-      recognitionRawData = jsonEncode(rawData);
-    }
+      } : null,
+      'edited': {
+        'type': _selectedType,
+        'amount': amount,
+        'category': _selectedCategory,
+        'description': _descriptionController.text,
+      },
+      'timestamp': _recognitionTimestamp?.toIso8601String(),
+    };
+    recognitionRawData = jsonEncode(rawData);
 
     // Calculate expiry date based on user settings
     final expiryDate = await _sourceFileService.calculateExpiryDate();
 
     // 解析识别出的日期
-    final transactionDate = _parseDate(_recognitionResult!.date);
+    final transactionDate = _parseDate(_recognitionResult?.date);
 
-    // 创建交易记录
+    // 创建交易记录 - 使用用户编辑后的值
     final transaction = Transaction(
       id: transactionId,
-      type: _recognitionResult!.type == 'income'
+      type: _selectedType == 'income'
           ? TransactionType.income
           : TransactionType.expense,
-      amount: _recognitionResult!.amount ?? 0,
-      category: _recognitionResult!.category ?? 'other',
-      note: _recognitionResult!.description,
+      amount: amount,
+      category: _selectedCategory,
+      note: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
       date: transactionDate,
       accountId: 'cash',
       // Source data fields
       source: TransactionSource.voice,
-      aiConfidence: _recognitionResult!.confidence,
+      aiConfidence: _recognitionResult?.confidence ?? 0.0,
       sourceFileLocalPath: savedAudioPath,
       sourceFileType: 'audio/wav',
       sourceFileSize: audioFileSize,
@@ -313,16 +365,17 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
         children: [
           // 语音输入区域
           Expanded(
-            flex: 2,
+            flex: _recognitionResult != null && _recognitionResult!.success ? 1 : 2,
             child: _buildVoiceInputArea(),
           ),
-          // 识别结果区域
+          // 识别结果区域（有结果时给更多空间显示表单）
           Expanded(
-            flex: 1,
+            flex: _recognitionResult != null && _recognitionResult!.success ? 2 : 1,
             child: _buildRecognitionResult(),
           ),
-          // 底部提示
-          _buildBottomHint(),
+          // 底部提示（有识别结果时隐藏）
+          if (_recognitionResult == null || !_recognitionResult!.success)
+            _buildBottomHint(),
         ],
       ),
     );
@@ -471,7 +524,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
               const Icon(Icons.error_outline, color: AppColors.expense, size: 32),
               const SizedBox(height: 8),
               Text(
-                _recognitionResult!.errorMessage ?? '解析失败',
+                _recognitionResult!.errorMessage ?? '解析失败，请重新录音',
                 style: const TextStyle(color: AppColors.expense),
               ),
             ],
@@ -480,6 +533,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
       );
     }
 
+    // 可编辑的结果表单
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -497,61 +551,67 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.check_circle, color: AppColors.income, size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                '解析成功',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.income,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: _recognitionResult!.type == 'income'
-                      ? AppColors.income.withValues(alpha: 0.1)
-                      : AppColors.expense.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _recognitionResult!.type == 'income' ? '收入' : '支出',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _recognitionResult!.type == 'income'
-                        ? AppColors.income
-                        : AppColors.expense,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 20),
+          // 可编辑表单
           Expanded(
             child: SingleChildScrollView(
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildResultItem('金额', '¥ ${_recognitionResult!.amount?.toStringAsFixed(2) ?? '未识别'}'),
-                        _buildResultItem('分类', _getCategoryName(_recognitionResult!.category)),
-                      ],
+                  // 收入/支出切换
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTypeButton('expense', '支出', AppColors.expense),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildTypeButton('income', '收入', AppColors.income),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // 金额输入
+                  TextField(
+                    controller: _amountController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    decoration: InputDecoration(
+                      labelText: '金额',
+                      prefixText: '¥ ',
+                      prefixStyle: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: _selectedType == 'income' ? AppColors.income : AppColors.expense,
+                      ),
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                   ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_recognitionResult!.description != null)
-                          _buildResultItem('备注', _recognitionResult!.description!),
-                      ],
+                  const SizedBox(height: 12),
+                  // 分类选择
+                  DropdownButtonFormField<String>(
+                    value: _selectedCategory,
+                    decoration: const InputDecoration(
+                      labelText: '分类',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
+                    items: _getCategoryItems(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _selectedCategory = value);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  // 备注输入
+                  TextField(
+                    controller: _descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: '备注',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    maxLines: 2,
                   ),
                 ],
               ),
@@ -562,24 +622,53 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
     );
   }
 
-  Widget _buildResultItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
+  Widget _buildTypeButton(String type, String label, Color color) {
+    final isSelected = _selectedType == type;
+    return GestureDetector(
+      onTap: () => setState(() {
+        _selectedType = type;
+        // 切换类型时，如果当前分类不适用，重置为 other
+        final validCategories = type == 'income'
+            ? ['salary', 'bonus', 'parttime', 'investment', 'other']
+            : ['food', 'transport', 'shopping', 'entertainment', 'housing', 'medical', 'education', 'other'];
+        if (!validCategories.contains(_selectedCategory)) {
+          _selectedCategory = 'other';
+        }
+      }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.15) : Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey[300]!,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Center(
+          child: Text(
             label,
-            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            style: TextStyle(
+              color: isSelected ? color : Colors.grey[600],
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-          ),
-        ],
+        ),
       ),
     );
+  }
+
+  List<DropdownMenuItem<String>> _getCategoryItems() {
+    final categories = _selectedType == 'income'
+        ? ['salary', 'bonus', 'parttime', 'investment', 'other']
+        : ['food', 'transport', 'shopping', 'entertainment', 'housing', 'medical', 'education', 'other'];
+
+    return categories.map((id) {
+      return DropdownMenuItem(
+        value: id,
+        child: Text(_getCategoryName(id)),
+      );
+    }).toList();
   }
 
   String _getCategoryName(String? categoryId) {
