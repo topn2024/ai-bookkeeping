@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user.dart';
 import '../services/secure_storage_service.dart';
 import '../services/http_service.dart';
+import '../core/config.dart';
 
 enum AuthStatus {
   initial,
@@ -53,6 +54,8 @@ class AuthNotifier extends Notifier<AuthState> {
     try {
       // 初始化 HTTP 服务（加载已保存的 token）
       await _http.initialize();
+      // 初始化配置（加载缓存的 API keys）
+      await appConfig.initialize();
 
       // 从安全存储加载用户数据
       final userJson = await _secureStorage.read('current_user_data');
@@ -73,6 +76,8 @@ class AuthNotifier extends Notifier<AuthState> {
                 // 更新本地缓存
                 await _secureStorage.write(
                     'current_user_data', jsonEncode(serverUser.toJson()));
+                // 刷新 API keys
+                await appConfig.fetchFromServer();
                 state = AuthState(
                   status: AuthStatus.authenticated,
                   user: serverUser,
@@ -80,7 +85,7 @@ class AuthNotifier extends Notifier<AuthState> {
                 return;
               }
             } catch (e) {
-              // 网络错误，使用本地缓存
+              // 网络错误，使用本地缓存（包括缓存的 API keys）
               state = AuthState(
                 status: AuthStatus.authenticated,
                 user: user,
@@ -141,6 +146,9 @@ class AuthNotifier extends Notifier<AuthState> {
         // 保存用户信息到本地
         await _secureStorage.write('current_user_data', jsonEncode(user.toJson()));
         await _secureStorage.saveUserId(user.id);
+
+        // 获取 API 配置
+        await appConfig.fetchFromServer();
 
         state = AuthState(
           status: AuthStatus.authenticated,
@@ -209,6 +217,9 @@ class AuthNotifier extends Notifier<AuthState> {
         await _secureStorage.write('current_user_data', jsonEncode(user.toJson()));
         await _secureStorage.saveUserId(user.id);
 
+        // 获取 API 配置
+        await appConfig.fetchFromServer();
+
         state = AuthState(
           status: AuthStatus.authenticated,
           user: user,
@@ -246,6 +257,9 @@ class AuthNotifier extends Notifier<AuthState> {
     // 清除本地用户数据
     await _secureStorage.clearOnLogout();
     await _secureStorage.delete('current_user_data');
+
+    // 清除缓存的 API 配置
+    await appConfig.clearCache();
 
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
