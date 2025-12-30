@@ -6,6 +6,8 @@ import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../widgets/budget_alert_widget.dart';
+import '../widgets/source_image_viewer.dart';
+import '../widgets/source_audio_player.dart';
 import 'quick_entry_page.dart';
 import 'image_recognition_page.dart';
 import 'voice_recognition_page.dart';
@@ -340,6 +342,7 @@ class HomePage extends ConsumerWidget {
         ],
       ),
       child: ListTile(
+        onTap: () => _showTransactionDetail(context, transaction, colors),
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
@@ -376,5 +379,297 @@ class HomePage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _showTransactionDetail(BuildContext context, Transaction transaction, ThemeColors colors) {
+    final category = DefaultCategories.findById(transaction.category);
+    final isExpense = transaction.type == TransactionType.expense;
+    final isIncome = transaction.type == TransactionType.income;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.5,
+          minChildSize: 0.3,
+          maxChildSize: 0.85,
+          expand: false,
+          builder: (context, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 标题栏
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: (category?.color ?? Colors.grey).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            category?.icon ?? Icons.help_outline,
+                            color: category?.color ?? Colors.grey,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    category?.localizedName ?? transaction.category,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  if (transaction.source != TransactionSource.manual) ...[
+                                    const SizedBox(width: 8),
+                                    _buildSourceBadge(transaction.source),
+                                  ],
+                                ],
+                              ),
+                              Text(
+                                DateFormat('yyyy年MM月dd日 HH:mm').format(transaction.date),
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '${isExpense ? '-' : (isIncome ? '+' : '')}¥${transaction.amount.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: isExpense ? colors.expense : (isIncome ? colors.income : colors.transfer),
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    // 详情信息
+                    if (transaction.note != null && transaction.note!.isNotEmpty)
+                      _buildDetailRow('备注', transaction.note!),
+                    _buildDetailRow('类型', isExpense ? '支出' : (isIncome ? '收入' : '转账')),
+                    _buildDetailRow('账户', transaction.accountId),
+                    if (transaction.aiConfidence != null)
+                      _buildDetailRow('AI置信度', '${(transaction.aiConfidence! * 100).toStringAsFixed(0)}%'),
+
+                    // Source data section
+                    if (transaction.source == TransactionSource.image &&
+                        transaction.sourceFileLocalPath != null) ...[
+                      const SizedBox(height: 20),
+                      const Divider(),
+                      const SizedBox(height: 12),
+                      const Text(
+                        '原始图片',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSourceImageSection(context, transaction),
+                    ],
+
+                    if (transaction.source == TransactionSource.voice &&
+                        transaction.sourceFileLocalPath != null) ...[
+                      const SizedBox(height: 20),
+                      const Divider(),
+                      const SizedBox(height: 12),
+                      SourceAudioPlayer(
+                        audioPath: transaction.sourceFileLocalPath!,
+                        expiresAt: transaction.sourceFileExpiresAt,
+                        fileSize: transaction.sourceFileSize,
+                      ),
+                    ],
+
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSourceBadge(TransactionSource source) {
+    String label;
+    IconData icon;
+    Color color;
+
+    switch (source) {
+      case TransactionSource.image:
+        label = '拍照';
+        icon = Icons.camera_alt;
+        color = Colors.blue;
+        break;
+      case TransactionSource.voice:
+        label = '语音';
+        icon = Icons.mic;
+        color = Colors.green;
+        break;
+      case TransactionSource.email:
+        label = '邮件';
+        icon = Icons.email;
+        color = Colors.orange;
+        break;
+      case TransactionSource.manual:
+        return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourceImageSection(BuildContext context, Transaction transaction) {
+    return Row(
+      children: [
+        SourceImageThumbnail(
+          imagePath: transaction.sourceFileLocalPath!,
+          size: 80,
+          expiresAt: transaction.sourceFileExpiresAt,
+          onTap: () {
+            Navigator.pop(context);
+            SourceImageViewer.show(
+              context,
+              imagePath: transaction.sourceFileLocalPath!,
+              expiresAt: transaction.sourceFileExpiresAt,
+              fileSize: transaction.sourceFileSize,
+            );
+          },
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (transaction.sourceFileSize != null)
+                Text(
+                  _formatFileSize(transaction.sourceFileSize!),
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              if (transaction.sourceFileExpiresAt != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  _getExpiryText(transaction.sourceFileExpiresAt!),
+                  style: TextStyle(
+                    color: transaction.isSourceFileExpired ? AppColors.expense : AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              if (!transaction.isSourceFileExpired)
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    SourceImageViewer.show(
+                      context,
+                      imagePath: transaction.sourceFileLocalPath!,
+                      expiresAt: transaction.sourceFileExpiresAt,
+                      fileSize: transaction.sourceFileSize,
+                    );
+                  },
+                  icon: const Icon(Icons.fullscreen, size: 16),
+                  label: const Text('查看大图'),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  String _getExpiryText(DateTime expiresAt) {
+    final now = DateTime.now();
+    if (expiresAt.isBefore(now)) {
+      return '已过期';
+    }
+    final diff = expiresAt.difference(now);
+    if (diff.inDays > 0) {
+      return '${diff.inDays}天后过期';
+    }
+    if (diff.inHours > 0) {
+      return '${diff.inHours}小时后过期';
+    }
+    return '即将过期';
   }
 }

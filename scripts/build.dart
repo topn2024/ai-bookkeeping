@@ -1,14 +1,21 @@
 /// 构建脚本 - 自动更新版本号和编译时间
-/// 使用方法: dart run scripts/build.dart [patch|minor|major]
+/// 使用方法: dart run scripts/build.dart [patch|minor|major] [debug|release|both]
 ///
-/// patch: 1.1.0 -> 1.1.1 (修复bug)
-/// minor: 1.1.0 -> 1.2.0 (新功能)
-/// major: 1.1.0 -> 2.0.0 (重大更新)
+/// 版本类型:
+///   patch: 1.1.0 -> 1.1.1 (修复bug)
+///   minor: 1.1.0 -> 1.2.0 (新功能)
+///   major: 1.1.0 -> 2.0.0 (重大更新)
+///
+/// 构建类型:
+///   debug: 只构建debug版本
+///   release: 只构建release版本
+///   both: 同时构建debug和release版本
 
 import 'dart:io';
 
 void main(List<String> args) async {
   final versionType = args.isNotEmpty ? args[0] : 'patch';
+  final buildType = args.length > 1 ? args[1] : 'debug';
 
   print('=== AI智能记账 构建脚本 ===\n');
 
@@ -70,6 +77,9 @@ void main(List<String> args) async {
   final buildTime = now.toIso8601String();
   final buildTimeFormatted = '${now.year}-${_pad(now.month)}-${_pad(now.day)} ${_pad(now.hour)}:${_pad(now.minute)}:${_pad(now.second)}';
 
+  // 构建类型标识
+  final buildTypeLabel = buildType == 'release' ? 'Release' : 'Debug';
+
   final buildInfoContent = '''
 /// 自动生成的构建信息 - 请勿手动修改
 /// 生成时间: $buildTimeFormatted
@@ -89,6 +99,12 @@ class BuildInfo {
 
   /// 完整版本
   static const String fullVersion = '$newVersion';
+
+  /// 构建类型 (Debug/Release)
+  static const String buildType = '$buildTypeLabel';
+
+  /// 带类型的完整版本号
+  static const String displayVersion = '$major.$minor.$patch ($buildTypeLabel)';
 }
 ''';
 
@@ -117,25 +133,75 @@ class BuildInfo {
     dartDefines.add('--dart-define=ZHIPU_API_KEY=${buildConfig['ZHIPU_API_KEY']}');
   }
 
-  final result = await Process.run(
-    'D:/flutter/bin/flutter.bat',
-    ['build', 'apk', '--debug', ...dartDefines],
-    workingDirectory: 'app',
-    runInShell: true,
-  );
+  // 根据构建类型执行构建
+  final buildTypes = buildType == 'both' ? ['debug', 'release'] : [buildType];
 
-  stdout.write(result.stdout);
-  stderr.write(result.stderr);
+  for (final type in buildTypes) {
+    // 如果是 both 模式，需要为每个类型重新生成 build_info.dart
+    if (buildType == 'both') {
+      final typeLabel = type == 'release' ? 'Release' : 'Debug';
+      final updatedBuildInfoContent = '''
+/// 自动生成的构建信息 - 请勿手动修改
+/// 生成时间: $buildTimeFormatted
 
-  if (result.exitCode == 0) {
-    print('\n=== 构建成功 ===');
-    print('APK路径: app/build/app/outputs/flutter-apk/app-debug.apk');
-    print('版本: $newVersion');
-    print('编译时间: $buildTimeFormatted');
-  } else {
-    print('\n=== 构建失败 ===');
-    exit(1);
+class BuildInfo {
+  /// 构建时间 (ISO 8601)
+  static const String buildTime = '$buildTime';
+
+  /// 构建时间 (格式化显示)
+  static const String buildTimeFormatted = '$buildTimeFormatted';
+
+  /// 版本号
+  static const String version = '$major.$minor.$patch';
+
+  /// 构建号
+  static const int buildNumber = $buildNumber;
+
+  /// 完整版本
+  static const String fullVersion = '$newVersion';
+
+  /// 构建类型 (Debug/Release)
+  static const String buildType = '$typeLabel';
+
+  /// 带类型的完整版本号
+  static const String displayVersion = '$major.$minor.$patch ($typeLabel)';
+}
+''';
+      buildInfoFile.writeAsStringSync(updatedBuildInfoContent);
+      print('✓ 已更新 build_info.dart ($typeLabel)');
+    }
+
+    print('\n=== 构建 $type 版本 ===');
+
+    final buildArgs = type == 'release'
+        ? ['build', 'apk', '--release', '--no-tree-shake-icons', ...dartDefines]
+        : ['build', 'apk', '--debug', ...dartDefines];
+
+    final result = await Process.run(
+      'D:/flutter/bin/flutter.bat',
+      buildArgs,
+      workingDirectory: 'app',
+      runInShell: true,
+    );
+
+    stdout.write(result.stdout);
+    stderr.write(result.stderr);
+
+    if (result.exitCode == 0) {
+      final apkPath = type == 'release'
+          ? 'app/build/app/outputs/flutter-apk/app-release.apk'
+          : 'app/build/app/outputs/flutter-apk/app-debug.apk';
+      print('\n=== $type 构建成功 ===');
+      print('APK路径: $apkPath');
+    } else {
+      print('\n=== $type 构建失败 ===');
+      exit(1);
+    }
   }
+
+  print('\n=== 全部构建完成 ===');
+  print('版本: $newVersion');
+  print('编译时间: $buildTimeFormatted');
 }
 
 String _pad(int n) => n.toString().padLeft(2, '0');

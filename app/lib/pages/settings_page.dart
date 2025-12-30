@@ -31,39 +31,7 @@ import 'tag_statistics_page.dart';
 import 'custom_report_page.dart';
 import 'help_page.dart';
 import 'source_data_settings_page.dart';
-
-/// 关于页面点击计数器状态
-class AboutClickState {
-  final int count;
-  final DateTime? lastClickTime;
-
-  const AboutClickState({this.count = 0, this.lastClickTime});
-
-  AboutClickState increment() {
-    final now = DateTime.now();
-    // 如果距离上次点击超过2秒，重置计数
-    if (lastClickTime != null && now.difference(lastClickTime!).inSeconds > 2) {
-      return AboutClickState(count: 1, lastClickTime: now);
-    }
-    return AboutClickState(count: count + 1, lastClickTime: now);
-  }
-}
-
-/// 关于页面点击计数器 Notifier
-class AboutClickNotifier extends Notifier<AboutClickState> {
-  @override
-  AboutClickState build() => const AboutClickState();
-
-  void increment() {
-    state = state.increment();
-  }
-
-  void reset() {
-    state = const AboutClickState();
-  }
-}
-
-final aboutClickProvider = NotifierProvider<AboutClickNotifier, AboutClickState>(AboutClickNotifier.new);
+import 'backup_page.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -525,8 +493,13 @@ class SettingsPage extends ConsumerWidget {
             icon: Icons.cloud_sync,
             iconColor: AppColors.primary,
             title: '数据备份',
-            subtitle: '上次备份: 从未',
-            onTap: () => _showBackupDialog(context),
+            subtitle: '备份到云端',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const BackupPage()),
+              );
+            },
           ),
           _buildDivider(),
           _buildMenuItem(
@@ -851,30 +824,6 @@ class SettingsPage extends ConsumerWidget {
         );
   }
 
-  void _showBackupDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('数据备份'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('备份您的数据到云端，确保数据安全。'),
-            SizedBox(height: 16),
-            Text('此功能即将上线，敬请期待！',
-              style: TextStyle(color: AppColors.textSecondary)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showNotificationSettingsDialog(BuildContext context) {
     showDialog(
@@ -927,18 +876,6 @@ class SettingsPage extends ConsumerWidget {
   }
 
   void _showAboutDialog(BuildContext context, WidgetRef ref) {
-    // 更新点击计数
-    final clickNotifier = ref.read(aboutClickProvider.notifier);
-    clickNotifier.increment();
-    final currentCount = ref.read(aboutClickProvider).count;
-
-    // 检查是否显示开发者信息
-    final showDevInfo = currentCount >= 5;
-    if (showDevInfo) {
-      // 重置计数
-      clickNotifier.reset();
-    }
-
     final appInfo = ref.read(appInfoSyncProvider);
 
     showDialog(
@@ -971,47 +908,15 @@ class SettingsPage extends ConsumerWidget {
           children: [
             const Divider(),
             const SizedBox(height: 8),
-            _buildAboutInfoRow('版本', appInfo.displayVersion),
+            _buildAboutInfoRow('版本', BuildInfo.displayVersion),
+            _buildAboutInfoRow('构建号', '${BuildInfo.buildNumber}'),
+            _buildAboutInfoRow('编译时间', BuildInfo.buildTimeFormatted),
             _buildAboutInfoRow('包名', appInfo.packageName),
-            if (showDevInfo) ...[
-              const Divider(),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.developer_mode, color: Colors.amber, size: 18),
-                        SizedBox(width: 8),
-                        Text('开发者信息', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    _buildDevInfoRow('编译时间', BuildInfo.buildTimeFormatted),
-                    _buildDevInfoRow('构建号', BuildInfo.buildNumber.toString()),
-                    _buildDevInfoRow('版本标识', BuildInfo.fullVersion),
-                  ],
-                ),
-              ),
-            ] else ...[
-              const SizedBox(height: 16),
-              const Text(
-                'AI智能记账是一款基于人工智能的智能记账应用，帮助您轻松管理个人财务。',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '连续点击${5 - currentCount}次查看开发者信息',
-                style: const TextStyle(fontSize: 11, color: AppColors.textHint),
-              ),
-            ],
+            const SizedBox(height: 16),
+            const Text(
+              'AI智能记账是一款基于人工智能的智能记账应用，帮助您轻松管理个人财务。',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
+            ),
           ],
         ),
         actions: [
@@ -1032,20 +937,6 @@ class SettingsPage extends ConsumerWidget {
           Text('$label: ', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
           Expanded(
             child: Text(value, style: const TextStyle(fontSize: 13), textAlign: TextAlign.right),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDevInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Text('$label: ', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-          Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 12, fontFamily: 'monospace'), textAlign: TextAlign.right),
           ),
         ],
       ),

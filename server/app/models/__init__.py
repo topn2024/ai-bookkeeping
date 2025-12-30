@@ -8,6 +8,7 @@ from app.models.budget import Budget
 from app.models.email_binding import EmailBinding, EmailType
 from app.models.expense_target import ExpenseTarget
 from app.models.oauth_provider import OAuthProvider, OAuthProviderType
+from app.models.backup import Backup
 
 __all__ = [
     "User",
@@ -22,4 +23,5 @@ __all__ = [
     "ExpenseTarget",
     "OAuthProvider",
     "OAuthProviderType",
+    "Backup",
 ]

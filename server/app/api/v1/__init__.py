@@ -15,6 +15,7 @@ from app.api.v1.email_bindings import router as email_bindings_router
 from app.api.v1.expense_targets import router as expense_targets_router
 from app.api.v1.sync import router as sync_router
 from app.api.v1.files import router as files_router
+from app.api.v1.backup import router as backup_router
 
 api_router = APIRouter()
 
@@ -32,3 +33,4 @@ api_router.include_router(email_bindings_router)
 api_router.include_router(expense_targets_router)
 api_router.include_router(sync_router)
 api_router.include_router(files_router)
+api_router.include_router(backup_router)

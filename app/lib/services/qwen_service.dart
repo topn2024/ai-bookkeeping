@@ -76,17 +76,44 @@ class QwenService {
                     'image': 'data:$mimeType;base64,$base64Image',
                   },
                   {
-                    'text': '''请分析这张小票/收据图片，提取以下信息并以JSON格式返回：
-1. amount: 金额（数字，单位元）
-2. merchant: 商家名称
-3. category: 消费类别（餐饮/交通/购物/娱乐/住房/医疗/教育/其他）
-4. date: 日期（格式：YYYY-MM-DD，如无法识别则返回null）
-5. items: 商品列表（数组，每项包含name和price）
-6. description: 简短描述（一句话总结这笔消费）
+                    'text': '''请仔细分析这张小票/收据图片，综合商户名称、商品明细、支付方式等信息，准确提取记账信息。
 
-只返回JSON，不要其他文字。如果无法识别某项，该字段返回null。
-示例格式：
-{"amount": 35.5, "merchant": "星巴克", "category": "餐饮", "date": "2025-01-15", "items": [{"name": "拿铁", "price": 35.5}], "description": "星巴克咖啡消费"}'''
+【分类规则 - 请严格按照以下规则分类】
+
+支出分类：
+- food(餐饮): 餐厅、外卖、咖啡店、奶茶店、快餐、便利店食品、超市食品、水果店、面包店、火锅、烧烤、小吃
+  常见商户：美团外卖、饿了么、麦当劳、肯德基、星巴克、瑞幸、喜茶、奈雪、盒马、永辉、沃尔玛（食品类）
+- transport(交通): 打车、地铁、公交、加油、停车费、过路费、高铁、火车票、机票、共享单车、网约车
+  常见商户：滴滴出行、高德打车、T3出行、中国石化、中国石油、铁路12306、航空公司、美团单车、哈啰出行
+- shopping(购物): 服装、鞋包、电子产品、日用品、化妆品、家居用品、网购商品
+  常见商户：淘宝、天猫、京东、拼多多、唯品会、优衣库、ZARA、苹果商店、小米、华为
+- entertainment(娱乐): 电影、游戏充值、KTV、景点门票、演出、健身、运动、会员订阅
+  常见商户：猫眼电影、淘票票、腾讯游戏、网易游戏、爱奇艺、腾讯视频、优酷、Keep、各景区
+- housing(住房): 房租、水费、电费、燃气费、物业费、网费、宽带、装修、家具、家电
+  常见商户：物业公司、水务公司、电力公司、燃气公司、中国移动/联通/电信、京东家电
+- medical(医疗): 挂号费、药品、体检、医疗器械、牙科、眼科
+  常见商户：医院、药店（大参林、益丰、老百姓）、美年大健康、爱康国宾
+- education(教育): 学费、培训费、书籍、文具、课程、考试费
+  常见商户：培训机构、书店、学校、网课平台
+
+收入分类：
+- salary(工资): 月薪、工资收入
+- bonus(奖金): 年终奖、绩效奖金、提成
+- parttime(兼职): 兼职收入、副业收入
+- investment(投资收益): 理财收益、股票分红、利息
+
+请返回JSON格式：
+{
+  "amount": 金额数字,
+  "merchant": "商户名称",
+  "category": "分类ID（如food/transport/shopping等）",
+  "type": "expense或income",
+  "date": "YYYY-MM-DD或null",
+  "items": [{"name": "商品名", "price": 价格}],
+  "description": "一句话描述"
+}
+
+只返回JSON，不要其他文字。'''
                   }
                 ]
               }
@@ -123,14 +150,44 @@ class QwenService {
             'messages': [
               {
                 'role': 'system',
-                'content': '''你是一个智能记账助手。用户会用自然语言描述一笔消费或收入，你需要提取关键信息。
+                'content': '''你是一个智能记账助手。根据用户描述的消费或收入，综合分析商户、商品、场景等信息，准确分类。
 
-请以JSON格式返回以下字段：
-1. amount: 金额（数字）
-2. type: 类型（expense表示支出，income表示收入）
-3. category: 分类（支出分类：餐饮/交通/购物/娱乐/住房/医疗/教育/其他；收入分类：工资/奖金/兼职/理财/其他）
-4. description: 简短描述
-5. date: 日期（如提到"今天"、"昨天"等，转换为具体日期YYYY-MM-DD格式，否则返回null）
+【分类规则 - 请严格按照以下规则分类】
+
+支出分类（使用英文ID）：
+- food: 餐饮相关（吃饭、外卖、咖啡、奶茶、水果、零食、超市买菜、便利店食品）
+- transport: 交通出行（打车、地铁、公交、加油、停车、高铁、机票、共享单车）
+- shopping: 购物消费（买衣服、日用品、电子产品、化妆品、网购）
+- entertainment: 娱乐休闲（电影、游戏、KTV、旅游、景点、健身、视频会员）
+- housing: 住房相关（房租、水电燃气、物业费、网费、家具家电）
+- medical: 医疗健康（看病、买药、体检、牙科）
+- education: 教育学习（学费、培训、买书、课程）
+- other: 其他支出（无法归类的支出）
+
+收入分类（使用英文ID）：
+- salary: 工资收入
+- bonus: 奖金（年终奖、绩效、提成）
+- parttime: 兼职副业
+- investment: 投资理财收益
+- other: 其他收入
+
+【关键词示例】
+- 打车/滴滴/出租车/高德 → transport
+- 午饭/晚饭/外卖/美团/饿了么/咖啡/奶茶 → food
+- 淘宝/京东/买了/购买 → shopping（除非是食品）
+- 电影/游戏/充值/会员 → entertainment
+- 房租/水电/物业 → housing
+- 医院/药/体检 → medical
+- 工资/薪水/到账 → salary (income)
+
+请返回JSON：
+{
+  "amount": 金额数字,
+  "type": "expense"或"income",
+  "category": "分类ID",
+  "description": "简短描述",
+  "date": "YYYY-MM-DD或null"
+}
 
 只返回JSON，不要其他文字。'''
               },
@@ -186,22 +243,45 @@ class QwenService {
                     'audio': 'data:$mimeType;base64,$base64Audio',
                   },
                   {
-                    'text': '''请仔细听这段语音，先转写成文字，然后提取记账信息。
+                    'text': '''请仔细听这段语音，准确转写并提取记账信息。
 
-步骤1: 将语音准确转写为文字
-步骤2: 从转写文字中提取金额、类型、分类
+【分类规则 - 请根据语音内容准确分类】
 
-请以JSON格式返回：
+支出分类（使用英文ID）：
+- food: 吃饭、外卖、咖啡、奶茶、水果、零食、买菜、餐厅
+- transport: 打车、滴滴、地铁、公交、加油、停车、高铁、机票
+- shopping: 买东西、购物、淘宝、京东、衣服、日用品
+- entertainment: 电影、游戏、KTV、旅游、景点、健身、会员
+- housing: 房租、水电、物业、网费、家具
+- medical: 看病、买药、体检、医院
+- education: 学费、培训、买书、课程
+- other: 其他支出
+
+收入分类（使用英文ID）：
+- salary: 工资、薪水
+- bonus: 奖金、年终奖、提成
+- parttime: 兼职、副业
+- investment: 理财、利息、分红
+- other: 其他收入
+
+【常见表达对应分类】
+- "打车花了XX" → transport
+- "吃饭/午饭/晚饭花了XX" → food
+- "买了XX东西" → shopping
+- "看电影/充游戏" → entertainment
+- "交房租/水电费" → housing
+- "发工资了" → salary (income)
+
+请返回JSON：
 {
-    "transcription": "语音转写的完整文字",
-    "amount": 金额数字（如：10、35.5），
-    "type": "expense"或"income",
-    "category": "餐饮/交通/购物/娱乐/住房/医疗/教育/工资/奖金/其他",
-    "description": "简短描述"
+  "transcription": "语音转写文字",
+  "amount": 金额数字,
+  "type": "expense"或"income",
+  "category": "分类ID",
+  "description": "简短描述"
 }
 
-重要：金额必须是数字，请准确识别语音中的金额数字。
-只返回JSON，不要其他文字。'''
+重要：金额必须是准确的数字。只返回JSON。'''
                   }
                 ]
               }
@@ -561,30 +641,51 @@ class QwenService {
 
     // 判断收入/支出
     String type = 'expense';
-    if (text.contains(RegExp(r'收入|工资|奖金|收到|进账|到账'))) {
+    if (text.contains(RegExp(r'收入|工资|奖金|收到|进账|到账|薪水|月薪|发工资'))) {
       type = 'income';
     }
 
-    // 提取分类 - 使用英文ID
+    // 提取分类 - 使用英文ID，按优先级排序（更具体的在前）
     String category = 'other';
-    final categoryPatterns = {
-      'food': RegExp(r'餐饮|吃饭|午餐|晚餐|早餐|夜宵|外卖|饭|餐|食|咖啡|奶茶|零食|水果|喝'),
-      'transport': RegExp(r'交通|打车|出租|地铁|公交|滴滴|加油|停车|高铁|火车|飞机|机票|车费|路费'),
-      'shopping': RegExp(r'购物|买|超市|商场|淘宝|京东|网购|衣服|鞋'),
-      'entertainment': RegExp(r'娱乐|电影|游戏|KTV|唱歌|旅游|景点|门票'),
-      'housing': RegExp(r'住房|房租|水电|物业|装修|家具|家电'),
-      'medical': RegExp(r'医疗|医院|药|看病|体检|牙'),
-      'education': RegExp(r'教育|学费|培训|书|课程'),
-      'salary': RegExp(r'工资|薪水|月薪|薪资'),
-      'bonus': RegExp(r'奖金|年终奖|提成|年终'),
-      'parttime': RegExp(r'兼职|副业|外快'),
-      'investment': RegExp(r'理财|投资|收益|利息|分红'),
-    };
 
-    for (final entry in categoryPatterns.entries) {
-      if (entry.value.hasMatch(text)) {
-        category = entry.key;
-        break;
+    // 收入分类优先判断
+    if (type == 'income') {
+      final incomePatterns = {
+        'salary': RegExp(r'工资|薪水|月薪|薪资|发工资'),
+        'bonus': RegExp(r'奖金|年终奖|提成|年终|绩效'),
+        'parttime': RegExp(r'兼职|副业|外快'),
+        'investment': RegExp(r'理财|投资|收益|利息|分红|股票|基金'),
+      };
+      for (final entry in incomePatterns.entries) {
+        if (entry.value.hasMatch(text)) {
+          category = entry.key;
+          break;
+        }
+      }
+    } else {
+      // 支出分类 - 按优先级排序
+      final expensePatterns = [
+        // 交通（优先级高，避免被其他分类误判）
+        MapEntry('transport', RegExp(r'打车|滴滴|出租车|高德打车|T3出行|曹操出行|地铁|公交|加油|中国石[化油]|停车|高铁|火车票|12306|机票|飞机|共享单车|哈啰|美团单车|青桔|车费|路费|过路费')),
+        // 餐饮（常见商户和关键词）
+        MapEntry('food', RegExp(r'餐饮|吃饭|午饭|晚饭|早饭|午餐|晚餐|早餐|夜宵|外卖|美团外卖|饿了么|咖啡|星巴克|瑞幸|奶茶|喜茶|奈雪|蜜雪|麦当劳|肯德基|必胜客|海底捞|火锅|烧烤|小吃|面包|蛋糕|水果|零食|超市食品|盒马|永辉|沃尔玛|便利店|全家|711|罗森')),
+        // 购物
+        MapEntry('shopping', RegExp(r'购物|淘宝|天猫|京东|拼多多|唯品会|网购|买衣服|买鞋|买包|优衣库|ZARA|HM|苹果|小米|华为|电子产品|日用品|化妆品|护肤品')),
+        // 娱乐
+        MapEntry('entertainment', RegExp(r'娱乐|电影|猫眼|淘票票|游戏|充值|腾讯游戏|网易游戏|王者|吃鸡|KTV|唱歌|旅游|景点|门票|演出|演唱会|健身|Keep|会员|爱奇艺|腾讯视频|优酷|B站|Netflix')),
+        // 住房
+        MapEntry('housing', RegExp(r'住房|房租|租金|水费|电费|燃气|物业费|网费|宽带|中国移动|中国联通|中国电信|装修|家具|家电|京东家电|苏宁')),
+        // 医疗
+        MapEntry('medical', RegExp(r'医疗|医院|挂号|药|药店|大参林|益丰|老百姓|看病|体检|美年|爱康|牙科|眼科|门诊')),
+        // 教育
+        MapEntry('education', RegExp(r'教育|学费|培训|书|课程|考试|补习|网课|学习')),
+      ];
+
+      for (final entry in expensePatterns) {
+        if (entry.value.hasMatch(text)) {
+          category = entry.key;
+          break;
+        }
       }
     }
 
