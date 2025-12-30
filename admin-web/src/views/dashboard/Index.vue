@@ -1,0 +1,465 @@
+<template>
+  <div class="dashboard">
+    <!-- Stats Cards -->
+    <div class="card-grid">
+      <el-card v-for="stat in statsCards" :key="stat.key" class="stats-card" shadow="hover">
+        <div class="stats-content">
+          <div class="stats-icon" :style="{ backgroundColor: stat.color + '20', color: stat.color }">
+            <el-icon :size="24"><component :is="stat.icon" /></el-icon>
+          </div>
+          <div class="stats-info">
+            <div class="stats-value">{{ formatNumber(stats[stat.key] || 0) }}</div>
+            <div class="stats-label">{{ stat.label }}</div>
+            <div v-if="stat.trend" class="stats-trend" :class="getTrendClass(stats[stat.trendKey])">
+              <el-icon><CaretTop v-if="stats[stat.trendKey] >= 0" /><CaretBottom v-else /></el-icon>
+              {{ Math.abs(stats[stat.trendKey] || 0).toFixed(1) }}%
+            </div>
+          </div>
+        </div>
+      </el-card>
+    </div>
+
+    <!-- Charts Row -->
+    <el-row :gutter="20" class="mb-20">
+      <el-col :span="16">
+        <el-card>
+          <template #header>
+            <div class="card-header">
+              <span>用户增长趋势</span>
+              <el-radio-group v-model="trendPeriod" size="small" @change="fetchTrends">
+                <el-radio-button label="7">7天</el-radio-button>
+                <el-radio-button label="30">30天</el-radio-button>
+                <el-radio-button label="90">90天</el-radio-button>
+              </el-radio-group>
+            </div>
+          </template>
+          <div ref="userTrendChart" class="chart-container"></div>
+        </el-card>
+      </el-col>
+      <el-col :span="8">
+        <el-card>
+          <template #header>
+            <span>交易类型分布</span>
+          </template>
+          <div ref="transactionPieChart" class="chart-container"></div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- Activity Heatmap -->
+    <el-row :gutter="20" class="mb-20">
+      <el-col :span="24">
+        <el-card>
+          <template #header>
+            <span>用户活跃热力图</span>
+          </template>
+          <div ref="heatmapChart" class="chart-container" style="height: 200px;"></div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- Recent Users & Transactions -->
+    <el-row :gutter="20">
+      <el-col :span="12">
+        <el-card>
+          <template #header>
+            <div class="card-header">
+              <span>最近注册用户</span>
+              <el-button type="primary" text @click="$router.push('/users')">查看全部</el-button>
+            </div>
+          </template>
+          <el-table :data="recentUsers" size="small" stripe>
+            <el-table-column prop="nickname" label="用户" width="150">
+              <template #default="{ row }">
+                <div class="user-cell">
+                  <el-avatar :size="32" :src="row.avatar_url">
+                    {{ row.nickname?.charAt(0) || row.phone?.slice(-4) }}
+                  </el-avatar>
+                  <span>{{ row.nickname || row.phone }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="phone" label="手机号" width="130" />
+            <el-table-column prop="created_at" label="注册时间">
+              <template #default="{ row }">
+                {{ formatDate(row.created_at) }}
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+      <el-col :span="12">
+        <el-card>
+          <template #header>
+            <div class="card-header">
+              <span>最近交易记录</span>
+              <el-button type="primary" text @click="$router.push('/data/transactions')">查看全部</el-button>
+            </div>
+          </template>
+          <el-table :data="recentTransactions" size="small" stripe>
+            <el-table-column prop="type" label="类型" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.type === 'income' ? 'success' : 'danger'" size="small">
+                  {{ row.type === 'income' ? '收入' : '支出' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="amount" label="金额" width="100">
+              <template #default="{ row }">
+                <span :class="row.type === 'income' ? 'text-success' : 'text-danger'">
+                  {{ row.type === 'income' ? '+' : '-' }}{{ formatMoney(row.amount) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="category_name" label="分类" />
+            <el-table-column prop="created_at" label="时间">
+              <template #default="{ row }">
+                {{ formatDate(row.created_at) }}
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import * as echarts from 'echarts'
+import * as dashboardApi from '@/api/dashboard'
+import { formatNumber, formatMoney, formatShortDate } from '@/utils'
+import type { DashboardStats } from '@/types'
+
+// Refs
+const userTrendChart = ref<HTMLElement>()
+const transactionPieChart = ref<HTMLElement>()
+const heatmapChart = ref<HTMLElement>()
+
+// State
+const stats = reactive<DashboardStats>({} as DashboardStats)
+const trendPeriod = ref('7')
+const recentUsers = ref<any[]>([])
+const recentTransactions = ref<any[]>([])
+
+// Chart instances
+let userTrendChartInstance: echarts.ECharts | null = null
+let transactionPieChartInstance: echarts.ECharts | null = null
+let heatmapChartInstance: echarts.ECharts | null = null
+
+// Stats cards config
+const statsCards = [
+  { key: 'total_users', label: '总用户数', icon: 'User', color: '#1890ff', trend: true, trendKey: 'user_growth_rate' },
+  { key: 'active_users', label: '活跃用户', icon: 'UserFilled', color: '#52c41a', trend: true, trendKey: 'active_growth_rate' },
+  { key: 'total_transactions', label: '总交易数', icon: 'Tickets', color: '#722ed1', trend: false },
+  { key: 'today_transactions', label: '今日交易', icon: 'Timer', color: '#fa8c16', trend: false },
+]
+
+// Formatters - use shared utilities
+const formatDate = formatShortDate
+
+const getTrendClass = (value: number) => {
+  return value >= 0 ? 'up' : 'down'
+}
+
+// Fetch data
+const fetchStats = async () => {
+  try {
+    const data = await dashboardApi.getDashboardStats()
+    Object.assign(stats, data)
+  } catch (e) {
+    console.error('Failed to fetch stats:', e)
+  }
+}
+
+const fetchTrends = async () => {
+  try {
+    const data = await dashboardApi.getUserTrend(Number(trendPeriod.value))
+    renderUserTrendChart(data)
+  } catch (e) {
+    console.error('Failed to fetch trends:', e)
+  }
+}
+
+const fetchRecentData = async () => {
+  try {
+    const data = await dashboardApi.getRecentActivity()
+    recentUsers.value = data.recent_users || []
+    recentTransactions.value = data.recent_transactions || []
+  } catch (e) {
+    console.error('Failed to fetch recent data:', e)
+  }
+}
+
+const fetchHeatmap = async () => {
+  try {
+    const data = await dashboardApi.getActivityHeatmap()
+    renderHeatmapChart(data)
+  } catch (e) {
+    console.error('Failed to fetch heatmap:', e)
+  }
+}
+
+// Render charts
+const renderUserTrendChart = (data: any) => {
+  if (!userTrendChart.value) return
+
+  if (!userTrendChartInstance) {
+    userTrendChartInstance = echarts.init(userTrendChart.value)
+  }
+
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+    },
+    legend: {
+      data: ['新增用户', '活跃用户'],
+      bottom: 0,
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '15%',
+      top: '10%',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: data.dates || [],
+    },
+    yAxis: {
+      type: 'value',
+    },
+    series: [
+      {
+        name: '新增用户',
+        type: 'line',
+        smooth: true,
+        areaStyle: { opacity: 0.3 },
+        data: data.new_users || [],
+        itemStyle: { color: '#1890ff' },
+      },
+      {
+        name: '活跃用户',
+        type: 'line',
+        smooth: true,
+        areaStyle: { opacity: 0.3 },
+        data: data.active_users || [],
+        itemStyle: { color: '#52c41a' },
+      },
+    ],
+  }
+
+  userTrendChartInstance.setOption(option)
+}
+
+const renderTransactionPieChart = () => {
+  if (!transactionPieChart.value) return
+
+  if (!transactionPieChartInstance) {
+    transactionPieChartInstance = echarts.init(transactionPieChart.value)
+  }
+
+  const option = {
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: {c} ({d}%)',
+    },
+    legend: {
+      orient: 'vertical',
+      right: 10,
+      top: 'center',
+    },
+    series: [
+      {
+        type: 'pie',
+        radius: ['40%', '70%'],
+        center: ['40%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 10,
+          borderColor: '#fff',
+          borderWidth: 2,
+        },
+        label: {
+          show: false,
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 14,
+            fontWeight: 'bold',
+          },
+        },
+        data: [
+          { value: stats.income_count || 0, name: '收入', itemStyle: { color: '#52c41a' } },
+          { value: stats.expense_count || 0, name: '支出', itemStyle: { color: '#ff4d4f' } },
+        ],
+      },
+    ],
+  }
+
+  transactionPieChartInstance.setOption(option)
+}
+
+const renderHeatmapChart = (data: any) => {
+  if (!heatmapChart.value) return
+
+  if (!heatmapChartInstance) {
+    heatmapChartInstance = echarts.init(heatmapChart.value)
+  }
+
+  const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`)
+  const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
+  const option = {
+    tooltip: {
+      position: 'top',
+      formatter: (params: any) => {
+        return `${days[params.value[1]]} ${hours[params.value[0]]}<br/>活跃度: ${params.value[2]}`
+      },
+    },
+    grid: {
+      height: '70%',
+      top: '10%',
+      left: '10%',
+      right: '10%',
+    },
+    xAxis: {
+      type: 'category',
+      data: hours,
+      splitArea: { show: true },
+    },
+    yAxis: {
+      type: 'category',
+      data: days,
+      splitArea: { show: true },
+    },
+    visualMap: {
+      min: 0,
+      max: 100,
+      calculable: true,
+      orient: 'horizontal',
+      left: 'center',
+      bottom: 0,
+      inRange: {
+        color: ['#f0f9eb', '#67c23a'],
+      },
+    },
+    series: [
+      {
+        type: 'heatmap',
+        data: data.heatmap || [],
+        label: { show: false },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        },
+      },
+    ],
+  }
+
+  heatmapChartInstance.setOption(option)
+}
+
+// Handle resize
+const handleResize = () => {
+  userTrendChartInstance?.resize()
+  transactionPieChartInstance?.resize()
+  heatmapChartInstance?.resize()
+}
+
+// Lifecycle
+onMounted(async () => {
+  await Promise.all([fetchStats(), fetchTrends(), fetchRecentData(), fetchHeatmap()])
+  renderTransactionPieChart()
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  userTrendChartInstance?.dispose()
+  transactionPieChartInstance?.dispose()
+  heatmapChartInstance?.dispose()
+})
+</script>
+
+<style scoped lang="scss">
+.dashboard {
+  .stats-card {
+    .stats-content {
+      display: flex;
+      align-items: center;
+
+      .stats-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 16px;
+      }
+
+      .stats-info {
+        flex: 1;
+
+        .stats-value {
+          font-size: 28px;
+          font-weight: 600;
+          color: #333;
+          line-height: 1.2;
+        }
+
+        .stats-label {
+          font-size: 14px;
+          color: #999;
+          margin-top: 4px;
+        }
+
+        .stats-trend {
+          display: flex;
+          align-items: center;
+          font-size: 12px;
+          margin-top: 8px;
+
+          &.up {
+            color: #52c41a;
+          }
+
+          &.down {
+            color: #ff4d4f;
+          }
+
+          .el-icon {
+            margin-right: 2px;
+          }
+        }
+      }
+    }
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .chart-container {
+    width: 100%;
+    height: 300px;
+  }
+
+  .user-cell {
+    display: flex;
+    align-items: center;
+
+    .el-avatar {
+      margin-right: 8px;
+    }
+  }
+}
+</style>
