@@ -10,6 +10,8 @@ import 'providers/locale_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'core/logger.dart';
 import 'services/cleanup_scheduler.dart';
+import 'services/app_config_service.dart';
+import 'services/http_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +37,17 @@ void main() async {
 
   // Log app startup
   logger.info('Application started', tag: 'App');
+
+  // Initialize app configuration from server
+  try {
+    await AppConfigService().initialize();
+    logger.info('App config service initialized', tag: 'App');
+    // Reinitialize HTTP service with new config
+    HttpService().reinitialize();
+    logger.info('HTTP service reinitialized with server config', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize app config: $e', tag: 'App');
+  }
 
   // Initialize cleanup scheduler for source files
   try {

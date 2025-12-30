@@ -2,25 +2,16 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'secure_storage_service.dart';
+import 'app_config_service.dart';
 
 class HttpService {
   static final HttpService _instance = HttpService._internal();
   late Dio _dio;
   final SecureStorageService _secureStorage = SecureStorageService();
+  final AppConfigService _configService = AppConfigService();
 
-  // 服务器地址配置 - 使用HTTPS加密传输
-  // 生产环境
-  static const String productionUrl = 'https://160.202.238.29/api/v1';
-  // 开发环境 - Android模拟器
-  static const String devAndroidUrl = 'https://10.0.2.2:8000/api/v1';
-  // 开发环境 - iOS模拟器/本地
-  static const String devLocalUrl = 'https://localhost:8000/api/v1';
-
-  // 当前使用的URL（开发时可切换，生产时使用productionUrl）
-  static const String baseUrl = productionUrl;
-
-  // 是否跳过证书验证（仅开发环境使用）
-  static const bool _skipCertificateVerification = true; // 生产环境设为false
+  // 默认配置（仅在配置服务未初始化时使用）
+  static const String _defaultApiBaseUrl = 'https://160.202.238.29/api/v1';
 
   String? _authToken;
   bool _initialized = false;
@@ -31,27 +22,40 @@ class HttpService {
     _initDio();
   }
 
+  /// 获取当前 API 基础 URL
+  String get baseUrl {
+    if (_configService.isInitialized) {
+      return _configService.config.apiBaseUrl;
+    }
+    return _defaultApiBaseUrl;
+  }
+
+  /// 是否跳过证书验证
+  bool get _skipCertificateVerification {
+    if (_configService.isInitialized) {
+      return _configService.config.skipCertificateVerification;
+    }
+    // 默认不跳过验证（安全优先）
+    return false;
+  }
+
   void _initDio() {
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 30),
+      connectTimeout: Duration(seconds: _configService.isInitialized
+          ? _configService.config.network.connectTimeoutSeconds
+          : 30),
+      receiveTimeout: Duration(seconds: _configService.isInitialized
+          ? _configService.config.network.receiveTimeoutSeconds
+          : 30),
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
     ));
 
-    // 开发环境：跳过证书验证（生产环境应使用有效证书）
-    if (_skipCertificateVerification) {
-      _dio.httpClientAdapter = IOHttpClientAdapter(
-        createHttpClient: () {
-          final client = HttpClient();
-          client.badCertificateCallback = (cert, host, port) => true;
-          return client;
-        },
-      );
-    }
+    // 配置 SSL 证书验证
+    _configureSslVerification();
 
     // 添加拦截器
     _dio.interceptors.add(InterceptorsWrapper(
@@ -85,11 +89,29 @@ class HttpService {
     ));
   }
 
+  /// 配置 SSL 证书验证
+  void _configureSslVerification() {
+    if (_skipCertificateVerification) {
+      _dio.httpClientAdapter = IOHttpClientAdapter(
+        createHttpClient: () {
+          final client = HttpClient();
+          client.badCertificateCallback = (cert, host, port) => true;
+          return client;
+        },
+      );
+    }
+  }
+
   /// 初始化：从安全存储加载Token
   Future<void> initialize() async {
     if (_initialized) return;
     _authToken = await _secureStorage.getAuthToken();
     _initialized = true;
+  }
+
+  /// 重新初始化 Dio（配置更新后调用）
+  void reinitialize() {
+    _initDio();
   }
 
   /// 尝试刷新Token

@@ -4,12 +4,17 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../core/config.dart';
 import '../core/logger.dart';
+import 'app_config_service.dart';
 
 /// 千问API服务
 /// 使用阿里云通义千问模型进行图片识别、文本解析和音频识别
 class QwenService {
   static final QwenService _instance = QwenService._internal();
   static final _logger = Logger.getLogger('QwenService');
+  final AppConfigService _configService = AppConfigService();
+
+  /// 获取 AI 模型配置
+  AIModelConfig get _models => _configService.config.aiModels;
 
   // API端点
   static const String _textApiUrl =
@@ -66,7 +71,7 @@ class QwenService {
       final response = await _dio.post(
         _visionApiUrl,
         data: {
-          'model': 'qwen-vl-plus',
+          'model': _models.visionModel,
           'input': {
             'messages': [
               {
@@ -145,7 +150,7 @@ class QwenService {
       final response = await _dio.post(
         _textApiUrl,
         data: {
-          'model': 'qwen-turbo',
+          'model': _models.textModel,
           'input': {
             'messages': [
               {
@@ -230,7 +235,7 @@ class QwenService {
       final response = await _dio.post(
         _audioApiUrl,
         data: {
-          'model': 'qwen-omni-turbo',  // 使用全模态模型，支持音频理解
+          'model': _models.audioModel,  // 使用全模态模型，支持音频理解
           'input': {
             'messages': [
               {
@@ -332,7 +337,7 @@ class QwenService {
       final response = await _dio.post(
         _textApiUrl,
         data: {
-          'model': 'qwen-turbo',
+          'model': _models.categoryModel,
           'input': {
             'messages': [
               {
@@ -379,7 +384,7 @@ class QwenService {
       final response = await _dio.post(
         _textApiUrl,
         data: {
-          'model': 'qwen-plus',
+          'model': _models.billModel,
           'input': {
             'messages': [
               {
