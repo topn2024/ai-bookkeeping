@@ -24,8 +24,14 @@ class TransactionCreate(BaseModel):
     location: Optional[str] = Field(None, max_length=200)
     is_reimbursable: bool = False
     is_exclude_stats: bool = False
-    source: int = Field(default=0, ge=0, le=3)  # 0: manual, 1: voice, 2: image, 3: import
+    source: int = Field(default=0, ge=0, le=3)  # 0: manual, 1: image, 2: voice, 3: email
     ai_confidence: Optional[Decimal] = Field(None, ge=0, le=1)
+    # Source file fields for AI recognition
+    source_file_type: Optional[str] = Field(None, max_length=50)  # MIME type
+    source_file_size: Optional[int] = Field(None, ge=0)  # File size in bytes
+    recognition_raw_response: Optional[str] = Field(None, max_length=5000)  # AI raw response
+    recognition_timestamp: Optional[datetime] = None
+    source_file_expires_at: Optional[datetime] = None
 
 
 class TransactionUpdate(BaseModel):
@@ -69,6 +75,13 @@ class TransactionResponse(BaseModel):
     is_exclude_stats: bool
     source: int
     ai_confidence: Optional[Decimal] = None
+    # Source file fields
+    source_file_url: Optional[str] = None
+    source_file_type: Optional[str] = None
+    source_file_size: Optional[int] = None
+    recognition_raw_response: Optional[str] = None
+    recognition_timestamp: Optional[datetime] = None
+    source_file_expires_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

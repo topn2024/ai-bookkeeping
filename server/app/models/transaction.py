@@ -36,6 +36,15 @@ class Transaction(Base):
     is_exclude_stats: Mapped[bool] = mapped_column(Boolean, default=False)
     source: Mapped[int] = mapped_column(Integer, default=0)  # 0: manual, 1: image, 2: voice, 3: email
     ai_confidence: Mapped[Optional[Decimal]] = mapped_column(Numeric(3, 2), nullable=True)
+
+    # Source file fields - for storing original images/audio from AI recognition
+    source_file_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # MinIO file URL after sync
+    source_file_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # MIME type: image/jpeg, audio/m4a
+    source_file_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # File size in bytes
+    recognition_raw_response: Mapped[Optional[str]] = mapped_column(String(5000), nullable=True)  # AI raw response JSON
+    recognition_timestamp: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # When AI recognition happened
+    source_file_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # File expiry time
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

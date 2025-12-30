@@ -9,6 +9,7 @@ import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'core/logger.dart';
+import 'services/cleanup_scheduler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +35,14 @@ void main() async {
 
   // Log app startup
   logger.info('Application started', tag: 'App');
+
+  // Initialize cleanup scheduler for source files
+  try {
+    await CleanupScheduler().initialize();
+    logger.info('Cleanup scheduler initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize cleanup scheduler: $e', tag: 'App');
+  }
 
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -74,16 +83,25 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final themeNotifier = ref.watch(themeProvider.notifier);
-    final primaryColor = themeNotifier.primaryColor;
+    // 监听主题状态变化，确保主题切换时 UI 会重建
+    final themeState = ref.watch(themeProvider);
+    final themeNotifier = ref.read(themeProvider.notifier);
     final localeState = ref.watch(localeProvider);
     final l10n = ref.watch(localeProvider.notifier).l10n;
+
+    // 根据是否使用自定义主题选择对应的 ThemeData
+    final lightTheme = themeState.isUsingCustomTheme
+        ? themeNotifier.getLightTheme()
+        : AppTheme.createLightTheme(themeNotifier.primaryColor);
+    final darkTheme = themeState.isUsingCustomTheme
+        ? themeNotifier.getDarkTheme()
+        : AppTheme.createDarkTheme(themeNotifier.primaryColor);
 
     return MaterialApp(
       title: l10n.appName,
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.createLightTheme(primaryColor),
-      darkTheme: AppTheme.createDarkTheme(primaryColor),
+      theme: lightTheme,
+      darkTheme: darkTheme,
       themeMode: themeNotifier.themeMode,
       locale: localeState.locale,
       supportedLocales: AppLanguages.supportedLocales,

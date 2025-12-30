@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -7,9 +8,11 @@ import '../theme/app_theme.dart';
 import '../providers/ai_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../services/ai_service.dart';
+import '../services/source_file_service.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
 import '../widgets/duplicate_transaction_dialog.dart';
+import '../services/category_localization_service.dart';
 
 /// 语音记账页面
 /// 使用千问音频模型直接识别语音内容并提取记账信息
@@ -23,6 +26,7 @@ class VoiceRecognitionPage extends ConsumerStatefulWidget {
 class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
     with SingleTickerProviderStateMixin {
   final AudioRecorder _audioRecorder = AudioRecorder();
+  final SourceFileService _sourceFileService = SourceFileService();
   bool _isRecording = false;
   bool _hasPermission = false;
   String? _recordingPath;
@@ -31,6 +35,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
   late AnimationController _animationController;
   Duration _recordingDuration = Duration.zero;
   DateTime? _recordingStartTime;
+  DateTime? _recognitionTimestamp;
 
   @override
   void initState() {
@@ -69,13 +74,14 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
       // 获取临时目录
       final directory = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      _recordingPath = '${directory.path}/recording_$timestamp.m4a';
+      _recordingPath = '${directory.path}/recording_$timestamp.wav';
 
-      // 配置录音参数
+      // 配置录音参数 - 使用 WAV 格式（千问 API 支持）
       const config = RecordConfig(
-        encoder: AudioEncoder.aacLc,
+        encoder: AudioEncoder.wav,
         bitRate: 128000,
-        sampleRate: 44100,
+        sampleRate: 16000,  // 16kHz 适合语音识别
+        numChannels: 1,     // 单声道
       );
 
       await _audioRecorder.start(config, path: _recordingPath!);
@@ -132,6 +138,9 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
     });
 
     try {
+      // Record recognition timestamp
+      _recognitionTimestamp = DateTime.now();
+
       // 读取音频文件
       final file = File(audioPath);
       if (!await file.exists()) {
@@ -142,7 +151,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
 
       // 使用AI服务识别音频
       final aiService = AIService();
-      final result = await aiService.recognizeAudio(audioData, format: 'm4a');
+      final result = await aiService.recognizeAudio(audioData, format: 'wav');
 
       setState(() {
         _recognitionResult = result;
@@ -206,12 +215,47 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
   Future<void> _confirmAndCreateTransaction() async {
     if (_recognitionResult == null || !_recognitionResult!.success) return;
 
+    // Generate transaction ID first
+    final transactionId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    // Save audio file to permanent local storage
+    String? savedAudioPath;
+    int? audioFileSize;
+    if (_recordingPath != null) {
+      final audioFile = File(_recordingPath!);
+      if (await audioFile.exists()) {
+        savedAudioPath = await _sourceFileService.saveAudioFile(audioFile, transactionId);
+        if (savedAudioPath != null) {
+          audioFileSize = await _sourceFileService.getFileSize(savedAudioPath);
+        }
+      }
+    }
+
+    // Prepare recognition raw data as JSON
+    String? recognitionRawData;
+    if (_recognitionResult != null) {
+      final rawData = {
+        'type': _recognitionResult!.type,
+        'amount': _recognitionResult!.amount,
+        'category': _recognitionResult!.category,
+        'description': _recognitionResult!.description,
+        'date': _recognitionResult!.date,
+        'confidence': _recognitionResult!.confidence,
+        'recognized_text': _recognitionResult!.recognizedText,
+        'timestamp': _recognitionTimestamp?.toIso8601String(),
+      };
+      recognitionRawData = jsonEncode(rawData);
+    }
+
+    // Calculate expiry date based on user settings
+    final expiryDate = await _sourceFileService.calculateExpiryDate();
+
     // 解析识别出的日期
     final transactionDate = _parseDate(_recognitionResult!.date);
 
     // 创建交易记录
     final transaction = Transaction(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: transactionId,
       type: _recognitionResult!.type == 'income'
           ? TransactionType.income
           : TransactionType.expense,
@@ -220,6 +264,14 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
       note: _recognitionResult!.description,
       date: transactionDate,
       accountId: 'cash',
+      // Source data fields
+      source: TransactionSource.voice,
+      aiConfidence: _recognitionResult!.confidence,
+      sourceFileLocalPath: savedAudioPath,
+      sourceFileType: 'audio/wav',
+      sourceFileSize: audioFileSize,
+      recognitionRawData: recognitionRawData,
+      sourceFileExpiresAt: expiryDate,
     );
 
     // 使用重复检测保存交易
@@ -377,7 +429,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                   SizedBox(width: 8),
-                  Text('千问音频模型识别中...'),
+                  Text('千问全模态模型识别中...'),
                 ],
               ),
             ),
@@ -531,47 +583,18 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
   }
 
   String _getCategoryName(String? categoryId) {
-    if (categoryId == null) return '其他';
-
-    for (final category in DefaultCategories.expenseCategories) {
-      if (category.id == categoryId) {
-        return category.name;
-      }
-    }
-    for (final category in DefaultCategories.incomeCategories) {
-      if (category.id == categoryId) {
-        return category.name;
-      }
+    if (categoryId == null) {
+      return CategoryLocalizationService.instance.getCategoryName('other_expense');
     }
 
-    const categoryNames = {
-      'food': '餐饮',
-      'transport': '交通',
-      'shopping': '购物',
-      'entertainment': '娱乐',
-      'housing': '住房',
-      'medical': '医疗',
-      'education': '教育',
-      'other': '其他',
-      'salary': '工资',
-      'bonus': '奖金',
-      'parttime': '兼职',
-      'investment': '理财',
-      '餐饮': '餐饮',
-      '交通': '交通',
-      '购物': '购物',
-      '娱乐': '娱乐',
-      '住房': '住房',
-      '医疗': '医疗',
-      '教育': '教育',
-      '其他': '其他',
-      '工资': '工资',
-      '奖金': '奖金',
-      '兼职': '兼职',
-      '理财': '理财',
-    };
+    // 使用本地化服务获取分类名称
+    final category = DefaultCategories.findById(categoryId);
+    if (category != null) {
+      return category.localizedName;
+    }
 
-    return categoryNames[categoryId] ?? categoryId;
+    // 如果找不到分类，尝试使用本地化服务直接获取
+    return CategoryLocalizationService.instance.getCategoryName(categoryId);
   }
 
   Widget _buildBottomHint() {
@@ -600,7 +623,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
           ),
           const SizedBox(height: 8),
           Text(
-            '使用千问音频模型直接识别语音',
+            '使用千问全模态模型直接识别语音',
             style: TextStyle(
               color: Colors.grey[400],
               fontSize: 12,

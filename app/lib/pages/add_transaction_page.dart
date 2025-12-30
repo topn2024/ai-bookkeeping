@@ -10,12 +10,15 @@ import '../providers/transaction_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/ai_provider.dart';
 import '../services/ai_service.dart';
+import '../widgets/duplicate_transaction_dialog.dart';
 import 'image_recognition_page.dart';
 import 'voice_recognition_page.dart';
 import 'split_transaction_page.dart';
 
 class AddTransactionPage extends ConsumerStatefulWidget {
-  const AddTransactionPage({super.key});
+  final Transaction? transaction; // 编辑时传入已有交易
+
+  const AddTransactionPage({super.key, this.transaction});
 
   @override
   ConsumerState<AddTransactionPage> createState() => _AddTransactionPageState();
@@ -49,6 +52,8 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
     }
   }
 
+  bool get _isEditing => widget.transaction != null;
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +65,23 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
         _suggestedCategory = null;
       });
     });
+
+    // 如果是编辑模式，预填充已有数据
+    if (_isEditing) {
+      final t = widget.transaction!;
+      _type = t.type;
+      _tabController.index = t.type.index;
+      _amountController.text = t.amount.toString();
+      _noteController.text = t.note ?? '';
+      _selectedCategory = t.category;
+      _selectedAccount = t.accountId;
+      _toAccountId = t.toAccountId ?? 'cash';
+      _selectedDate = t.date;
+      _isReimbursable = t.isReimbursable;
+      if (t.tags != null) {
+        _tags.addAll(t.tags!);
+      }
+    }
 
     // 监听备注输入，触发智能分类建议
     _noteController.addListener(_onNoteChanged);
@@ -155,7 +177,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('记一笔'),
+        title: Text(_isEditing ? '编辑交易' : '记一笔'),
         actions: [
           // 拆分记账入口
           IconButton(
@@ -324,7 +346,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                     _tags.remove(tag);
                   });
                 },
-                backgroundColor: AppColors.primary.withOpacity(0.1),
+                backgroundColor: AppColors.primary.withValues(alpha:0.1),
                 labelStyle: const TextStyle(
                   color: AppColors.primary,
                   fontSize: 12,
@@ -361,7 +383,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
               _isReimbursable = value;
             });
           },
-          activeColor: AppColors.primary,
+          activeThumbColor: AppColors.primary,
         ),
       ],
     );
@@ -369,7 +391,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
 
   /// 构建支持子分类的分类选择器
   Widget _buildCategoryGridWithSubcategories({required bool isExpense}) {
-    final categoryTree = ref.watch(categoryProvider.notifier).getCategoryTree(isExpense: isExpense);
+    final categoryTree = ref.read(categoryProvider.notifier).getCategoryTree(isExpense: isExpense);
     final allCategories = isExpense
         ? ref.watch(expenseCategoriesProvider)
         : ref.watch(incomeCategoriesProvider);
@@ -377,7 +399,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
     // 获取当前选中父分类的子分类
     List<Category> childCategories = [];
     if (_selectedParentCategory != null) {
-      childCategories = ref.watch(categoryProvider.notifier).getChildCategories(_selectedParentCategory!);
+      childCategories = ref.read(categoryProvider.notifier).getChildCategories(_selectedParentCategory!);
     }
 
     return Container(
@@ -437,23 +459,23 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                       Container(
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? category.color.withOpacity(0.2)
+                              ? category.color.withValues(alpha:0.2)
                               : isParentSelected
-                                  ? category.color.withOpacity(0.1)
+                                  ? category.color.withValues(alpha:0.1)
                                   : isSuggested
-                                      ? Colors.amber.withOpacity(0.15)
+                                      ? Colors.amber.withValues(alpha:0.15)
                                       : Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: isSelected
                               ? Border.all(color: category.color, width: 2)
                               : isParentSelected
-                                  ? Border.all(color: category.color.withOpacity(0.5), width: 2)
+                                  ? Border.all(color: category.color.withValues(alpha:0.5), width: 2)
                                   : isSuggested
                                       ? Border.all(color: Colors.amber, width: 2)
                                       : null,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha:0.05),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -465,7 +487,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: category.color.withOpacity(0.1),
+                                color: category.color.withValues(alpha:0.1),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
@@ -476,7 +498,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              category.name,
+                              category.localizedName,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isSelected || isParentSelected ? category.color : AppColors.textPrimary,
@@ -531,7 +553,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
 
   /// 构建子分类选择器
   Widget _buildSubcategorySelector(List<Category> childCategories) {
-    final parentCategory = ref.watch(categoryProvider.notifier).getCategoryById(_selectedParentCategory!);
+    final parentCategory = ref.read(categoryProvider.notifier).getCategoryById(_selectedParentCategory!);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -539,7 +561,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: parentCategory?.color.withOpacity(0.3) ?? Colors.grey),
+        border: Border.all(color: parentCategory?.color.withValues(alpha:0.3) ?? Colors.grey),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -593,7 +615,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? child.color.withOpacity(0.2)
+                        ? child.color.withValues(alpha:0.2)
                         : AppColors.background,
                     borderRadius: BorderRadius.circular(20),
                     border: isSelected
@@ -618,118 +640,6 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                 ),
               );
             }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryGrid(List<Category> categories) {
-    return Container(
-      color: AppColors.background,
-      child: Column(
-        children: [
-          // AI智能分类建议提示
-          if (_suggestedCategory != null && _selectedCategory == null)
-            _buildAISuggestionBanner(categories),
-          Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 0.85,
-              ),
-              itemCount: categories.length,
-              itemBuilder: (context, index) {
-                final category = categories[index];
-                final isSelected = _selectedCategory == category.id;
-                final isSuggested = _suggestedCategory == category.id && _selectedCategory == null;
-
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      _selectedCategory = category.id;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Stack(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? category.color.withOpacity(0.2)
-                              : isSuggested
-                                  ? Colors.amber.withOpacity(0.15)
-                                  : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: isSelected
-                              ? Border.all(color: category.color, width: 2)
-                              : isSuggested
-                                  ? Border.all(color: Colors.amber, width: 2)
-                                  : null,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: category.color.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                category.icon,
-                                color: category.color,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              category.name,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isSelected ? category.color : AppColors.textPrimary,
-                                fontWeight: isSelected || isSuggested ? FontWeight.bold : FontWeight.normal,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // AI推荐标识
-                      if (isSuggested)
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: Colors.amber,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'AI',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              },
-            ),
           ),
         ],
       ),
@@ -815,7 +725,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.transfer.withOpacity(0.1),
+              color: AppColors.transfer.withValues(alpha:0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.arrow_downward, color: AppColors.transfer),
@@ -866,7 +776,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected ? account.color.withOpacity(0.2) : AppColors.background,
+                    color: isSelected ? account.color.withValues(alpha:0.2) : AppColors.background,
                     borderRadius: BorderRadius.circular(20),
                     border: isSelected
                         ? Border.all(color: account.color, width: 2)
@@ -908,7 +818,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, -4),
           ),
@@ -996,7 +906,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: account.color.withOpacity(0.1),
+                      color: account.color.withValues(alpha:0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(account.icon, color: account.color),
@@ -1035,7 +945,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
     }
   }
 
-  void _saveTransaction() {
+  Future<void> _saveTransaction() async {
     final amountText = _amountController.text;
     if (amountText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1067,7 +977,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
     }
 
     final transaction = Transaction(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: _isEditing ? widget.transaction!.id : DateTime.now().millisecondsSinceEpoch.toString(),
       type: _type,
       amount: amount,
       category: _type == TransactionType.transfer ? 'transfer' : (_selectedCategory ?? 'other'),
@@ -1079,7 +989,22 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
       tags: _tags.isEmpty ? null : _tags,
     );
 
-    ref.read(transactionProvider.notifier).addTransaction(transaction);
-    Navigator.of(context).pop();
+    if (_isEditing) {
+      // 编辑模式直接更新，不检查重复
+      ref.read(transactionProvider.notifier).updateTransaction(transaction);
+      Navigator.of(context).pop();
+    } else {
+      // 新增模式使用重复检测
+      final confirmed = await DuplicateTransactionHelper.checkAndConfirm(
+        context: context,
+        transaction: transaction,
+        transactionNotifier: ref.read(transactionProvider.notifier),
+        showSuccessMessage: false,
+      );
+
+      if (confirmed && mounted) {
+        Navigator.of(context).pop();
+      }
+    }
   }
 }

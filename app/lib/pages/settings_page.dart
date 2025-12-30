@@ -30,6 +30,7 @@ import 'reimbursement_page.dart';
 import 'tag_statistics_page.dart';
 import 'custom_report_page.dart';
 import 'help_page.dart';
+import 'source_data_settings_page.dart';
 
 /// 关于页面点击计数器状态
 class AboutClickState {
@@ -639,6 +640,19 @@ class SettingsPage extends ConsumerWidget {
             iconColor: AppColors.expense,
             title: '安全设置',
             onTap: () => _showSecuritySettingsDialog(context),
+          ),
+          _buildDivider(),
+          _buildMenuItem(
+            icon: Icons.source,
+            iconColor: const Color(0xFF607D8B),
+            title: '来源数据管理',
+            subtitle: '管理拍照、语音原始文件',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SourceDataSettingsPage()),
+              );
+            },
           ),
           _buildDivider(),
           _buildMenuItem(

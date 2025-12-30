@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,9 +8,11 @@ import '../providers/ai_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../services/ai_service.dart';
 import '../services/qwen_service.dart' show ReceiptItem;
+import '../services/source_file_service.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
 import '../widgets/duplicate_transaction_dialog.dart';
+import '../services/category_localization_service.dart';
 
 /// 图片识别记账页面
 class ImageRecognitionPage extends ConsumerStatefulWidget {
@@ -21,9 +24,11 @@ class ImageRecognitionPage extends ConsumerStatefulWidget {
 
 class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
   final ImagePicker _picker = ImagePicker();
+  final SourceFileService _sourceFileService = SourceFileService();
   File? _selectedImage;
   AIRecognitionResult? _recognitionResult;
   bool _isProcessing = false;
+  DateTime? _recognitionTimestamp;
 
   @override
   void dispose() {
@@ -61,6 +66,9 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
     });
 
     try {
+      // Record recognition timestamp
+      _recognitionTimestamp = DateTime.now();
+
       final result = await ref
           .read(aiBookkeepingProvider.notifier)
           .recognizeImage(_selectedImage!);
@@ -137,12 +145,59 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
   Future<void> _confirmAndCreateTransaction() async {
     if (_recognitionResult == null || !_recognitionResult!.success) return;
 
+    // Generate transaction ID first
+    final transactionId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    // Save source image file locally
+    String? sourceFileLocalPath;
+    String? sourceFileType;
+    int? sourceFileSize;
+
+    if (_selectedImage != null) {
+      sourceFileLocalPath = await _sourceFileService.saveImageFile(
+        _selectedImage!,
+        transactionId,
+      );
+
+      if (sourceFileLocalPath != null) {
+        final file = File(sourceFileLocalPath);
+        if (await file.exists()) {
+          sourceFileSize = await file.length();
+          // Determine MIME type from extension
+          final ext = sourceFileLocalPath.split('.').last.toLowerCase();
+          sourceFileType = _getMimeType(ext);
+        }
+      }
+    }
+
+    // Prepare raw response data as JSON
+    String? recognitionRawData;
+    if (_recognitionResult != null) {
+      recognitionRawData = jsonEncode({
+        'amount': _recognitionResult!.amount,
+        'category': _recognitionResult!.category,
+        'merchant': _recognitionResult!.merchant,
+        'date': _recognitionResult!.date,
+        'type': _recognitionResult!.type,
+        'description': _recognitionResult!.description,
+        'confidence': _recognitionResult!.confidence,
+        'timestamp': _recognitionTimestamp?.toIso8601String(),
+        'items': _recognitionResult!.items?.map((item) => {
+          'name': item.name,
+          'price': item.price,
+        }).toList(),
+      });
+    }
+
+    // Calculate expiry date based on user settings
+    final expiryDate = await _sourceFileService.calculateExpiryDate();
+
     // 解析识别出的日期
     final transactionDate = _parseDate(_recognitionResult!.date);
 
-    // 创建交易记录
+    // 创建交易记录 with source file data
     final transaction = Transaction(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: transactionId,
       type: _recognitionResult!.type == 'income'
           ? TransactionType.income
           : TransactionType.expense,
@@ -151,6 +206,14 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
       note: _recognitionResult!.description ?? _recognitionResult!.merchant,
       date: transactionDate,
       accountId: 'cash',
+      // Source file fields
+      source: TransactionSource.image,
+      aiConfidence: _recognitionResult!.confidence,
+      sourceFileLocalPath: sourceFileLocalPath,
+      sourceFileType: sourceFileType,
+      sourceFileSize: sourceFileSize,
+      recognitionRawData: recognitionRawData,
+      sourceFileExpiresAt: expiryDate,
     );
 
     // 使用重复检测保存交易
@@ -164,6 +227,27 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
 
     // 返回上一页
     Navigator.pop(context, _recognitionResult);
+  }
+
+  /// Get MIME type from file extension
+  String _getMimeType(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'heic':
+        return 'image/heic';
+      case 'heif':
+        return 'image/heif';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'image/jpeg';
+    }
   }
 
   @override
@@ -561,33 +645,18 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
   }
 
   String _getCategoryName(String? categoryId) {
-    if (categoryId == null) return '其他';
-
-    // 查找分类名称
-    for (final category in DefaultCategories.expenseCategories) {
-      if (category.id == categoryId) {
-        return category.name;
-      }
-    }
-    for (final category in DefaultCategories.incomeCategories) {
-      if (category.id == categoryId) {
-        return category.name;
-      }
+    if (categoryId == null) {
+      return CategoryLocalizationService.instance.getCategoryName('other_expense');
     }
 
-    // 分类映射
-    const categoryNames = {
-      'food': '餐饮',
-      'transport': '交通',
-      'shopping': '购物',
-      'entertainment': '娱乐',
-      'housing': '住房',
-      'medical': '医疗',
-      'education': '教育',
-      'other': '其他',
-    };
+    // 使用本地化服务获取分类名称
+    final category = DefaultCategories.findById(categoryId);
+    if (category != null) {
+      return category.localizedName;
+    }
 
-    return categoryNames[categoryId] ?? categoryId;
+    // 如果找不到分类，尝试使用本地化服务直接获取
+    return CategoryLocalizationService.instance.getCategoryName(categoryId);
   }
 
   Widget _buildBottomActions() {

@@ -36,7 +36,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 12,
+      version: 13,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -59,7 +59,15 @@ class DatabaseService {
         isReimbursable INTEGER NOT NULL DEFAULT 0,
         isReimbursed INTEGER NOT NULL DEFAULT 0,
         tags TEXT,
-        createdAt INTEGER NOT NULL
+        createdAt INTEGER NOT NULL,
+        source INTEGER NOT NULL DEFAULT 0,
+        aiConfidence REAL,
+        sourceFileLocalPath TEXT,
+        sourceFileServerUrl TEXT,
+        sourceFileType TEXT,
+        sourceFileSize INTEGER,
+        recognitionRawData TEXT,
+        sourceFileExpiresAt INTEGER
       )
     ''');
 
@@ -774,6 +782,18 @@ class DatabaseService {
       await db.execute('CREATE INDEX idx_id_mapping_local ON id_mapping(entityType, localId)');
       await db.execute('CREATE INDEX idx_id_mapping_server ON id_mapping(entityType, serverId)');
     }
+
+    if (oldVersion < 13) {
+      // Add source file fields to transactions table for AI recognition source tracking
+      await db.execute('ALTER TABLE transactions ADD COLUMN source INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE transactions ADD COLUMN aiConfidence REAL');
+      await db.execute('ALTER TABLE transactions ADD COLUMN sourceFileLocalPath TEXT');
+      await db.execute('ALTER TABLE transactions ADD COLUMN sourceFileServerUrl TEXT');
+      await db.execute('ALTER TABLE transactions ADD COLUMN sourceFileType TEXT');
+      await db.execute('ALTER TABLE transactions ADD COLUMN sourceFileSize INTEGER');
+      await db.execute('ALTER TABLE transactions ADD COLUMN recognitionRawData TEXT');
+      await db.execute('ALTER TABLE transactions ADD COLUMN sourceFileExpiresAt INTEGER');
+    }
   }
 
   // ==================== 事务支持 ====================
@@ -839,6 +859,14 @@ class DatabaseService {
       'isReimbursed': transaction.isReimbursed ? 1 : 0,
       'tags': transaction.tags?.join(','),
       'createdAt': DateTime.now().millisecondsSinceEpoch,
+      'source': transaction.source.index,
+      'aiConfidence': transaction.aiConfidence,
+      'sourceFileLocalPath': transaction.sourceFileLocalPath,
+      'sourceFileServerUrl': transaction.sourceFileServerUrl,
+      'sourceFileType': transaction.sourceFileType,
+      'sourceFileSize': transaction.sourceFileSize,
+      'recognitionRawData': transaction.recognitionRawData,
+      'sourceFileExpiresAt': transaction.sourceFileExpiresAt?.millisecondsSinceEpoch,
     });
 
     // Insert splits if this is a split transaction
@@ -865,6 +893,8 @@ class DatabaseService {
       }
 
       final tagsString = map['tags'] as String?;
+      final sourceFileExpiresAtMs = map['sourceFileExpiresAt'] as int?;
+
       transactions.add(model.Transaction(
         id: map['id'] as String,
         type: model.TransactionType.values[map['type'] as int],
@@ -880,6 +910,16 @@ class DatabaseService {
         isReimbursed: (map['isReimbursed'] as int?) == 1,
         tags: tagsString != null && tagsString.isNotEmpty
             ? tagsString.split(',')
+            : null,
+        source: model.TransactionSource.values[(map['source'] as int?) ?? 0],
+        aiConfidence: map['aiConfidence'] as double?,
+        sourceFileLocalPath: map['sourceFileLocalPath'] as String?,
+        sourceFileServerUrl: map['sourceFileServerUrl'] as String?,
+        sourceFileType: map['sourceFileType'] as String?,
+        sourceFileSize: map['sourceFileSize'] as int?,
+        recognitionRawData: map['recognitionRawData'] as String?,
+        sourceFileExpiresAt: sourceFileExpiresAtMs != null
+            ? DateTime.fromMillisecondsSinceEpoch(sourceFileExpiresAtMs)
             : null,
       ));
     }
@@ -905,6 +945,14 @@ class DatabaseService {
         'isReimbursable': transaction.isReimbursable ? 1 : 0,
         'isReimbursed': transaction.isReimbursed ? 1 : 0,
         'tags': transaction.tags?.join(','),
+        'source': transaction.source.index,
+        'aiConfidence': transaction.aiConfidence,
+        'sourceFileLocalPath': transaction.sourceFileLocalPath,
+        'sourceFileServerUrl': transaction.sourceFileServerUrl,
+        'sourceFileType': transaction.sourceFileType,
+        'sourceFileSize': transaction.sourceFileSize,
+        'recognitionRawData': transaction.recognitionRawData,
+        'sourceFileExpiresAt': transaction.sourceFileExpiresAt?.millisecondsSinceEpoch,
       },
       where: 'id = ?',
       whereArgs: [transaction.id],
@@ -961,7 +1009,7 @@ class DatabaseService {
       'type': account.type.index,
       'balance': account.balance,
       'iconCode': account.icon.codePoint,
-      'colorValue': account.color.value,
+      'colorValue': account.color.toARGB32(),
       'isDefault': account.isDefault ? 1 : 0,
       'createdAt': account.createdAt.millisecondsSinceEpoch,
     });
@@ -991,7 +1039,7 @@ class DatabaseService {
         'type': account.type.index,
         'balance': account.balance,
         'iconCode': account.icon.codePoint,
-        'colorValue': account.color.value,
+        'colorValue': account.color.toARGB32(),
         'isDefault': account.isDefault ? 1 : 0,
       },
       where: 'id = ?',
@@ -1011,7 +1059,7 @@ class DatabaseService {
       'id': category.id,
       'name': category.name,
       'iconCode': category.icon.codePoint,
-      'colorValue': category.color.value,
+      'colorValue': category.color.toARGB32(),
       'isExpense': category.isExpense ? 1 : 0,
       'parentId': category.parentId,
       'sortOrder': category.sortOrder,
@@ -1041,7 +1089,7 @@ class DatabaseService {
       {
         'name': category.name,
         'iconCode': category.icon.codePoint,
-        'colorValue': category.color.value,
+        'colorValue': category.color.toARGB32(),
         'isExpense': category.isExpense ? 1 : 0,
         'parentId': category.parentId,
         'sortOrder': category.sortOrder,
@@ -1065,7 +1113,7 @@ class DatabaseService {
       'name': ledger.name,
       'description': ledger.description,
       'iconCode': ledger.icon.codePoint,
-      'colorValue': ledger.color.value,
+      'colorValue': ledger.color.toARGB32(),
       'isDefault': ledger.isDefault ? 1 : 0,
       'createdAt': ledger.createdAt.millisecondsSinceEpoch,
     });
@@ -1093,7 +1141,7 @@ class DatabaseService {
         'name': ledger.name,
         'description': ledger.description,
         'iconCode': ledger.icon.codePoint,
-        'colorValue': ledger.color.value,
+        'colorValue': ledger.color.toARGB32(),
         'isDefault': ledger.isDefault ? 1 : 0,
       },
       where: 'id = ?',
@@ -1117,7 +1165,7 @@ class DatabaseService {
       'categoryId': budget.categoryId,
       'ledgerId': budget.ledgerId,
       'iconCode': budget.icon.codePoint,
-      'colorValue': budget.color.value,
+      'colorValue': budget.color.toARGB32(),
       'isEnabled': budget.isEnabled ? 1 : 0,
       'createdAt': budget.createdAt.millisecondsSinceEpoch,
       'budgetType': budget.budgetType.index,
@@ -1157,7 +1205,7 @@ class DatabaseService {
         'categoryId': budget.categoryId,
         'ledgerId': budget.ledgerId,
         'iconCode': budget.icon.codePoint,
-        'colorValue': budget.color.value,
+        'colorValue': budget.color.toARGB32(),
         'isEnabled': budget.isEnabled ? 1 : 0,
         'budgetType': budget.budgetType.index,
         'enableCarryover': budget.enableCarryover ? 1 : 0,
@@ -1264,7 +1312,7 @@ class DatabaseService {
       'accountId': template.accountId,
       'toAccountId': template.toAccountId,
       'iconCode': template.icon.codePoint,
-      'colorValue': template.color.value,
+      'colorValue': template.color.toARGB32(),
       'useCount': template.useCount,
       'createdAt': template.createdAt.millisecondsSinceEpoch,
       'lastUsedAt': template.lastUsedAt?.millisecondsSinceEpoch,
@@ -1306,7 +1354,7 @@ class DatabaseService {
         'accountId': template.accountId,
         'toAccountId': template.toAccountId,
         'iconCode': template.icon.codePoint,
-        'colorValue': template.color.value,
+        'colorValue': template.color.toARGB32(),
         'useCount': template.useCount,
         'lastUsedAt': template.lastUsedAt?.millisecondsSinceEpoch,
       },
@@ -1351,7 +1399,7 @@ class DatabaseService {
       'lastExecutedAt': recurring.lastExecutedAt?.millisecondsSinceEpoch,
       'nextExecuteAt': recurring.nextExecuteAt?.millisecondsSinceEpoch,
       'iconCode': recurring.icon.codePoint,
-      'colorValue': recurring.color.value,
+      'colorValue': recurring.color.toARGB32(),
       'createdAt': recurring.createdAt.millisecondsSinceEpoch,
     });
   }
@@ -1411,7 +1459,7 @@ class DatabaseService {
         'lastExecutedAt': recurring.lastExecutedAt?.millisecondsSinceEpoch,
         'nextExecuteAt': recurring.nextExecuteAt?.millisecondsSinceEpoch,
         'iconCode': recurring.icon.codePoint,
-        'colorValue': recurring.color.value,
+        'colorValue': recurring.color.toARGB32(),
       },
       where: 'id = ?',
       whereArgs: [recurring.id],
