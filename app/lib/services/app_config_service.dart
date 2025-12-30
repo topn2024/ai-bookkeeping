@@ -18,7 +18,8 @@ class AppConfigService {
 
   // 默认配置（硬编码回退值）
   static const String _defaultApiBaseUrl = 'https://160.202.238.29/api/v1';
-  static const bool _defaultSkipCertVerification = false;
+  // 默认跳过证书验证（开发环境自签名证书）
+  static const bool _defaultSkipCertVerification = true;
 
   // 缓存的配置
   AppSettingsConfig? _cachedConfig;
@@ -153,7 +154,7 @@ class AppSettingsConfig {
       configVersion: '1.0.0',
       minAppVersion: '1.0.0',
       apiBaseUrl: 'https://160.202.238.29/api/v1',
-      skipCertificateVerification: false,
+      skipCertificateVerification: true,  // 开发环境自签名证书
       aiModels: AIModelConfig.defaults(),
       network: NetworkConfig.defaults(),
       duplicateDetection: DuplicateDetectionConfig.defaults(),

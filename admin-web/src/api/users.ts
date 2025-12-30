@@ -62,7 +62,7 @@ export const deleteUser = (userId: string, hardDelete: boolean = false): Promise
 }
 
 // Batch operations
-export const batchOperation = (data: { user_ids: string[]; action: string }): Promise<any> => {
+export const batchOperation = (data: { user_ids: string[]; operation: string }): Promise<any> => {
   return post('/users/batch-operation', data)
 }
 

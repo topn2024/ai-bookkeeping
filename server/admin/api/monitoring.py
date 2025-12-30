@@ -308,19 +308,96 @@ async def get_api_metrics(
     _: bool = Depends(has_permission("monitor:view")),
 ):
     """API响应时间和请求量统计 (SM-005, SM-006)"""
-    # In a real implementation, this would query from a metrics store (e.g., Prometheus, logs)
-    # For now, return mock data structure
+    from admin.models.admin_log import AdminLog
 
-    return {
-        "period_hours": hours,
-        "total_requests": 0,
-        "avg_response_time_ms": 0,
-        "endpoints": [],
-        "message": "Metrics collection not yet implemented. Consider integrating with Prometheus or similar.",
-    }
+    start_time = datetime.utcnow() - timedelta(hours=hours)
+
+    try:
+        # 获取总请求数（基于审计日志）
+        total_result = await db.execute(
+            select(func.count(AdminLog.id))
+            .where(AdminLog.created_at >= start_time)
+        )
+        total_requests = total_result.scalar() or 0
+
+        # 按模块统计请求数
+        module_stats = await db.execute(
+            select(
+                AdminLog.module,
+                func.count(AdminLog.id).label("count")
+            )
+            .where(AdminLog.created_at >= start_time)
+            .group_by(AdminLog.module)
+            .order_by(func.count(AdminLog.id).desc())
+            .limit(20)
+        )
+
+        endpoints = [
+            {
+                "module": row.module or "unknown",
+                "request_count": row.count,
+                "error_count": 0,  # 可从status字段统计
+                "error_rate": 0.0,
+            }
+            for row in module_stats.all()
+        ]
+
+        # 按操作类型统计
+        action_stats = await db.execute(
+            select(
+                AdminLog.action,
+                func.count(AdminLog.id).label("count")
+            )
+            .where(AdminLog.created_at >= start_time)
+            .group_by(AdminLog.action)
+            .order_by(func.count(AdminLog.id).desc())
+            .limit(20)
+        )
+
+        actions = [
+            {"action": row.action, "count": row.count}
+            for row in action_stats.all()
+        ]
+
+        # 按小时统计请求量趋势
+        hourly_stats = await db.execute(
+            select(
+                func.date_trunc('hour', AdminLog.created_at).label("hour"),
+                func.count(AdminLog.id).label("count")
+            )
+            .where(AdminLog.created_at >= start_time)
+            .group_by(func.date_trunc('hour', AdminLog.created_at))
+            .order_by(func.date_trunc('hour', AdminLog.created_at))
+        )
+
+        hourly_trend = [
+            {"hour": row.hour.isoformat() if row.hour else None, "count": row.count}
+            for row in hourly_stats.all()
+        ]
+
+        return {
+            "period_hours": hours,
+            "total_requests": total_requests,
+            "avg_response_time_ms": 0,  # 需要实际的响应时间记录
+            "endpoints": endpoints,
+            "actions": actions,
+            "hourly_trend": hourly_trend,
+            "data_source": "admin_audit_logs",
+        }
+    except Exception as e:
+        return {
+            "period_hours": hours,
+            "total_requests": 0,
+            "avg_response_time_ms": 0,
+            "endpoints": [],
+            "actions": [],
+            "hourly_trend": [],
+            "error": str(e),
+            "message": "Failed to retrieve metrics from audit logs",
+        }
 
 
-@router.get("/errors", response_model=ErrorStats)
+@router.get("/errors")
 async def get_error_stats(
     hours: int = Query(24, ge=1, le=168),
     current_admin: AdminUser = Depends(get_current_admin),
@@ -328,15 +405,96 @@ async def get_error_stats(
     _: bool = Depends(has_permission("monitor:view")),
 ):
     """错误率统计 (SM-007)"""
-    # In a real implementation, this would query error logs
-    # For now, return empty structure
+    from admin.models.admin_log import AdminLog
 
-    return ErrorStats(
-        total_errors=0,
-        by_status_code={},
-        by_endpoint=[],
-        recent_errors=[],
-    )
+    start_time = datetime.utcnow() - timedelta(hours=hours)
+
+    try:
+        # 统计失败的操作 (status != 1)
+        error_count_result = await db.execute(
+            select(func.count(AdminLog.id))
+            .where(
+                AdminLog.created_at >= start_time,
+                AdminLog.status != 1
+            )
+        )
+        total_errors = error_count_result.scalar() or 0
+
+        # 按状态码统计
+        status_stats = await db.execute(
+            select(
+                AdminLog.status,
+                func.count(AdminLog.id).label("count")
+            )
+            .where(AdminLog.created_at >= start_time)
+            .group_by(AdminLog.status)
+        )
+        by_status_code = {
+            str(row.status): row.count
+            for row in status_stats.all()
+        }
+
+        # 按模块统计错误
+        module_error_stats = await db.execute(
+            select(
+                AdminLog.module,
+                func.count(AdminLog.id).label("error_count")
+            )
+            .where(
+                AdminLog.created_at >= start_time,
+                AdminLog.status != 1
+            )
+            .group_by(AdminLog.module)
+            .order_by(func.count(AdminLog.id).desc())
+            .limit(10)
+        )
+        by_endpoint = [
+            {"module": row.module or "unknown", "error_count": row.error_count}
+            for row in module_error_stats.all()
+        ]
+
+        # 最近的错误
+        recent_errors_result = await db.execute(
+            select(AdminLog)
+            .where(
+                AdminLog.created_at >= start_time,
+                AdminLog.status != 1
+            )
+            .order_by(AdminLog.created_at.desc())
+            .limit(20)
+        )
+        recent_errors = [
+            {
+                "id": str(log.id),
+                "action": log.action,
+                "module": log.module,
+                "description": log.description,
+                "admin_username": log.admin_username,
+                "ip_address": log.ip_address,
+                "status": log.status,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+            }
+            for log in recent_errors_result.scalars().all()
+        ]
+
+        return {
+            "period_hours": hours,
+            "total_errors": total_errors,
+            "by_status_code": by_status_code,
+            "by_endpoint": by_endpoint,
+            "recent_errors": recent_errors,
+            "data_source": "admin_audit_logs",
+        }
+    except Exception as e:
+        return {
+            "period_hours": hours,
+            "total_errors": 0,
+            "by_status_code": {},
+            "by_endpoint": [],
+            "recent_errors": [],
+            "error": str(e),
+            "message": "Failed to retrieve error stats from audit logs",
+        }
 
 
 @router.get("/slow-queries")
@@ -450,11 +608,16 @@ async def get_alert_rules(
     return {"rules": rules}
 
 
+class AlertRuleUpdate(BaseModel):
+    """Alert rule update request."""
+    threshold: Optional[float] = None
+    enabled: Optional[bool] = None
+
+
 @router.put("/alerts/rules/{rule_id}")
 async def update_alert_rule(
     rule_id: str,
-    threshold: Optional[float] = None,
-    enabled: Optional[bool] = None,
+    update_data: AlertRuleUpdate,
     current_admin: AdminUser = Depends(get_current_admin),
     _: bool = Depends(has_permission("monitor:alert")),
 ):
@@ -463,8 +626,8 @@ async def update_alert_rule(
     return {
         "message": f"Alert rule {rule_id} updated",
         "rule_id": rule_id,
-        "threshold": threshold,
-        "enabled": enabled,
+        "threshold": update_data.threshold,
+        "enabled": update_data.enabled,
     }
 
 

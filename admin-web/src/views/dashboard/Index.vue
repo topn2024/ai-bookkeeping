@@ -69,17 +69,17 @@
             </div>
           </template>
           <el-table :data="recentUsers" size="small" stripe>
-            <el-table-column prop="nickname" label="用户" width="150">
+            <el-table-column prop="display_name" label="用户" width="150">
               <template #default="{ row }">
                 <div class="user-cell">
                   <el-avatar :size="32" :src="row.avatar_url">
-                    {{ row.nickname?.charAt(0) || row.phone?.slice(-4) }}
+                    {{ row.display_name?.charAt(0) || '?' }}
                   </el-avatar>
-                  <span>{{ row.nickname || row.phone }}</span>
+                  <span>{{ row.display_name || '未设置' }}</span>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="phone" label="手机号" width="130" />
+            <el-table-column prop="email_masked" label="邮箱" width="130" />
             <el-table-column prop="created_at" label="注册时间">
               <template #default="{ row }">
                 {{ formatDate(row.created_at) }}
@@ -174,7 +174,9 @@ const fetchStats = async () => {
 
 const fetchTrends = async () => {
   try {
-    const data = await dashboardApi.getUserTrend(Number(trendPeriod.value))
+    // 使用 period 格式 (7d, 30d, 90d)
+    const period = `${trendPeriod.value}d`
+    const data = await dashboardApi.getUserTrend(period)
     renderUserTrendChart(data)
   } catch (e) {
     console.error('Failed to fetch trends:', e)
@@ -208,6 +210,16 @@ const renderUserTrendChart = (data: any) => {
     userTrendChartInstance = echarts.init(userTrendChart.value)
   }
 
+  // 适配后端返回的数据格式
+  // 后端返回: { new_users: { label, data: [{date, value}] }, active_users: {...}, period }
+  const newUsersData = data.new_users?.data || []
+  const activeUsersData = data.active_users?.data || []
+
+  // 提取日期和值
+  const dates = newUsersData.map((item: any) => item.date)
+  const newUsersValues = newUsersData.map((item: any) => item.value)
+  const activeUsersValues = activeUsersData.map((item: any) => item.value)
+
   const option = {
     tooltip: {
       trigger: 'axis',
@@ -226,7 +238,7 @@ const renderUserTrendChart = (data: any) => {
     xAxis: {
       type: 'category',
       boundaryGap: false,
-      data: data.dates || [],
+      data: dates,
     },
     yAxis: {
       type: 'value',
@@ -237,7 +249,7 @@ const renderUserTrendChart = (data: any) => {
         type: 'line',
         smooth: true,
         areaStyle: { opacity: 0.3 },
-        data: data.new_users || [],
+        data: newUsersValues,
         itemStyle: { color: '#1890ff' },
       },
       {
@@ -245,7 +257,7 @@ const renderUserTrendChart = (data: any) => {
         type: 'line',
         smooth: true,
         areaStyle: { opacity: 0.3 },
-        data: data.active_users || [],
+        data: activeUsersValues,
         itemStyle: { color: '#52c41a' },
       },
     ],
@@ -313,11 +325,26 @@ const renderHeatmapChart = (data: any) => {
   const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`)
   const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
+  // 将后端返回的 7x24 矩阵转换为 echarts 需要的格式
+  // 后端: heatmap_matrix[day][hour] = count
+  // echarts: [[hour, day, value], ...]
+  const heatmapData: [number, number, number][] = []
+  const matrix = data.heatmap_matrix || []
+
+  for (let day = 0; day < 7; day++) {
+    for (let hour = 0; hour < 24; hour++) {
+      const value = matrix[day]?.[hour] || 0
+      heatmapData.push([hour, day, value])
+    }
+  }
+
+  const maxValue = data.max_value || Math.max(...heatmapData.map(d => d[2]), 1)
+
   const option = {
     tooltip: {
       position: 'top',
       formatter: (params: any) => {
-        return `${days[params.value[1]]} ${hours[params.value[0]]}<br/>活跃度: ${params.value[2]}`
+        return `${days[params.value[1]]} ${hours[params.value[0]]}<br/>交易数: ${params.value[2]}`
       },
     },
     grid: {
@@ -338,7 +365,7 @@ const renderHeatmapChart = (data: any) => {
     },
     visualMap: {
       min: 0,
-      max: 100,
+      max: maxValue,
       calculable: true,
       orient: 'horizontal',
       left: 'center',
@@ -350,7 +377,7 @@ const renderHeatmapChart = (data: any) => {
     series: [
       {
         type: 'heatmap',
-        data: data.heatmap || [],
+        data: heatmapData,
         label: { show: false },
         emphasis: {
           itemStyle: {

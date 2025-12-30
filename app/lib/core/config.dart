@@ -22,9 +22,10 @@ class AppConfig {
   bool _initialized = false;
 
   /// Backend API URL (compile-time constant)
+  /// 默认使用生产服务器地址
   String get apiBaseUrl => const String.fromEnvironment(
         'API_BASE_URL',
-        defaultValue: 'http://localhost:8000/api/v1',
+        defaultValue: 'https://160.202.238.29/api/v1',
       );
 
   /// Get Qwen API Key (from cache or compile-time)
@@ -62,8 +63,9 @@ class AppConfig {
       _qwenApiKey = await _secureStorage.read('qwen_api_key');
       _zhipuApiKey = await _secureStorage.read('zhipu_api_key');
       _initialized = true;
+      debugPrint('AppConfig: Initialized from cache, qwenApiKey=${_qwenApiKey?.isNotEmpty == true ? "[SET:${_qwenApiKey!.substring(0, 8)}...]" : "[EMPTY/NULL]"}');
     } catch (e) {
-      debugPrint('Failed to load cached API keys: $e');
+      debugPrint('AppConfig: Failed to load cached API keys: $e');
     }
   }
 
@@ -71,26 +73,35 @@ class AppConfig {
   /// Call this after user logs in
   Future<bool> fetchFromServer() async {
     try {
+      debugPrint('AppConfig: Fetching API keys from /config/ai...');
       final response = await _http.get('/config/ai');
 
+      debugPrint('AppConfig: Response status=${response.statusCode}');
       if (response.statusCode == 200) {
         final data = response.data;
+        debugPrint('AppConfig: Response data=$data');
         _qwenApiKey = data['qwen_api_key'] as String?;
         _zhipuApiKey = data['zhipu_api_key'] as String?;
+
+        debugPrint('AppConfig: Parsed qwen_api_key=${_qwenApiKey?.isNotEmpty == true ? "[SET:${_qwenApiKey!.substring(0, 8)}...]" : "[EMPTY]"}');
 
         // Cache to secure storage
         if (_qwenApiKey != null && _qwenApiKey!.isNotEmpty) {
           await _secureStorage.write('qwen_api_key', _qwenApiKey!);
+          debugPrint('AppConfig: Cached qwen_api_key to secure storage');
         }
         if (_zhipuApiKey != null && _zhipuApiKey!.isNotEmpty) {
           await _secureStorage.write('zhipu_api_key', _zhipuApiKey!);
         }
 
-        debugPrint('API keys fetched and cached from server');
+        debugPrint('AppConfig: API keys fetched and cached from server');
         return true;
+      } else {
+        debugPrint('AppConfig: Unexpected status code: ${response.statusCode}');
       }
-    } catch (e) {
-      debugPrint('Failed to fetch API keys from server: $e');
+    } catch (e, stack) {
+      debugPrint('AppConfig: Failed to fetch API keys from server: $e');
+      debugPrint('AppConfig: Stack trace: $stack');
     }
     return false;
   }

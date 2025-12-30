@@ -24,20 +24,28 @@ class QwenService {
   static const String _audioApiUrl =
       'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
 
-  late final Dio _dio;
+  late Dio _dio;
   bool _initialized = false;
+  String? _lastApiKey;
 
   factory QwenService() => _instance;
 
   QwenService._internal();
 
   /// Initialize the service with API key from config
+  /// Re-initializes if API key has changed (e.g., after login)
   void _ensureInitialized() {
-    if (_initialized) return;
-
     final apiKey = appConfig.qwenApiKey;
+
+    // Check if API key changed (e.g., after user login)
+    if (_initialized && _lastApiKey == apiKey) {
+      return;
+    }
+
     if (apiKey.isEmpty) {
-      _logger.warning('Qwen API key not configured');
+      _logger.warning('Qwen API key not configured - please login first');
+    } else {
+      _logger.info('Qwen API key available: ${apiKey.substring(0, 8)}...');
     }
 
     _dio = Dio(BaseOptions(
@@ -48,14 +56,31 @@ class QwenService {
         'Content-Type': 'application/json',
       },
     ));
+    _lastApiKey = apiKey;
     _initialized = true;
-    _logger.info('QwenService initialized');
+    _logger.info('QwenService initialized/reinitialized');
+  }
+
+  /// Force reinitialize with new API key (call after login)
+  void reinitialize() {
+    final apiKey = appConfig.qwenApiKey;
+    _logger.info('QwenService.reinitialize() called, apiKey=${apiKey.isNotEmpty ? "[SET:${apiKey.substring(0, 8)}...]" : "[EMPTY]"}');
+    _initialized = false;
+    _lastApiKey = null;
+    _ensureInitialized();
   }
 
   /// 图片识别 - 识别小票/收据
   /// 使用 qwen-vl-plus 视觉模型
   Future<QwenRecognitionResult> recognizeReceipt(File imageFile) async {
     _ensureInitialized();
+
+    // Check if API key is available
+    if (appConfig.qwenApiKey.isEmpty) {
+      _logger.error('Qwen API key is empty');
+      return QwenRecognitionResult.error('图片识别服务未配置，请先登录账号');
+    }
+
     _logger.info('Recognizing receipt: ${imageFile.path}');
 
     try {
@@ -226,6 +251,13 @@ class QwenService {
   Future<QwenRecognitionResult> recognizeAudio(Uint8List audioData,
       {String format = 'wav'}) async {
     _ensureInitialized();
+
+    // Check if API key is available
+    if (appConfig.qwenApiKey.isEmpty) {
+      _logger.error('Qwen API key is empty');
+      return QwenRecognitionResult.error('语音识别服务未配置，请先登录账号');
+    }
+
     _logger.info('Recognizing audio: ${audioData.length} bytes, format: $format');
 
     try {
@@ -242,14 +274,9 @@ class QwenService {
                 'role': 'user',
                 'content': [
                   {
-                    'type': 'input_audio',
-                    'input_audio': {
-                      'data': base64Audio,
-                      'format': format,
-                    },
+                    'audio': 'data:audio/$format;base64,$base64Audio',
                   },
                   {
-                    'type': 'text',
                     'text': '''请仔细听这段语音，准确转写并提取记账信息。
 
 【分类规则 - 请根据语音内容准确分类】
@@ -299,11 +326,6 @@ class QwenService {
           }
         },
       );
-
-      // 打印原始响应用于调试
-      print('=== QWEN AUDIO API RESPONSE ===');
-      print(response.data.toString());
-      print('=== END RESPONSE ===');
 
       return _parseAudioResponse(response.data);
     } on DioException catch (e) {
@@ -604,11 +626,18 @@ class QwenService {
           if (textContent.isNotEmpty) {
             // 先尝试 JSON 解析
             final jsonResult = _extractAudioJsonResult(textContent);
-            if (jsonResult.success && jsonResult.amount != null) {
+
+            // 如果 JSON 解析返回了明确的错误（如空转写），直接返回该错误
+            if (!jsonResult.success) {
               return jsonResult;
             }
 
-            // JSON 解析失败或无金额，尝试从文本中提取信息
+            // JSON 解析成功且有金额，返回结果
+            if (jsonResult.amount != null) {
+              return jsonResult;
+            }
+
+            // JSON 解析成功但无金额，尝试从文本中提取信息
             return _extractFromPlainText(textContent);
           }
         }
@@ -716,10 +745,24 @@ class QwenService {
       final jsonStr = _extractJsonString(content);
       if (jsonStr != null) {
         final data = jsonDecode(jsonStr);
+
+        // 检查转写内容是否为空（可能是麦克风问题或静音）
+        final transcription = data['transcription'] as String?;
+        final description = data['description'] as String?;
+        final amount = (data['amount'] as num?)?.toDouble();
+
+        // 如果转写为空且没有金额，说明可能是麦克风问题
+        if ((transcription == null || transcription.isEmpty) &&
+            (description == null || description.isEmpty) &&
+            amount == null) {
+          _logger.warning('Audio transcription is empty - possible microphone issue');
+          return QwenRecognitionResult.error('未检测到语音内容，请确保麦克风正常工作并清晰说话');
+        }
+
         return QwenRecognitionResult(
-          amount: (data['amount'] as num?)?.toDouble(),
+          amount: amount,
           category: data['category'] as String?,
-          description: data['description'] as String? ?? data['transcription'] as String?,
+          description: description ?? transcription,
           type: data['type'] as String? ?? 'expense',
           success: true,
           confidence: 0.9,

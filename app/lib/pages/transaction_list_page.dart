@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../providers/transaction_provider.dart';
+import '../providers/account_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import '../models/account.dart';
 import '../widgets/source_image_viewer.dart';
 import '../widgets/source_audio_player.dart';
 
@@ -986,7 +988,7 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
                     if (transaction.note != null && transaction.note!.isNotEmpty)
                       _buildDetailRow('备注', transaction.note!),
                     _buildDetailRow('类型', isExpense ? '支出' : (isIncome ? '收入' : '转账')),
-                    _buildDetailRow('账户', transaction.accountId),
+                    _buildDetailRow('账户', _getAccountName(transaction.accountId)),
                     if (transaction.aiConfidence != null)
                       _buildDetailRow('AI置信度', '${(transaction.aiConfidence! * 100).toStringAsFixed(0)}%'),
 
@@ -1179,6 +1181,27 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
     } else {
       return '即将过期';
     }
+  }
+
+  /// 根据账户ID获取账户名称
+  String _getAccountName(String accountId) {
+    final accounts = ref.read(accountProvider);
+    final account = accounts.firstWhere(
+      (a) => a.id == accountId,
+      orElse: () => DefaultAccounts.accounts.firstWhere(
+        (a) => a.id == accountId,
+        orElse: () => Account(
+          id: accountId,
+          name: accountId,  // 如果找不到，显示ID
+          type: AccountType.cash,
+          balance: 0,
+          icon: Icons.account_balance_wallet,
+          color: Colors.grey,
+          createdAt: DateTime.now(),
+        ),
+      ),
+    );
+    return account.name;
   }
 
   Widget _buildDetailRow(String label, String value) {
