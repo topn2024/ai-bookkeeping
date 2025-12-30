@@ -4,6 +4,7 @@ import '../utils/aggregations.dart';
 import '../utils/date_utils.dart';
 import '../services/duplicate_detection_service.dart';
 import 'base/crud_notifier.dart';
+import 'account_provider.dart';
 
 /// 交易管理 Notifier
 ///
@@ -27,6 +28,42 @@ class TransactionNotifier extends SimpleCrudNotifier<Transaction, String> {
   @override
   Future<void> deleteOne(String id) => db.deleteTransaction(id);
 
+  // ==================== 账户余额同步逻辑 ====================
+
+  /// 更新账户余额（记账时调用）
+  /// [isReverse] 为 true 时表示撤销操作（删除交易或更新前恢复原余额）
+  Future<void> _updateAccountBalance(Transaction transaction, {bool isReverse = false}) async {
+    final accountNotifier = ref.read(accountProvider.notifier);
+    final accountId = transaction.accountId;
+
+    // 转账类型需要特殊处理
+    if (transaction.type == TransactionType.transfer) {
+      final toAccountId = transaction.toAccountId;
+      if (toAccountId != null) {
+        if (isReverse) {
+          // 撤销转账：从目标账户扣回，转入源账户
+          await accountNotifier.updateBalance(toAccountId, transaction.amount, true);
+          await accountNotifier.updateBalance(accountId, transaction.amount, false);
+        } else {
+          // 正向转账：从源账户扣除，转入目标账户
+          await accountNotifier.updateBalance(accountId, transaction.amount, true);
+          await accountNotifier.updateBalance(toAccountId, transaction.amount, false);
+        }
+      }
+      return;
+    }
+
+    // 普通收支
+    final isExpense = transaction.type == TransactionType.expense;
+    if (isReverse) {
+      // 撤销：支出恢复余额，收入扣除余额
+      await accountNotifier.updateBalance(accountId, transaction.amount, !isExpense);
+    } else {
+      // 正向：支出扣除余额，收入增加余额
+      await accountNotifier.updateBalance(accountId, transaction.amount, isExpense);
+    }
+  }
+
   // ==================== 业务特有方法（保留原有接口）====================
 
   /// 添加交易（保持原有方法名兼容）
@@ -34,13 +71,37 @@ class TransactionNotifier extends SimpleCrudNotifier<Transaction, String> {
     await add(transaction);
     // 新交易放在列表前面
     state = [transaction, ...state.where((t) => t.id != transaction.id)];
+    // 更新账户余额
+    await _updateAccountBalance(transaction);
   }
 
   /// 更新交易（保持原有方法名兼容）
-  Future<void> updateTransaction(Transaction transaction) => update(transaction);
+  Future<void> updateTransaction(Transaction transaction) async {
+    // 先获取旧交易，恢复旧余额
+    final oldTransaction = state.firstWhere(
+      (t) => t.id == transaction.id,
+      orElse: () => transaction,
+    );
+    if (oldTransaction.id == transaction.id && oldTransaction != transaction) {
+      await _updateAccountBalance(oldTransaction, isReverse: true);
+    }
+    // 执行更新
+    await update(transaction);
+    // 应用新余额
+    await _updateAccountBalance(transaction);
+  }
 
   /// 删除交易（保持原有方法名兼容）
-  Future<void> deleteTransaction(String id) => delete(id);
+  Future<void> deleteTransaction(String id) async {
+    // 先获取交易，恢复余额
+    final transaction = state.firstWhere(
+      (t) => t.id == id,
+      orElse: () => throw Exception('Transaction not found: $id'),
+    );
+    await _updateAccountBalance(transaction, isReverse: true);
+    // 执行删除
+    await delete(id);
+  }
 
   // ==================== 重复检测方法 ====================
 
