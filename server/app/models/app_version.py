@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.core.timezone import beijing_now_naive
 
 
 class AppVersion(Base):
@@ -70,9 +71,9 @@ class AppVersion(Base):
     published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Audit fields
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=beijing_now_naive, onupdate=beijing_now_naive
     )
     created_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # Creator username
 

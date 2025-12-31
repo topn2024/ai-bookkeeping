@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.timezone import beijing_now_naive
 
 
 class Account(Base):
@@ -27,7 +28,7 @@ class Account(Base):
     repay_day: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # payment due date
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
 
     # Relationships
     user = relationship("User", back_populates="accounts")

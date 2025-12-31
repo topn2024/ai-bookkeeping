@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.timezone import beijing_now_naive
 
 
 class Transaction(Base):
@@ -45,8 +46,8 @@ class Transaction(Base):
     recognition_timestamp: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # When AI recognition happened
     source_file_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # File expiry time
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
 
     # Relationships
     user = relationship("User", back_populates="transactions")

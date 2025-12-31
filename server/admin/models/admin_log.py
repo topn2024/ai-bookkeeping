@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID, JSONB
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.core.timezone import beijing_now_naive
 
 
 class AdminLog(Base):
@@ -46,7 +47,7 @@ class AdminLog(Base):
     error_message = Column(Text, nullable=True)
 
     # 时间
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=beijing_now_naive, index=True)
 
     # 关系
     admin_user = relationship("AdminUser", back_populates="logs", foreign_keys=[admin_id])

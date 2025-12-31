@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.timezone import beijing_now_naive
 
 
 class Backup(Base):
@@ -48,7 +49,7 @@ class Backup(Base):
     app_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
 
     # Relationships
     user = relationship("User", backref="backups")

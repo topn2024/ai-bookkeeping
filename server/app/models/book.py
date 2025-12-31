@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.timezone import beijing_now_naive
 
 
 class Book(Base):
@@ -22,7 +23,7 @@ class Book(Base):
     cover_image: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     book_type: Mapped[int] = mapped_column(Integer, default=0)  # 0: normal, 1: family, 2: business
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
 
     # Relationships
     user = relationship("User", back_populates="books")
@@ -39,7 +40,7 @@ class BookMember(Base):
     book_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("books.id"), nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     role: Mapped[int] = mapped_column(Integer, default=0)  # 0: member, 1: admin, 2: owner
-    joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    joined_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
 
     # Relationships
     book = relationship("Book", back_populates="members")

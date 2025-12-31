@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.core.timezone import beijing_now_naive
 
 
 # 角色-权限关联表
@@ -37,8 +38,8 @@ class AdminRole(Base):
     sort_order = Column(Integer, default=0)
 
     # 时间戳
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now_naive)
+    updated_at = Column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
 
     # 关系
     users = relationship("AdminUser", back_populates="role")
@@ -63,7 +64,7 @@ class AdminPermission(Base):
     module = Column(String(50), nullable=False)  # 所属模块 (如: user, transaction, system)
 
     # 时间戳
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now_naive)
 
     # 关系
     roles = relationship("AdminRole", secondary=RolePermission, back_populates="permissions")

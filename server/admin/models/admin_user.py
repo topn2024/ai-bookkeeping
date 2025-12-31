@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.core.timezone import beijing_now_naive
 
 
 class AdminUser(Base):
@@ -43,8 +44,8 @@ class AdminUser(Base):
     locked_until = Column(DateTime, nullable=True)  # 账户锁定到期时间
 
     # 时间戳
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now_naive)
+    updated_at = Column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
     created_by = Column(PGUUID(as_uuid=True), nullable=True)  # 创建人
 
     # 关系

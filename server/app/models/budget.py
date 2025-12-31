@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.core.timezone import beijing_now_naive
 
 
 class Budget(Base):
@@ -24,4 +25,4 @@ class Budget(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     month: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # NULL for yearly
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)

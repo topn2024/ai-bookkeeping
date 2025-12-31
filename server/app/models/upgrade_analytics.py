@@ -2,6 +2,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Text, Index
 from app.core.database import Base
+from app.core.timezone import beijing_now_naive
 
 
 class UpgradeAnalytics(Base):
@@ -54,7 +55,7 @@ class UpgradeAnalytics(Base):
     # Timestamps
     event_time = Column(DateTime, nullable=False,
                        comment="When the event occurred on client")
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False,
+    created_at = Column(DateTime, default=beijing_now_naive, nullable=False,
                        comment="When the event was recorded on server")
 
     # Indexes for common queries
