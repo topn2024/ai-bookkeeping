@@ -1185,6 +1185,29 @@ class DatabaseService {
     )).toList();
   }
 
+  /// Get the default ledger, or the first ledger if none is marked as default
+  Future<Ledger?> getDefaultLedger() async {
+    final db = await database;
+    // First try to find the default ledger
+    var maps = await db.query('ledgers', where: 'isDefault = 1', limit: 1);
+    if (maps.isEmpty) {
+      // Fall back to first ledger
+      maps = await db.query('ledgers', limit: 1);
+    }
+    if (maps.isEmpty) return null;
+
+    final map = maps.first;
+    return Ledger(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      description: map['description'] as String?,
+      icon: IconData(map['iconCode'] as int, fontFamily: 'MaterialIcons'),
+      color: Color(map['colorValue'] as int),
+      isDefault: (map['isDefault'] as int) == 1,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
+    );
+  }
+
   Future<int> updateLedger(Ledger ledger) async {
     final db = await database;
     return await db.update(

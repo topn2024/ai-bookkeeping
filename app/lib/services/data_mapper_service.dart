@@ -20,8 +20,17 @@ class DataMapperService {
   /// Convert local Transaction to server format
   Future<Map<String, dynamic>> transactionToServer(Transaction tx) async {
     // Get server IDs for referenced entities
-    final bookServerId = await _db.getServerIdByLocalId('book', tx.accountId) ?? tx.accountId;
+    // Get default ledger (book) for this transaction
+    final defaultLedger = await _db.getDefaultLedger();
+    String? bookServerId;
+    if (defaultLedger != null) {
+      bookServerId = await _db.getServerIdByLocalId('book', defaultLedger.id) ?? defaultLedger.id;
+    }
+
+    // Get account server ID
     final accountServerId = await _db.getServerIdByLocalId('account', tx.accountId) ?? tx.accountId;
+
+    // Get category server ID
     final categoryServerId = await _getCategoryServerId(tx.category);
 
     return {

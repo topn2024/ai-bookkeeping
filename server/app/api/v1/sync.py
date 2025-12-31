@@ -124,12 +124,82 @@ async def _handle_create(
         tx_date = date.fromisoformat(data["transaction_date"]) if isinstance(data.get("transaction_date"), str) else data.get("transaction_date", date.today())
         tx_time = time.fromisoformat(data["transaction_time"]) if data.get("transaction_time") else None
 
+        # Get book_id - use provided or get user's default book
+        book_id = None
+        if data.get("book_id"):
+            try:
+                book_id = UUID(data["book_id"]) if isinstance(data["book_id"], str) else data["book_id"]
+            except ValueError:
+                pass
+        if not book_id:
+            # Get or create default book for user
+            default_book = await db.execute(
+                select(Book).where(Book.user_id == user.id, Book.is_default == True)
+            )
+            book = default_book.scalar_one_or_none()
+            if not book:
+                # Get any book or create one
+                any_book = await db.execute(
+                    select(Book).where(Book.user_id == user.id).limit(1)
+                )
+                book = any_book.scalar_one_or_none()
+                if not book:
+                    book = Book(user_id=user.id, name="默认账本", is_default=True)
+                    db.add(book)
+                    await db.flush()
+            book_id = book.id
+
+        # Get account_id - use provided or get user's default account
+        account_id = None
+        if data.get("account_id"):
+            try:
+                account_id = UUID(data["account_id"]) if isinstance(data["account_id"], str) else data["account_id"]
+            except ValueError:
+                pass
+        if not account_id:
+            default_account = await db.execute(
+                select(Account).where(Account.user_id == user.id, Account.is_default == True)
+            )
+            account = default_account.scalar_one_or_none()
+            if not account:
+                any_account = await db.execute(
+                    select(Account).where(Account.user_id == user.id).limit(1)
+                )
+                account = any_account.scalar_one_or_none()
+                if not account:
+                    account = Account(user_id=user.id, name="现金", account_type=1, is_default=True)
+                    db.add(account)
+                    await db.flush()
+            account_id = account.id
+
+        # Get category_id - use provided or get default category
+        category_id = None
+        if data.get("category_id"):
+            try:
+                category_id = UUID(data["category_id"]) if isinstance(data["category_id"], str) else data["category_id"]
+            except ValueError:
+                pass
+        if not category_id:
+            tx_type = data.get("transaction_type", 1)
+            default_category = await db.execute(
+                select(Category).where(
+                    Category.category_type == tx_type,
+                    or_(Category.user_id == user.id, Category.is_system == True)
+                ).limit(1)
+            )
+            category = default_category.scalar_one_or_none()
+            if not category:
+                category = Category(name="其他", category_type=tx_type, is_system=True)
+                db.add(category)
+                await db.flush()
+            category_id = category.id
+
         entity = Transaction(
             user_id=user.id,
-            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data.get("book_id"),
-            account_id=UUID(data["account_id"]) if isinstance(data.get("account_id"), str) else data.get("account_id"),
+            book_id=book_id,
+            account_id=account_id,
             target_account_id=UUID(data["target_account_id"]) if data.get("target_account_id") else None,
-            category_id=UUID(data["category_id"]) if isinstance(data.get("category_id"), str) else data.get("category_id"),
+            category_id=category_id,
             transaction_type=data.get("transaction_type", 1),
             amount=Decimal(str(data.get("amount", 0))),
             fee=Decimal(str(data.get("fee", 0))),
