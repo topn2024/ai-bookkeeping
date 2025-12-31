@@ -38,14 +38,5 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
     chunkSizeWarningLimit: 2000,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'element-plus': ['element-plus'],
-          echarts: ['echarts', 'vue-echarts'],
-          vendor: ['vue', 'vue-router', 'pinia', 'axios'],
-        },
-      },
-    },
   },
 })
