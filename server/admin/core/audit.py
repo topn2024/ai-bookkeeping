@@ -125,7 +125,9 @@ def sanitize_sensitive_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
 def mask_email(email: str) -> str:
     """邮箱脱敏"""
-    if not email or "@" not in email:
+    if not email:
+        return "未设置"
+    if "@" not in email:
         return email
 
     parts = email.split("@")

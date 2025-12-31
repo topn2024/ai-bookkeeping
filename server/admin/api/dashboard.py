@@ -607,7 +607,9 @@ async def _get_transaction_trend_by_type(
 
 def _mask_email(email: str) -> str:
     """邮箱脱敏"""
-    if not email or "@" not in email:
+    if not email:
+        return "未设置"
+    if "@" not in email:
         return email
 
     parts = email.split("@")

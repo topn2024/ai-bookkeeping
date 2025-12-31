@@ -142,297 +142,6 @@ async def create_admin(
     return new_admin
 
 
-@router.get("/{admin_id}", response_model=AdminUserResponse)
-async def get_admin(
-    admin_id: UUID,
-    current_admin: AdminUser = Depends(require_superadmin),
-    db: AsyncSession = Depends(get_db),
-):
-    """获取管理员详情"""
-    result = await db.execute(
-        select(AdminUser)
-        .options(selectinload(AdminUser.role))
-        .where(AdminUser.id == admin_id)
-    )
-    admin = result.scalar_one_or_none()
-
-    if not admin:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="管理员不存在",
-        )
-
-    return admin
-
-
-@router.put("/{admin_id}", response_model=AdminUserResponse)
-async def update_admin(
-    request: Request,
-    admin_id: UUID,
-    admin_data: AdminUserUpdate,
-    current_admin: AdminUser = Depends(require_superadmin),
-    db: AsyncSession = Depends(get_db),
-):
-    """更新管理员"""
-    result = await db.execute(
-        select(AdminUser)
-        .options(selectinload(AdminUser.role))
-        .where(AdminUser.id == admin_id)
-    )
-    admin = result.scalar_one_or_none()
-
-    if not admin:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="管理员不存在",
-        )
-
-    # 不能修改超级管理员
-    if admin.is_superadmin and admin.id != current_admin.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="不能修改其他超级管理员",
-        )
-
-    changes = {}
-
-    if admin_data.email is not None and admin_data.email != admin.email:
-        # 检查邮箱是否已被使用
-        existing = await db.execute(
-            select(AdminUser).where(AdminUser.email == admin_data.email)
-        )
-        if existing.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="邮箱已被使用",
-            )
-        changes["email"] = {"before": admin.email, "after": admin_data.email}
-        admin.email = admin_data.email
-
-    if admin_data.display_name is not None:
-        changes["display_name"] = {"before": admin.display_name, "after": admin_data.display_name}
-        admin.display_name = admin_data.display_name
-
-    if admin_data.phone is not None:
-        changes["phone"] = {"before": admin.phone, "after": admin_data.phone}
-        admin.phone = admin_data.phone
-
-    if admin_data.role_id is not None:
-        # 验证角色
-        role_result = await db.execute(
-            select(AdminRole).where(AdminRole.id == admin_data.role_id)
-        )
-        role = role_result.scalar_one_or_none()
-        if not role:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="角色不存在",
-            )
-        changes["role_id"] = {"before": str(admin.role_id), "after": str(admin_data.role_id)}
-        admin.role_id = admin_data.role_id
-
-    if admin_data.is_active is not None:
-        changes["is_active"] = {"before": admin.is_active, "after": admin_data.is_active}
-        admin.is_active = admin_data.is_active
-
-    # 记录审计日志
-    await create_audit_log(
-        db=db,
-        admin_id=current_admin.id,
-        admin_username=current_admin.username,
-        action="admin.edit",
-        module="admin",
-        target_type="admin",
-        target_id=str(admin_id),
-        target_name=admin.username,
-        description=f"编辑管理员: {admin.username}",
-        changes=changes,
-        request=request,
-    )
-
-    await db.commit()
-    await db.refresh(admin)
-
-    return admin
-
-
-@router.delete("/{admin_id}")
-async def delete_admin(
-    request: Request,
-    admin_id: UUID,
-    current_admin: AdminUser = Depends(require_superadmin),
-    db: AsyncSession = Depends(get_db),
-):
-    """删除管理员"""
-    if admin_id == current_admin.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="不能删除自己",
-        )
-
-    result = await db.execute(
-        select(AdminUser).where(AdminUser.id == admin_id)
-    )
-    admin = result.scalar_one_or_none()
-
-    if not admin:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="管理员不存在",
-        )
-
-    if admin.is_superadmin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="不能删除超级管理员",
-        )
-
-    # 记录审计日志
-    await create_audit_log(
-        db=db,
-        admin_id=current_admin.id,
-        admin_username=current_admin.username,
-        action="admin.delete",
-        module="admin",
-        target_type="admin",
-        target_id=str(admin_id),
-        target_name=admin.username,
-        description=f"删除管理员: {admin.username}",
-        request=request,
-    )
-
-    await db.delete(admin)
-    await db.commit()
-
-    return {"message": "管理员已删除"}
-
-
-# 角色管理
-
-@router.get("/roles/list", response_model=AdminRoleListResponse)
-async def list_roles(
-    current_admin: AdminUser = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    """获取角色列表"""
-    result = await db.execute(
-        select(AdminRole)
-        .options(selectinload(AdminRole.permissions))
-        .order_by(AdminRole.sort_order)
-    )
-    roles = result.scalars().all()
-
-    items = []
-    for role in roles:
-        # 获取使用该角色的用户数
-        user_count_result = await db.execute(
-            select(func.count(AdminUser.id))
-            .where(AdminUser.role_id == role.id)
-        )
-        user_count = user_count_result.scalar() or 0
-
-        items.append(AdminRoleResponse(
-            id=role.id,
-            name=role.name,
-            display_name=role.display_name,
-            description=role.description,
-            is_system=role.is_system,
-            is_active=role.is_active,
-            permissions=[p.code for p in role.permissions],
-            user_count=user_count,
-            created_at=role.created_at,
-        ))
-
-    return AdminRoleListResponse(
-        items=items,
-        total=len(items),
-    )
-
-
-@router.get("/permissions/list", response_model=AdminPermissionListResponse)
-async def list_permissions(
-    current_admin: AdminUser = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    """获取权限列表（按模块分组）"""
-    result = await db.execute(
-        select(AdminPermission).order_by(AdminPermission.module, AdminPermission.code)
-    )
-    permissions = result.scalars().all()
-
-    # 按模块分组
-    modules = {}
-    for perm in permissions:
-        if perm.module not in modules:
-            modules[perm.module] = []
-        modules[perm.module].append({
-            "id": str(perm.id),
-            "code": perm.code,
-            "name": perm.name,
-            "description": perm.description,
-        })
-
-    return AdminPermissionListResponse(modules=modules)
-
-
-@router.post("/init-data")
-async def init_admin_data(
-    request: Request,
-    current_admin: AdminUser = Depends(require_superadmin),
-    db: AsyncSession = Depends(get_db),
-):
-    """初始化权限和角色数据（仅超级管理员可用）"""
-    # 初始化权限
-    for perm_data in PREDEFINED_PERMISSIONS:
-        existing = await db.execute(
-            select(AdminPermission).where(AdminPermission.code == perm_data["code"])
-        )
-        if not existing.scalar_one_or_none():
-            perm = AdminPermission(**perm_data)
-            db.add(perm)
-
-    await db.flush()
-
-    # 初始化角色
-    for role_name, role_data in PREDEFINED_ROLES.items():
-        existing = await db.execute(
-            select(AdminRole).where(AdminRole.name == role_name)
-        )
-        if not existing.scalar_one_or_none():
-            role = AdminRole(
-                name=role_name,
-                display_name=role_data["display_name"],
-                description=role_data["description"],
-                is_system=role_data["is_system"],
-            )
-            db.add(role)
-            await db.flush()
-
-            # 分配权限
-            if role_data["permissions"] != ["*"]:
-                for perm_code in role_data["permissions"]:
-                    perm_result = await db.execute(
-                        select(AdminPermission).where(AdminPermission.code == perm_code)
-                    )
-                    perm = perm_result.scalar_one_or_none()
-                    if perm:
-                        role.permissions.append(perm)
-
-    await create_audit_log(
-        db=db,
-        admin_id=current_admin.id,
-        admin_username=current_admin.username,
-        action="admin.init_data",
-        module="admin",
-        description="初始化权限和角色数据",
-        request=request,
-    )
-
-    await db.commit()
-
-    return {"message": "初始化完成"}
-
-
 # ============ Request/Response Models ============
 
 class ProfileUpdateRequest(BaseModel):
@@ -475,6 +184,7 @@ _notification_preferences: Dict[str, NotificationPreferences] = {}
 
 
 # ============ Profile Management (GF-008) ============
+# NOTE: /me endpoints MUST be defined BEFORE /{admin_id} routes to avoid path conflicts
 
 @router.get("/me")
 async def get_my_profile(
@@ -819,3 +529,296 @@ async def update_notification_preferences(
     await db.commit()
 
     return {"message": "通知偏好已更新"}
+
+
+# ============ Admin CRUD (must be after /me routes) ============
+
+@router.get("/{admin_id}", response_model=AdminUserResponse)
+async def get_admin(
+    admin_id: UUID,
+    current_admin: AdminUser = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取管理员详情"""
+    result = await db.execute(
+        select(AdminUser)
+        .options(selectinload(AdminUser.role))
+        .where(AdminUser.id == admin_id)
+    )
+    admin = result.scalar_one_or_none()
+
+    if not admin:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="管理员不存在",
+        )
+
+    return admin
+
+
+@router.put("/{admin_id}", response_model=AdminUserResponse)
+async def update_admin(
+    request: Request,
+    admin_id: UUID,
+    admin_data: AdminUserUpdate,
+    current_admin: AdminUser = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新管理员"""
+    result = await db.execute(
+        select(AdminUser)
+        .options(selectinload(AdminUser.role))
+        .where(AdminUser.id == admin_id)
+    )
+    admin = result.scalar_one_or_none()
+
+    if not admin:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="管理员不存在",
+        )
+
+    # 不能修改超级管理员
+    if admin.is_superadmin and admin.id != current_admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="不能修改其他超级管理员",
+        )
+
+    changes = {}
+
+    if admin_data.email is not None and admin_data.email != admin.email:
+        # 检查邮箱是否已被使用
+        existing = await db.execute(
+            select(AdminUser).where(AdminUser.email == admin_data.email)
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="邮箱已被使用",
+            )
+        changes["email"] = {"before": admin.email, "after": admin_data.email}
+        admin.email = admin_data.email
+
+    if admin_data.display_name is not None:
+        changes["display_name"] = {"before": admin.display_name, "after": admin_data.display_name}
+        admin.display_name = admin_data.display_name
+
+    if admin_data.phone is not None:
+        changes["phone"] = {"before": admin.phone, "after": admin_data.phone}
+        admin.phone = admin_data.phone
+
+    if admin_data.role_id is not None:
+        # 验证角色
+        role_result = await db.execute(
+            select(AdminRole).where(AdminRole.id == admin_data.role_id)
+        )
+        role = role_result.scalar_one_or_none()
+        if not role:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="角色不存在",
+            )
+        changes["role_id"] = {"before": str(admin.role_id), "after": str(admin_data.role_id)}
+        admin.role_id = admin_data.role_id
+
+    if admin_data.is_active is not None:
+        changes["is_active"] = {"before": admin.is_active, "after": admin_data.is_active}
+        admin.is_active = admin_data.is_active
+
+    # 记录审计日志
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="admin.edit",
+        module="admin",
+        target_type="admin",
+        target_id=str(admin_id),
+        target_name=admin.username,
+        description=f"编辑管理员: {admin.username}",
+        changes=changes,
+        request=request,
+    )
+
+    await db.commit()
+    await db.refresh(admin)
+
+    return admin
+
+
+@router.delete("/{admin_id}")
+async def delete_admin(
+    request: Request,
+    admin_id: UUID,
+    current_admin: AdminUser = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db),
+):
+    """删除管理员"""
+    if admin_id == current_admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="不能删除自己",
+        )
+
+    result = await db.execute(
+        select(AdminUser).where(AdminUser.id == admin_id)
+    )
+    admin = result.scalar_one_or_none()
+
+    if not admin:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="管理员不存在",
+        )
+
+    if admin.is_superadmin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="不能删除超级管理员",
+        )
+
+    # 记录审计日志
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="admin.delete",
+        module="admin",
+        target_type="admin",
+        target_id=str(admin_id),
+        target_name=admin.username,
+        description=f"删除管理员: {admin.username}",
+        request=request,
+    )
+
+    await db.delete(admin)
+    await db.commit()
+
+    return {"message": "管理员已删除"}
+
+
+# 角色管理
+
+@router.get("/roles/list", response_model=AdminRoleListResponse)
+async def list_roles(
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取角色列表"""
+    result = await db.execute(
+        select(AdminRole)
+        .options(selectinload(AdminRole.permissions))
+        .order_by(AdminRole.sort_order)
+    )
+    roles = result.scalars().all()
+
+    items = []
+    for role in roles:
+        # 获取使用该角色的用户数
+        user_count_result = await db.execute(
+            select(func.count(AdminUser.id))
+            .where(AdminUser.role_id == role.id)
+        )
+        user_count = user_count_result.scalar() or 0
+
+        items.append(AdminRoleResponse(
+            id=role.id,
+            name=role.name,
+            display_name=role.display_name,
+            description=role.description,
+            is_system=role.is_system,
+            is_active=role.is_active,
+            permissions=[p.code for p in role.permissions],
+            user_count=user_count,
+            created_at=role.created_at,
+        ))
+
+    return AdminRoleListResponse(
+        items=items,
+        total=len(items),
+    )
+
+
+@router.get("/permissions/list", response_model=AdminPermissionListResponse)
+async def list_permissions(
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取权限列表（按模块分组）"""
+    result = await db.execute(
+        select(AdminPermission).order_by(AdminPermission.module, AdminPermission.code)
+    )
+    permissions = result.scalars().all()
+
+    # 按模块分组
+    modules = {}
+    for perm in permissions:
+        if perm.module not in modules:
+            modules[perm.module] = []
+        modules[perm.module].append({
+            "id": str(perm.id),
+            "code": perm.code,
+            "name": perm.name,
+            "description": perm.description,
+        })
+
+    return AdminPermissionListResponse(modules=modules)
+
+
+@router.post("/init-data")
+async def init_admin_data(
+    request: Request,
+    current_admin: AdminUser = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db),
+):
+    """初始化权限和角色数据（仅超级管理员可用）"""
+    # 初始化权限
+    for perm_data in PREDEFINED_PERMISSIONS:
+        existing = await db.execute(
+            select(AdminPermission).where(AdminPermission.code == perm_data["code"])
+        )
+        if not existing.scalar_one_or_none():
+            perm = AdminPermission(**perm_data)
+            db.add(perm)
+
+    await db.flush()
+
+    # 初始化角色
+    for role_name, role_data in PREDEFINED_ROLES.items():
+        existing = await db.execute(
+            select(AdminRole).where(AdminRole.name == role_name)
+        )
+        if not existing.scalar_one_or_none():
+            role = AdminRole(
+                name=role_name,
+                display_name=role_data["display_name"],
+                description=role_data["description"],
+                is_system=role_data["is_system"],
+            )
+            db.add(role)
+            await db.flush()
+
+            # 分配权限
+            if role_data["permissions"] != ["*"]:
+                for perm_code in role_data["permissions"]:
+                    perm_result = await db.execute(
+                        select(AdminPermission).where(AdminPermission.code == perm_code)
+                    )
+                    perm = perm_result.scalar_one_or_none()
+                    if perm:
+                        role.permissions.append(perm)
+
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="admin.init_data",
+        module="admin",
+        description="初始化权限和角色数据",
+        request=request,
+    )
+
+    await db.commit()
+
+    return {"message": "初始化完成"}

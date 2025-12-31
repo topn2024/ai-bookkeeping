@@ -128,8 +128,13 @@ _settings_store: Dict[str, Any] = {
 }
 
 
-def mask_secret(value: Optional[str]) -> Optional[str]:
+def mask_secret(value) -> Optional[str]:
     """Mask secret values."""
+    if value is None:
+        return None
+    # Convert to string if not already
+    if not isinstance(value, str):
+        return str(value)
     if not value:
         return None
     if len(value) <= 8:

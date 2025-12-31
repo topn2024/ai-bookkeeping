@@ -64,7 +64,7 @@ async def list_users(
         query = query.where(
             or_(
                 User.email.ilike(search_pattern),
-                User.display_name.ilike(search_pattern),
+                User.nickname.ilike(search_pattern),
             )
         )
 
@@ -120,7 +120,7 @@ async def list_users(
         items.append(AppUserListItem(
             id=user.id,
             email_masked=mask_email(user.email),
-            display_name=user.display_name,
+            display_name=user.nickname,
             avatar_url=user.avatar_url,
             is_active=user.is_active if hasattr(user, 'is_active') else True,
             is_premium=getattr(user, 'is_premium', False),
@@ -128,7 +128,7 @@ async def list_users(
             total_amount=f"¥{total_amount:,.2f}",
             book_count=book_count.scalar() or 0,
             account_count=account_count.scalar() or 0,
-            last_login_at=user.last_login_at,
+            last_login_at=getattr(user, 'last_login_at', None),
             created_at=user.created_at,
         ))
 
@@ -151,6 +151,105 @@ async def list_users(
         page_size=page_size,
     )
 
+
+# ============ User Export (UM-005) ============
+# NOTE: /export route MUST be defined BEFORE /{user_id} to avoid path conflicts
+
+@router.get("/export")
+async def export_users(
+    request: Request,
+    format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    include_stats: bool = Query(False),
+    is_active: Optional[bool] = None,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("user:export")),
+):
+    """批量导出用户数据 (UM-005)"""
+    # Build query
+    query = select(User)
+    if is_active is not None:
+        query = query.where(User.is_active == is_active)
+    query = query.order_by(User.created_at.desc())
+
+    result = await db.execute(query)
+    users = result.scalars().all()
+
+    # Prepare data
+    rows = []
+    for user in users:
+        row = {
+            "ID": str(user.id),
+            "邮箱(脱敏)": mask_email(user.email),
+            "显示名称": user.nickname or "",
+            "状态": "活跃" if getattr(user, 'is_active', True) else "禁用",
+            "会员": "是" if getattr(user, 'is_premium', False) else "否",
+            "注册时间": user.created_at.strftime("%Y-%m-%d %H:%M:%S") if user.created_at else "",
+            "最后登录": getattr(user, 'last_login_at', None).strftime("%Y-%m-%d %H:%M:%S") if getattr(user, 'last_login_at', None) else "",
+        }
+
+        if include_stats:
+            # Get transaction count
+            tx_count = await db.execute(
+                select(func.count(Transaction.id))
+                .where(Transaction.user_id == user.id)
+            )
+            row["交易数"] = tx_count.scalar() or 0
+
+            # Get book count
+            book_count = await db.execute(
+                select(func.count(Book.id))
+                .where(Book.user_id == user.id)
+            )
+            row["账本数"] = book_count.scalar() or 0
+
+        rows.append(row)
+
+    # Generate file
+    if format == "csv":
+        output = io.StringIO()
+        if rows:
+            headers = list(rows[0].keys())
+            output.write(",".join(headers) + "\n")
+            for row in rows:
+                output.write(",".join(str(row.get(h, "")) for h in headers) + "\n")
+
+        content = output.getvalue().encode('utf-8-sig')
+        media_type = "text/csv; charset=utf-8"
+        filename = f"users_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    else:
+        # For xlsx, return CSV with xlsx extension (simplified)
+        output = io.StringIO()
+        if rows:
+            headers = list(rows[0].keys())
+            output.write("\t".join(headers) + "\n")
+            for row in rows:
+                output.write("\t".join(str(row.get(h, "")) for h in headers) + "\n")
+
+        content = output.getvalue().encode('utf-8-sig')
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = f"users_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+    # Audit log
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="user.export",
+        module="user",
+        description=f"导出用户数据: {len(rows)}条记录, 格式={format}",
+        request=request,
+    )
+    await db.commit()
+
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+# ============ User CRUD (must be after /export route) ============
 
 @router.get("/{user_id}", response_model=AppUserDetail)
 async def get_user_detail(
@@ -243,7 +342,7 @@ async def get_user_detail(
     return AppUserDetail(
         id=user.id,
         email_masked=mask_email(user.email),
-        display_name=user.display_name,
+        display_name=user.nickname,
         avatar_url=user.avatar_url,
         is_active=user.is_active if hasattr(user, 'is_active') else True,
         is_premium=getattr(user, 'is_premium', False),
@@ -257,7 +356,7 @@ async def get_user_detail(
         total_expense=f"¥{total_expense:,.2f}",
         total_balance=f"¥{total_balance:,.2f}",
         created_at=user.created_at,
-        last_login_at=user.last_login_at,
+        last_login_at=getattr(user, 'last_login_at', None),
         last_transaction_at=last_tx_time,
     )
 
@@ -475,102 +574,6 @@ class UserDeleteResponse(BaseModel):
     deleted_at: datetime
 
 
-# ============ User Export (UM-005) ============
-
-@router.get("/export")
-async def export_users(
-    request: Request,
-    format: str = Query("csv", pattern="^(csv|xlsx)$"),
-    include_stats: bool = Query(False),
-    is_active: Optional[bool] = None,
-    current_admin: AdminUser = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db),
-    _: bool = Depends(has_permission("user:export")),
-):
-    """批量导出用户数据 (UM-005)"""
-    # Build query
-    query = select(User)
-    if is_active is not None:
-        query = query.where(User.is_active == is_active)
-    query = query.order_by(User.created_at.desc())
-
-    result = await db.execute(query)
-    users = result.scalars().all()
-
-    # Prepare data
-    rows = []
-    for user in users:
-        row = {
-            "ID": str(user.id),
-            "邮箱(脱敏)": mask_email(user.email),
-            "显示名称": user.display_name or "",
-            "状态": "活跃" if getattr(user, 'is_active', True) else "禁用",
-            "会员": "是" if getattr(user, 'is_premium', False) else "否",
-            "注册时间": user.created_at.strftime("%Y-%m-%d %H:%M:%S") if user.created_at else "",
-            "最后登录": user.last_login_at.strftime("%Y-%m-%d %H:%M:%S") if user.last_login_at else "",
-        }
-
-        if include_stats:
-            # Get transaction count
-            tx_count = await db.execute(
-                select(func.count(Transaction.id))
-                .where(Transaction.user_id == user.id)
-            )
-            row["交易数"] = tx_count.scalar() or 0
-
-            # Get book count
-            book_count = await db.execute(
-                select(func.count(Book.id))
-                .where(Book.user_id == user.id)
-            )
-            row["账本数"] = book_count.scalar() or 0
-
-        rows.append(row)
-
-    # Generate file
-    if format == "csv":
-        output = io.StringIO()
-        if rows:
-            headers = list(rows[0].keys())
-            output.write(",".join(headers) + "\n")
-            for row in rows:
-                output.write(",".join(str(row.get(h, "")) for h in headers) + "\n")
-
-        content = output.getvalue().encode('utf-8-sig')
-        media_type = "text/csv; charset=utf-8"
-        filename = f"users_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    else:
-        # For xlsx, return CSV with xlsx extension (simplified)
-        output = io.StringIO()
-        if rows:
-            headers = list(rows[0].keys())
-            output.write("\t".join(headers) + "\n")
-            for row in rows:
-                output.write("\t".join(str(row.get(h, "")) for h in headers) + "\n")
-
-        content = output.getvalue().encode('utf-8-sig')
-        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        filename = f"users_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-
-    # Audit log
-    await create_audit_log(
-        db=db,
-        admin_id=current_admin.id,
-        admin_username=current_admin.username,
-        action="user.export",
-        module="user",
-        description=f"导出用户数据: {len(rows)}条记录, 格式={format}",
-        request=request,
-    )
-    await db.commit()
-
-    return StreamingResponse(
-        io.BytesIO(content),
-        media_type=media_type,
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
-
-
 # ============ Login History (UM-009) ============
 
 @router.get("/{user_id}/login-history")
@@ -630,9 +633,10 @@ async def get_user_login_history(
         # Table doesn't exist, return empty or simulated data based on last_login_at
         items = []
         total = 0
-        if user.last_login_at:
+        last_login = getattr(user, 'last_login_at', None)
+        if last_login:
             items.append(LoginHistoryItem(
-                login_time=user.last_login_at,
+                login_time=last_login,
                 ip_address="--",
                 device_type="--",
                 device_info="登录历史表未配置",
@@ -764,8 +768,9 @@ async def get_user_behavior_analysis(
         risk_indicators.append("无交易记录")
 
     # Check last login
-    if user.last_login_at:
-        days_since_login = (datetime.utcnow() - user.last_login_at).days
+    user_last_login = getattr(user, 'last_login_at', None)
+    if user_last_login:
+        days_since_login = (datetime.utcnow() - user_last_login).days
         if days_since_login > 30:
             risk_indicators.append(f"超过{days_since_login}天未登录")
 

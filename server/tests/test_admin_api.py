@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 import json
 
 # Base URL for admin API
-BASE_URL = "http://localhost:8001"
+# Use remote server if localhost is not available
+BASE_URL = "http://160.202.238.29:8001"
 
 
 # ============ Module-level shared state ============

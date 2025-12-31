@@ -211,30 +211,8 @@ async def get_log_stats(
     }
 
 
-@router.get("/{log_id}", response_model=AdminLogDetail)
-async def get_log_detail(
-    log_id: UUID,
-    current_admin: AdminUser = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db),
-    _: bool = Depends(has_permission("log:view")),
-):
-    """获取日志详情"""
-    result = await db.execute(
-        select(AdminLog).where(AdminLog.id == log_id)
-    )
-    log = result.scalar_one_or_none()
-
-    if not log:
-        from fastapi import HTTPException, status
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="日志不存在",
-        )
-
-    return log
-
-
 # ============ Log Export (GF-007) ============
+# NOTE: /export route MUST be defined BEFORE /{log_id} to avoid path conflicts
 
 @router.get("/export")
 async def export_logs(
@@ -340,3 +318,28 @@ async def export_logs(
         media_type=media_type,
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# ============ Log Detail (must be after /export) ============
+
+@router.get("/{log_id}", response_model=AdminLogDetail)
+async def get_log_detail(
+    log_id: UUID,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("log:view")),
+):
+    """获取日志详情"""
+    result = await db.execute(
+        select(AdminLog).where(AdminLog.id == log_id)
+    )
+    log = result.scalar_one_or_none()
+
+    if not log:
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="日志不存在",
+        )
+
+    return log
