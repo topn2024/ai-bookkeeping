@@ -507,6 +507,7 @@ ai-bookkeeping-app/
 │   │   └── ai/                # AI记账模块
 │   └── shared/
 │       ├── widgets/           # 通用组件
+│       │   └── swipeable_transaction_item.dart  # 可滑动交易条目
 │       └── dialogs/           # 弹窗组件
 ├── assets/
 │   ├── images/                # 图片资源
@@ -10977,6 +10978,356 @@ class TransactionCoordinator:
 | 22-24 | 模块解耦、UI/UX、埋点 | 单一职责、可观测性 |
 | 25-28 | 主题换肤、性能优化、安全隐私、用户协议 | 高性能、安全性 |
 | 29-30 | 架构原则、高可用保障、总结 | 全部原则 |
+| 31 | APP升级与更新系统 | 高可用、安全性 |
+
+---
+
+## 三十一、APP 升级与更新系统
+
+### 31.1 系统概述
+
+APP 升级系统提供完整的版本管理、增量更新、升级监控功能，支持灰度发布和强制更新策略。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     APP 升级系统架构                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
+│  │  版本检查   │───▶│  增量更新   │───▶│  升级监控   │         │
+│  │  Service    │    │  Service    │    │  Service    │         │
+│  └─────────────┘    └─────────────┘    └─────────────┘         │
+│         │                  │                  │                 │
+│         ▼                  ▼                  ▼                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
+│  │  灰度发布   │    │  bspatch    │    │  事件埋点   │         │
+│  │  策略       │    │  原生库     │    │  上报       │         │
+│  └─────────────┘    └─────────────┘    └─────────────┘         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 31.2 版本检查
+
+#### 31.2.1 检查流程
+
+```dart
+// 客户端版本检查
+class AppUpgradeService {
+  Future<UpdateCheckResult> checkUpdate({bool force = false}) async {
+    // 1. 检查本地缓存（1小时有效）
+    if (!force && _lastCheckResult != null) {
+      if (DateTime.now().difference(_lastCheckTime!) < _cacheExpiry) {
+        return _lastCheckResult!;
+      }
+    }
+
+    // 2. 请求服务器
+    final response = await dio.get('/app-upgrade/check', queryParameters: {
+      'version_name': packageInfo.version,
+      'version_code': packageInfo.buildNumber,
+      'platform': Platform.isAndroid ? 'android' : 'ios',
+      'device_id': deviceId,  // 用于灰度发布
+    });
+
+    // 3. 返回检查结果
+    return UpdateCheckResult.fromJson(response.data);
+  }
+}
+```
+
+#### 31.2.2 灰度发布
+
+```python
+# 服务端灰度逻辑
+def is_in_rollout(device_id: str, rollout_percentage: int) -> bool:
+    """使用一致性哈希确保同一设备始终获得相同结果"""
+    if rollout_percentage >= 100:
+        return True
+    if rollout_percentage <= 0:
+        return False
+
+    # 计算设备哈希值
+    hash_bytes = hashlib.md5(device_id.encode()).digest()
+    hash_value = int.from_bytes(hash_bytes[:4], 'big')
+    device_bucket = hash_value % 100
+
+    return device_bucket < rollout_percentage
+```
+
+### 31.3 APK 下载
+
+#### 31.3.1 断点续传
+
+```dart
+Future<DownloadResult> downloadApk(
+  VersionInfo version, {
+  bool enableResume = true,
+}) async {
+  final tempPath = '$savePath.tmp';
+  int downloadedBytes = 0;
+  bool resuming = false;
+
+  // 检查是否有部分下载的文件
+  if (enableResume && await tempFile.exists()) {
+    downloadedBytes = await tempFile.length();
+    if (version.fileSize != null && downloadedBytes < version.fileSize!) {
+      resuming = true;
+    }
+  }
+
+  // 设置 Range 头实现断点续传
+  final options = Options();
+  if (resuming && downloadedBytes > 0) {
+    options.headers = {'Range': 'bytes=$downloadedBytes-'};
+  }
+
+  await dio.download(
+    version.downloadUrl!,
+    tempPath,
+    onReceiveProgress: (received, total) {
+      final actualReceived = resuming ? received + downloadedBytes : received;
+      final actualTotal = resuming ? total + downloadedBytes : total;
+      onProgress?.call(actualReceived, actualTotal);
+    },
+    options: options,
+    deleteOnError: false,  // 保留部分下载的文件
+  );
+
+  // 下载完成后重命名
+  await tempFile.rename(savePath);
+}
+```
+
+#### 31.3.2 MD5 校验
+
+```dart
+Future<String> _calculateFileMd5(File file) async {
+  final bytes = await file.readAsBytes();
+  final digest = md5.convert(bytes);
+  return digest.toString().toLowerCase();
+}
+```
+
+### 31.4 增量更新
+
+#### 31.4.1 架构设计
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    增量更新流程                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  服务端（发布时）:                                               │
+│  ┌─────────┐    ┌─────────┐    ┌─────────┐                     │
+│  │ old.apk │ + │ bsdiff  │ = │ patch   │                       │
+│  │         │    │ 工具    │    │ 文件    │                       │
+│  └─────────┘    └─────────┘    └─────────┘                     │
+│                                                                  │
+│  客户端（更新时）:                                               │
+│  ┌─────────┐    ┌─────────┐    ┌─────────┐                     │
+│  │当前APK  │ + │ bspatch │ = │ new.apk │                       │
+│  │         │    │ 原生库  │    │         │                       │
+│  └─────────┘    └─────────┘    └─────────┘                     │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 31.4.2 原生 bspatch 实现
+
+```c
+// bspatch.c - 核心补丁应用算法
+int bspatch(const char *old_path, const char *new_path, const char *patch_path) {
+    // 1. 读取原文件和补丁文件
+    // 2. 解压控制块、差异块、额外块
+    // 3. 应用补丁算法生成新文件
+    // 4. 返回结果
+}
+```
+
+```kotlin
+// BsPatchHelper.kt - JNI 接口
+object BsPatchHelper {
+    init {
+        System.loadLibrary("bspatch")
+    }
+
+    @JvmStatic
+    external fun applyPatch(oldPath: String, newPath: String, patchPath: String): Int
+
+    @JvmStatic
+    fun getCurrentApkPath(context: Context): String? {
+        return context.applicationInfo.sourceDir
+    }
+}
+```
+
+#### 31.4.3 智能下载策略
+
+```dart
+Future<DownloadResult> smartDownload(VersionInfo version) async {
+  // 优先使用增量更新
+  if (version.hasPatch) {
+    final bspatch = BsPatchService();
+    if (bspatch.isSupported) {
+      // 下载补丁
+      final patchResult = await downloadPatch(version.patch!);
+      if (patchResult.isSuccess) {
+        // 应用补丁
+        final newApk = await applyPatch(
+          patchPath: patchResult.filePath!,
+          targetVersion: version.versionName,
+          expectedMd5: version.fileMd5,
+        );
+        if (newApk != null) {
+          return DownloadResult.success(newApk);
+        }
+      }
+    }
+    _logger.warning('增量更新失败，回退到全量下载');
+  }
+
+  // 回退到全量下载
+  return await downloadApk(version);
+}
+```
+
+### 31.5 升级监控
+
+#### 31.5.1 事件类型
+
+| 事件类型 | 描述 | 触发时机 |
+|---------|------|---------|
+| checkUpdate | 检查更新 | 启动时 |
+| updateFound | 发现新版本 | 有可用更新 |
+| downloadStart | 开始下载 | 用户确认更新 |
+| downloadProgress | 下载进度 | 每25%上报 |
+| downloadComplete | 下载完成 | 下载成功 |
+| downloadFailed | 下载失败 | 下载异常 |
+| md5Failed | MD5校验失败 | 文件损坏 |
+| installStart | 开始安装 | 打开安装界面 |
+| installSuccess | 安装成功 | 下次启动检测 |
+
+#### 31.5.2 离线缓存与批量上报
+
+```dart
+class UpgradeAnalyticsService {
+  final List<UpgradeEvent> _pendingEvents = [];
+
+  Future<void> trackEvent(UpgradeEventType type) async {
+    final event = UpgradeEvent(type: type, ...);
+
+    // 尝试直接上报
+    final sent = await _sendEvent(event);
+    if (!sent) {
+      // 上报失败，加入待发送队列
+      _pendingEvents.add(event);
+      await _savePendingEvents();
+    }
+  }
+
+  Future<void> _flushPendingEvents() async {
+    for (final event in _pendingEvents) {
+      if (await _sendEvent(event)) {
+        _pendingEvents.remove(event);
+      }
+    }
+  }
+}
+```
+
+### 31.6 数据库迁移安全
+
+#### 31.6.1 迁移流程
+
+```dart
+class DatabaseMigrationService {
+  Future<MigrationResult> prepareMigration({
+    required int currentVersion,
+    required int targetVersion,
+  }) async {
+    // 1. 创建备份
+    final backupPath = await _createBackup(currentVersion);
+
+    // 2. 记录迁移状态
+    await _setMigrationStatus('in_progress');
+
+    return MigrationResult.prepared(backupPath: backupPath);
+  }
+
+  Future<void> onMigrationComplete({
+    required int newVersion,
+    required bool success,
+  }) async {
+    if (success) {
+      await _setMigrationStatus('completed');
+      await _cleanupOldBackups();  // 保留最近5个
+    } else {
+      await _setMigrationStatus('failed');
+      // 可通过 restoreFromBackup() 恢复
+    }
+  }
+}
+```
+
+### 31.7 API 设计
+
+| 方法 | 路径 | 描述 |
+|------|------|------|
+| GET | /api/v1/app-upgrade/check | 检查更新 |
+| GET | /api/v1/app-upgrade/latest | 获取最新版本 |
+| POST | /api/v1/app-upgrade/analytics | 上报埋点事件 |
+| GET | /api/v1/app-upgrade/stats/{version} | 获取版本统计 |
+
+### 31.8 数据模型
+
+```sql
+-- 版本管理表
+CREATE TABLE app_versions (
+    id UUID PRIMARY KEY,
+    version_name VARCHAR(20) NOT NULL,
+    version_code INTEGER NOT NULL,
+    platform VARCHAR(20) DEFAULT 'android',
+
+    -- 完整包
+    file_url VARCHAR(500),
+    file_size BIGINT,
+    file_md5 VARCHAR(32),
+
+    -- 增量包
+    patch_from_version VARCHAR(20),
+    patch_from_code INTEGER,
+    patch_file_url VARCHAR(500),
+    patch_file_size BIGINT,
+    patch_file_md5 VARCHAR(32),
+
+    -- 更新策略
+    is_force_update BOOLEAN DEFAULT FALSE,
+    min_supported_version VARCHAR(20),
+    rollout_percentage INTEGER DEFAULT 100,
+
+    -- 发布状态
+    status INTEGER DEFAULT 0,  -- 0=草稿, 1=发布, 2=废弃
+    release_notes TEXT,
+    published_at TIMESTAMP
+);
+
+-- 升级埋点表
+CREATE TABLE upgrade_analytics (
+    id SERIAL PRIMARY KEY,
+    event_type VARCHAR(50) NOT NULL,
+    platform VARCHAR(20) NOT NULL,
+    from_version VARCHAR(20) NOT NULL,
+    to_version VARCHAR(20),
+    download_progress INTEGER,
+    download_size INTEGER,
+    download_duration_ms INTEGER,
+    error_message TEXT,
+    device_id VARCHAR(100),
+    event_time TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
 ---
 
