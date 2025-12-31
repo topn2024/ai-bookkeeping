@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class AppUserListItem(BaseModel):
     """APP用户列表项"""
     id: UUID
-    email_masked: str  # 脱敏后的邮箱
+    email_masked: Optional[str] = None  # 脱敏后的邮箱（可能为空，如手机号登录用户）
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     is_active: bool
@@ -37,7 +37,7 @@ class AppUserListResponse(BaseModel):
 class AppUserDetail(BaseModel):
     """APP用户详情"""
     id: UUID
-    email_masked: str
+    email_masked: Optional[str] = None
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     is_active: bool
