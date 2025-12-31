@@ -8,11 +8,11 @@
             <el-icon :size="24"><component :is="stat.icon" /></el-icon>
           </div>
           <div class="stats-info">
-            <div class="stats-value">{{ formatNumber(stats[stat.key] || 0) }}</div>
-            <div class="stats-label">{{ stat.label }}</div>
-            <div v-if="stat.trend" class="stats-trend" :class="getTrendClass(stats[stat.trendKey])">
-              <el-icon><CaretTop v-if="stats[stat.trendKey] >= 0" /><CaretBottom v-else /></el-icon>
-              {{ Math.abs(stats[stat.trendKey] || 0).toFixed(1) }}%
+            <div class="stats-value">{{ getStatValue(stat.key) }}</div>
+            <div class="stats-label">{{ getStatLabel(stat.key) }}</div>
+            <div v-if="getStatChange(stat.key) !== null" class="stats-trend" :class="getStatChangeType(stat.key)">
+              <el-icon><CaretTop v-if="getStatChange(stat.key) >= 0" /><CaretBottom v-else /></el-icon>
+              {{ Math.abs(getStatChange(stat.key) || 0).toFixed(1) }}%
             </div>
           </div>
         </div>
@@ -147,16 +147,49 @@ let userTrendChartInstance: echarts.ECharts | null = null
 let transactionPieChartInstance: echarts.ECharts | null = null
 let heatmapChartInstance: echarts.ECharts | null = null
 
-// Stats cards config
+// Stats cards config - 匹配后端 DashboardStatsResponse 结构
 const statsCards = [
-  { key: 'total_users', label: '总用户数', icon: 'User', color: '#1890ff', trend: true, trendKey: 'user_growth_rate' },
-  { key: 'active_users', label: '活跃用户', icon: 'UserFilled', color: '#52c41a', trend: true, trendKey: 'active_growth_rate' },
-  { key: 'total_transactions', label: '总交易数', icon: 'Tickets', color: '#722ed1', trend: false },
-  { key: 'today_transactions', label: '今日交易', icon: 'Timer', color: '#fa8c16', trend: false },
+  { key: 'today_new_users', label: '今日新增', icon: 'User', color: '#1890ff', isStatCard: true },
+  { key: 'today_active_users', label: '今日活跃', icon: 'UserFilled', color: '#52c41a', isStatCard: true },
+  { key: 'today_transactions', label: '今日交易', icon: 'Tickets', color: '#722ed1', isStatCard: true },
+  { key: 'today_amount', label: '今日金额', icon: 'Timer', color: '#fa8c16', isStatCard: true },
 ]
 
 // Formatters - use shared utilities
 const formatDate = formatShortDate
+
+// 获取 StatCard 数据的辅助函数
+const getStatValue = (key: string) => {
+  const statCard = (stats as any)[key]
+  if (statCard && typeof statCard === 'object' && 'value' in statCard) {
+    return statCard.value
+  }
+  return statCard || 0
+}
+
+const getStatLabel = (key: string) => {
+  const statCard = (stats as any)[key]
+  if (statCard && typeof statCard === 'object' && 'label' in statCard) {
+    return statCard.label
+  }
+  return ''
+}
+
+const getStatChange = (key: string): number | null => {
+  const statCard = (stats as any)[key]
+  if (statCard && typeof statCard === 'object' && 'change' in statCard) {
+    return statCard.change
+  }
+  return null
+}
+
+const getStatChangeType = (key: string) => {
+  const statCard = (stats as any)[key]
+  if (statCard && typeof statCard === 'object' && 'change_type' in statCard) {
+    return statCard.change_type === 'up' ? 'up' : 'down'
+  }
+  return 'flat'
+}
 
 const getTrendClass = (value: number) => {
   return value >= 0 ? 'up' : 'down'
