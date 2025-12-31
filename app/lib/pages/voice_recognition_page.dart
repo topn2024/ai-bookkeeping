@@ -15,6 +15,7 @@ import '../models/category.dart';
 import '../models/transaction.dart';
 import '../widgets/duplicate_transaction_dialog.dart';
 import '../services/category_localization_service.dart';
+import 'multi_transaction_confirm_page.dart';
 
 /// 语音记账页面 - 单手操作优化设计
 /// 使用千问音频模型直接识别语音内容并提取记账信息
@@ -244,18 +245,56 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
 
       final audioData = await file.readAsBytes();
       final aiService = AIService();
-      final result = await aiService.recognizeAudio(audioData, format: 'wav');
 
-      setState(() {
-        _recognitionResult = result;
-        _state = result.success ? 'result' : 'idle';
-        if (result.success) {
-          _populateFieldsFromResult(result);
+      // 使用多笔交易识别
+      final multiResult = await aiService.recognizeAudioMulti(audioData, format: 'wav');
+
+      if (!multiResult.success) {
+        setState(() {
+          _state = 'idle';
+        });
+        _showError(multiResult.errorMessage ?? '识别失败');
+        return;
+      }
+
+      // 检查是否识别到多笔交易
+      if (multiResult.isMultiple) {
+        // 多笔交易 -> 跳转到多笔确认页面
+        if (mounted) {
+          final result = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MultiTransactionConfirmPage(
+                transactions: multiResult.transactions,
+                audioFilePath: audioPath,
+                recognitionTimestamp: _recognitionTimestamp,
+              ),
+            ),
+          );
+
+          // 如果成功保存，返回上一页
+          if (result == true && mounted) {
+            Navigator.pop(context);
+          } else {
+            setState(() {
+              _state = 'idle';
+            });
+          }
         }
-      });
+      } else {
+        // 单笔交易 -> 保持原有流程
+        final result = multiResult.first;
+        setState(() {
+          _recognitionResult = result;
+          _state = result != null && result.success ? 'result' : 'idle';
+          if (result != null && result.success) {
+            _populateFieldsFromResult(result);
+          }
+        });
 
-      if (!result.success) {
-        _showError(result.errorMessage ?? '识别失败');
+        if (result == null || !result.success) {
+          _showError(result?.errorMessage ?? '识别失败');
+        }
       }
     } catch (e) {
       setState(() {
@@ -1258,15 +1297,15 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
-              _buildExampleChip('午餐花了35块', isDark),
+              _buildExampleChip('午餐35，咖啡15', isDark),
               _buildExampleChip('打车去公司20元', isDark),
-              _buildExampleChip('超市买菜168', isDark),
+              _buildExampleChip('超市168，水果28', isDark),
               _buildExampleChip('收到工资8000', isDark),
             ],
           ),
           const SizedBox(height: 12),
           Text(
-            '使用千问全模态模型直接识别语音',
+            '支持一次说多笔消费，自动识别分类',
             style: TextStyle(
               color: isDark ? Colors.white38 : Colors.black38,
               fontSize: 12,

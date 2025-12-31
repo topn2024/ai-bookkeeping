@@ -350,6 +350,195 @@ class QwenService {
     }
   }
 
+  /// 音频识别记账 - 支持多笔交易
+  /// 一次语音输入可以识别多笔消费/收入
+  Future<MultiRecognitionResult> recognizeAudioMulti(Uint8List audioData,
+      {String format = 'wav'}) async {
+    _ensureInitialized();
+
+    // Check if API key is available
+    if (appConfig.qwenApiKey.isEmpty) {
+      _logger.error('Qwen API key is empty');
+      return MultiRecognitionResult.error('语音识别服务未配置，请先登录账号');
+    }
+
+    _logger.info('Recognizing audio (multi): ${audioData.length} bytes, format: $format');
+
+    try {
+      // 将音频数据转为Base64
+      final base64Audio = base64Encode(audioData);
+
+      final response = await _dio.post(
+        _audioApiUrl,
+        data: {
+          'model': _models.audioModel,
+          'input': {
+            'messages': [
+              {
+                'role': 'user',
+                'content': [
+                  {
+                    'audio': 'data:audio/$format;base64,$base64Audio',
+                  },
+                  {
+                    'text': '''请仔细听这段语音，识别其中提到的所有消费或收入记录。
+用户可能在一段语音中提到多笔交易，请全部提取出来。
+
+【分类规则 - 请根据语音内容准确分类】
+
+支出分类（使用英文ID）：
+- food: 吃饭、外卖、咖啡、奶茶、水果、零食、买菜、餐厅
+- transport: 打车、滴滴、地铁、公交、加油、停车、高铁、机票
+- shopping: 买东西、购物、淘宝、京东、衣服、日用品
+- entertainment: 电影、游戏、KTV、旅游、景点、健身、会员
+- housing: 房租、水电、物业、网费、家具
+- medical: 看病、买药、体检、医院
+- education: 学费、培训、买书、课程
+- other: 其他支出
+
+收入分类（使用英文ID）：
+- salary: 工资、薪水
+- bonus: 奖金、年终奖、提成
+- parttime: 兼职、副业
+- investment: 理财、利息、分红
+- other: 其他收入
+
+请返回JSON格式（注意是数组，即使只有一笔也返回数组）：
+{
+  "transcription": "完整的语音转写文字",
+  "transactions": [
+    {"type": "expense", "amount": 15.0, "category": "food", "description": "咖啡"},
+    {"type": "expense", "amount": 35.0, "category": "food", "description": "午餐"}
+  ]
+}
+
+重要：
+1. 金额必须是准确的数字
+2. 每笔交易单独列出
+3. 只返回JSON，不要其他文字'''
+                  }
+                ]
+              }
+            ]
+          },
+          'parameters': {
+            'result_format': 'message',
+          }
+        },
+      );
+
+      return _parseAudioMultiResponse(response.data);
+    } on DioException catch (e) {
+      _logger.error('Audio recognition (multi) failed', error: e);
+      return MultiRecognitionResult.error(_handleDioError(e));
+    } catch (e, stack) {
+      _logger.error('Audio recognition (multi) failed', error: e, stack: stack);
+      return MultiRecognitionResult.error('音频识别失败: $e');
+    }
+  }
+
+  /// 解析多笔交易音频响应
+  MultiRecognitionResult _parseAudioMultiResponse(Map<String, dynamic> response) {
+    try {
+      _logger.debug('Audio API response (multi): $response');
+
+      if (response['output'] != null && response['output']['choices'] != null) {
+        final choices = response['output']['choices'] as List;
+        if (choices.isNotEmpty) {
+          final message = choices[0]['message'];
+          var content = message['content'];
+
+          // 音频模型可能返回字符串或数组
+          String textContent = '';
+          if (content is String) {
+            textContent = content;
+          } else if (content is List) {
+            for (final item in content) {
+              if (item is Map && item['text'] != null) {
+                textContent = item['text'];
+                break;
+              }
+            }
+          }
+
+          _logger.info('Audio response text (multi): $textContent');
+
+          if (textContent.isNotEmpty) {
+            return _extractMultiJsonResult(textContent);
+          }
+        }
+      }
+      return MultiRecognitionResult.error('无法解析音频响应');
+    } catch (e) {
+      _logger.error('Parse audio response (multi) failed', error: e);
+      return MultiRecognitionResult.error('解析音频响应失败: $e');
+    }
+  }
+
+  /// 从响应中提取多笔交易
+  MultiRecognitionResult _extractMultiJsonResult(String content) {
+    try {
+      final jsonStr = _extractJsonString(content);
+      if (jsonStr != null) {
+        final data = jsonDecode(jsonStr);
+
+        // 检查转写内容
+        final transcription = data['transcription'] as String?;
+
+        // 如果有 transactions 数组
+        if (data['transactions'] != null && data['transactions'] is List) {
+          final txList = data['transactions'] as List;
+
+          if (txList.isEmpty) {
+            // 没有识别到交易，可能是麦克风问题
+            if (transcription == null || transcription.isEmpty) {
+              return MultiRecognitionResult.error('未检测到语音内容，请确保麦克风正常工作并清晰说话');
+            }
+            return MultiRecognitionResult.error('未能从语音中识别出交易信息，请重试');
+          }
+
+          final results = <QwenRecognitionResult>[];
+          for (var tx in txList) {
+            results.add(QwenRecognitionResult(
+              amount: (tx['amount'] as num?)?.toDouble(),
+              category: tx['category'] as String?,
+              description: tx['description'] as String?,
+              type: tx['type'] as String? ?? 'expense',
+              date: tx['date'] as String?,
+              success: true,
+              confidence: 0.9,
+            ));
+          }
+
+          _logger.info('Parsed ${results.length} transactions from audio');
+          return MultiRecognitionResult(transactions: results);
+        }
+
+        // 兼容旧格式（单笔交易）
+        if (data['amount'] != null) {
+          final result = QwenRecognitionResult(
+            amount: (data['amount'] as num?)?.toDouble(),
+            category: data['category'] as String?,
+            description: data['description'] as String? ?? transcription,
+            type: data['type'] as String? ?? 'expense',
+            success: true,
+            confidence: 0.9,
+          );
+          return MultiRecognitionResult.single(result);
+        }
+
+        return MultiRecognitionResult.error('无法识别交易信息');
+      }
+
+      // JSON提取失败，尝试从纯文本提取
+      final fallbackResult = _extractFromPlainText(content);
+      return MultiRecognitionResult.single(fallbackResult);
+    } catch (e) {
+      _logger.error('Extract multi JSON failed', error: e);
+      return MultiRecognitionResult.error('JSON解析失败: $e');
+    }
+  }
+
   /// 智能分类建议
   Future<String?> suggestCategory(String description) async {
     _ensureInitialized();
@@ -834,6 +1023,47 @@ class QwenRecognitionResult {
   @override
   String toString() {
     return 'QwenRecognitionResult(amount: $amount, merchant: $merchant, category: $category, type: $type, success: $success)';
+  }
+}
+
+/// 多笔交易识别结果
+class MultiRecognitionResult {
+  final List<QwenRecognitionResult> transactions;
+  final bool success;
+  final String? errorMessage;
+
+  MultiRecognitionResult({
+    required this.transactions,
+    this.success = true,
+    this.errorMessage,
+  });
+
+  /// 是否包含多笔交易
+  bool get isMultiple => transactions.length > 1;
+
+  /// 交易数量
+  int get count => transactions.length;
+
+  /// 总金额
+  double get totalAmount => transactions.fold(
+        0.0,
+        (sum, tx) => sum + (tx.amount ?? 0),
+      );
+
+  factory MultiRecognitionResult.error(String message) {
+    return MultiRecognitionResult(
+      transactions: [],
+      success: false,
+      errorMessage: message,
+    );
+  }
+
+  factory MultiRecognitionResult.single(QwenRecognitionResult result) {
+    return MultiRecognitionResult(
+      transactions: [result],
+      success: result.success,
+      errorMessage: result.errorMessage,
+    );
   }
 }
 

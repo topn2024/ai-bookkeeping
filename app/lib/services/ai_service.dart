@@ -235,6 +235,65 @@ class AIRecognitionResult {
   }
 }
 
+/// 多笔AI识别结果
+class MultiAIRecognitionResult {
+  final List<AIRecognitionResult> transactions;
+  final bool success;
+  final String? errorMessage;
+
+  MultiAIRecognitionResult({
+    required this.transactions,
+    this.success = true,
+    this.errorMessage,
+  });
+
+  /// 是否包含多笔交易
+  bool get isMultiple => transactions.length > 1;
+
+  /// 交易数量
+  int get count => transactions.length;
+
+  /// 总金额
+  double get totalAmount => transactions.fold(
+        0.0,
+        (sum, tx) => sum + (tx.amount ?? 0),
+      );
+
+  /// 第一笔交易（兼容单笔场景）
+  AIRecognitionResult? get first => transactions.isNotEmpty ? transactions.first : null;
+
+  factory MultiAIRecognitionResult.error(String message) {
+    return MultiAIRecognitionResult(
+      transactions: [],
+      success: false,
+      errorMessage: message,
+    );
+  }
+
+  factory MultiAIRecognitionResult.single(AIRecognitionResult result) {
+    return MultiAIRecognitionResult(
+      transactions: [result],
+      success: result.success,
+      errorMessage: result.errorMessage,
+    );
+  }
+
+  factory MultiAIRecognitionResult.fromQwenResult(MultiRecognitionResult qwenResult) {
+    if (!qwenResult.success) {
+      return MultiAIRecognitionResult.error(qwenResult.errorMessage ?? '识别失败');
+    }
+
+    final aiResults = qwenResult.transactions.map((tx) {
+      return AIRecognitionResult.fromQwenResult(tx);
+    }).toList();
+
+    return MultiAIRecognitionResult(
+      transactions: aiResults,
+      success: true,
+    );
+  }
+}
+
 /// AI服务类
 /// 使用阿里云通义千问模型进行智能记账
 class AIService {
@@ -280,6 +339,17 @@ class AIService {
       return AIRecognitionResult.fromQwenResult(qwenResult);
     } catch (e) {
       return AIRecognitionResult.error('音频文件识别失败: $e');
+    }
+  }
+
+  /// 音频识别记账 - 支持多笔交易
+  /// 一次语音输入可以识别多笔消费/收入
+  Future<MultiAIRecognitionResult> recognizeAudioMulti(Uint8List audioData, {String format = 'wav'}) async {
+    try {
+      final qwenResult = await _qwenService.recognizeAudioMulti(audioData, format: format);
+      return MultiAIRecognitionResult.fromQwenResult(qwenResult);
+    } catch (e) {
+      return MultiAIRecognitionResult.error('音频识别失败: $e');
     }
   }
 
