@@ -4,6 +4,9 @@ import NProgress from 'nprogress'
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
 
+// 防止重复弹出登录过期提示
+let isShowingLogoutDialog = false
+
 // Create axios instance
 const service: AxiosInstance = axios.create({
   baseURL: '/admin',
@@ -44,15 +47,21 @@ service.interceptors.response.use(
 
       switch (status) {
         case 401:
-          ElMessageBox.confirm('登录已过期，请重新登录', '提示', {
-            confirmButtonText: '重新登录',
-            cancelButtonText: '取消',
-            type: 'warning',
-          }).then(() => {
-            const authStore = useAuthStore()
-            authStore.logout()
-            router.push('/login')
-          })
+          // 防止重复弹出登录过期提示
+          if (!isShowingLogoutDialog) {
+            isShowingLogoutDialog = true
+            ElMessageBox.confirm('登录已过期，请重新登录', '提示', {
+              confirmButtonText: '重新登录',
+              cancelButtonText: '取消',
+              type: 'warning',
+            }).then(() => {
+              const authStore = useAuthStore()
+              authStore.logout()
+              router.push('/login')
+            }).finally(() => {
+              isShowingLogoutDialog = false
+            })
+          }
           break
         case 403:
           ElMessage.error('没有权限执行此操作')
