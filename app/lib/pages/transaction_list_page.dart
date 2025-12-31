@@ -9,6 +9,8 @@ import '../models/category.dart';
 import '../models/account.dart';
 import '../widgets/source_image_viewer.dart';
 import '../widgets/source_audio_player.dart';
+import '../widgets/swipeable_transaction_item.dart';
+import 'add_transaction_page.dart';
 
 /// 流水查询页面
 /// 支持按日期、类型、分类、金额筛选，支持关键词搜索
@@ -22,6 +24,9 @@ class TransactionListPage extends ConsumerStatefulWidget {
 class _TransactionListPageState extends ConsumerState<TransactionListPage> {
   // 主题颜色
   late ThemeColors _themeColors;
+
+  // 当前展开操作按钮的条目ID
+  String? _activeItemId;
 
   // 筛选条件
   TransactionType? _selectedType;
@@ -503,177 +508,126 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
       sortedKeys.sort((a, b) => b.compareTo(a));
     }
 
-    return ListView.builder(
-      itemCount: sortedKeys.length,
-      itemBuilder: (context, index) {
-        final dateKey = sortedKeys[index];
-        final dayTransactions = groupedTransactions[dateKey]!;
-        final dayTotal = dayTransactions.fold(0.0, (sum, t) {
-          if (t.type == TransactionType.income) return sum + t.amount;
-          if (t.type == TransactionType.expense) return sum - t.amount;
-          return sum;
-        });
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 日期头
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: AppColors.background,
-              child: Row(
-                children: [
-                  Text(
-                    _formatDateHeader(dateKey),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${dayTotal >= 0 ? '+' : ''}¥${dayTotal.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: dayTotal >= 0 ? _themeColors.income : _themeColors.expense,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // 当日交易列表
-            ...dayTransactions.map((t) => _buildTransactionItem(t)),
-          ],
-        );
+    // 监听滚动，收起展开的操作按钮
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (_activeItemId != null && notification is ScrollUpdateNotification) {
+          setState(() => _activeItemId = null);
+        }
+        return false;
       },
+      child: ListView.builder(
+        itemCount: sortedKeys.length,
+        itemBuilder: (context, index) {
+          final dateKey = sortedKeys[index];
+          final dayTransactions = groupedTransactions[dateKey]!;
+          final dayTotal = dayTransactions.fold(0.0, (sum, t) {
+            if (t.type == TransactionType.income) return sum + t.amount;
+            if (t.type == TransactionType.expense) return sum - t.amount;
+            return sum;
+          });
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 日期头
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: AppColors.background,
+                child: Row(
+                  children: [
+                    Text(
+                      _formatDateHeader(dateKey),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${dayTotal >= 0 ? '+' : ''}¥${dayTotal.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: dayTotal >= 0 ? _themeColors.income : _themeColors.expense,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // 当日交易列表
+              ...dayTransactions.map((t) => _buildTransactionItem(t)),
+            ],
+          );
+        },
+      ),
     );
   }
 
   Widget _buildTransactionItem(Transaction transaction) {
-    final category = DefaultCategories.findById(transaction.category);
-    final isExpense = transaction.type == TransactionType.expense;
-    final isIncome = transaction.type == TransactionType.income;
+    return SwipeableTransactionItem(
+      key: ValueKey(transaction.id),
+      transaction: transaction,
+      isActive: _activeItemId == transaction.id,
+      themeColors: _themeColors,
+      onLongPress: () {
+        setState(() => _activeItemId = transaction.id);
+      },
+      onEdit: () => _handleEdit(transaction),
+      onDelete: () => _confirmDelete(transaction),
+      onTap: () => _showTransactionDetail(transaction),
+      onDismiss: () => setState(() => _activeItemId = null),
+      sourceIndicator: transaction.source != TransactionSource.manual
+          ? _buildSourceIndicator(transaction.source)
+          : null,
+    );
+  }
 
-    return Dismissible(
-      key: Key(transaction.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        color: _themeColors.expense,
-        child: const Icon(Icons.delete, color: Colors.white),
+  /// 编辑交易
+  void _handleEdit(Transaction transaction) {
+    // 先收起按钮
+    setState(() => _activeItemId = null);
+
+    // 跳转到编辑页面
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddTransactionPage(transaction: transaction),
       ),
-      confirmDismiss: (direction) async {
-        return await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('确认删除'),
-            content: const Text('确定要删除这条记录吗？'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('取消'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text('删除', style: TextStyle(color: _themeColors.expense)),
-              ),
-            ],
+    ).then((_) {
+      // 返回后刷新列表
+      ref.read(transactionProvider.notifier).refresh();
+    });
+  }
+
+  /// 确认删除交易
+  Future<void> _confirmDelete(Transaction transaction) async {
+    // 先收起按钮
+    setState(() => _activeItemId = null);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: const Text('确定要删除这条记录吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
           ),
-        );
-      },
-      onDismissed: (direction) {
-        ref.read(transactionProvider.notifier).deleteTransaction(transaction.id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已删除')),
-        );
-      },
-      child: InkWell(
-        onTap: () => _showTransactionDetail(transaction),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(
-              bottom: BorderSide(color: AppColors.divider, width: 0.5),
-            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('删除', style: TextStyle(color: _themeColors.expense)),
           ),
-          child: Row(
-            children: [
-              // 分类图标
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: (category?.color ?? Colors.grey).withValues(alpha:0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  category?.icon ?? Icons.help_outline,
-                  color: category?.color ?? Colors.grey,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              // 分类和备注
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          category?.localizedName ?? transaction.category,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 16,
-                          ),
-                        ),
-                        // Source indicator
-                        if (transaction.source != TransactionSource.manual) ...[
-                          const SizedBox(width: 6),
-                          _buildSourceIndicator(transaction.source),
-                        ],
-                      ],
-                    ),
-                    if (transaction.note != null && transaction.note!.isNotEmpty)
-                      Text(
-                        transaction.note!,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
-                ),
-              ),
-              // 金额和时间
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${isExpense ? '-' : (isIncome ? '+' : '')}¥${transaction.amount.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: isExpense ? _themeColors.expense : (isIncome ? _themeColors.income : _themeColors.transfer),
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    DateFormat('HH:mm').format(transaction.date),
-                    style: const TextStyle(
-                      color: AppColors.textHint,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
+
+    if (confirmed == true && mounted) {
+      ref.read(transactionProvider.notifier).deleteTransaction(transaction.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已删除')),
+      );
+    }
   }
 
   /// Build source indicator icon for transaction list items
@@ -1183,7 +1137,7 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
     }
   }
 
-  /// 根据账户ID获取账户名称
+  /// 根据账户ID获取账户名称（本地化）
   String _getAccountName(String accountId) {
     final accounts = ref.read(accountProvider);
     final account = accounts.firstWhere(
@@ -1201,7 +1155,7 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
         ),
       ),
     );
-    return account.name;
+    return account.localizedName;
   }
 
   Widget _buildDetailRow(String label, String value) {
@@ -1224,33 +1178,6 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
         ],
       ),
     );
-  }
-
-  void _confirmDelete(Transaction transaction) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: const Text('确定要删除这条记录吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('删除', style: TextStyle(color: _themeColors.expense)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      ref.read(transactionProvider.notifier).deleteTransaction(transaction.id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已删除')),
-      );
-    }
   }
 }
 

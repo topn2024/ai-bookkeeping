@@ -8,17 +8,27 @@ import '../models/category.dart';
 import '../widgets/budget_alert_widget.dart';
 import '../widgets/source_image_viewer.dart';
 import '../widgets/source_audio_player.dart';
+import '../widgets/swipeable_transaction_item.dart';
 import 'quick_entry_page.dart';
 import 'image_recognition_page.dart';
 import 'voice_recognition_page.dart';
 import 'statistics_page.dart';
 import 'transaction_list_page.dart';
+import 'add_transaction_page.dart';
 
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  // 当前展开操作按钮的条目ID
+  String? _activeItemId;
+
+  @override
+  Widget build(BuildContext context) {
     final transactions = ref.watch(transactionProvider);
     final monthlyIncome = ref.watch(monthlyIncomeProvider);
     final monthlyExpense = ref.watch(monthlyExpenseProvider);
@@ -32,15 +42,24 @@ class HomePage extends ConsumerWidget {
           BudgetAlertIconButton(),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSummaryCard(context, monthlyIncome, monthlyExpense, colors),
-            const BudgetAlertBanner(),
-            _buildQuickActions(context, colors),
-            _buildRecentTransactions(context, transactions, colors),
-          ],
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          // 滚动时收起展开的操作按钮
+          if (_activeItemId != null && notification is ScrollUpdateNotification) {
+            setState(() => _activeItemId = null);
+          }
+          return false;
+        },
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSummaryCard(context, monthlyIncome, monthlyExpense, colors),
+              const BudgetAlertBanner(),
+              _buildQuickActions(context, colors),
+              _buildRecentTransactions(context, transactions, colors),
+            ],
+          ),
         ),
       ),
     );
@@ -315,7 +334,8 @@ class HomePage extends ConsumerWidget {
           physics: const NeverScrollableScrollPhysics(),
           itemCount: transactions.length > 5 ? 5 : transactions.length,
           itemBuilder: (context, index) {
-            return _buildTransactionItem(context, transactions[index], colors);
+            final transaction = transactions[index];
+            return _buildTransactionItem(context, transaction, colors);
           },
         ),
         const SizedBox(height: 80),
@@ -324,67 +344,136 @@ class HomePage extends ConsumerWidget {
   }
 
   Widget _buildTransactionItem(BuildContext context, Transaction transaction, ThemeColors colors) {
+    final theme = Theme.of(context);
     final category = DefaultCategories.findById(transaction.category);
     final isExpense = transaction.type == TransactionType.expense;
-    final theme = Theme.of(context);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ListTile(
-        onTap: () => _showTransactionDetail(context, transaction, colors),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: (category?.color ?? Colors.grey).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            category?.icon ?? Icons.help_outline,
-            color: category?.color ?? Colors.grey,
-            size: 24,
-          ),
-        ),
-        title: Text(
-          category?.localizedName ?? transaction.category,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 16,
-          ),
-        ),
-        subtitle: Text(
-          transaction.note ?? DateFormat('MM/dd HH:mm').format(transaction.date),
-          style: TextStyle(
-            color: theme.colorScheme.outline,
-            fontSize: 12,
-          ),
-        ),
-        trailing: Text(
-          '${isExpense ? '-' : '+'}¥${transaction.amount.toStringAsFixed(2)}',
-          style: TextStyle(
-            color: isExpense ? colors.expense : colors.income,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+        child: SwipeableTransactionItem(
+          transaction: transaction,
+          isActive: _activeItemId == transaction.id,
+          themeColors: colors,
+          onLongPress: () {
+            setState(() => _activeItemId = transaction.id);
+          },
+          onEdit: () => _handleEdit(transaction),
+          onDelete: () => _confirmDelete(transaction),
+          onTap: () => _showTransactionDetail(context, transaction, colors),
+          onDismiss: () => setState(() => _activeItemId = null),
+          contentBuilder: (tx, themeColors) => Container(
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: (category?.color ?? Colors.grey).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  category?.icon ?? Icons.help_outline,
+                  color: category?.color ?? Colors.grey,
+                  size: 24,
+                ),
+              ),
+              title: Text(
+                category?.localizedName ?? tx.category,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 16,
+                ),
+              ),
+              subtitle: Text(
+                tx.note ?? DateFormat('MM/dd HH:mm').format(tx.date),
+                style: TextStyle(
+                  color: theme.colorScheme.outline,
+                  fontSize: 12,
+                ),
+              ),
+              trailing: Text(
+                '${isExpense ? '-' : '+'}¥${tx.amount.toStringAsFixed(2)}',
+                style: TextStyle(
+                  color: isExpense ? themeColors.expense : themeColors.income,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
+  /// 编辑交易
+  void _handleEdit(Transaction transaction) {
+    // 先收起按钮
+    setState(() => _activeItemId = null);
+
+    // 跳转到编辑页面
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddTransactionPage(transaction: transaction),
+      ),
+    ).then((_) {
+      // 返回后刷新列表
+      ref.read(transactionProvider.notifier).refresh();
+    });
+  }
+
+  /// 确认删除交易
+  Future<void> _confirmDelete(Transaction transaction) async {
+    final colors = ref.themeColors;
+    // 先收起按钮
+    setState(() => _activeItemId = null);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: const Text('确定要删除这条记录吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('删除', style: TextStyle(color: colors.expense)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      ref.read(transactionProvider.notifier).deleteTransaction(transaction.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已删除')),
+      );
+    }
+  }
+
   void _showTransactionDetail(BuildContext context, Transaction transaction, ThemeColors colors) {
     final category = DefaultCategories.findById(transaction.category);
     final isExpense = transaction.type == TransactionType.expense;
     final isIncome = transaction.type == TransactionType.income;
+
+    // 如果当前有展开的条目，先收起
+    if (_activeItemId != null) {
+      setState(() => _activeItemId = null);
+    }
 
     showModalBottomSheet(
       context: context,
