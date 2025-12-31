@@ -314,7 +314,7 @@ async def get_top_users(
         if user:
             top_users.append(TopUser(
                 user_id=str(row.user_id),
-                display_name=user.display_name or "未设置",
+                display_name=user.nickname or "未设置",
                 email_masked=_mask_email(user.email),
                 transaction_count=row.tx_count,
                 total_amount=f"¥{row.total_amount:,.2f}" if row.total_amount else "¥0.00",
@@ -438,7 +438,7 @@ async def get_recent_users(
 
         items.append({
             "id": str(user.id),
-            "display_name": user.display_name or "未设置",
+            "display_name": user.nickname or "未设置",
             "email_masked": _mask_email(user.email),
             "avatar_url": user.avatar_url,
             "is_active": user.is_active if hasattr(user, 'is_active') else True,
@@ -483,7 +483,7 @@ async def get_recent_transactions(
         items.append(RecentTransaction(
             id=str(tx.id),
             user_id=str(tx.user_id),
-            user_display_name=user.display_name if user else "未知",
+            user_display_name=user.nickname if user else "未知",
             transaction_type=tx.transaction_type,
             type_name=type_names.get(tx.transaction_type, "未知"),
             amount=f"¥{tx.amount:,.2f}",
