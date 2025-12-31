@@ -6,7 +6,7 @@ import router from '@/router'
 
 // Create axios instance
 const service: AxiosInstance = axios.create({
-  baseURL: '/api',
+  baseURL: '/admin',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -98,6 +98,16 @@ export const download = (url: string, params?: any): Promise<Blob> => {
   return service.get(url, {
     params,
     responseType: 'blob',
+  })
+}
+
+export const upload = <T = any>(url: string, data: FormData, config?: AxiosRequestConfig): Promise<T> => {
+  return service.post(url, data, {
+    ...config,
+    headers: {
+      'Content-Type': 'multipart/form-data',
+      ...config?.headers,
+    },
   })
 }
 
