@@ -174,7 +174,7 @@ class AppSettingsConfig(BaseModel):
     """Complete app settings configuration."""
     # 版本信息
     config_version: str = "1.0.0"
-    min_app_version: str = "1.0.0"
+    min_app_version: str = "1.1.0"  # 最低支持的客户端版本
 
     # API 配置
     api_base_url: str = "https://160.202.238.29/api/v1"
