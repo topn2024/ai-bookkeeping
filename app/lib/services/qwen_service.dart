@@ -637,18 +637,28 @@ class QwenService {
 
   QwenRecognitionResult _parseVisionResponse(Map<String, dynamic> response) {
     try {
+      _logger.debug('Vision API response: $response');
+
       if (response['output'] != null && response['output']['choices'] != null) {
         final choices = response['output']['choices'] as List;
         if (choices.isNotEmpty) {
-          final content = choices[0]['message']['content'] as List;
-          // 视觉模型返回的content是数组
+          final message = choices[0]['message'];
+          var content = message['content'];
+
+          // 视觉模型返回的content可能是数组或字符串
           String textContent = '';
-          for (final item in content) {
-            if (item is Map && item['text'] != null) {
-              textContent = item['text'];
-              break;
+          if (content is String) {
+            textContent = content;
+          } else if (content is List) {
+            for (final item in content) {
+              if (item is Map && item['text'] != null) {
+                textContent = item['text'];
+                break;
+              }
             }
           }
+
+          _logger.info('Vision response text: $textContent');
 
           if (textContent.isNotEmpty) {
             return _extractJsonResult(textContent);
@@ -657,34 +667,75 @@ class QwenService {
       }
       return QwenRecognitionResult.error('无法解析响应');
     } catch (e) {
+      _logger.error('Parse vision response failed', error: e);
       return QwenRecognitionResult.error('解析响应失败: $e');
     }
   }
 
   QwenRecognitionResult _parseTextResponse(Map<String, dynamic> response) {
     try {
+      _logger.debug('Text API response: $response');
+
       if (response['output'] != null && response['output']['choices'] != null) {
         final choices = response['output']['choices'] as List;
         if (choices.isNotEmpty) {
-          final content = choices[0]['message']['content'] as String;
-          return _extractJsonResult(content);
+          final message = choices[0]['message'];
+          var content = message['content'];
+
+          // 文本模型返回的content可能是字符串或数组
+          String textContent = '';
+          if (content is String) {
+            textContent = content;
+          } else if (content is List) {
+            for (final item in content) {
+              if (item is Map && item['text'] != null) {
+                textContent = item['text'];
+                break;
+              }
+            }
+          }
+
+          _logger.info('Text response: $textContent');
+
+          if (textContent.isNotEmpty) {
+            return _extractJsonResult(textContent);
+          }
         }
       }
       return QwenRecognitionResult.error('无法解析响应');
     } catch (e) {
+      _logger.error('Parse text response failed', error: e);
       return QwenRecognitionResult.error('解析响应失败: $e');
     }
   }
 
   List<QwenRecognitionResult> _parseEmailResponse(Map<String, dynamic> response) {
     try {
+      _logger.debug('Email API response: $response');
+
       if (response['output'] != null && response['output']['choices'] != null) {
         final choices = response['output']['choices'] as List;
         if (choices.isNotEmpty) {
-          final content = choices[0]['message']['content'] as String;
+          final message = choices[0]['message'];
+          var content = message['content'];
+
+          // 邮件解析返回的content可能是字符串或数组
+          String textContent = '';
+          if (content is String) {
+            textContent = content;
+          } else if (content is List) {
+            for (final item in content) {
+              if (item is Map && item['text'] != null) {
+                textContent = item['text'];
+                break;
+              }
+            }
+          }
+
+          _logger.info('Email response: $textContent');
 
           // 提取JSON数组
-          final jsonStr = _extractJsonString(content);
+          final jsonStr = _extractJsonString(textContent);
           if (jsonStr != null) {
             final decoded = jsonDecode(jsonStr);
             if (decoded is List) {
@@ -706,6 +757,7 @@ class QwenService {
       }
       return [QwenRecognitionResult.error('无法解析账单')];
     } catch (e) {
+      _logger.error('Parse email response failed', error: e);
       return [QwenRecognitionResult.error('解析账单失败: $e')];
     }
   }
