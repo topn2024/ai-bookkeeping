@@ -1,11 +1,12 @@
 """Admin system monitoring endpoints."""
+import logging
 import os
 import platform
 import psutil
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text
 
@@ -13,7 +14,10 @@ from app.core.database import get_db
 from admin.models.admin_user import AdminUser
 from admin.api.deps import get_current_admin
 from admin.core.permissions import has_permission
+from admin.core.audit import create_audit_log
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/monitoring", tags=["System Monitoring"])
@@ -618,17 +622,39 @@ class AlertRuleUpdate(BaseModel):
 async def update_alert_rule(
     rule_id: str,
     update_data: AlertRuleUpdate,
+    request: Request,
     current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
     _: bool = Depends(has_permission("monitor:alert")),
 ):
     """更新告警规则 (SM-009)"""
+    logger.info(f"Admin {current_admin.username} updating alert rule: {rule_id}")
+
     # In a real implementation, this would update in database
-    return {
+    result = {
         "message": f"Alert rule {rule_id} updated",
         "rule_id": rule_id,
         "threshold": update_data.threshold,
         "enabled": update_data.enabled,
     }
+
+    # Create audit log
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="monitor.alert.update",
+        module="monitoring",
+        target_type="alert_rule",
+        target_id=rule_id,
+        description=f"更新告警规则 {rule_id}",
+        request_data=update_data.model_dump(),
+        request=request,
+    )
+    await db.commit()
+
+    logger.info(f"Alert rule {rule_id} updated successfully")
+    return result
 
 
 @router.get("/alerts/notifications")
@@ -665,11 +691,32 @@ async def get_notification_config(
 @router.put("/alerts/notifications")
 async def update_notification_config(
     config: Dict[str, Any],
+    request: Request,
     current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
     _: bool = Depends(has_permission("monitor:alert")),
 ):
     """更新告警通知配置 (SM-010)"""
-    return {
+    logger.info(f"Admin {current_admin.username} updating notification config")
+
+    result = {
         "message": "Notification config updated",
         "config": config,
     }
+
+    # Create audit log
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="monitor.notification.update",
+        module="monitoring",
+        target_type="notification_config",
+        description="更新告警通知配置",
+        request_data=config,
+        request=request,
+    )
+    await db.commit()
+
+    logger.info("Notification config updated successfully")
+    return result

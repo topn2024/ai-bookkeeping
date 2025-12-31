@@ -1,20 +1,27 @@
 """Admin platform main application."""
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from admin.api import admin_router
+from app.core.logging import setup_logging
+from app.middleware import RequestLoggingMiddleware, SlowRequestLoggingMiddleware
+
+# Initialize logging
+setup_logging()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
-    print("Admin API starting up...")
+    logger.info("Admin API starting up...")
     yield
     # Shutdown
-    print("Admin API shutting down...")
+    logger.info("Admin API shutting down...")
 
 
 def create_admin_app() -> FastAPI:
@@ -40,6 +47,10 @@ def create_admin_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # 日志中间件 (order matters: last added = first executed)
+    app.add_middleware(SlowRequestLoggingMiddleware)
+    app.add_middleware(RequestLoggingMiddleware)
 
     # 注册路由
     app.include_router(admin_router, prefix="/admin")

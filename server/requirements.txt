@@ -31,6 +31,9 @@ minio==7.2.8
 # Utilities
 python-dotenv==1.0.1
 
+# APK patch generation (incremental updates)
+bsdiff4==1.2.4
+
 # Celery (background tasks)
 celery==5.4.0
 

@@ -99,4 +99,14 @@ LOG_ACTIONS = {
     "admin.role.create": "创建角色",
     "admin.role.edit": "编辑角色",
     "admin.role.delete": "删除角色",
+
+    # 系统监控
+    "monitor.alert.update": "更新告警规则",
+    "monitor.notification.update": "更新告警通知配置",
+
+    # 应用版本
+    "version.create": "创建应用版本",
+    "version.update": "更新应用版本",
+    "version.delete": "删除应用版本",
+    "version.publish": "发布应用版本",
 }

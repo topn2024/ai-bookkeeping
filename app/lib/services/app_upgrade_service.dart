@@ -5,14 +5,18 @@ import 'package:path_provider/path_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/logger.dart';
 import '../core/build_info.dart';
 import 'app_config_service.dart';
+import 'bspatch_service.dart';
 
 /// APP 升级检查结果
 class UpdateCheckResult {
   final bool hasUpdate;
   final bool isForceUpdate;
+  final bool hasPatch;
   final String currentVersion;
   final VersionInfo? latestVersion;
   final String? message;
@@ -20,6 +24,7 @@ class UpdateCheckResult {
   UpdateCheckResult({
     required this.hasUpdate,
     required this.isForceUpdate,
+    this.hasPatch = false,
     required this.currentVersion,
     this.latestVersion,
     this.message,
@@ -29,12 +34,49 @@ class UpdateCheckResult {
     return UpdateCheckResult(
       hasUpdate: json['has_update'] ?? false,
       isForceUpdate: json['is_force_update'] ?? false,
+      hasPatch: json['has_patch'] ?? false,
       currentVersion: json['current_version'] ?? '',
       latestVersion: json['latest_version'] != null
           ? VersionInfo.fromJson(json['latest_version'])
           : null,
       message: json['message'],
     );
+  }
+
+  /// 是否推荐使用增量更新
+  bool get shouldUsePatch => hasPatch && latestVersion?.patch != null;
+}
+
+/// 增量包信息
+class PatchInfo {
+  final String fromVersion;
+  final int fromCode;
+  final String downloadUrl;
+  final int fileSize;
+  final String fileMd5;
+
+  PatchInfo({
+    required this.fromVersion,
+    required this.fromCode,
+    required this.downloadUrl,
+    required this.fileSize,
+    required this.fileMd5,
+  });
+
+  factory PatchInfo.fromJson(Map<String, dynamic> json) {
+    return PatchInfo(
+      fromVersion: json['from_version'] ?? '',
+      fromCode: json['from_code'] ?? 0,
+      downloadUrl: json['download_url'] ?? '',
+      fileSize: json['file_size'] ?? 0,
+      fileMd5: json['file_md5'] ?? '',
+    );
+  }
+
+  /// 格式化文件大小
+  String get formattedFileSize {
+    final mb = fileSize / (1024 * 1024);
+    return '${mb.toStringAsFixed(1)} MB';
   }
 }
 
@@ -49,6 +91,7 @@ class VersionInfo {
   final int? fileSize;
   final String? fileMd5;
   final DateTime? publishedAt;
+  final PatchInfo? patch;
 
   VersionInfo({
     required this.versionName,
@@ -60,6 +103,7 @@ class VersionInfo {
     this.fileSize,
     this.fileMd5,
     this.publishedAt,
+    this.patch,
   });
 
   factory VersionInfo.fromJson(Map<String, dynamic> json) {
@@ -75,8 +119,12 @@ class VersionInfo {
       publishedAt: json['published_at'] != null
           ? DateTime.tryParse(json['published_at'])
           : null,
+      patch: json['patch'] != null ? PatchInfo.fromJson(json['patch']) : null,
     );
   }
+
+  /// 是否有增量更新包
+  bool get hasPatch => patch != null;
 
   /// 获取本地化的更新说明
   String getLocalizedReleaseNotes(String languageCode) {
@@ -99,6 +147,72 @@ class VersionInfo {
   String get fullVersion => '$versionName+$versionCode';
 }
 
+/// 下载结果状态
+enum DownloadStatus {
+  success,
+  error,
+  md5Failed,
+}
+
+/// APK 下载结果
+class DownloadResult {
+  final DownloadStatus status;
+  final String? filePath;
+  final String? errorMessage;
+  final String? expectedMd5;
+  final String? actualMd5;
+
+  DownloadResult._({
+    required this.status,
+    this.filePath,
+    this.errorMessage,
+    this.expectedMd5,
+    this.actualMd5,
+  });
+
+  factory DownloadResult.success(String filePath) {
+    return DownloadResult._(
+      status: DownloadStatus.success,
+      filePath: filePath,
+    );
+  }
+
+  factory DownloadResult.error(String message) {
+    return DownloadResult._(
+      status: DownloadStatus.error,
+      errorMessage: message,
+    );
+  }
+
+  factory DownloadResult.md5Failed({
+    required String expectedMd5,
+    required String actualMd5,
+  }) {
+    return DownloadResult._(
+      status: DownloadStatus.md5Failed,
+      errorMessage: '文件校验失败，请重新下载',
+      expectedMd5: expectedMd5,
+      actualMd5: actualMd5,
+    );
+  }
+
+  bool get isSuccess => status == DownloadStatus.success;
+  bool get isMd5Failed => status == DownloadStatus.md5Failed;
+  bool get isError => status == DownloadStatus.error;
+
+  /// 用户友好的错误提示
+  String get userMessage {
+    switch (status) {
+      case DownloadStatus.success:
+        return '下载完成';
+      case DownloadStatus.md5Failed:
+        return '文件校验失败，可能已损坏，请重新下载';
+      case DownloadStatus.error:
+        return errorMessage ?? '下载失败';
+    }
+  }
+}
+
 /// APP 升级服务
 class AppUpgradeService {
   static final AppUpgradeService _instance = AppUpgradeService._internal();
@@ -108,9 +222,26 @@ class AppUpgradeService {
   final Logger _logger = Logger();
   UpdateCheckResult? _lastCheckResult;
   DateTime? _lastCheckTime;
+  String? _deviceId;
 
   // 缓存时间：1小时内不重复检查（除非强制）
   static const Duration _cacheExpiry = Duration(hours: 1);
+
+  /// 获取设备 ID（用于灰度发布）
+  Future<String> _getDeviceId() async {
+    if (_deviceId != null) return _deviceId!;
+
+    final prefs = await SharedPreferences.getInstance();
+    var deviceId = prefs.getString('device_id');
+    if (deviceId == null) {
+      // 生成唯一设备 ID
+      final platform = Platform.isAndroid ? 'android' : 'ios';
+      deviceId = '${DateTime.now().millisecondsSinceEpoch}_$platform';
+      await prefs.setString('device_id', deviceId);
+    }
+    _deviceId = deviceId;
+    return deviceId;
+  }
 
   /// 获取上次检查结果
   UpdateCheckResult? get lastCheckResult => _lastCheckResult;
@@ -135,6 +266,7 @@ class AppUpgradeService {
     try {
       final config = AppConfigService().config;
       final packageInfo = await PackageInfo.fromPlatform();
+      final deviceId = await _getDeviceId();
 
       final dio = Dio(BaseOptions(
         baseUrl: config.apiBaseUrl,
@@ -160,6 +292,7 @@ class AppUpgradeService {
           'version_code':
               int.tryParse(packageInfo.buildNumber) ?? BuildInfo.buildNumber,
           'platform': Platform.isAndroid ? 'android' : 'ios',
+          'device_id': deviceId,  // 用于灰度发布
         },
       );
 
@@ -188,15 +321,17 @@ class AppUpgradeService {
     );
   }
 
-  /// 下载 APK
-  Future<String?> downloadApk(
+  /// 下载 APK（带 MD5 校验和断点续传）
+  Future<DownloadResult> downloadApk(
     VersionInfo version, {
     void Function(int received, int total)? onProgress,
     CancelToken? cancelToken,
+    bool verifyMd5 = true,
+    bool enableResume = true,
   }) async {
     if (version.downloadUrl == null) {
       _logger.error('No download URL available', tag: 'Upgrade');
-      return null;
+      return DownloadResult.error('没有可用的下载链接');
     }
 
     try {
@@ -204,7 +339,7 @@ class AppUpgradeService {
       final dir = await getExternalStorageDirectory();
       if (dir == null) {
         _logger.error('Cannot access external storage', tag: 'Upgrade');
-        return null;
+        return DownloadResult.error('无法访问存储空间');
       }
 
       // 创建下载目录
@@ -215,11 +350,40 @@ class AppUpgradeService {
 
       final savePath =
           '${downloadDir.path}/ai_bookkeeping_${version.versionName}.apk';
+      final tempPath = '$savePath.tmp';
 
-      // 如果文件已存在，先删除
+      // 如果完整文件已存在，检查 MD5
       final existingFile = File(savePath);
       if (await existingFile.exists()) {
+        if (verifyMd5 && version.fileMd5 != null) {
+          final existingMd5 = await _calculateFileMd5(existingFile);
+          if (existingMd5 == version.fileMd5!.toLowerCase()) {
+            _logger.info('APK already exists and MD5 matches', tag: 'Upgrade');
+            return DownloadResult.success(savePath);
+          }
+        }
         await existingFile.delete();
+      }
+
+      // 检查是否有部分下载的文件（断点续传）
+      final tempFile = File(tempPath);
+      int downloadedBytes = 0;
+      bool resuming = false;
+
+      if (enableResume && await tempFile.exists()) {
+        downloadedBytes = await tempFile.length();
+        // 如果服务器提供了文件大小，检查部分下载是否有效
+        if (version.fileSize != null && downloadedBytes < version.fileSize!) {
+          resuming = true;
+          _logger.info(
+            'Resuming download from $downloadedBytes bytes',
+            tag: 'Upgrade',
+          );
+        } else {
+          // 部分文件无效，删除重新开始
+          await tempFile.delete();
+          downloadedBytes = 0;
+        }
       }
 
       final dio = Dio();
@@ -233,19 +397,89 @@ class AppUpgradeService {
         );
       }
 
+      // 设置断点续传头
+      final options = Options();
+      if (resuming && downloadedBytes > 0) {
+        options.headers = {
+          'Range': 'bytes=$downloadedBytes-',
+        };
+      }
+
+      // 下载到临时文件
       await dio.download(
         version.downloadUrl!,
-        savePath,
-        onReceiveProgress: onProgress,
+        tempPath,
+        onReceiveProgress: (received, total) {
+          // 断点续传时，received 是本次下载的字节数，total 是剩余字节数
+          final actualReceived = resuming ? received + downloadedBytes : received;
+          final actualTotal = resuming ? total + downloadedBytes : total;
+          onProgress?.call(actualReceived, actualTotal);
+        },
         cancelToken: cancelToken,
+        options: options,
+        deleteOnError: false, // 保留部分下载的文件
       );
 
+      // 下载完成，重命名临时文件
+      if (await tempFile.exists()) {
+        await tempFile.rename(savePath);
+      }
+
       _logger.info('APK downloaded to: $savePath', tag: 'Upgrade');
-      return savePath;
+
+      // MD5 校验
+      if (verifyMd5 && version.fileMd5 != null) {
+        _logger.info('Verifying APK MD5...', tag: 'Upgrade');
+        final downloadedFile = File(savePath);
+        final actualMd5 = await _calculateFileMd5(downloadedFile);
+
+        if (actualMd5 != version.fileMd5!.toLowerCase()) {
+          _logger.error(
+            'MD5 verification failed! Expected: ${version.fileMd5}, Actual: $actualMd5',
+            tag: 'Upgrade',
+          );
+          // 删除损坏的文件和临时文件
+          await downloadedFile.delete();
+          if (await tempFile.exists()) {
+            await tempFile.delete();
+          }
+          return DownloadResult.md5Failed(
+            expectedMd5: version.fileMd5!,
+            actualMd5: actualMd5,
+          );
+        }
+
+        _logger.info('MD5 verification passed: $actualMd5', tag: 'Upgrade');
+      } else {
+        _logger.warning('MD5 verification skipped (no MD5 provided)', tag: 'Upgrade');
+      }
+
+      return DownloadResult.success(savePath);
     } catch (e) {
       _logger.error('Failed to download APK: $e', tag: 'Upgrade');
-      return null;
+      return DownloadResult.error('下载失败: $e');
     }
+  }
+
+  /// 计算文件 MD5
+  Future<String> _calculateFileMd5(File file) async {
+    final bytes = await file.readAsBytes();
+    final digest = md5.convert(bytes);
+    return digest.toString().toLowerCase();
+  }
+
+  /// 下载 APK（兼容旧接口，返回路径或 null）
+  Future<String?> downloadApkSimple(
+    VersionInfo version, {
+    void Function(int received, int total)? onProgress,
+    CancelToken? cancelToken,
+  }) async {
+    final result = await downloadApk(
+      version,
+      onProgress: onProgress,
+      cancelToken: cancelToken,
+    );
+    return result.isSuccess ? result.filePath : null;
   }
 
   /// 安装 APK
@@ -288,5 +522,214 @@ class AppUpgradeService {
   void clearCache() {
     _lastCheckResult = null;
     _lastCheckTime = null;
+  }
+
+  /// 下载增量更新包
+  ///
+  /// 返回下载的补丁文件路径，如果失败返回 null
+  Future<DownloadResult> downloadPatch(
+    PatchInfo patch, {
+    void Function(int received, int total)? onProgress,
+    CancelToken? cancelToken,
+    bool verifyMd5 = true,
+  }) async {
+    try {
+      final config = AppConfigService().config;
+      final dir = await getExternalStorageDirectory();
+      if (dir == null) {
+        _logger.error('Cannot access external storage', tag: 'Upgrade');
+        return DownloadResult.error('无法访问存储空间');
+      }
+
+      // 创建下载目录
+      final downloadDir = Directory('${dir.path}/downloads');
+      if (!await downloadDir.exists()) {
+        await downloadDir.create(recursive: true);
+      }
+
+      final savePath =
+          '${downloadDir.path}/patch_${patch.fromVersion}_to_next.patch';
+
+      // 如果补丁文件已存在，验证 MD5
+      final existingFile = File(savePath);
+      if (await existingFile.exists()) {
+        if (verifyMd5 && patch.fileMd5.isNotEmpty) {
+          final existingMd5 = await _calculateFileMd5(existingFile);
+          if (existingMd5 == patch.fileMd5.toLowerCase()) {
+            _logger.info('Patch already exists and MD5 matches', tag: 'Upgrade');
+            return DownloadResult.success(savePath);
+          }
+        }
+        await existingFile.delete();
+      }
+
+      final dio = Dio();
+      if (config.skipCertificateVerification) {
+        dio.httpClientAdapter = IOHttpClientAdapter(
+          createHttpClient: () {
+            final client = HttpClient();
+            client.badCertificateCallback = (cert, host, port) => true;
+            return client;
+          },
+        );
+      }
+
+      await dio.download(
+        patch.downloadUrl,
+        savePath,
+        onReceiveProgress: onProgress,
+        cancelToken: cancelToken,
+      );
+
+      _logger.info('Patch downloaded to: $savePath', tag: 'Upgrade');
+
+      // MD5 校验
+      if (verifyMd5 && patch.fileMd5.isNotEmpty) {
+        _logger.info('Verifying patch MD5...', tag: 'Upgrade');
+        final downloadedFile = File(savePath);
+        final actualMd5 = await _calculateFileMd5(downloadedFile);
+
+        if (actualMd5 != patch.fileMd5.toLowerCase()) {
+          _logger.error(
+            'Patch MD5 verification failed! Expected: ${patch.fileMd5}, Actual: $actualMd5',
+            tag: 'Upgrade',
+          );
+          await downloadedFile.delete();
+          return DownloadResult.md5Failed(
+            expectedMd5: patch.fileMd5,
+            actualMd5: actualMd5,
+          );
+        }
+
+        _logger.info('Patch MD5 verification passed', tag: 'Upgrade');
+      }
+
+      return DownloadResult.success(savePath);
+    } catch (e) {
+      _logger.error('Failed to download patch: $e', tag: 'Upgrade');
+      return DownloadResult.error('补丁下载失败: $e');
+    }
+  }
+
+  /// 应用增量更新补丁
+  ///
+  /// 需要补丁文件路径和目标版本
+  /// 返回生成的新 APK 路径，如果失败返回 null
+  Future<String?> applyPatch({
+    required String patchPath,
+    required String targetVersion,
+    String? expectedMd5,
+  }) async {
+    try {
+      final bspatch = BsPatchService();
+
+      if (!bspatch.isSupported) {
+        _logger.warning('bspatch not supported on this platform', tag: 'Upgrade');
+        return null;
+      }
+
+      final dir = await getExternalStorageDirectory();
+      if (dir == null) {
+        _logger.error('Cannot access external storage', tag: 'Upgrade');
+        return null;
+      }
+
+      _logger.info(
+        'Applying patch for version $targetVersion',
+        tag: 'Upgrade',
+      );
+
+      final result = await bspatch.performIncrementalUpdate(
+        patchPath: patchPath,
+        targetVersion: targetVersion,
+        expectedMd5: expectedMd5,
+        outputDir: '${dir.path}/downloads',
+      );
+
+      if (result.success && result.outputPath != null) {
+        _logger.info('Patch applied successfully: ${result.outputPath}', tag: 'Upgrade');
+        return result.outputPath;
+      } else {
+        _logger.error('Patch failed: ${result.errorMessage}', tag: 'Upgrade');
+        return null;
+      }
+    } catch (e) {
+      _logger.error('Failed to apply patch: $e', tag: 'Upgrade');
+      return null;
+    }
+  }
+
+  /// 获取当前安装的 APK 路径
+  ///
+  /// 用于增量更新时作为基础文件
+  Future<String?> getCurrentApkPath() async {
+    try {
+      if (!Platform.isAndroid) return null;
+
+      final bspatch = BsPatchService();
+      return await bspatch.getCurrentApkPath();
+    } catch (e) {
+      _logger.error('Failed to get current APK path: $e', tag: 'Upgrade');
+      return null;
+    }
+  }
+
+  /// 智能下载：优先使用增量更新，失败时回退到全量下载
+  Future<DownloadResult> smartDownload(
+    VersionInfo version, {
+    void Function(int received, int total)? onProgress,
+    CancelToken? cancelToken,
+    bool preferPatch = true,
+  }) async {
+    // 如果有增量更新包且用户偏好使用
+    if (preferPatch && version.hasPatch) {
+      final patch = version.patch!;
+      _logger.info(
+        'Attempting incremental update from ${patch.fromVersion}',
+        tag: 'Upgrade',
+      );
+
+      // 检查是否支持增量更新
+      final bspatch = BsPatchService();
+      if (!bspatch.isSupported) {
+        _logger.warning(
+          'Platform does not support incremental updates',
+          tag: 'Upgrade',
+        );
+      } else {
+        // 下载补丁
+        final patchResult = await downloadPatch(
+          patch,
+          onProgress: onProgress,
+          cancelToken: cancelToken,
+        );
+
+        if (patchResult.isSuccess) {
+          // 应用补丁（原生代码会自动获取当前 APK 路径）
+          final newApk = await applyPatch(
+            patchPath: patchResult.filePath!,
+            targetVersion: version.versionName,
+            expectedMd5: version.fileMd5,
+          );
+
+          if (newApk != null) {
+            _logger.info('Incremental update successful', tag: 'Upgrade');
+            return DownloadResult.success(newApk);
+          }
+        }
+
+        _logger.warning(
+          'Incremental update failed, falling back to full download',
+          tag: 'Upgrade',
+        );
+      }
+    }
+
+    // 回退到全量下载
+    return await downloadApk(
+      version,
+      onProgress: onProgress,
+      cancelToken: cancelToken,
+    );
   }
 }

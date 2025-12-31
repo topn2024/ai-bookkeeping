@@ -15,10 +15,17 @@ import '../models/investment_account.dart';
 import '../models/debt.dart';
 import '../models/member.dart';
 import 'package:flutter/material.dart';
+import 'database_migration_service.dart';
+import '../core/logger.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
   static Database? _database;
+  final DatabaseMigrationService _migrationService = DatabaseMigrationService();
+  final Logger _logger = Logger();
+
+  // 当前数据库版本
+  static const int currentVersion = 13;
 
   factory DatabaseService() => _instance;
 
@@ -34,12 +41,57 @@ class DatabaseService {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'ai_bookkeeping.db');
 
+    // 检查是否需要迁移并创建备份
+    int? existingVersion;
+    try {
+      final db = await openDatabase(path, readOnly: true);
+      existingVersion = await db.getVersion();
+      await db.close();
+    } catch (e) {
+      // 数据库不存在或损坏，将创建新数据库
+      _logger.debug('No existing database found', tag: 'DB');
+    }
+
+    // 如果需要升级，先创建备份
+    if (existingVersion != null && existingVersion < currentVersion) {
+      final result = await _migrationService.prepareMigration(
+        currentVersion: existingVersion,
+        targetVersion: currentVersion,
+      );
+      if (!result.isSuccess) {
+        _logger.warning('Migration preparation failed, proceeding anyway', tag: 'DB');
+      }
+    }
+
     return await openDatabase(
       path,
-      version: 13,
+      version: currentVersion,
       onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
+      onUpgrade: _onUpgradeWithRecovery,
     );
+  }
+
+  /// 带恢复能力的升级方法
+  Future<void> _onUpgradeWithRecovery(Database db, int oldVersion, int newVersion) async {
+    try {
+      await _onUpgrade(db, oldVersion, newVersion);
+
+      // 迁移成功
+      await _migrationService.onMigrationComplete(
+        newVersion: newVersion,
+        success: true,
+      );
+    } catch (e) {
+      // 迁移失败
+      await _migrationService.onMigrationComplete(
+        newVersion: newVersion,
+        success: false,
+        error: e.toString(),
+      );
+
+      _logger.error('Database migration failed: $e', tag: 'DB');
+      rethrow;
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {

@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user.dart';
 import '../services/secure_storage_service.dart';
 import '../services/http_service.dart';
+import '../services/qwen_service.dart';
 import '../core/config.dart';
 
 enum AuthStatus {
@@ -77,7 +79,12 @@ class AuthNotifier extends Notifier<AuthState> {
                 await _secureStorage.write(
                     'current_user_data', jsonEncode(serverUser.toJson()));
                 // 刷新 API keys
-                await appConfig.fetchFromServer();
+                final fetchResult = await appConfig.fetchFromServer();
+                // 重新初始化 QwenService 以使用新的 API key
+                QwenService().reinitialize();
+                if (!fetchResult) {
+                  debugPrint('AuthProvider: Warning - Failed to fetch API keys from server');
+                }
                 state = AuthState(
                   status: AuthStatus.authenticated,
                   user: serverUser,
@@ -86,6 +93,8 @@ class AuthNotifier extends Notifier<AuthState> {
               }
             } catch (e) {
               // 网络错误，使用本地缓存（包括缓存的 API keys）
+              // 重新初始化 QwenService 以使用缓存的 API key
+              QwenService().reinitialize();
               state = AuthState(
                 status: AuthStatus.authenticated,
                 user: user,
@@ -149,6 +158,8 @@ class AuthNotifier extends Notifier<AuthState> {
 
         // 获取 API 配置
         await appConfig.fetchFromServer();
+        // 重新初始化 QwenService 以使用新的 API key
+        QwenService().reinitialize();
 
         state = AuthState(
           status: AuthStatus.authenticated,
@@ -219,6 +230,8 @@ class AuthNotifier extends Notifier<AuthState> {
 
         // 获取 API 配置
         await appConfig.fetchFromServer();
+        // 重新初始化 QwenService 以使用新的 API key
+        QwenService().reinitialize();
 
         state = AuthState(
           status: AuthStatus.authenticated,
@@ -309,6 +322,11 @@ class AuthNotifier extends Notifier<AuthState> {
     await _http.setAuthToken(accessToken);
     await _secureStorage.write('current_user_data', jsonEncode(user.toJson()));
     await _secureStorage.saveUserId(user.id);
+
+    // 获取 API 配置
+    await appConfig.fetchFromServer();
+    // 重新初始化 QwenService 以使用新的 API key
+    QwenService().reinitialize();
 
     state = AuthState(
       status: AuthStatus.authenticated,

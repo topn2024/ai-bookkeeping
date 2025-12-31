@@ -13,10 +13,30 @@ class HttpService {
   // 默认配置（仅在配置服务未初始化时使用）
   static const String _defaultApiBaseUrl = 'https://160.202.238.29/api/v1';
 
+  // API 版本（与服务器 APIVersionConfig 保持同步）
+  static const String apiVersion = '1.0.0';
+
   String? _authToken;
   bool _initialized = false;
 
+  // 服务器返回的最低支持版本
+  String? _serverMinVersion;
+
+  // 升级需求回调（426 响应时触发）
+  Function(dynamic data)? _onUpgradeRequired;
+
   factory HttpService() => _instance;
+
+  /// 设置升级需求回调
+  void setUpgradeRequiredCallback(Function(dynamic data) callback) {
+    _onUpgradeRequired = callback;
+  }
+
+  /// 获取当前 API 版本
+  String get currentApiVersion => apiVersion;
+
+  /// 获取服务器要求的最低版本
+  String? get serverMinVersion => _serverMinVersion;
 
   HttpService._internal() {
     _initDio();
@@ -52,6 +72,7 @@ class HttpService {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'X-API-Version': apiVersion,
       },
     ));
 
@@ -68,7 +89,21 @@ class HttpService {
         }
         return handler.next(options);
       },
+      onResponse: (response, handler) {
+        // 记录服务器返回的最低版本要求
+        final minVersion = response.headers.value('X-API-Min-Version');
+        if (minVersion != null) {
+          _serverMinVersion = minVersion;
+        }
+        return handler.next(response);
+      },
       onError: (error, handler) async {
+        // 426错误：API版本过旧，需要升级应用
+        if (error.response?.statusCode == 426) {
+          _onUpgradeRequired?.call(error.response?.data);
+          return handler.next(error);
+        }
+
         // 401错误：Token过期，尝试刷新
         if (error.response?.statusCode == 401) {
           final refreshed = await _tryRefreshToken();

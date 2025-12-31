@@ -10,6 +10,7 @@ from app.models.expense_target import ExpenseTarget
 from app.models.oauth_provider import OAuthProvider, OAuthProviderType
 from app.models.backup import Backup
 from app.models.app_version import AppVersion
+from app.models.upgrade_analytics import UpgradeAnalytics
 
 __all__ = [
     "User",
@@ -26,4 +27,5 @@ __all__ = [
     "OAuthProviderType",
     "Backup",
     "AppVersion",
+    "UpgradeAnalytics",
 ]

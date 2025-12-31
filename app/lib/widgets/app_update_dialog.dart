@@ -44,6 +44,8 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
   String _statusText = '';
   CancelToken? _cancelToken;
   bool _downloadFailed = false;
+  String _errorMessage = '';
+  bool _md5Failed = false;
 
   @override
   void dispose() {
@@ -178,20 +180,46 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red[50],
+                    color: _md5Failed ? Colors.orange[50] : Colors.red[50],
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red[200]!),
+                    border: Border.all(
+                      color: _md5Failed ? Colors.orange[200]! : Colors.red[200]!,
+                    ),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.error_outline, color: Colors.red[700], size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '下载失败，请尝试浏览器下载',
-                          style: TextStyle(color: Colors.red[900], fontSize: 13),
-                        ),
+                      Row(
+                        children: [
+                          Icon(
+                            _md5Failed ? Icons.security : Icons.error_outline,
+                            color: _md5Failed ? Colors.orange[700] : Colors.red[700],
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _errorMessage.isNotEmpty
+                                  ? _errorMessage
+                                  : '下载失败，请尝试浏览器下载',
+                              style: TextStyle(
+                                color: _md5Failed ? Colors.orange[900] : Colors.red[900],
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+                      if (_md5Failed) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          '文件可能在传输过程中损坏，建议重新下载或使用浏览器下载',
+                          style: TextStyle(
+                            color: Colors.orange[800],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -266,6 +294,8 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
   void _retryDownload() {
     setState(() {
       _downloadFailed = false;
+      _md5Failed = false;
+      _errorMessage = '';
     });
     _startDownload();
   }
@@ -276,11 +306,13 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
       _progress = 0;
       _statusText = '准备下载...';
       _downloadFailed = false;
+      _md5Failed = false;
+      _errorMessage = '';
     });
 
     _cancelToken = CancelToken();
 
-    final filePath = await AppUpgradeService().downloadApk(
+    final result = await AppUpgradeService().downloadApk(
       widget.versionInfo,
       onProgress: (received, total) {
         if (total > 0 && mounted) {
@@ -297,13 +329,19 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
 
     if (!mounted) return;
 
-    if (filePath != null) {
-      // 下载完成，开始安装
-      setState(() {
-        _statusText = '正在安装...';
-      });
+    if (result.isSuccess && result.filePath != null) {
+      // 显示校验通过状态
+      if (widget.versionInfo.fileMd5 != null) {
+        setState(() {
+          _statusText = '文件校验通过，正在安装...';
+        });
+      } else {
+        setState(() {
+          _statusText = '正在安装...';
+        });
+      }
 
-      final installed = await AppUpgradeService().installApk(filePath);
+      final installed = await AppUpgradeService().installApk(result.filePath!);
 
       if (mounted) {
         if (installed) {
@@ -313,16 +351,29 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
           setState(() {
             _downloading = false;
             _downloadFailed = true;
+            _errorMessage = '安装失败，请尝试浏览器下载';
             _statusText = '';
           });
         }
       }
-    } else {
-      // 下载失败
+    } else if (result.isMd5Failed) {
+      // MD5 校验失败
       if (mounted) {
         setState(() {
           _downloading = false;
           _downloadFailed = true;
+          _md5Failed = true;
+          _errorMessage = result.userMessage;
+          _statusText = '';
+        });
+      }
+    } else {
+      // 其他下载失败
+      if (mounted) {
+        setState(() {
+          _downloading = false;
+          _downloadFailed = true;
+          _errorMessage = result.userMessage;
           _statusText = '';
         });
       }

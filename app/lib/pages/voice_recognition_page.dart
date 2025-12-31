@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -14,45 +16,105 @@ import '../models/transaction.dart';
 import '../widgets/duplicate_transaction_dialog.dart';
 import '../services/category_localization_service.dart';
 
-/// 语音记账页面
+/// 语音记账页面 - 单手操作优化设计
 /// 使用千问音频模型直接识别语音内容并提取记账信息
 class VoiceRecognitionPage extends ConsumerStatefulWidget {
   const VoiceRecognitionPage({super.key});
 
   @override
-  ConsumerState<VoiceRecognitionPage> createState() => _VoiceRecognitionPageState();
+  ConsumerState<VoiceRecognitionPage> createState() =>
+      _VoiceRecognitionPageState();
 }
 
 class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
+  // 录音相关
   final AudioRecorder _audioRecorder = AudioRecorder();
   final SourceFileService _sourceFileService = SourceFileService();
-  bool _isRecording = false;
   bool _hasPermission = false;
   String? _recordingPath;
-  AIRecognitionResult? _recognitionResult;
-  bool _isProcessing = false;
-  late AnimationController _animationController;
-  Duration _recordingDuration = Duration.zero;
   DateTime? _recordingStartTime;
   DateTime? _recognitionTimestamp;
-  // 缓存 ScaffoldMessenger 用于安全清除 SnackBar
-  ScaffoldMessengerState? _scaffoldMessenger;
+  Duration _recordingDuration = Duration.zero;
 
-  // 可编辑字段的控制器
+  // 状态: idle, recording, recognizing, result, success
+  String _state = 'idle';
+
+  // 识别结果
+  AIRecognitionResult? _recognitionResult;
+
+  // 波形动画
+  late AnimationController _waveController;
+  final List<double> _waveHeights = List.generate(12, (_) => 0.3);
+
+  // 成功动画
+  late AnimationController _successController;
+  late Animation<double> _successScale;
+
+  // 脉冲动画
+  late AnimationController _pulseController;
+
+  // 可编辑字段
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   String _selectedType = 'expense';
   String _selectedCategory = 'other';
+  String _selectedCategoryIcon = '📦';
+
+  // 缓存 ScaffoldMessenger
+  ScaffoldMessengerState? _scaffoldMessenger;
 
   @override
   void initState() {
     super.initState();
     _checkPermission();
-    _animationController = AnimationController(
+
+    // 波形动画控制器 - 使用 repeat 而不是在 listener 中递归调用
+    _waveController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 200),
+    );
+
+    // 成功动画控制器
+    _successController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _successScale = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _successController,
+        curve: Curves.elasticOut,
+      ),
+    );
+
+    // 脉冲动画控制器 - 不在 initState 中启动，等到 idle 状态时才启动
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+  }
+
+  // 波形动画更新 - 使用 Timer 而不是递归
+  void _startWaveAnimation() {
+    _waveController.repeat();
+    _waveController.addListener(_onWaveAnimationTick);
+  }
+
+  void _stopWaveAnimation() {
+    _waveController.removeListener(_onWaveAnimationTick);
+    _waveController.stop();
+    _waveController.reset();
+  }
+
+  void _onWaveAnimationTick() {
+    // 只在动画完成一个周期时更新波形高度，减少 setState 频率
+    if (_waveController.value >= 0.95 && _state == 'recording') {
+      setState(() {
+        for (int i = 0; i < _waveHeights.length; i++) {
+          _waveHeights[i] = 0.2 + Random().nextDouble() * 0.6;
+        }
+      });
+    }
   }
 
   @override
@@ -63,29 +125,18 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
 
   @override
   void dispose() {
-    // 清除 SnackBar，避免返回首页后继续显示
     _scaffoldMessenger?.clearSnackBars();
-    _animationController.dispose();
+    // 停止所有动画并移除 listeners
+    _stopWaveAnimation();
+    _waveController.dispose();
+    _successController.dispose();
+    _pulseController.stop();
+    _pulseController.dispose();
     _audioRecorder.dispose();
     _amountController.dispose();
     _descriptionController.dispose();
     ref.read(aiBookkeepingProvider.notifier).reset();
     super.dispose();
-  }
-
-  /// 将识别结果填充到编辑字段
-  void _populateFieldsFromResult(AIRecognitionResult result) {
-    _amountController.text = result.amount?.toStringAsFixed(2) ?? '';
-    _descriptionController.text = result.description ?? '';
-    _selectedType = result.type ?? 'expense';
-
-    // 确保分类在有效列表中
-    final category = result.category ?? 'other';
-    final validCategories = _selectedType == 'income'
-        ? ['salary', 'bonus', 'parttime', 'investment', 'other']
-        : ['food', 'transport', 'shopping', 'entertainment', 'housing', 'medical', 'education', 'other'];
-
-    _selectedCategory = validCategories.contains(category) ? category : 'other';
   }
 
   Future<void> _checkPermission() async {
@@ -97,6 +148,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
     }
   }
 
+  // 开始录音
   Future<void> _startRecording() async {
     if (!_hasPermission) {
       _showError('请授予麦克风权限');
@@ -104,44 +156,51 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
     }
 
     try {
-      // 获取临时目录
       final directory = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       _recordingPath = '${directory.path}/recording_$timestamp.wav';
 
-      // 配置录音参数 - 使用 WAV 格式（千问 API 支持）
       const config = RecordConfig(
         encoder: AudioEncoder.wav,
         bitRate: 128000,
-        sampleRate: 16000,  // 16kHz 适合语音识别
-        numChannels: 1,     // 单声道
+        sampleRate: 16000,
+        numChannels: 1,
       );
 
       await _audioRecorder.start(config, path: _recordingPath!);
 
       setState(() {
-        _isRecording = true;
-        // 清空之前的结果
+        _state = 'recording';
         _recognitionResult = null;
         _amountController.clear();
         _descriptionController.clear();
         _selectedType = 'expense';
         _selectedCategory = 'other';
+        _selectedCategoryIcon = '📦';
         _recordingStartTime = DateTime.now();
+        _recordingDuration = Duration.zero;
       });
 
-      // 更新录音时长
-      _updateRecordingDuration();
+      _startWaveAnimation();
+      _startDurationTimer();
+
+      HapticFeedback.mediumImpact();
     } catch (e) {
       _showError('开始录音失败: $e');
     }
   }
 
-  void _updateRecordingDuration() {
-    if (!_isRecording) return;
+  // 使用定时器更新录音时长，降低频率到每秒1次
+  void _startDurationTimer() {
+    _updateRecordingDuration();
+  }
 
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_isRecording && _recordingStartTime != null) {
+  void _updateRecordingDuration() {
+    if (_state != 'recording') return;
+
+    // 降低更新频率到每500ms一次，减少 setState 调用
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (_state == 'recording' && _recordingStartTime != null && mounted) {
         setState(() {
           _recordingDuration = DateTime.now().difference(_recordingStartTime!);
         });
@@ -150,50 +209,46 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
     });
   }
 
+  // 停止录音
   Future<void> _stopRecording() async {
     try {
       final path = await _audioRecorder.stop();
+      _stopWaveAnimation();
 
       setState(() {
-        _isRecording = false;
+        _state = 'recognizing';
         _recordingPath = path;
       });
+
+      HapticFeedback.mediumImpact();
 
       if (path != null && path.isNotEmpty) {
         await _processAudio(path);
       }
     } catch (e) {
       setState(() {
-        _isRecording = false;
+        _state = 'idle';
       });
       _showError('停止录音失败: $e');
     }
   }
 
   Future<void> _processAudio(String audioPath) async {
-    setState(() {
-      _isProcessing = true;
-    });
-
     try {
-      // Record recognition timestamp
       _recognitionTimestamp = DateTime.now();
 
-      // 读取音频文件
       final file = File(audioPath);
       if (!await file.exists()) {
         throw Exception('录音文件不存在');
       }
 
       final audioData = await file.readAsBytes();
-
-      // 使用AI服务识别音频
       final aiService = AIService();
       final result = await aiService.recognizeAudio(audioData, format: 'wav');
 
       setState(() {
         _recognitionResult = result;
-        _isProcessing = false;
+        _state = result.success ? 'result' : 'idle';
         if (result.success) {
           _populateFieldsFromResult(result);
         }
@@ -204,46 +259,89 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
       }
     } catch (e) {
       setState(() {
-        _isProcessing = false;
+        _state = 'idle';
       });
       _showError('处理音频失败: $e');
     }
   }
 
+  void _populateFieldsFromResult(AIRecognitionResult result) {
+    _amountController.text = result.amount?.toStringAsFixed(2) ?? '';
+    _descriptionController.text = result.description ?? '';
+    _selectedType = result.type ?? 'expense';
+
+    final category = result.category ?? 'other';
+    final validCategories = _selectedType == 'income'
+        ? ['salary', 'bonus', 'parttime', 'investment', 'other']
+        : [
+            'food',
+            'transport',
+            'shopping',
+            'entertainment',
+            'housing',
+            'medical',
+            'education',
+            'other'
+          ];
+
+    _selectedCategory = validCategories.contains(category) ? category : 'other';
+    _selectedCategoryIcon = _getCategoryIcon(_selectedCategory);
+  }
+
+  String _getCategoryIcon(String categoryId) {
+    const icons = {
+      'food': '🍜',
+      'transport': '🚗',
+      'shopping': '🛒',
+      'entertainment': '🎬',
+      'housing': '🏠',
+      'medical': '💊',
+      'education': '📚',
+      'salary': '💰',
+      'bonus': '🎁',
+      'parttime': '💼',
+      'investment': '📈',
+      'other': '📦',
+    };
+    return icons[categoryId] ?? '📦';
+  }
+
   void _showError(String message) {
+    final themeColors = ThemeColors.of(ref);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppColors.expense,
+        backgroundColor: themeColors.expense,
       ),
     );
   }
 
-  /// 解析日期字符串
   DateTime _parseDate(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty || dateStr == '今天') {
       return DateTime.now();
     }
 
     try {
-      // 尝试多种日期格式
       final patterns = [
-        RegExp(r'(\d{4})-(\d{1,2})-(\d{1,2})'),  // 2024-12-30
-        RegExp(r'(\d{4})/(\d{1,2})/(\d{1,2})'),  // 2024/12/30
-        RegExp(r'(\d{4})年(\d{1,2})月(\d{1,2})日'), // 2024年12月30日
-        RegExp(r'(\d{1,2})-(\d{1,2})'),           // 12-30
-        RegExp(r'(\d{1,2})/(\d{1,2})'),           // 12/30
-        RegExp(r'(\d{1,2})月(\d{1,2})日'),        // 12月30日
+        RegExp(r'(\d{4})-(\d{1,2})-(\d{1,2})'),
+        RegExp(r'(\d{4})/(\d{1,2})/(\d{1,2})'),
+        RegExp(r'(\d{4})年(\d{1,2})月(\d{1,2})日'),
+        RegExp(r'(\d{1,2})-(\d{1,2})'),
+        RegExp(r'(\d{1,2})/(\d{1,2})'),
+        RegExp(r'(\d{1,2})月(\d{1,2})日'),
       ];
 
       for (final pattern in patterns) {
         final match = pattern.firstMatch(dateStr);
         if (match != null) {
-          final groups = match.groups([1, 2, 3]).whereType<String>().toList();
+          final groups =
+              match.groups([1, 2, 3]).whereType<String>().toList();
           if (groups.length >= 3) {
-            return DateTime(int.parse(groups[0]), int.parse(groups[1]), int.parse(groups[2]));
+            return DateTime(
+                int.parse(groups[0]), int.parse(groups[1]), int.parse(groups[2]));
           } else if (groups.length == 2) {
-            return DateTime(DateTime.now().year, int.parse(groups[0]), int.parse(groups[1]));
+            return DateTime(
+                DateTime.now().year, int.parse(groups[0]), int.parse(groups[1]));
           }
         }
       }
@@ -253,42 +351,42 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
     return DateTime.now();
   }
 
-  Future<void> _confirmAndCreateTransaction() async {
-    // 验证金额
+  // 确认记账
+  Future<void> _confirmTransaction() async {
     final amount = double.tryParse(_amountController.text);
     if (amount == null || amount <= 0) {
       _showError('请输入有效金额');
       return;
     }
 
-    // Generate transaction ID first
     final transactionId = DateTime.now().millisecondsSinceEpoch.toString();
 
-    // Save audio file to permanent local storage
     String? savedAudioPath;
     int? audioFileSize;
     if (_recordingPath != null) {
       final audioFile = File(_recordingPath!);
       if (await audioFile.exists()) {
-        savedAudioPath = await _sourceFileService.saveAudioFile(audioFile, transactionId);
+        savedAudioPath =
+            await _sourceFileService.saveAudioFile(audioFile, transactionId);
         if (savedAudioPath != null) {
           audioFileSize = await _sourceFileService.getFileSize(savedAudioPath);
         }
       }
     }
 
-    // Prepare recognition raw data as JSON (保存原始识别结果和用户修改后的值)
     String? recognitionRawData;
     final rawData = {
-      'original': _recognitionResult != null ? {
-        'type': _recognitionResult!.type,
-        'amount': _recognitionResult!.amount,
-        'category': _recognitionResult!.category,
-        'description': _recognitionResult!.description,
-        'date': _recognitionResult!.date,
-        'confidence': _recognitionResult!.confidence,
-        'recognized_text': _recognitionResult!.recognizedText,
-      } : null,
+      'original': _recognitionResult != null
+          ? {
+              'type': _recognitionResult!.type,
+              'amount': _recognitionResult!.amount,
+              'category': _recognitionResult!.category,
+              'description': _recognitionResult!.description,
+              'date': _recognitionResult!.date,
+              'confidence': _recognitionResult!.confidence,
+              'recognized_text': _recognitionResult!.recognizedText,
+            }
+          : null,
       'edited': {
         'type': _selectedType,
         'amount': amount,
@@ -299,13 +397,9 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
     };
     recognitionRawData = jsonEncode(rawData);
 
-    // Calculate expiry date based on user settings
     final expiryDate = await _sourceFileService.calculateExpiryDate();
-
-    // 解析识别出的日期
     final transactionDate = _parseDate(_recognitionResult?.date);
 
-    // 创建交易记录 - 使用用户编辑后的值
     final transaction = Transaction(
       id: transactionId,
       type: _selectedType == 'income'
@@ -313,10 +407,11 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
           : TransactionType.expense,
       amount: amount,
       category: _selectedCategory,
-      note: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
+      note: _descriptionController.text.isNotEmpty
+          ? _descriptionController.text
+          : null,
       date: transactionDate,
       accountId: 'cash',
-      // Source data fields
       source: TransactionSource.voice,
       aiConfidence: _recognitionResult?.confidence ?? 0.0,
       sourceFileLocalPath: savedAudioPath,
@@ -326,17 +421,70 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
       sourceFileExpiresAt: expiryDate,
     );
 
-    // 使用重复检测保存交易
     final confirmed = await DuplicateTransactionHelper.checkAndConfirm(
       context: context,
       transaction: transaction,
       transactionNotifier: ref.read(transactionProvider.notifier),
     );
 
-    if (!confirmed) return; // 用户取消
+    if (!confirmed) return;
 
-    // 返回上一页
-    Navigator.pop(context, _recognitionResult);
+    // 显示成功状态
+    setState(() {
+      _state = 'success';
+    });
+    _successController.forward(from: 0);
+    HapticFeedback.heavyImpact();
+
+    // 延迟后返回
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        Navigator.pop(context, _recognitionResult);
+      }
+    });
+  }
+
+  // 继续记账
+  void _continueRecording() {
+    setState(() {
+      _state = 'idle';
+      _recognitionResult = null;
+    });
+  }
+
+  // 打开编辑面板
+  void _openEditPanel() {
+    final themeColors = ThemeColors.of(ref);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _EditTransactionPanel(
+        amountController: _amountController,
+        descriptionController: _descriptionController,
+        selectedType: _selectedType,
+        selectedCategory: _selectedCategory,
+        selectedCategoryIcon: _selectedCategoryIcon,
+        themeColors: themeColors,
+        onTypeChanged: (type) {
+          setState(() {
+            _selectedType = type;
+            // 重置分类
+            _selectedCategory = 'other';
+            _selectedCategoryIcon = '📦';
+          });
+        },
+        onCategoryChanged: (category, icon) {
+          setState(() {
+            _selectedCategory = category;
+            _selectedCategoryIcon = icon;
+          });
+        },
+        onSave: () {
+          Navigator.pop(context);
+        },
+      ),
+    );
   }
 
   String _formatDuration(Duration duration) {
@@ -347,273 +495,1192 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
 
   @override
   Widget build(BuildContext context) {
+    final themeColors = ThemeColors.of(ref);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // 背景渐变色 - 基于主题色
+    final primaryColor = themeColors.primary;
+    final backgroundGradient = isDark
+        ? [
+            const Color(0xFF1a1a2e),
+            const Color(0xFF16213e),
+            HSLColor.fromColor(primaryColor)
+                .withLightness(0.15)
+                .withSaturation(0.5)
+                .toColor(),
+          ]
+        : [
+            HSLColor.fromColor(primaryColor)
+                .withLightness(0.95)
+                .toColor(),
+            HSLColor.fromColor(primaryColor)
+                .withLightness(0.90)
+                .toColor(),
+            HSLColor.fromColor(primaryColor)
+                .withLightness(0.85)
+                .toColor(),
+          ];
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('语音记账'),
-        actions: [
-          if (_recognitionResult != null && _recognitionResult!.success)
-            TextButton(
-              onPressed: _confirmAndCreateTransaction,
-              child: const Text(
-                '确认',
-                style: TextStyle(color: Colors.white, fontSize: 16),
-              ),
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // 语音输入区域
-          Expanded(
-            flex: _recognitionResult != null && _recognitionResult!.success ? 1 : 2,
-            child: _buildVoiceInputArea(),
-          ),
-          // 识别结果区域（有结果时给更多空间显示表单）
-          Expanded(
-            flex: _recognitionResult != null && _recognitionResult!.success ? 2 : 1,
-            child: _buildRecognitionResult(),
-          ),
-          // 底部提示（有识别结果时隐藏）
-          if (_recognitionResult == null || !_recognitionResult!.success)
-            _buildBottomHint(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVoiceInputArea() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // 录音按钮
-          GestureDetector(
-            onTap: _isRecording ? _stopRecording : _startRecording,
-            child: AnimatedBuilder(
-              animation: _animationController,
-              builder: (context, child) {
-                return Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _isRecording
-                        ? AppColors.expense.withValues(alpha: 0.1 + _animationController.value * 0.2)
-                        : Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                    border: Border.all(
-                      color: _isRecording
-                          ? AppColors.expense
-                          : Theme.of(context).primaryColor,
-                      width: 3,
-                    ),
-                  ),
-                  child: Icon(
-                    _isRecording ? Icons.stop : Icons.mic,
-                    size: 48,
-                    color: _isRecording
-                        ? AppColors.expense
-                        : Theme.of(context).primaryColor,
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 24),
-          // 状态文本和录音时长
-          if (_isRecording)
-            Column(
-              children: [
-                Text(
-                  '正在录音...',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppColors.expense,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _formatDuration(_recordingDuration),
-                  style: TextStyle(
-                    fontSize: 24,
-                    color: AppColors.expense,
-                    fontWeight: FontWeight.bold,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
-            )
-          else
-            Text(
-              _hasPermission ? '点击开始录音' : '请授予麦克风权限',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
-            ),
-          const SizedBox(height: 16),
-          // 处理状态
-          if (_isProcessing)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  SizedBox(width: 8),
-                  Text('千问全模态模型识别中...'),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecognitionResult() {
-    if (_recognitionResult == null) {
-      return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.all(16),
+      body: Container(
         decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(
-          child: Text(
-            '解析结果将在这里显示',
-            style: TextStyle(color: Colors.grey[500]),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: backgroundGradient,
           ),
         ),
-      );
-    }
-
-    if (!_recognitionResult!.success) {
-      return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.red[50],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(
+        child: SafeArea(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, color: AppColors.expense, size: 32),
-              const SizedBox(height: 8),
-              Text(
-                _recognitionResult!.errorMessage ?? '解析失败，请重新录音',
-                style: const TextStyle(color: AppColors.expense),
-              ),
+              _buildHeader(isDark),
+              Expanded(child: _buildMainContent(themeColors, isDark)),
+              if (_state == 'idle') _buildBottomHint(isDark),
             ],
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    // 可编辑的结果表单
+  Widget _buildHeader(bool isDark) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        children: [
+          IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+          Expanded(
+            child: Text(
+              '语音记账',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.history,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+            onPressed: () {
+              // TODO: 显示历史记录
+            },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMainContent(ThemeColors themeColors, bool isDark) {
+    // 管理脉冲动画 - 只在 idle 状态时运行
+    if (_state == 'idle' && !_pulseController.isAnimating) {
+      _pulseController.repeat();
+    } else if (_state != 'idle' && _pulseController.isAnimating) {
+      _pulseController.stop();
+      _pulseController.reset();
+    }
+
+    switch (_state) {
+      case 'idle':
+        return _buildIdleState(themeColors, isDark);
+      case 'recording':
+        return _buildRecordingState(themeColors, isDark);
+      case 'recognizing':
+        return _buildRecognizingState(themeColors, isDark);
+      case 'result':
+        return _buildResultState(themeColors, isDark);
+      case 'success':
+        return _buildSuccessState(themeColors, isDark);
+      default:
+        return _buildIdleState(themeColors, isDark);
+    }
+  }
+
+  // ============================================================================
+  // 状态1: 准备录音
+  // ============================================================================
+  Widget _buildIdleState(ThemeColors themeColors, bool isDark) {
+    final primaryColor = themeColors.primary;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Spacer(flex: 2),
+
+        // 提示文字
+        Text(
+          _hasPermission ? '点击开始语音记账' : '请授予麦克风权限',
+          style: TextStyle(
+            color: isDark ? Colors.white60 : Colors.black54,
+            fontSize: 18,
+          ),
+        ),
+
+        const SizedBox(height: 60),
+
+        // 麦克风按钮
+        GestureDetector(
+          onTap: _startRecording,
+          child: AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, child) {
+              final pulseValue = _pulseController.value;
+              return Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      primaryColor,
+                      HSLColor.fromColor(primaryColor)
+                          .withLightness(
+                              HSLColor.fromColor(primaryColor).lightness * 0.7)
+                          .toColor(),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryColor.withOpacity(0.4),
+                      blurRadius: 40,
+                      spreadRadius: 0,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // 脉冲圈
+                    Container(
+                      width: 160 * (1 + pulseValue * 0.3),
+                      height: 160 * (1 + pulseValue * 0.3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: primaryColor.withValues(alpha: 1 - pulseValue),
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                    // 麦克风图标
+                    const Icon(
+                      Icons.mic,
+                      size: 56,
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+
+        const Spacer(flex: 3),
+      ],
+    );
+  }
+
+  // ============================================================================
+  // 状态2: 录音中
+  // ============================================================================
+  Widget _buildRecordingState(ThemeColors themeColors, bool isDark) {
+    final expenseColor = themeColors.expense;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Spacer(flex: 2),
+
+        // 录音时长
+        Text(
+          _formatDuration(_recordingDuration),
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black87,
+            fontSize: 48,
+            fontWeight: FontWeight.w300,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // 波形动画
+        SizedBox(
+          height: 60,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(12, (index) {
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 4,
+                height: 60 * _waveHeights[index],
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(2),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [expenseColor, expenseColor.withOpacity(0.7)],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+
+        const SizedBox(height: 60),
+
+        // 停止按钮
+        GestureDetector(
+          onTap: _stopRecording,
+          child: Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [expenseColor, expenseColor.withOpacity(0.8)],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: expenseColor.withOpacity(0.4),
+                  blurRadius: 40,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 30),
+
+        Text(
+          '点击结束录音',
+          style: TextStyle(
+            color: isDark ? Colors.white54 : Colors.black45,
+            fontSize: 14,
+          ),
+        ),
+
+        const Spacer(flex: 3),
+      ],
+    );
+  }
+
+  // ============================================================================
+  // 状态3: 识别中
+  // ============================================================================
+  Widget _buildRecognizingState(ThemeColors themeColors, bool isDark) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 60,
+          height: 60,
+          child: CircularProgressIndicator(
+            strokeWidth: 3,
+            valueColor: AlwaysStoppedAnimation<Color>(themeColors.primary),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          '正在识别...',
+          style: TextStyle(
+            color: isDark ? Colors.white70 : Colors.black54,
+            fontSize: 18,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '千问全模态模型识别中',
+          style: TextStyle(
+            color: isDark ? Colors.white38 : Colors.black38,
+            fontSize: 14,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================================
+  // 状态4: 识别结果
+  // ============================================================================
+  Widget _buildResultState(ThemeColors themeColors, bool isDark) {
+    final amount = double.tryParse(_amountController.text) ?? 0;
+    final isExpense = _selectedType == 'expense';
+    final amountColor = isExpense ? themeColors.expense : themeColors.income;
+    final confidence = _recognitionResult?.confidence ?? 0.0;
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 可编辑表单
+          // 结果卡片
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withOpacity(0.95)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 头部
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        '识别结果',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF666666),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: themeColors.income.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '置信度 ${(confidence * 100).toInt()}%',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: themeColors.income,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // 金额显示
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: Color(0xFFEEEEEE)),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          isExpense ? '支出金额' : '收入金额',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF999999),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: isExpense ? '-¥' : '+¥',
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
+                                  color: amountColor,
+                                ),
+                              ),
+                              TextSpan(
+                                text: amount.toStringAsFixed(2),
+                                style: TextStyle(
+                                  fontSize: 48,
+                                  fontWeight: FontWeight.w700,
+                                  color: amountColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 分类行
+                  _buildDetailRow(
+                    '分类',
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: themeColors.primary.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(
+                              _selectedCategoryIcon,
+                              style: const TextStyle(fontSize: 18),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _getCategoryName(_selectedCategory),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF333333),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 备注行
+                  if (_descriptionController.text.isNotEmpty)
+                    _buildDetailRow(
+                      '备注',
+                      Flexible(
+                        child: Text(
+                          _descriptionController.text,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF333333),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+
+                  // 日期行
+                  _buildDetailRow(
+                    '日期',
+                    Text(
+                      _recognitionResult?.date ?? '今天',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  // 操作按钮
+                  Row(
+                    children: [
+                      // 编辑按钮
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: _openEditPanel,
+                          child: Container(
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF5F5F5),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                '编辑',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF666666),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      // 确认按钮
+                      Expanded(
+                        flex: 2,
+                        child: GestureDetector(
+                          onTap: _confirmTransaction,
+                          child: Container(
+                            height: 56,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  themeColors.primary,
+                                  HSLColor.fromColor(themeColors.primary)
+                                      .withLightness(HSLColor.fromColor(
+                                                  themeColors.primary)
+                                              .lightness *
+                                          0.8)
+                                      .toColor(),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: themeColors.primary.withOpacity(0.3),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '确认记账',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(width: 6),
+                                Icon(Icons.check, color: Colors.white, size: 20),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // 提示文字
+          Text(
+            '向上滑动可编辑详情',
+            style: TextStyle(
+              color: isDark ? Colors.white54 : Colors.black38,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, Widget value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFF5F5F5)),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF999999),
+            ),
+          ),
+          value,
+        ],
+      ),
+    );
+  }
+
+  // ============================================================================
+  // 状态5: 记账成功
+  // ============================================================================
+  Widget _buildSuccessState(ThemeColors themeColors, bool isDark) {
+    final amount = double.tryParse(_amountController.text) ?? 0;
+    final isExpense = _selectedType == 'expense';
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Spacer(flex: 2),
+
+        // 成功图标
+        ScaleTransition(
+          scale: _successScale,
+          child: Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  themeColors.income,
+                  themeColors.income.withOpacity(0.7),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: themeColors.income.withOpacity(0.3),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.check,
+              size: 60,
+              color: Colors.white,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 30),
+
+        Text(
+          '记账成功',
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black87,
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        Text(
+          '${_getCategoryName(_selectedCategory)} ${isExpense ? "-" : "+"}¥${amount.toStringAsFixed(2)}',
+          style: TextStyle(
+            color: isDark ? Colors.white70 : Colors.black54,
+            fontSize: 16,
+          ),
+        ),
+
+        if (_descriptionController.text.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            _descriptionController.text,
+            style: TextStyle(
+              color: isDark ? Colors.white70 : Colors.black54,
+              fontSize: 16,
+            ),
+          ),
+        ],
+
+        const Spacer(flex: 2),
+
+        // 继续记账按钮
+        GestureDetector(
+          onTap: _continueRecording,
+          child: Container(
+            width: 200,
+            height: 56,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withOpacity(0.2)
+                  : Colors.black.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Center(
+              child: Text(
+                '继续记账',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        const Spacer(),
+      ],
+    );
+  }
+
+  // ============================================================================
+  // 底部语音示例
+  // ============================================================================
+  Widget _buildBottomHint(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '语音示例',
+            style: TextStyle(
+              color: isDark ? Colors.white60 : Colors.black54,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              _buildExampleChip('午餐花了35块', isDark),
+              _buildExampleChip('打车去公司20元', isDark),
+              _buildExampleChip('超市买菜168', isDark),
+              _buildExampleChip('收到工资8000', isDark),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '使用千问全模态模型直接识别语音',
+            style: TextStyle(
+              color: isDark ? Colors.white38 : Colors.black38,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExampleChip(String text, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withOpacity(0.1)
+            : Colors.black.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        '"$text"',
+        style: TextStyle(
+          color: isDark ? Colors.white70 : Colors.black54,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  String _getCategoryName(String? categoryId) {
+    if (categoryId == null) {
+      return CategoryLocalizationService.instance.getCategoryName('other_expense');
+    }
+
+    final category = DefaultCategories.findById(categoryId);
+    if (category != null) {
+      return category.localizedName;
+    }
+
+    return CategoryLocalizationService.instance.getCategoryName(categoryId);
+  }
+}
+
+// ============================================================================
+// 编辑面板组件
+// ============================================================================
+class _EditTransactionPanel extends StatefulWidget {
+  final TextEditingController amountController;
+  final TextEditingController descriptionController;
+  final String selectedType;
+  final String selectedCategory;
+  final String selectedCategoryIcon;
+  final ThemeColors themeColors;
+  final Function(String) onTypeChanged;
+  final Function(String, String) onCategoryChanged;
+  final VoidCallback onSave;
+
+  const _EditTransactionPanel({
+    required this.amountController,
+    required this.descriptionController,
+    required this.selectedType,
+    required this.selectedCategory,
+    required this.selectedCategoryIcon,
+    required this.themeColors,
+    required this.onTypeChanged,
+    required this.onCategoryChanged,
+    required this.onSave,
+  });
+
+  @override
+  State<_EditTransactionPanel> createState() => _EditTransactionPanelState();
+}
+
+class _EditTransactionPanelState extends State<_EditTransactionPanel> {
+  late String _selectedType;
+  late String _selectedCategory;
+
+  final List<Map<String, String>> _expenseCategories = [
+    {'id': 'food', 'name': '餐饮', 'icon': '🍜'},
+    {'id': 'transport', 'name': '交通', 'icon': '🚗'},
+    {'id': 'shopping', 'name': '购物', 'icon': '🛒'},
+    {'id': 'entertainment', 'name': '娱乐', 'icon': '🎬'},
+    {'id': 'housing', 'name': '居住', 'icon': '🏠'},
+    {'id': 'medical', 'name': '医疗', 'icon': '💊'},
+    {'id': 'education', 'name': '教育', 'icon': '📚'},
+    {'id': 'other', 'name': '其他', 'icon': '📦'},
+  ];
+
+  final List<Map<String, String>> _incomeCategories = [
+    {'id': 'salary', 'name': '工资', 'icon': '💰'},
+    {'id': 'bonus', 'name': '奖金', 'icon': '🎁'},
+    {'id': 'parttime', 'name': '兼职', 'icon': '💼'},
+    {'id': 'investment', 'name': '投资', 'icon': '📈'},
+    {'id': 'other', 'name': '其他', 'icon': '📦'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedType = widget.selectedType;
+    _selectedCategory = widget.selectedCategory;
+  }
+
+  List<Map<String, String>> get _categories =>
+      _selectedType == 'income' ? _incomeCategories : _expenseCategories;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          // 拖动手柄
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFDDDDDD),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // 头部
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '编辑账单',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      size: 18,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1),
+
+          // 表单内容
           Expanded(
             child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 收入/支出切换
                   Row(
                     children: [
                       Expanded(
-                        child: _buildTypeButton('expense', '支出', AppColors.expense),
+                        child: _buildTypeButton(
+                          'expense',
+                          '支出',
+                          widget.themeColors.expense,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildTypeButton('income', '收入', AppColors.income),
+                        child: _buildTypeButton(
+                          'income',
+                          '收入',
+                          widget.themeColors.income,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+
+                  const SizedBox(height: 24),
+
                   // 金额输入
+                  const Text(
+                    '金额',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   TextField(
-                    controller: _amountController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    controller: widget.amountController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w600,
+                      color: _selectedType == 'expense'
+                          ? widget.themeColors.expense
+                          : widget.themeColors.income,
+                    ),
                     decoration: InputDecoration(
-                      labelText: '金额',
                       prefixText: '¥ ',
                       prefixStyle: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: _selectedType == 'income' ? AppColors.income : AppColors.expense,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w600,
+                        color: _selectedType == 'expense'
+                            ? widget.themeColors.expense
+                            : widget.themeColors.income,
                       ),
-                      border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFF0F0F0)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Color(0xFFF0F0F0), width: 2),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                            color: widget.themeColors.primary, width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // 分类选择
+                  const Text(
+                    '分类',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF666666),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // 分类选择
-                  DropdownButtonFormField<String>(
-                    value: _selectedCategory,
-                    decoration: const InputDecoration(
-                      labelText: '分类',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 1,
                     ),
-                    items: _getCategoryItems(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _selectedCategory = value);
-                      }
+                    itemCount: _categories.length,
+                    itemBuilder: (context, index) {
+                      final category = _categories[index];
+                      final isSelected = category['id'] == _selectedCategory;
+
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedCategory = category['id']!;
+                          });
+                          widget.onCategoryChanged(
+                            category['id']!,
+                            category['icon']!,
+                          );
+                          HapticFeedback.selectionClick();
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? widget.themeColors.primary.withOpacity(0.15)
+                                : const Color(0xFFF8F8F8),
+                            borderRadius: BorderRadius.circular(12),
+                            border: isSelected
+                                ? Border.all(
+                                    color: widget.themeColors.primary,
+                                    width: 2,
+                                  )
+                                : null,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                category['icon']!,
+                                style: const TextStyle(fontSize: 24),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                category['name']!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isSelected
+                                      ? widget.themeColors.primary
+                                      : const Color(0xFF666666),
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
                     },
                   ),
-                  const SizedBox(height: 12),
+
+                  const SizedBox(height: 24),
+
                   // 备注输入
-                  TextField(
-                    controller: _descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: '备注',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  const Text(
+                    '备注',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF666666),
                     ),
-                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: widget.descriptionController,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF333333),
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '添加备注...',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFFBBBBBB),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFF0F0F0)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Color(0xFFF0F0F0), width: 2),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                            color: widget.themeColors.primary, width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                    ),
                   ),
                 ],
+              ),
+            ),
+          ),
+
+          // 保存按钮
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 34),
+            decoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(color: Color(0xFFF0F0F0)),
+              ),
+            ),
+            child: GestureDetector(
+              onTap: widget.onSave,
+              child: Container(
+                width: double.infinity,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      widget.themeColors.primary,
+                      HSLColor.fromColor(widget.themeColors.primary)
+                          .withLightness(
+                              HSLColor.fromColor(widget.themeColors.primary)
+                                      .lightness *
+                                  0.8)
+                          .toColor(),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.themeColors.primary.withOpacity(0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Text(
+                    '保存',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -625,23 +1692,22 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
   Widget _buildTypeButton(String type, String label, Color color) {
     final isSelected = _selectedType == type;
     return GestureDetector(
-      onTap: () => setState(() {
-        _selectedType = type;
-        // 切换类型时，如果当前分类不适用，重置为 other
-        final validCategories = type == 'income'
-            ? ['salary', 'bonus', 'parttime', 'investment', 'other']
-            : ['food', 'transport', 'shopping', 'entertainment', 'housing', 'medical', 'education', 'other'];
-        if (!validCategories.contains(_selectedCategory)) {
+      onTap: () {
+        setState(() {
+          _selectedType = type;
+          // 切换类型时重置分类
           _selectedCategory = 'other';
-        }
-      }),
+        });
+        widget.onTypeChanged(type);
+        HapticFeedback.selectionClick();
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.15) : Colors.grey[100],
-          borderRadius: BorderRadius.circular(8),
+          color: isSelected ? color.withOpacity(0.15) : const Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? color : Colors.grey[300]!,
+            color: isSelected ? color : const Color(0xFFE0E0E0),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -649,92 +1715,11 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
           child: Text(
             label,
             style: TextStyle(
-              color: isSelected ? color : Colors.grey[600],
+              color: isSelected ? color : const Color(0xFF666666),
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontSize: 16,
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  List<DropdownMenuItem<String>> _getCategoryItems() {
-    final categories = _selectedType == 'income'
-        ? ['salary', 'bonus', 'parttime', 'investment', 'other']
-        : ['food', 'transport', 'shopping', 'entertainment', 'housing', 'medical', 'education', 'other'];
-
-    return categories.map((id) {
-      return DropdownMenuItem(
-        value: id,
-        child: Text(_getCategoryName(id)),
-      );
-    }).toList();
-  }
-
-  String _getCategoryName(String? categoryId) {
-    if (categoryId == null) {
-      return CategoryLocalizationService.instance.getCategoryName('other_expense');
-    }
-
-    // 使用本地化服务获取分类名称
-    final category = DefaultCategories.findById(categoryId);
-    if (category != null) {
-      return category.localizedName;
-    }
-
-    // 如果找不到分类，尝试使用本地化服务直接获取
-    return CategoryLocalizationService.instance.getCategoryName(categoryId);
-  }
-
-  Widget _buildBottomHint() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Text(
-            '语音示例',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              _buildExampleChip('午餐花了35块'),
-              _buildExampleChip('打车去公司20元'),
-              _buildExampleChip('超市买菜168'),
-              _buildExampleChip('收到工资8000'),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '使用千问全模态模型直接识别语音',
-            style: TextStyle(
-              color: Colors.grey[400],
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExampleChip(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Text(
-        '"$text"',
-        style: TextStyle(
-          color: Colors.grey[700],
-          fontSize: 12,
         ),
       ),
     );

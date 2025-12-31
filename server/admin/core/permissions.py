@@ -104,17 +104,40 @@ class PermissionChecker:
         request: Request,
         db: AsyncSession = Depends(get_db),
     ) -> bool:
-        # 从request.state获取当前管理员
-        current_admin = getattr(request.state, "admin", None)
+        # 延迟导入避免循环依赖
+        from admin.api.deps import get_current_admin
+        from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-        if not current_admin:
+        security = HTTPBearer()
+
+        # 从Authorization header获取token
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="未认证",
             )
 
-        # 获取权限
-        permissions = await get_admin_permissions(current_admin.id, db)
+        token = auth_header[7:]  # Remove "Bearer " prefix
+
+        # 解码token获取admin
+        from admin.core.security import decode_access_token
+        payload = decode_access_token(token)
+        if not payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="无效的认证令牌",
+            )
+
+        admin_id = payload.get("sub")
+        if not admin_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="无效的认证令牌",
+            )
+
+        # 获取权限 (超级管理员自动拥有所有权限)
+        permissions = await get_admin_permissions(UUID(admin_id), db)
 
         # 检查权限
         if not check_permission(permissions, self.required_permission):

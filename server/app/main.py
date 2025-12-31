@@ -9,10 +9,14 @@ from app.core.config import settings
 from app.core.database import engine
 from app.core.logging import setup_logging, get_logger
 from app.middleware import RequestLoggingMiddleware, SlowRequestLoggingMiddleware
+from app.middleware.api_version import APIVersionMiddleware
 from app.models import *  # noqa: Import all models for table creation
 from app.api.v1 import api_router
 from app.services.init_service import init_system_categories
 from app.core.database import AsyncSessionLocal
+
+# Admin API
+from admin.api import admin_router
 
 # Initialize logging first
 setup_logging()
@@ -66,21 +70,35 @@ app.add_middleware(
 app.add_middleware(SlowRequestLoggingMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 
+# API Version compatibility middleware
+app.add_middleware(APIVersionMiddleware)
+
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
+
+# Include Admin API routes
+app.include_router(admin_router, prefix="/admin")
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "service": settings.APP_NAME}
+    from app.middleware.api_version import APIVersionConfig
+    return {
+        "status": "healthy",
+        "service": settings.APP_NAME,
+        "api_version": APIVersionConfig.CURRENT_VERSION,
+    }
 
 
 @app.get("/")
 async def root():
     """Root endpoint."""
+    from app.middleware.api_version import APIVersionConfig
     return {
         "message": f"Welcome to {settings.APP_NAME} API",
         "docs": "/docs",
         "version": "1.0.0",
+        "api_version": APIVersionConfig.CURRENT_VERSION,
+        "min_api_version": APIVersionConfig.MIN_SUPPORTED_VERSION,
     }

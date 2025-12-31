@@ -199,284 +199,41 @@ class _CategoryManagementPageState
 
   void _showAddSubcategoryDialog(
       BuildContext context, WidgetRef ref, Category parentCategory) {
-    _showCategoryDialog(
-      context,
-      ref,
-      null,
-      parentCategory.isExpense,
-      parentId: parentCategory.id,
+    // 使用Navigator.push显示全屏对话框页面
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _CategoryEditPage(
+          category: null,
+          isExpense: parentCategory.isExpense,
+          parentId: parentCategory.id,
+        ),
+      ),
     );
   }
 
   void _showAddCategoryDialog(
       BuildContext context, WidgetRef ref, bool isExpense) {
-    _showCategoryDialog(context, ref, null, isExpense);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _CategoryEditPage(
+          category: null,
+          isExpense: isExpense,
+          parentId: null,
+        ),
+      ),
+    );
   }
 
   void _showEditCategoryDialog(
       BuildContext context, WidgetRef ref, Category category) {
-    _showCategoryDialog(context, ref, category, category.isExpense);
-  }
-
-  void _showCategoryDialog(
-      BuildContext context, WidgetRef ref, Category? category, bool isExpense,
-      {String? parentId}) {
-    final isEdit = category != null;
-    final nameController = TextEditingController(text: category?.name ?? '');
-    Color selectedColor = category?.color ?? const Color(0xFF4CAF50);
-    IconData selectedIcon = category?.icon ?? Icons.category;
-    String? selectedParentId = parentId ?? category?.parentId;
-
-    // 获取可选的父分类（顶级分类）
-    final availableParents =
-        ref.read(categoryProvider.notifier).getRootCategories(isExpense: isExpense);
-
-    final colors = [
-      const Color(0xFFE91E63),
-      const Color(0xFF2196F3),
-      const Color(0xFF4CAF50),
-      const Color(0xFFFF9800),
-      const Color(0xFF9C27B0),
-      const Color(0xFF00BCD4),
-      const Color(0xFFF44336),
-      const Color(0xFF795548),
-    ];
-
-    final icons = [
-      Icons.restaurant,
-      Icons.directions_car,
-      Icons.shopping_bag,
-      Icons.movie,
-      Icons.home,
-      Icons.local_hospital,
-      Icons.school,
-      Icons.phone_android,
-      Icons.checkroom,
-      Icons.face,
-      Icons.sports_esports,
-      Icons.pets,
-      Icons.flight,
-      Icons.fitness_center,
-      Icons.coffee,
-      Icons.work,
-      Icons.card_giftcard,
-      Icons.trending_up,
-      Icons.redeem,
-      Icons.receipt_long,
-    ];
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            // 如果当前分类有子分类，不能设置父分类（避免多级嵌套）
-            final hasChildren = isEdit &&
-                ref.read(categoryProvider.notifier).hasChildren(category.id);
-            // 过滤掉自己，不能选自己作为父分类
-            final filteredParents = isEdit
-                ? availableParents.where((p) => p.id != category.id).toList()
-                : availableParents;
-
-            return AlertDialog(
-              title: Text(isEdit
-                  ? '编辑分类'
-                  : (selectedParentId != null ? '添加子分类' : '添加分类')),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: '分类名称',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // 父分类选择器
-                    if (!hasChildren && filteredParents.isNotEmpty) ...[
-                      const Text('父分类（可选）',
-                          style: TextStyle(
-                              fontSize: 12, color: AppColors.textSecondary)),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String?>(
-                            value: selectedParentId,
-                            isExpanded: true,
-                            hint: const Text('无（顶级分类）'),
-                            items: [
-                              const DropdownMenuItem<String?>(
-                                value: null,
-                                child: Text('无（顶级分类）'),
-                              ),
-                              ...filteredParents.map((parent) {
-                                return DropdownMenuItem<String?>(
-                                  value: parent.id,
-                                  child: Row(
-                                    children: [
-                                      Icon(parent.icon,
-                                          color: parent.color, size: 20),
-                                      const SizedBox(width: 8),
-                                      Text(parent.name),
-                                    ],
-                                  ),
-                                );
-                              }),
-                            ],
-                            onChanged: (value) {
-                              setState(() => selectedParentId = value);
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    if (hasChildren) ...[
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha:0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.info_outline,
-                                color: Colors.amber, size: 16),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '此分类有子分类，不能设置为其他分类的子分类',
-                                style: TextStyle(
-                                    fontSize: 12, color: Colors.amber),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    const Text('图标颜色',
-                        style: TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: colors.map((color) {
-                        final isSelected = color == selectedColor;
-                        return GestureDetector(
-                          onTap: () => setState(() => selectedColor = color),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: isSelected
-                                  ? Border.all(color: Colors.black, width: 2)
-                                  : null,
-                            ),
-                            child: isSelected
-                                ? const Icon(Icons.check,
-                                    color: Colors.white, size: 20)
-                                : null,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('图标',
-                        style: TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 200,
-                      child: GridView.builder(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 5,
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                        ),
-                        itemCount: icons.length,
-                        itemBuilder: (context, index) {
-                          final icon = icons[index];
-                          final isSelected = icon == selectedIcon;
-                          return GestureDetector(
-                            onTap: () => setState(() => selectedIcon = icon),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? selectedColor.withValues(alpha:0.2)
-                                    : AppColors.background,
-                                borderRadius: BorderRadius.circular(8),
-                                border: isSelected
-                                    ? Border.all(color: selectedColor, width: 2)
-                                    : null,
-                              ),
-                              child: Icon(icon, color: selectedColor),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('取消'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    final name = nameController.text.trim();
-                    if (name.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('请输入分类名称')),
-                      );
-                      return;
-                    }
-
-                    final newCategory = Category(
-                      id: category?.id ??
-                          DateTime.now().millisecondsSinceEpoch.toString(),
-                      name: name,
-                      icon: selectedIcon,
-                      color: selectedColor,
-                      isExpense: isExpense,
-                      parentId: selectedParentId,
-                      sortOrder: category?.sortOrder ?? 50,
-                      isCustom: true,
-                    );
-
-                    if (isEdit) {
-                      ref
-                          .read(categoryProvider.notifier)
-                          .updateCategory(newCategory);
-                    } else {
-                      ref
-                          .read(categoryProvider.notifier)
-                          .addCategory(newCategory);
-                    }
-
-                    Navigator.pop(context);
-                  },
-                  child: Text(isEdit ? '保存' : '添加'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _CategoryEditPage(
+          category: category,
+          isExpense: category.isExpense,
+          parentId: category.parentId,
+        ),
+      ),
     );
   }
 
@@ -541,5 +298,209 @@ class _CategoryManagementPageState
         );
       },
     );
+  }
+}
+
+/// 分类编辑页面（全屏）
+class _CategoryEditPage extends ConsumerStatefulWidget {
+  final Category? category;
+  final bool isExpense;
+  final String? parentId;
+
+  const _CategoryEditPage({
+    this.category,
+    required this.isExpense,
+    this.parentId,
+  });
+
+  @override
+  ConsumerState<_CategoryEditPage> createState() => _CategoryEditPageState();
+}
+
+class _CategoryEditPageState extends ConsumerState<_CategoryEditPage> {
+  late TextEditingController _nameController;
+  late Color _selectedColor;
+  late IconData _selectedIcon;
+  String? _selectedParentId;
+
+  final List<Color> _colors = const [
+    Color(0xFFE91E63),
+    Color(0xFF2196F3),
+    Color(0xFF4CAF50),
+    Color(0xFFFF9800),
+    Color(0xFF9C27B0),
+    Color(0xFF00BCD4),
+    Color(0xFFF44336),
+    Color(0xFF795548),
+  ];
+
+  final List<IconData> _icons = const [
+    Icons.restaurant,
+    Icons.directions_car,
+    Icons.shopping_bag,
+    Icons.movie,
+    Icons.home,
+    Icons.local_hospital,
+    Icons.school,
+    Icons.phone_android,
+    Icons.checkroom,
+    Icons.face,
+    Icons.sports_esports,
+    Icons.pets,
+    Icons.flight,
+    Icons.fitness_center,
+    Icons.coffee,
+    Icons.work,
+    Icons.card_giftcard,
+    Icons.trending_up,
+    Icons.redeem,
+    Icons.receipt_long,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.category?.name ?? '');
+    _selectedColor = widget.category?.color ?? const Color(0xFF4CAF50);
+    _selectedIcon = widget.category?.icon ?? Icons.category;
+    _selectedParentId = widget.parentId ?? widget.category?.parentId;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEdit = widget.category != null;
+    final title = isEdit
+        ? '编辑分类'
+        : (_selectedParentId != null ? '添加子分类' : '添加分类');
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          TextButton(
+            onPressed: _save,
+            child: const Text('保存', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 分类名称
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: '分类名称',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 24),
+
+            // 图标颜色
+            const Text('图标颜色', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: _colors.map((color) {
+                final isSelected = color == _selectedColor;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedColor = color),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: isSelected
+                          ? Border.all(color: Colors.black, width: 3)
+                          : null,
+                      boxShadow: isSelected
+                          ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 8)]
+                          : null,
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check, color: Colors.white, size: 24)
+                        : null,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 24),
+
+            // 图标选择
+            const Text('图标', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 5,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+              ),
+              itemCount: _icons.length,
+              itemBuilder: (context, index) {
+                final icon = _icons[index];
+                final isSelected = icon == _selectedIcon;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedIcon = icon),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? _selectedColor.withOpacity(0.2)
+                          : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: isSelected
+                          ? Border.all(color: _selectedColor, width: 2)
+                          : null,
+                    ),
+                    child: Icon(icon, color: _selectedColor, size: 28),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _save() {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入分类名称')),
+      );
+      return;
+    }
+
+    final newCategory = Category(
+      id: widget.category?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      name: name,
+      icon: _selectedIcon,
+      color: _selectedColor,
+      isExpense: widget.isExpense,
+      parentId: _selectedParentId,
+      sortOrder: widget.category?.sortOrder ?? 50,
+      isCustom: true,
+    );
+
+    if (widget.category != null) {
+      ref.read(categoryProvider.notifier).updateCategory(newCategory);
+    } else {
+      ref.read(categoryProvider.notifier).addCategory(newCategory);
+    }
+
+    Navigator.pop(context);
   }
 }

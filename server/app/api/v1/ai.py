@@ -1,4 +1,6 @@
 """AI recognition endpoints."""
+import logging
+import time
 from typing import Optional, List
 from decimal import Decimal
 
@@ -8,6 +10,8 @@ from pydantic import BaseModel
 from app.models.user import User
 from app.api.deps import get_current_user
 from app.services.ai_service import AIService
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/ai", tags=["AI Recognition"])
@@ -31,8 +35,13 @@ async def recognize_image(
     current_user: User = Depends(get_current_user),
 ):
     """Recognize receipt/bill from image."""
+    start_time = time.time()
+    user_id = str(current_user.id)
+    logger.info(f"Image recognition started | user_id={user_id} | filename={file.filename}")
+
     # Validate file type
     if not file.content_type.startswith("image/"):
+        logger.warning(f"Invalid file type | user_id={user_id} | content_type={file.content_type}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File must be an image",
@@ -40,10 +49,20 @@ async def recognize_image(
 
     # Read file content
     content = await file.read()
+    file_size = len(content)
+    logger.debug(f"Image loaded | user_id={user_id} | size={file_size} bytes")
 
     # Use AI service to recognize
     ai_service = AIService()
     result = await ai_service.recognize_image(content)
+
+    elapsed = time.time() - start_time
+    has_amount = result.get("amount") is not None
+    logger.info(
+        f"Image recognition completed | user_id={user_id} | "
+        f"success={has_amount} | confidence={result.get('confidence')} | "
+        f"elapsed={elapsed:.2f}s"
+    )
 
     return result
 
@@ -54,8 +73,22 @@ async def recognize_voice(
     current_user: User = Depends(get_current_user),
 ):
     """Parse transaction from voice text."""
+    start_time = time.time()
+    user_id = str(current_user.id)
+    text_preview = text[:50] + "..." if len(text) > 50 else text
+    logger.info(f"Voice text parsing started | user_id={user_id} | text_len={len(text)}")
+    logger.debug(f"Voice text preview | user_id={user_id} | text={text_preview}")
+
     ai_service = AIService()
     result = await ai_service.parse_voice_text(text)
+
+    elapsed = time.time() - start_time
+    has_amount = result.get("amount") is not None
+    logger.info(
+        f"Voice text parsing completed | user_id={user_id} | "
+        f"success={has_amount} | confidence={result.get('confidence')} | "
+        f"elapsed={elapsed:.2f}s"
+    )
 
     return result
 
@@ -66,8 +99,22 @@ async def parse_text(
     current_user: User = Depends(get_current_user),
 ):
     """Parse transaction from text input."""
+    start_time = time.time()
+    user_id = str(current_user.id)
+    text_preview = text[:50] + "..." if len(text) > 50 else text
+    logger.info(f"Text parsing started | user_id={user_id} | text_len={len(text)}")
+    logger.debug(f"Text preview | user_id={user_id} | text={text_preview}")
+
     ai_service = AIService()
     result = await ai_service.parse_voice_text(text)
+
+    elapsed = time.time() - start_time
+    has_amount = result.get("amount") is not None
+    logger.info(
+        f"Text parsing completed | user_id={user_id} | "
+        f"success={has_amount} | confidence={result.get('confidence')} | "
+        f"elapsed={elapsed:.2f}s"
+    )
 
     return result
 
@@ -117,9 +164,15 @@ async def recognize_audio(
 
     # Read file content
     content = await file.read()
+    file_size = len(content)
+
+    start_time = time.time()
+    user_id = str(current_user.id)
+    logger.info(f"Audio recognition started | user_id={user_id} | filename={filename} | format={audio_format} | size={file_size}")
 
     # Validate file size (max 10MB)
-    if len(content) > 10 * 1024 * 1024:
+    if file_size > 10 * 1024 * 1024:
+        logger.warning(f"Audio file too large | user_id={user_id} | size={file_size}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Audio file too large. Max size: 10MB",
@@ -128,6 +181,13 @@ async def recognize_audio(
     # Use AI service to recognize
     ai_service = AIService()
     result = await ai_service.recognize_voice_audio(content, audio_format)
+
+    elapsed = time.time() - start_time
+    logger.info(
+        f"Audio recognition completed | user_id={user_id} | "
+        f"success={result.get('success')} | confidence={result.get('confidence')} | "
+        f"elapsed={elapsed:.2f}s"
+    )
 
     return AudioRecognitionResult(
         transcription=result.get("transcription"),
@@ -179,11 +239,27 @@ async def parse_bill(
     - Bill dates and amounts
     - Individual transactions with categories
     """
+    start_time = time.time()
+    user_id = str(current_user.id)
+    subject_preview = subject[:30] + "..." if len(subject) > 30 else subject
+    logger.info(
+        f"Bill parsing started | user_id={user_id} | "
+        f"subject={subject_preview} | sender={sender} | content_len={len(content)}"
+    )
+
     ai_service = AIService()
     result = await ai_service.parse_bill_email(
         email_content=content,
         email_subject=subject,
         sender=sender,
+    )
+
+    elapsed = time.time() - start_time
+    tx_count = len(result.get("transactions", []))
+    logger.info(
+        f"Bill parsing completed | user_id={user_id} | "
+        f"is_bill={result.get('is_bill')} | tx_count={tx_count} | "
+        f"confidence={result.get('confidence')} | elapsed={elapsed:.2f}s"
     )
 
     # Convert transactions to proper schema
