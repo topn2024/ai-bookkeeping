@@ -1,25 +1,25 @@
 /// 自动生成的构建信息 - 请勿手动修改
-/// 生成时间: 2026-01-01 02:15:00
+/// 生成时间: 2026-01-01 03:00:00
 
 class BuildInfo {
   /// 构建时间 (ISO 8601)
-  static const String buildTime = '2026-01-01T02:15:00.000000';
+  static const String buildTime = '2026-01-01T03:00:00.000000';
 
   /// 构建时间 (格式化显示)
-  static const String buildTimeFormatted = '2026-01-01 02:15:00';
+  static const String buildTimeFormatted = '2026-01-01 03:00:00';
 
   /// 版本号
-  static const String version = '1.2.16';
+  static const String version = '1.2.17';
 
   /// 构建号
-  static const int buildNumber = 33;
+  static const int buildNumber = 34;
 
   /// 完整版本
-  static const String fullVersion = '1.2.16+33';
+  static const String fullVersion = '1.2.17+34';
 
   /// 构建类型 (Debug/Release)
   static const String buildType = 'Release';
 
   /// 带类型的完整版本号
-  static const String displayVersion = '1.2.16';
+  static const String displayVersion = '1.2.17';
 }

@@ -482,68 +482,50 @@ class QwenService {
       if (jsonStr != null) {
         final decoded = jsonDecode(jsonStr);
 
-        // 处理返回值可能是 List 的情况（如 [{...}]）
-        Map<String, dynamic> data;
+        // 处理返回值可能是 List 的情况
+        // AI 可能返回两种格式：
+        // 1. {"transcription": "...", "transactions": [{...}, {...}]}
+        // 2. [{...}, {...}] 直接返回交易列表
         if (decoded is List) {
           if (decoded.isEmpty) {
             return MultiRecognitionResult.error('返回的JSON数组为空');
           }
-          if (decoded[0] is! Map) {
+
+          // 检查第一个元素是否包含 transactions（格式1被包在数组里）
+          if (decoded[0] is Map && decoded[0]['transactions'] != null) {
+            // 格式: [{"transcription": "...", "transactions": [...]}]
+            final data = decoded[0] as Map<String, dynamic>;
+            return _parseTransactionsFromData(data);
+          }
+
+          // 否则整个列表就是交易列表（格式2）
+          _logger.info('Detected direct transaction list format');
+          final results = <QwenRecognitionResult>[];
+          for (var tx in decoded) {
+            if (tx is Map) {
+              results.add(QwenRecognitionResult(
+                amount: (tx['amount'] as num?)?.toDouble(),
+                category: tx['category'] as String?,
+                description: tx['description'] as String?,
+                type: tx['type'] as String? ?? 'expense',
+                date: tx['date'] as String?,
+                success: true,
+                confidence: 0.9,
+              ));
+            }
+          }
+
+          if (results.isEmpty) {
             return MultiRecognitionResult.error('JSON数组元素格式错误');
           }
-          data = decoded[0] as Map<String, dynamic>;
+
+          _logger.info('Parsed ${results.length} transactions from list format');
+          return MultiRecognitionResult(transactions: results);
         } else if (decoded is Map<String, dynamic>) {
-          data = decoded;
+          return _parseTransactionsFromData(decoded);
         } else {
           return MultiRecognitionResult.error('JSON格式不正确');
         }
-
-        // 检查转写内容
-        final transcription = data['transcription'] as String?;
-
-        // 如果有 transactions 数组
-        if (data['transactions'] != null && data['transactions'] is List) {
-          final txList = data['transactions'] as List;
-
-          if (txList.isEmpty) {
-            // 没有识别到交易，可能是麦克风问题
-            if (transcription == null || transcription.isEmpty) {
-              return MultiRecognitionResult.error('未检测到语音内容，请确保麦克风正常工作并清晰说话');
-            }
-            return MultiRecognitionResult.error('未能从语音中识别出交易信息，请重试');
-          }
-
-          final results = <QwenRecognitionResult>[];
-          for (var tx in txList) {
-            results.add(QwenRecognitionResult(
-              amount: (tx['amount'] as num?)?.toDouble(),
-              category: tx['category'] as String?,
-              description: tx['description'] as String?,
-              type: tx['type'] as String? ?? 'expense',
-              date: tx['date'] as String?,
-              success: true,
-              confidence: 0.9,
-            ));
-          }
-
-          _logger.info('Parsed ${results.length} transactions from audio');
-          return MultiRecognitionResult(transactions: results);
-        }
-
-        // 兼容旧格式（单笔交易）
-        if (data['amount'] != null) {
-          final result = QwenRecognitionResult(
-            amount: (data['amount'] as num?)?.toDouble(),
-            category: data['category'] as String?,
-            description: data['description'] as String? ?? transcription,
-            type: data['type'] as String? ?? 'expense',
-            success: true,
-            confidence: 0.9,
-          );
-          return MultiRecognitionResult.single(result);
-        }
-
-        return MultiRecognitionResult.error('无法识别交易信息');
       }
 
       // JSON提取失败，尝试从纯文本提取
@@ -553,6 +535,56 @@ class QwenService {
       _logger.error('Extract multi JSON failed', error: e);
       return MultiRecognitionResult.error('JSON解析失败: $e');
     }
+  }
+
+  /// 从标准格式数据中解析交易
+  MultiRecognitionResult _parseTransactionsFromData(Map<String, dynamic> data) {
+    // 检查转写内容
+    final transcription = data['transcription'] as String?;
+
+    // 如果有 transactions 数组
+    if (data['transactions'] != null && data['transactions'] is List) {
+      final txList = data['transactions'] as List;
+
+      if (txList.isEmpty) {
+        // 没有识别到交易，可能是麦克风问题
+        if (transcription == null || transcription.isEmpty) {
+          return MultiRecognitionResult.error('未检测到语音内容，请确保麦克风正常工作并清晰说话');
+        }
+        return MultiRecognitionResult.error('未能从语音中识别出交易信息，请重试');
+      }
+
+      final results = <QwenRecognitionResult>[];
+      for (var tx in txList) {
+        results.add(QwenRecognitionResult(
+          amount: (tx['amount'] as num?)?.toDouble(),
+          category: tx['category'] as String?,
+          description: tx['description'] as String?,
+          type: tx['type'] as String? ?? 'expense',
+          date: tx['date'] as String?,
+          success: true,
+          confidence: 0.9,
+        ));
+      }
+
+      _logger.info('Parsed ${results.length} transactions from audio');
+      return MultiRecognitionResult(transactions: results);
+    }
+
+    // 兼容旧格式（单笔交易）
+    if (data['amount'] != null) {
+      final result = QwenRecognitionResult(
+        amount: (data['amount'] as num?)?.toDouble(),
+        category: data['category'] as String?,
+        description: data['description'] as String? ?? transcription,
+        type: data['type'] as String? ?? 'expense',
+        success: true,
+        confidence: 0.9,
+      );
+      return MultiRecognitionResult.single(result);
+    }
+
+    return MultiRecognitionResult.error('无法识别交易信息');
   }
 
   /// 智能分类建议

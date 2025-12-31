@@ -1,0 +1,679 @@
+{
+  "@@locale": "en",
+  "@@last_modified": "2025-12-31",
+
+  "appName": "AI Bookkeeping",
+  "@appName": {
+    "description": "Application name"
+  },
+
+  "confirm": "Confirm",
+  "cancel": "Cancel",
+  "save": "Save",
+  "delete": "Delete",
+  "edit": "Edit",
+  "add": "Add",
+  "close": "Close",
+  "loading": "Loading...",
+  "error": "Error",
+  "success": "Success",
+  "warning": "Warning",
+  "noData": "No Data",
+  "retry": "Retry",
+  "search": "Search",
+  "all": "All",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "thisWeek": "This Week",
+  "thisMonth": "This Month",
+  "thisYear": "This Year",
+  "custom": "Custom",
+  "startDate": "Start Date",
+  "endDate": "End Date",
+  "pleaseSelect": "Please Select",
+  "pleaseEnter": "Please Enter",
+  "required": "Required",
+  "optional": "Optional",
+  "more": "More",
+  "less": "Less",
+  "viewAll": "View All",
+  "back": "Back",
+  "next": "Next",
+  "done": "Done",
+  "skip": "Skip",
+  "reset": "Reset",
+  "clear": "Clear",
+  "copy": "Copy",
+  "copied": "Copied",
+  "share": "Share",
+  "refresh": "Refresh",
+  "update": "Update",
+  "version": "Version",
+  "unknown": "Unknown",
+  "none": "None",
+  "enabled": "Enabled",
+  "disabled": "Disabled",
+  "on": "On",
+  "off": "Off",
+  "yes": "Yes",
+  "no": "No",
+  "ok": "OK",
+
+  "home": "Home",
+  "@home": {
+    "description": "Bottom navigation - Home"
+  },
+  "statistics": "Statistics",
+  "@statistics": {
+    "description": "Bottom navigation - Statistics"
+  },
+  "addRecord": "Add",
+  "@addRecord": {
+    "description": "Bottom navigation - Add record"
+  },
+  "budget": "Budget",
+  "@budget": {
+    "description": "Bottom navigation - Budget"
+  },
+  "settings": "Settings",
+  "@settings": {
+    "description": "Bottom navigation - Settings"
+  },
+
+  "expense": "Expense",
+  "@expense": {
+    "description": "Transaction type - Expense"
+  },
+  "income": "Income",
+  "@income": {
+    "description": "Transaction type - Income"
+  },
+  "transfer": "Transfer",
+  "@transfer": {
+    "description": "Transaction type - Transfer"
+  },
+  "amount": "Amount",
+  "category": "Category",
+  "subcategory": "Subcategory",
+  "account": "Account",
+  "date": "Date",
+  "time": "Time",
+  "note": "Note",
+  "remark": "Remark",
+  "enterAmount": "Enter amount",
+  "selectCategory": "Select category",
+  "selectSubcategory": "Select subcategory",
+  "selectAccount": "Select account",
+  "selectDate": "Select date",
+  "selectTime": "Select time",
+  "addNote": "Add note",
+  "transactionSaved": "Transaction saved",
+  "transactionDeleted": "Transaction deleted",
+  "transactionUpdated": "Transaction updated",
+  "confirmDeleteTransaction": "Confirm delete this transaction?",
+  "noTransactions": "No transactions",
+  "recentTransactions": "Recent Transactions",
+  "allTransactions": "All Transactions",
+  "transactionDetails": "Transaction Details",
+  "editTransaction": "Edit Transaction",
+  "addTransaction": "Add Transaction",
+  "fromAccount": "From Account",
+  "toAccount": "To Account",
+  "transferFee": "Transfer Fee",
+
+  "totalIncome": "Total Income",
+  "totalExpense": "Total Expense",
+  "balance": "Balance",
+  "netIncome": "Net Income",
+  "daily": "Daily",
+  "weekly": "Weekly",
+  "monthly": "Monthly",
+  "yearly": "Yearly",
+  "average": "Average",
+  "trend": "Trend",
+  "comparison": "Comparison",
+  "breakdown": "Breakdown",
+  "expenseByCategory": "Expense by Category",
+  "incomeByCategory": "Income by Category",
+  "expenseByAccount": "Expense by Account",
+  "incomeByAccount": "Income by Account",
+  "topCategories": "Top Categories",
+  "expenseTrend": "Expense Trend",
+  "incomeTrend": "Income Trend",
+  "balanceTrend": "Balance Trend",
+  "statisticsOverview": "Statistics Overview",
+  "noStatisticsData": "No statistics data",
+
+  "profile": "Profile",
+  "language": "Language",
+  "currency": "Currency",
+  "theme": "Theme",
+  "darkMode": "Dark Mode",
+  "lightMode": "Light Mode",
+  "systemMode": "System",
+  "dataBackup": "Backup",
+  "dataExport": "Export",
+  "dataImport": "Import",
+  "dataSync": "Sync",
+  "about": "About",
+  "help": "Help",
+  "feedback": "Feedback",
+  "logout": "Logout",
+  "login": "Login",
+  "register": "Register",
+  "username": "Username",
+  "password": "Password",
+  "email": "Email",
+  "phone": "Phone",
+  "forgotPassword": "Forgot Password",
+  "rememberMe": "Remember Me",
+  "loginSuccess": "Login successful",
+  "logoutSuccess": "Logout successful",
+  "registerSuccess": "Registration successful",
+  "privacyPolicy": "Privacy Policy",
+  "termsOfService": "Terms of Service",
+  "notifications": "Notifications",
+  "security": "Security",
+  "general": "General",
+  "appearance": "Appearance",
+  "accountSettings": "Account Settings",
+  "displaySettings": "Display Settings",
+  "notificationSettings": "Notification Settings",
+  "securitySettings": "Security Settings",
+  "dataManagement": "Data Management",
+  "clearCache": "Clear Cache",
+  "cacheCleared": "Cache cleared",
+  "checkUpdate": "Check Update",
+  "alreadyLatest": "Already latest version",
+  "newVersionAvailable": "New version available",
+
+  "cash": "Cash",
+  "@cash": {
+    "description": "Account type - Cash"
+  },
+  "bankCard": "Bank Card",
+  "@bankCard": {
+    "description": "Account type - Bank Card"
+  },
+  "creditCard": "Credit Card",
+  "@creditCard": {
+    "description": "Account type - Credit Card"
+  },
+  "eWallet": "E-Wallet",
+  "@eWallet": {
+    "description": "Account type - E-Wallet"
+  },
+  "accountBalance": "Balance",
+  "accountManagement": "Account Management",
+  "addAccount": "Add Account",
+  "editAccount": "Edit Account",
+  "deleteAccount": "Delete Account",
+  "accountName": "Account Name",
+  "accountType": "Account Type",
+  "initialBalance": "Initial Balance",
+  "currentBalance": "Current Balance",
+  "accountDeleted": "Account deleted",
+  "accountSaved": "Account saved",
+  "confirmDeleteAccount": "Confirm delete this account?",
+  "defaultAccount": "Default Account",
+  "setAsDefault": "Set as Default",
+  "includeInTotal": "Include in Total",
+  "accountIcon": "Account Icon",
+  "accountColor": "Account Color",
+  "totalAssets": "Total Assets",
+  "totalLiabilities": "Total Liabilities",
+  "netAssets": "Net Assets",
+  "debitCard": "Debit Card",
+  "savingsAccount": "Savings Account",
+  "investmentAccount": "Investment Account",
+  "loanAccount": "Loan Account",
+  "otherAccount": "Other Account",
+
+  "budgetManagement": "Budget",
+  "monthlyBudget": "Monthly Budget",
+  "categoryBudget": "Category Budget",
+  "budgetRemaining": "Remaining",
+  "budgetExceeded": "Exceeded",
+  "budgetUsed": "Used",
+  "budgetProgress": "Progress",
+  "addBudget": "Add Budget",
+  "editBudget": "Edit Budget",
+  "deleteBudget": "Delete Budget",
+  "budgetAmount": "Budget Amount",
+  "budgetPeriod": "Budget Period",
+  "budgetAlert": "Budget Alert",
+  "alertThreshold": "Alert Threshold",
+  "budgetSaved": "Budget saved",
+  "budgetDeleted": "Budget deleted",
+  "confirmDeleteBudget": "Confirm delete this budget?",
+  "overBudget": "Over budget",
+  "underBudget": "Under budget",
+  "noBudget": "No budget set",
+  "setBudget": "Set Budget",
+  "totalBudget": "Total Budget",
+  "remainingBudget": "Remaining Budget",
+  "budgetOverview": "Budget Overview",
+
+  "currencySettings": "Currency Settings",
+  "defaultCurrency": "Default Currency",
+  "showCurrencySymbol": "Show Symbol",
+  "currencyFormat": "Currency Format",
+  "decimalPlaces": "Decimal Places",
+  "thousandSeparator": "Thousand Separator",
+  "currencyPosition": "Symbol Position",
+  "beforeAmount": "Before Amount",
+  "afterAmount": "After Amount",
+
+  "languageSettings": "Language Settings",
+  "followSystem": "Follow System",
+  "selectLanguage": "Select Language",
+  "languageChanged": "Language changed",
+  "restartRequired": "Restart required for changes to take effect",
+
+  "categoryManagement": "Category Management",
+  "expenseCategories": "Expense Categories",
+  "incomeCategories": "Income Categories",
+  "addCategory": "Add Category",
+  "editCategory": "Edit Category",
+  "deleteCategory": "Delete Category",
+  "categoryName": "Category Name",
+  "categoryIcon": "Category Icon",
+  "categoryColor": "Category Color",
+  "parentCategory": "Parent Category",
+  "noParent": "No Parent (Top Level)",
+  "categorySaved": "Category saved",
+  "categoryDeleted": "Category deleted",
+  "confirmDeleteCategory": "Confirm delete this category?",
+  "customCategory": "Custom",
+  "defaultCategory": "Default",
+  "sortOrder": "Sort Order",
+  "categoryHasSubcategories": "This category has subcategories",
+  "deleteWithSubcategories": "Delete with subcategories",
+  "moveToOther": "Move transactions to other category",
+  "subcategoriesCount": "{count} subcategories",
+  "@subcategoriesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "voiceInput": "Voice Input",
+  "voiceRecognition": "Voice Recognition",
+  "startRecording": "Start Recording",
+  "stopRecording": "Stop Recording",
+  "recording": "Recording...",
+  "processing": "Processing...",
+  "voiceInputHint": "Tap to start voice input",
+  "voiceRecognitionFailed": "Voice recognition failed",
+  "tryAgain": "Try again",
+  "recognitionResult": "Recognition Result",
+  "confirmRecognition": "Confirm",
+  "reRecognize": "Re-recognize",
+  "microphonePermission": "Microphone permission required",
+  "grantPermission": "Grant Permission",
+
+  "imageRecognition": "Image Recognition",
+  "takePhoto": "Take Photo",
+  "chooseFromGallery": "Choose from Gallery",
+  "imageProcessing": "Processing image...",
+  "recognitionComplete": "Recognition complete",
+  "noReceiptFound": "No receipt found",
+  "cameraPermission": "Camera permission required",
+  "galleryPermission": "Gallery permission required",
+
+  "recurring": "Recurring",
+  "recurringTransaction": "Recurring Transaction",
+  "addRecurring": "Add Recurring",
+  "editRecurring": "Edit Recurring",
+  "deleteRecurring": "Delete Recurring",
+  "frequency": "Frequency",
+  "everyDay": "Every Day",
+  "everyWeek": "Every Week",
+  "everyMonth": "Every Month",
+  "everyYear": "Every Year",
+  "startFrom": "Start From",
+  "endAt": "End At",
+  "noEndDate": "No End Date",
+  "nextOccurrence": "Next Occurrence",
+  "recurringSaved": "Recurring saved",
+  "recurringDeleted": "Recurring deleted",
+  "confirmDeleteRecurring": "Confirm delete this recurring transaction?",
+
+  "reminder": "Reminder",
+  "billReminder": "Bill Reminder",
+  "addReminder": "Add Reminder",
+  "editReminder": "Edit Reminder",
+  "deleteReminder": "Delete Reminder",
+  "reminderTime": "Reminder Time",
+  "reminderDate": "Reminder Date",
+  "reminderNote": "Reminder Note",
+  "reminderSaved": "Reminder saved",
+  "reminderDeleted": "Reminder deleted",
+  "confirmDeleteReminder": "Confirm delete this reminder?",
+  "markAsPaid": "Mark as Paid",
+  "paid": "Paid",
+  "unpaid": "Unpaid",
+  "overdue": "Overdue",
+  "dueDate": "Due Date",
+  "daysLeft": "{days} days left",
+  "@daysLeft": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "daysOverdue": "{days} days overdue",
+  "@daysOverdue": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+
+  "debt": "Debt",
+  "debtManagement": "Debt Management",
+  "addDebt": "Add Debt",
+  "editDebt": "Edit Debt",
+  "deleteDebt": "Delete Debt",
+  "lend": "Lend",
+  "borrow": "Borrow",
+  "lendTo": "Lend To",
+  "borrowFrom": "Borrow From",
+  "personName": "Person Name",
+  "debtAmount": "Debt Amount",
+  "repaidAmount": "Repaid Amount",
+  "remainingAmount": "Remaining Amount",
+  "debtSaved": "Debt saved",
+  "debtDeleted": "Debt deleted",
+  "confirmDeleteDebt": "Confirm delete this debt?",
+  "addRepayment": "Add Repayment",
+  "repaymentHistory": "Repayment History",
+  "fullyRepaid": "Fully Repaid",
+  "partiallyRepaid": "Partially Repaid",
+  "notRepaid": "Not Repaid",
+  "totalLent": "Total Lent",
+  "totalBorrowed": "Total Borrowed",
+
+  "savingsGoal": "Savings Goal",
+  "addGoal": "Add Goal",
+  "editGoal": "Edit Goal",
+  "deleteGoal": "Delete Goal",
+  "goalName": "Goal Name",
+  "targetAmount": "Target Amount",
+  "currentAmount": "Current Amount",
+  "targetDate": "Target Date",
+  "goalProgress": "Progress",
+  "goalSaved": "Goal saved",
+  "goalDeleted": "Goal deleted",
+  "confirmDeleteGoal": "Confirm delete this goal?",
+  "addSavings": "Add Savings",
+  "withdrawSavings": "Withdraw Savings",
+  "goalAchieved": "Goal Achieved",
+  "daysToGoal": "{days} days to goal",
+  "@daysToGoal": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "amountNeeded": "Amount needed",
+  "dailySavingsNeeded": "Daily savings needed",
+  "monthlySavingsNeeded": "Monthly savings needed",
+
+  "report": "Report",
+  "generateReport": "Generate Report",
+  "exportReport": "Export Report",
+  "reportPeriod": "Report Period",
+  "incomeReport": "Income Report",
+  "expenseReport": "Expense Report",
+  "balanceReport": "Balance Report",
+  "categoryReport": "Category Report",
+  "accountReport": "Account Report",
+  "annualReport": "Annual Report",
+  "monthlyReport": "Monthly Report",
+  "weeklyReport": "Weekly Report",
+  "customReport": "Custom Report",
+
+  "networkError": "Network error",
+  "connectionTimeout": "Connection timeout",
+  "serverError": "Server error",
+  "unknownError": "Unknown error",
+  "noInternetConnection": "No internet connection",
+  "checkYourConnection": "Please check your internet connection",
+  "sessionExpired": "Session expired",
+  "pleaseLoginAgain": "Please login again",
+  "operationFailed": "Operation failed",
+  "operationSuccess": "Operation successful",
+  "dataLoadFailed": "Data load failed",
+  "dataSaveFailed": "Data save failed",
+  "invalidInput": "Invalid input",
+  "fieldRequired": "This field is required",
+  "invalidEmail": "Invalid email format",
+  "invalidPhone": "Invalid phone format",
+  "passwordTooShort": "Password too short",
+  "passwordMismatch": "Passwords do not match",
+  "amountInvalid": "Invalid amount",
+  "dateInvalid": "Invalid date",
+
+  "welcomeMessage": "Welcome to AI Bookkeeping",
+  "quickAdd": "Quick Add",
+  "voiceAdd": "Voice Add",
+  "scanReceipt": "Scan Receipt",
+  "todaySpending": "Today's Spending",
+  "monthlySpending": "Monthly Spending",
+  "budgetStatus": "Budget Status",
+  "financialOverview": "Financial Overview",
+  "quickActions": "Quick Actions",
+  "recentActivity": "Recent Activity",
+  "tips": "Tips",
+  "didYouKnow": "Did You Know",
+  "getStarted": "Get Started",
+  "createFirstTransaction": "Create your first transaction",
+  "setupBudget": "Set up your budget",
+  "addAccounts": "Add your accounts",
+  "startTracking": "Start tracking your finances",
+
+  "ledgerManagement": "Ledger Management",
+  "investmentAccount": "Investment Account",
+  "reimbursement": "Reimbursement",
+  "tagStatistics": "Tag Statistics",
+  "templateManagement": "Template Management",
+  "recurringManagement": "Recurring Transactions",
+  "openMembership": "Open Membership",
+  "unlockAIFeatures": "Unlock AI smart bookkeeping features",
+  "openNow": "Open Now",
+  "dataCloudSync": "Cloud Sync",
+  "cloudSyncEnabled": "Enabled, data auto-syncs to cloud",
+  "cloudSyncDisabled": "Disabled, data saved locally only",
+  "cloudSyncTurnedOn": "Cloud sync enabled",
+  "cloudSyncTurnedOff": "Cloud sync disabled, data saved locally only",
+  "dataBackupTitle": "Data Backup",
+  "backupToCloud": "Backup to cloud",
+  "dataExportTitle": "Data Export",
+  "exportToCSV": "Export to CSV file",
+  "dataImportTitle": "Data Import",
+  "importFromCSV": "Import from CSV file",
+  "annualReportTitle": "Annual Report",
+  "viewAnnualSummary": "View annual financial summary",
+  "customReportTitle": "Custom Report",
+  "multiDimensionalAnalysis": "Multi-dimensional custom analysis",
+  "assetOverview": "Asset Overview",
+  "netAssetsTrendDistribution": "Net assets, trends and distribution",
+  "systemSettings": "System Settings",
+  "themeLanguageSecurity": "Theme, language, security, etc.",
+
+  "editTransactionTitle": "Edit Transaction",
+  "addTransactionTitle": "Add Record",
+  "splitTransaction": "Split Transaction",
+  "voiceRecord": "Voice Record",
+  "photoRecord": "Photo Record",
+  "addNoteHint": "Add note...",
+  "reimbursable": "Reimbursable",
+  "subcategoryOf": "{name}'s subcategories",
+  "@subcategoryOf": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "useParentCategory": "Use parent",
+  "aiRecommendedCategory": "AI Recommended: {name}",
+  "@aiRecommendedCategory": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "useCategory": "Use",
+  "pleaseEnterAmount": "Please enter amount",
+  "pleaseSelectCategory": "Please select category",
+  "accountsCannotBeSame": "From and to accounts cannot be the same",
+  "pleaseEnterValidAmount": "Please enter a valid amount",
+
+  "aiSmartBookkeeping": "AI Smart Bookkeeping",
+  "thisMonthLabel": "This Month",
+  "quickRecord": "Quick",
+  "reportAnalysis": "Reports",
+  "confirmDelete": "Confirm Delete",
+  "confirmDeleteRecord": "Are you sure you want to delete this record?",
+  "deleted": "Deleted",
+  "noteLabel": "Note",
+  "typeLabel": "Type",
+  "accountLabel": "Account",
+  "aiConfidenceLabel": "AI Confidence",
+  "originalImage": "Original Image",
+  "viewLargeImage": "View Full Image",
+  "sourcePhoto": "Photo",
+  "sourceVoice": "Voice",
+  "sourceEmail": "Email",
+  "expired": "Expired",
+  "expiresInDays": "{days} days left",
+  "@expiresInDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "expiresInHours": "{hours} hours left",
+  "@expiresInHours": {
+    "placeholders": {
+      "hours": {"type": "int"}
+    }
+  },
+  "expiringSoon": "Expiring soon"
+,
+
+  "deleteText": "Delete",
+  "saveText": "Save",
+  "confirmDeleteAccount": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+  "@confirmDeleteAccount": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "accountType": "Account Type",
+  "iconColor": "Icon Color",
+  "iconText": "Icon",
+
+  "budgetPeriod": "Budget Period",
+  "budgetType": "Budget Type",
+  "linkedCategory": "Linked Category (Optional)",
+  "colorText": "Color",
+  "budgetCarryover": "Budget Carryover",
+  "carryoverMode": "Carryover Mode",
+  "confirmDeleteBudget": "Are you sure you want to delete budget \"{name}\"?",
+  "@confirmDeleteBudget": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "confirmDeleteCategoryMsg": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+  "@confirmDeleteCategoryMsg": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "noData": "No Data",
+  "totalAssets": "Total Assets",
+  "debtToAssetRatio": "Debt to Asset Ratio",
+  "statisticsDimension": "Statistics Dimension",
+  "adjustFilters": "Please adjust filter criteria",
+  "advancedFilters": "Advanced Filters",
+
+  "cleanupText": "Cleanup",
+  "restoreText": "Restore",
+  "noCacheFiles": "No cache files",
+  "restoreStatistics": "Restore Statistics:",
+  "confirmRestoreBackup": "Are you sure you want to restore from \"{name}\"?",
+  "@confirmRestoreBackup": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "confirmDeleteBackup": "Are you sure you want to delete backup \"{name}\"? This action cannot be undone.",
+  "@confirmDeleteBackup": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "confirmDeleteBillReminder": "Are you sure you want to delete bill reminder \"{name}\"?",
+  "@confirmDeleteBillReminder": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "confirmDeleteCreditCard": "Are you sure you want to delete credit card \"{name}\"?",
+  "@confirmDeleteCreditCard": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "repaymentTitle": "Repayment - {name}",
+  "@repaymentTitle": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "currentDebt": "Current Debt: ¥{amount}",
+  "@currentDebt": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "repaymentSuccess": "Successfully repaid ¥{amount}",
+  "@repaymentSuccess": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+
+  "confirmDeleteTheme": "Are you sure you want to delete theme \"{name}\"? This action cannot be undone.",
+  "@confirmDeleteTheme": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "editThemeName": "Edit {name}",
+  "@editThemeName": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "cardBorderRadius": "Card Border Radius",
+  "buttonBorderRadius": "Button Border Radius",
+  "materialDesign3": "Material 3",
+  "useMaterialDesign3": "Use Material Design 3 style",
+
+  "featureComingSoon": "{feature} feature coming soon",
+  "@featureComingSoon": {
+    "placeholders": {
+      "feature": {"type": "String"}
+    }
+  }
+}
