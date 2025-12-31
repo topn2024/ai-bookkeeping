@@ -46,32 +46,36 @@ export const exportTransactions = (params: {
   return download('/transactions/export', params)
 }
 
-// Book APIs
+// Book APIs - 后端路由在 /data 下
 export const getBooks = (params: {
   page?: number
   page_size?: number
   user_id?: string
   search?: string
 }): Promise<PaginatedResponse<any>> => {
-  return get('/books', { params })
+  return get('/data/books', { params })
 }
 
 export const getBookDetail = (bookId: string): Promise<any> => {
-  return get(`/books/${bookId}`)
+  return get(`/data/books/${bookId}`)
 }
 
-// Account APIs
+export const getBookStats = (): Promise<any> => {
+  return get('/data/books/stats')
+}
+
+// Account APIs - 后端路由在 /data 下
 export const getAccounts = (params: {
   page?: number
   page_size?: number
   user_id?: string
   account_type?: string
 }): Promise<PaginatedResponse<any>> => {
-  return get('/accounts', { params })
+  return get('/data/accounts', { params })
 }
 
 export const getAccountTypeStats = (): Promise<any> => {
-  return get('/accounts/stats/types')
+  return get('/data/accounts/stats')
 }
 
 // Category APIs
@@ -127,5 +131,5 @@ export const updateBackupPolicy = (data: any): Promise<any> => {
 
 // Data integrity
 export const checkDataIntegrity = (): Promise<any> => {
-  return get('/books/integrity/check')
+  return get('/data/integrity-check')
 }

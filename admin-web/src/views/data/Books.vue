@@ -220,8 +220,10 @@ const formatDateTime = (date: string) => {
   return new Date(date).toLocaleString('zh-CN')
 }
 
-const formatMoney = (amount: number) => {
-  return amount.toFixed(2)
+const formatMoney = (amount: number | string | null | undefined) => {
+  if (amount === null || amount === undefined) return '0.00'
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount
+  return isNaN(num) ? '0.00' : num.toFixed(2)
 }
 
 const getBookTypeTag = (type: string) => {
