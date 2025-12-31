@@ -71,8 +71,6 @@
     <!-- Transaction Table -->
     <div class="table-container">
       <el-table v-loading="loading" :data="transactions" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="user_id" label="用户ID" width="100" />
         <el-table-column prop="type" label="类型" width="80">
           <template #default="{ row }">
             <el-tag :type="row.type === 'income' ? 'success' : 'danger'" size="small">
@@ -127,8 +125,6 @@
     <!-- Detail Dialog -->
     <el-dialog v-model="detailVisible" title="交易详情" width="500px">
       <el-descriptions v-if="currentTransaction" :column="1" border>
-        <el-descriptions-item label="ID">{{ currentTransaction.id }}</el-descriptions-item>
-        <el-descriptions-item label="用户ID">{{ currentTransaction.user_id }}</el-descriptions-item>
         <el-descriptions-item label="类型">
           <el-tag :type="currentTransaction.type === 'income' ? 'success' : 'danger'">
             {{ currentTransaction.type === 'income' ? '收入' : '支出' }}
@@ -140,6 +136,7 @@
           </span>
         </el-descriptions-item>
         <el-descriptions-item label="分类">{{ currentTransaction.category_name }}</el-descriptions-item>
+        <el-descriptions-item label="账户">{{ currentTransaction.account_name || '-' }}</el-descriptions-item>
         <el-descriptions-item label="账本">{{ currentTransaction.book_name }}</el-descriptions-item>
         <el-descriptions-item label="备注">{{ currentTransaction.note || '-' }}</el-descriptions-item>
         <el-descriptions-item label="交易时间">{{ formatDateTime(currentTransaction.transaction_time) }}</el-descriptions-item>

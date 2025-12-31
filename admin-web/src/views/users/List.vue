@@ -47,7 +47,6 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="50" />
-        <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="display_name" label="用户信息" min-width="180">
           <template #default="{ row }">
             <div class="user-info-cell">

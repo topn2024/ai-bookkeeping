@@ -27,7 +27,6 @@
             <el-tag :type="getStatusType(user?.status)">{{ getStatusText(user?.status) }}</el-tag>
           </div>
           <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="ID">{{ user?.id }}</el-descriptions-item>
             <el-descriptions-item label="手机号">{{ user?.phone }}</el-descriptions-item>
             <el-descriptions-item label="邮箱">{{ user?.email || '-' }}</el-descriptions-item>
             <el-descriptions-item label="性别">{{ getGenderText(user?.gender) }}</el-descriptions-item>
@@ -159,7 +158,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as usersApi from '@/api/users'
-import type { AppUser } from '@/types'
+import type { AppUser, TagType } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -249,8 +248,8 @@ const formatMoney = (amount: number | string | null | undefined) => {
   return isNaN(num) ? '0.00' : num.toFixed(2)
 }
 
-const getStatusType = (status: string | undefined) => {
-  const map: Record<string, string> = {
+const getStatusType = (status: string | undefined): TagType => {
+  const map: Record<string, TagType> = {
     active: 'success',
     disabled: 'warning',
     deleted: 'danger',

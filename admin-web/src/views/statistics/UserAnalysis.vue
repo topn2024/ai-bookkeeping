@@ -33,8 +33,8 @@
             <div class="metric-info">
               <div class="metric-value">{{ formatNumber(metrics.new_users) }}</div>
               <div class="metric-label">新增用户</div>
-              <div class="metric-trend" :class="metrics.new_users_change >= 0 ? 'up' : 'down'">
-                {{ metrics.new_users_change >= 0 ? '+' : '' }}{{ metrics.new_users_change?.toFixed(1) }}%
+              <div class="metric-trend" :class="(metrics.new_users_change || 0) >= 0 ? 'up' : 'down'">
+                {{ (metrics.new_users_change || 0) >= 0 ? '+' : '' }}{{ (metrics.new_users_change || 0).toFixed(1) }}%
               </div>
             </div>
           </div>
@@ -47,7 +47,7 @@
               <el-icon :size="24"><TrendCharts /></el-icon>
             </div>
             <div class="metric-info">
-              <div class="metric-value">{{ (metrics.retention_rate * 100).toFixed(1) }}%</div>
+              <div class="metric-value">{{ ((metrics.retention_rate || 0) * 100).toFixed(1) }}%</div>
               <div class="metric-label">留存率</div>
             </div>
           </div>
@@ -60,7 +60,7 @@
               <el-icon :size="24"><Warning /></el-icon>
             </div>
             <div class="metric-info">
-              <div class="metric-value">{{ (metrics.churn_rate * 100).toFixed(1) }}%</div>
+              <div class="metric-value">{{ ((metrics.churn_rate || 0) * 100).toFixed(1) }}%</div>
               <div class="metric-label">流失率</div>
             </div>
           </div>

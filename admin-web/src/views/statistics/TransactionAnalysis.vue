@@ -86,7 +86,6 @@
       <template #header>交易活跃用户TOP20</template>
       <el-table :data="topUsers" size="small" stripe>
         <el-table-column type="index" label="排名" width="80" />
-        <el-table-column prop="user_id" label="用户ID" width="100" />
         <el-table-column prop="nickname" label="昵称" />
         <el-table-column prop="transaction_count" label="交易笔数" width="120" />
         <el-table-column prop="total_income" label="总收入" width="150">

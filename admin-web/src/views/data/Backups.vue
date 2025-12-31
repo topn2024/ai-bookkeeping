@@ -66,8 +66,6 @@
     <!-- Backup Table -->
     <div class="table-container">
       <el-table v-loading="loading" :data="backups" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="user_id" label="用户ID" width="100" />
         <el-table-column prop="type" label="类型" width="120">
           <template #default="{ row }">
             <el-tag :type="getBackupTypeTag(row.type)" size="small">
@@ -150,12 +148,8 @@
           </el-select>
         </el-form-item>
         <el-form-item label="过期时间" prop="expires_days">
-          <el-select v-model="createForm.expires_days" placeholder="选择过期时间">
-            <el-option label="7天" :value="7" />
-            <el-option label="30天" :value="30" />
-            <el-option label="90天" :value="90" />
-            <el-option label="永不过期" :value="0" />
-          </el-select>
+          <el-input-number v-model="createForm.expires_days" :min="0" :max="365" placeholder="天数，0表示永不过期" style="width: 100%;" />
+          <div class="form-tip">0 表示永不过期</div>
         </el-form-item>
         <el-form-item label="备注" prop="note">
           <el-input v-model="createForm.note" type="textarea" rows="3" placeholder="备份说明" />
@@ -173,7 +167,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import * as dataApi from '@/api/data'
-import type { Backup } from '@/types'
+import type { Backup, TagType } from '@/types'
 
 // State
 const loading = ref(false)
@@ -350,8 +344,8 @@ const formatFileSize = (bytes: number) => {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
-const getBackupTypeTag = (type: string) => {
-  const map: Record<string, string> = {
+const getBackupTypeTag = (type: string): TagType => {
+  const map: Record<string, TagType> = {
     full: 'primary',
     incremental: 'success',
     transactions: 'info',
@@ -368,8 +362,8 @@ const getBackupTypeText = (type: string) => {
   return map[type] || type
 }
 
-const getStatusTag = (status: string) => {
-  const map: Record<string, string> = {
+const getStatusTag = (status: string): TagType => {
+  const map: Record<string, TagType> = {
     pending: 'warning',
     completed: 'success',
     failed: 'danger',

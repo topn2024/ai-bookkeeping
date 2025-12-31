@@ -29,9 +29,7 @@
     <!-- Book Table -->
     <div class="table-container">
       <el-table v-loading="loading" :data="books" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="账本名称" min-width="150" />
-        <el-table-column prop="user_id" label="用户ID" width="100" />
         <el-table-column prop="type" label="类型" width="120">
           <template #default="{ row }">
             <el-tag :type="getBookTypeTag(row.type)" size="small">
@@ -86,8 +84,6 @@
     <!-- Detail Dialog -->
     <el-dialog v-model="detailVisible" title="账本详情" width="600px">
       <el-descriptions v-if="currentBook" :column="2" border>
-        <el-descriptions-item label="ID">{{ currentBook.id }}</el-descriptions-item>
-        <el-descriptions-item label="用户ID">{{ currentBook.user_id }}</el-descriptions-item>
         <el-descriptions-item label="账本名称">{{ currentBook.name }}</el-descriptions-item>
         <el-descriptions-item label="类型">
           <el-tag :type="getBookTypeTag(currentBook.type)">
@@ -113,7 +109,6 @@
       <div v-if="currentBook && currentBook.type !== 'personal'" class="mt-20">
         <h4>账本成员</h4>
         <el-table :data="currentBook.members || []" size="small" stripe>
-          <el-table-column prop="user_id" label="用户ID" />
           <el-table-column prop="nickname" label="昵称" />
           <el-table-column prop="role" label="角色">
             <template #default="{ row }">

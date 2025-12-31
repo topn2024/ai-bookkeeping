@@ -72,7 +72,6 @@
     <!-- Log Table -->
     <div class="table-container">
       <el-table v-loading="loading" :data="logs" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="admin_username" label="管理员" width="120" />
         <el-table-column prop="action" label="操作" width="120">
           <template #default="{ row }">
@@ -117,7 +116,6 @@
     <!-- Detail Dialog -->
     <el-dialog v-model="detailVisible" title="日志详情" width="600px">
       <el-descriptions v-if="currentLog" :column="2" border>
-        <el-descriptions-item label="ID">{{ currentLog.id }}</el-descriptions-item>
         <el-descriptions-item label="管理员">{{ currentLog.admin_username }}</el-descriptions-item>
         <el-descriptions-item label="操作">
           <el-tag :type="getActionTag(currentLog.action)">

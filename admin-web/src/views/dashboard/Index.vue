@@ -1,8 +1,24 @@
 <template>
   <div class="dashboard">
+    <!-- Stats Header -->
+    <div class="stats-header">
+      <div class="date-info">
+        <span class="today" @click="goToTransactionAnalysis('today')">{{ todayStr }}</span>
+        <span class="divider">|</span>
+        <span class="month" @click="goToTransactionAnalysis('month')">{{ monthStr }}</span>
+      </div>
+      <div class="header-tip">点击卡片查看详细分析</div>
+    </div>
+
     <!-- Stats Cards -->
     <div class="card-grid">
-      <el-card v-for="stat in statsCards" :key="stat.key" class="stats-card" shadow="hover">
+      <el-card
+        v-for="stat in statsCards"
+        :key="stat.key"
+        class="stats-card clickable"
+        shadow="hover"
+        @click="handleStatCardClick(stat.key)"
+      >
         <div class="stats-content">
           <div class="stats-icon" :style="{ backgroundColor: stat.color + '20', color: stat.color }">
             <el-icon :size="24"><component :is="stat.icon" /></el-icon>
@@ -11,8 +27,8 @@
             <div class="stats-value">{{ getStatValue(stat.key) }}</div>
             <div class="stats-label">{{ getStatLabel(stat.key) }}</div>
             <div v-if="getStatChange(stat.key) !== null" class="stats-trend" :class="getStatChangeType(stat.key)">
-              <el-icon><CaretTop v-if="getStatChange(stat.key) >= 0" /><CaretBottom v-else /></el-icon>
-              {{ Math.abs(getStatChange(stat.key) || 0).toFixed(1) }}%
+              <el-icon><CaretTop v-if="(getStatChange(stat.key) ?? 0) >= 0" /><CaretBottom v-else /></el-icon>
+              {{ Math.abs(getStatChange(stat.key) ?? 0).toFixed(1) }}%
             </div>
           </div>
         </div>
@@ -96,7 +112,7 @@
               <el-button type="primary" text @click="$router.push('/data/transactions')">查看全部</el-button>
             </div>
           </template>
-          <el-table :data="recentTransactions" size="small" stripe>
+          <el-table :data="recentTransactions" size="small" stripe @row-click="handleTransactionClick" style="cursor: pointer;">
             <el-table-column prop="type" label="类型" width="80">
               <template #default="{ row }">
                 <el-tag :type="row.type === 'income' ? 'success' : 'danger'" size="small">
@@ -121,15 +137,40 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- Transaction Detail Dialog -->
+    <el-dialog v-model="transactionDetailVisible" title="交易详情" width="450px">
+      <el-descriptions v-if="currentTransaction" :column="1" border size="small">
+        <el-descriptions-item label="类型">
+          <el-tag :type="currentTransaction.type === 'income' ? 'success' : 'danger'" size="small">
+            {{ currentTransaction.type_name || (currentTransaction.type === 'income' ? '收入' : '支出') }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="金额">
+          <span :class="currentTransaction.type === 'income' ? 'text-success' : 'text-danger'">
+            {{ currentTransaction.amount }}
+          </span>
+        </el-descriptions-item>
+        <el-descriptions-item label="分类">{{ currentTransaction.category_name || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="账户">{{ currentTransaction.account_name || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="账本">{{ currentTransaction.book_name || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="用户">{{ currentTransaction.user_display_name || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="备注">{{ currentTransaction.note || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="时间">{{ formatDateTime(currentTransaction.created_at) }}</el-descriptions-item>
+      </el-descriptions>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import * as dashboardApi from '@/api/dashboard'
-import { formatNumber, formatMoney, formatShortDate } from '@/utils'
+import { formatMoney, formatShortDate } from '@/utils'
 import type { DashboardStats } from '@/types'
+
+const router = useRouter()
 
 // Refs
 const userTrendChart = ref<HTMLElement>()
@@ -141,6 +182,8 @@ const stats = reactive<DashboardStats>({} as DashboardStats)
 const trendPeriod = ref('7')
 const recentUsers = ref<any[]>([])
 const recentTransactions = ref<any[]>([])
+const transactionDetailVisible = ref(false)
+const currentTransaction = ref<any>(null)
 
 // Chart instances
 let userTrendChartInstance: echarts.ECharts | null = null
@@ -155,8 +198,55 @@ const statsCards = [
   { key: 'today_amount', label: '今日金额', icon: 'Timer', color: '#fa8c16', isStatCard: true },
 ]
 
+// 日期显示
+const todayStr = computed(() => {
+  const now = new Date()
+  return `${now.getMonth() + 1}月${now.getDate()}日`
+})
+
+const monthStr = computed(() => {
+  const now = new Date()
+  return `${now.getFullYear()}年${now.getMonth() + 1}月`
+})
+
+// 点击统计卡片
+const handleStatCardClick = (key: string) => {
+  if (key === 'today_new_users' || key === 'today_active_users') {
+    router.push('/statistics/users')
+  } else if (key === 'today_transactions' || key === 'today_amount') {
+    router.push('/statistics/transactions')
+  }
+}
+
+// 点击日期跳转到交易分析
+const goToTransactionAnalysis = (period: 'today' | 'month') => {
+  const now = new Date()
+  if (period === 'today') {
+    const dateStr = now.toISOString().split('T')[0]
+    router.push(`/statistics/transactions?start_date=${dateStr}&end_date=${dateStr}`)
+  } else {
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+    const lastDay = new Date(year, month, 0).getDate()
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    router.push(`/statistics/transactions?start_date=${startDate}&end_date=${endDate}`)
+  }
+}
+
 // Formatters - use shared utilities
 const formatDate = formatShortDate
+
+const formatDateTime = (date: string) => {
+  if (!date) return '-'
+  return new Date(date).toLocaleString('zh-CN')
+}
+
+// Transaction detail
+const handleTransactionClick = (row: any) => {
+  currentTransaction.value = row
+  transactionDetailVisible.value = true
+}
 
 // 获取 StatCard 数据的辅助函数
 const getStatValue = (key: string) => {
@@ -189,10 +279,6 @@ const getStatChangeType = (key: string) => {
     return statCard.change_type === 'up' ? 'up' : 'down'
   }
   return 'flat'
-}
-
-const getTrendClass = (value: number) => {
-  return value >= 0 ? 'up' : 'down'
 }
 
 // Fetch data
@@ -338,8 +424,8 @@ const renderTransactionPieChart = () => {
           },
         },
         data: [
-          { value: stats.income_count || 0, name: '收入', itemStyle: { color: '#52c41a' } },
-          { value: stats.expense_count || 0, name: '支出', itemStyle: { color: '#ff4d4f' } },
+          { value: (stats as any).income_count || 0, name: '收入', itemStyle: { color: '#52c41a' } },
+          { value: (stats as any).expense_count || 0, name: '支出', itemStyle: { color: '#ff4d4f' } },
         ],
       },
     ],
@@ -449,7 +535,52 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 .dashboard {
+  .stats-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 0 4px;
+
+    .date-info {
+      font-size: 16px;
+      color: #333;
+
+      .today, .month {
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: all 0.3s;
+
+        &:hover {
+          background-color: #e6f7ff;
+          color: #1890ff;
+        }
+      }
+
+      .divider {
+        margin: 0 8px;
+        color: #ddd;
+      }
+    }
+
+    .header-tip {
+      font-size: 12px;
+      color: #999;
+    }
+  }
+
   .stats-card {
+    &.clickable {
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+    }
+
     .stats-content {
       display: flex;
       align-items: center;

@@ -43,7 +43,6 @@
       </template>
 
       <el-table v-loading="loading" :data="reports" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="报表名称" min-width="200" />
         <el-table-column prop="type" label="类型" width="120">
           <template #default="{ row }">

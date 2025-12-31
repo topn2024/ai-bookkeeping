@@ -119,7 +119,6 @@
     <!-- Detail Dialog -->
     <el-dialog v-model="detailVisible" title="分类详情" width="500px">
       <el-descriptions v-if="currentCategory" :column="1" border>
-        <el-descriptions-item label="ID">{{ currentCategory.id }}</el-descriptions-item>
         <el-descriptions-item label="名称">
           <span class="category-name">
             <span v-if="currentCategory.icon" class="category-icon">{{ currentCategory.icon }}</span>

@@ -10,7 +10,6 @@
     <!-- Admin Table -->
     <div class="table-container">
       <el-table v-loading="loading" :data="admins" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" label="用户名" width="150" />
         <el-table-column prop="display_name" label="显示名称" width="150" />
         <el-table-column prop="email" label="邮箱" min-width="200" />

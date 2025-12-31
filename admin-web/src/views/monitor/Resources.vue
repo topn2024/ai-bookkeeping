@@ -223,9 +223,12 @@ const fetchResources = async () => {
 
 const fetchTrends = async () => {
   try {
-    const data = await monitorApi.getResourceTrends(trendPeriod.value)
-    renderCpuMemoryChart(data.cpu_memory || [])
-    renderNetworkChart(data.network || [])
+    // Convert period string to hours number
+    const hoursMap: Record<string, number> = { '1h': 1, '6h': 6, '24h': 24 }
+    const hours = hoursMap[trendPeriod.value] || 24
+    const data = await monitorApi.getResourceTrends(hours)
+    renderCpuMemoryChart(data.trends || [])
+    renderNetworkChart(data.trends || [])
   } catch (e) {
     ElMessage.error('获取资源趋势失败')
   }
@@ -239,15 +242,21 @@ const renderCpuMemoryChart = (data: any[]) => {
     cpuMemoryChartInstance = echarts.init(cpuMemoryChart.value)
   }
 
+  // Format timestamp for display
+  const formatTime = (ts: string) => {
+    const date = new Date(ts)
+    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+  }
+
   const option = {
     tooltip: { trigger: 'axis' },
     legend: { data: ['CPU', '内存'], bottom: 0 },
     grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
-    xAxis: { type: 'category', data: data.map(d => d.time) },
+    xAxis: { type: 'category', data: data.map(d => formatTime(d.timestamp)) },
     yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
     series: [
-      { name: 'CPU', type: 'line', smooth: true, areaStyle: { opacity: 0.3 }, data: data.map(d => d.cpu), itemStyle: { color: '#1890ff' } },
-      { name: '内存', type: 'line', smooth: true, areaStyle: { opacity: 0.3 }, data: data.map(d => d.memory), itemStyle: { color: '#52c41a' } },
+      { name: 'CPU', type: 'line', smooth: true, areaStyle: { opacity: 0.3 }, data: data.map(d => d.cpu_percent), itemStyle: { color: '#1890ff' } },
+      { name: '内存', type: 'line', smooth: true, areaStyle: { opacity: 0.3 }, data: data.map(d => d.memory_percent), itemStyle: { color: '#52c41a' } },
     ],
   }
 
@@ -261,15 +270,21 @@ const renderNetworkChart = (data: any[]) => {
     networkChartInstance = echarts.init(networkChart.value)
   }
 
+  // Format timestamp for display
+  const formatTime = (ts: string) => {
+    const date = new Date(ts)
+    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+  }
+
   const option = {
     tooltip: { trigger: 'axis' },
     legend: { data: ['入流量', '出流量'], bottom: 0 },
     grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
-    xAxis: { type: 'category', data: data.map(d => d.time) },
+    xAxis: { type: 'category', data: data.map(d => formatTime(d.timestamp)) },
     yAxis: { type: 'value', axisLabel: { formatter: (v: number) => formatSpeed(v) } },
     series: [
-      { name: '入流量', type: 'line', smooth: true, areaStyle: { opacity: 0.3 }, data: data.map(d => d.in), itemStyle: { color: '#722ed1' } },
-      { name: '出流量', type: 'line', smooth: true, areaStyle: { opacity: 0.3 }, data: data.map(d => d.out), itemStyle: { color: '#fa8c16' } },
+      { name: '入流量', type: 'line', smooth: true, areaStyle: { opacity: 0.3 }, data: data.map(d => d.network_in || 0), itemStyle: { color: '#722ed1' } },
+      { name: '出流量', type: 'line', smooth: true, areaStyle: { opacity: 0.3 }, data: data.map(d => d.network_out || 0), itemStyle: { color: '#fa8c16' } },
     ],
   }
 
