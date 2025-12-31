@@ -1,14 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
-import '../providers/theme_provider.dart';
 import '../providers/auth_provider.dart';
-import '../providers/locale_provider.dart';
-import '../providers/currency_provider.dart';
-import '../providers/app_info_provider.dart';
-import '../core/logger.dart';
-import '../core/build_info.dart';
 import 'account_management_page.dart';
 import 'category_management_page.dart';
 import 'ledger_management_page.dart';
@@ -24,17 +17,12 @@ import 'export_page.dart';
 import 'import_page.dart';
 import 'investment_page.dart';
 import 'login_page.dart';
-import 'language_settings_page.dart';
-import 'currency_settings_page.dart';
 import 'reimbursement_page.dart';
 import 'tag_statistics_page.dart';
 import 'custom_report_page.dart';
-import 'help_page.dart';
-import 'source_data_settings_page.dart';
 import 'backup_page.dart';
-import '../services/app_upgrade_service.dart';
-import '../widgets/app_update_dialog.dart';
-import '../providers/upgrade_provider.dart';
+import 'system_settings_page.dart';
+import '../services/auto_sync_service.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -475,8 +463,6 @@ class SettingsPage extends ConsumerWidget {
   }
 
   Widget _buildSettingsSection(BuildContext context, WidgetRef ref) {
-    final themeNotifier = ref.watch(themeProvider.notifier);
-
     return Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -492,6 +478,8 @@ class SettingsPage extends ConsumerWidget {
       ),
       child: Column(
         children: [
+          _buildSyncToggleItem(context),
+          _buildDivider(),
           _buildMenuItem(
             icon: Icons.cloud_sync,
             iconColor: AppColors.primary,
@@ -571,101 +559,16 @@ class SettingsPage extends ConsumerWidget {
           ),
           _buildDivider(),
           _buildMenuItem(
-            icon: themeNotifier.themeIcon,
-            iconColor: const Color(0xFFE91E63),
-            title: '主题换肤',
-            subtitle: themeNotifier.themeName,
-            onTap: () => _showThemeDialog(context, ref),
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            icon: Icons.language,
-            iconColor: const Color(0xFF2196F3),
-            title: '语言设置',
-            subtitle: ref.watch(localeProvider).languageInfo.name,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const LanguageSettingsPage()),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            icon: Icons.currency_exchange,
-            iconColor: const Color(0xFF4CAF50),
-            title: '货币设置',
-            subtitle: '${ref.watch(currencyProvider).currency.name} (${ref.watch(currencyProvider).currency.symbol})',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const CurrencySettingsPage()),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            icon: Icons.notifications,
-            iconColor: AppColors.transfer,
-            title: '通知设置',
-            onTap: () => _showNotificationSettingsDialog(context),
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            icon: Icons.lock,
-            iconColor: AppColors.expense,
-            title: '安全设置',
-            onTap: () => _showSecuritySettingsDialog(context),
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            icon: Icons.source,
+            icon: Icons.settings,
             iconColor: const Color(0xFF607D8B),
-            title: '来源数据管理',
-            subtitle: '管理拍照、语音原始文件',
+            title: '系统设置',
+            subtitle: '主题、语言、安全等',
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const SourceDataSettingsPage()),
+                MaterialPageRoute(builder: (context) => const SystemSettingsPage()),
               );
             },
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            icon: Icons.bug_report,
-            iconColor: const Color(0xFF795548),
-            title: '日志管理',
-            subtitle: '查看和清理应用日志',
-            onTap: () => _showLogManagementDialog(context),
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            icon: Icons.help_outline,
-            iconColor: AppColors.textSecondary,
-            title: '帮助与反馈',
-            subtitle: '使用指南、常见问题',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const HelpPage()),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            icon: Icons.system_update,
-            iconColor: AppColors.primary,
-            title: '检查更新',
-            subtitle: '当前版本 ${BuildInfo.displayVersion}',
-            onTap: () => _checkForUpdate(context, ref),
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            icon: Icons.info_outline,
-            iconColor: AppColors.textSecondary,
-            title: '关于我们',
-            subtitle: ref.watch(appInfoSyncProvider).displayVersion,
-            onTap: () => _showAboutDialog(context, ref),
           ),
         ],
       ),
@@ -720,427 +623,69 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  void _showThemeDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => Consumer(
-        builder: (context, ref, child) {
-          final currentState = ref.watch(themeProvider);
-          return AlertDialog(
-            title: const Text('选择主题'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('外观模式', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  RadioListTile<AppThemeMode>(
-                    title: const Text('浅色模式'),
-                    secondary: const Icon(Icons.light_mode),
-                    value: AppThemeMode.light,
-                    groupValue: currentState.mode,
-                    onChanged: (value) {
-                      ref.read(themeProvider.notifier).setThemeMode(AppThemeMode.light);
-                    },
-                  ),
-                  RadioListTile<AppThemeMode>(
-                    title: const Text('深色模式'),
-                    secondary: const Icon(Icons.dark_mode),
-                    value: AppThemeMode.dark,
-                    groupValue: currentState.mode,
-                    onChanged: (value) {
-                      ref.read(themeProvider.notifier).setThemeMode(AppThemeMode.dark);
-                    },
-                  ),
-                  RadioListTile<AppThemeMode>(
-                    title: const Text('跟随系统'),
-                    secondary: const Icon(Icons.brightness_auto),
-                    value: AppThemeMode.system,
-                    groupValue: currentState.mode,
-                    onChanged: (value) {
-                      ref.read(themeProvider.notifier).setThemeMode(AppThemeMode.system);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('主题色', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    // 过滤掉 custom，自定义主题有单独入口
-                    children: AppColorTheme.values
-                        .where((t) => t != AppColorTheme.custom)
-                        .map((colorTheme) {
-                      final themeData = AppColorThemes.getTheme(colorTheme);
-                      final isSelected = currentState.colorTheme == colorTheme;
-                      return GestureDetector(
-                        onTap: () {
-                          ref.read(themeProvider.notifier).setColorTheme(colorTheme);
-                        },
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: themeData.primaryColor,
-                            shape: BoxShape.circle,
-                            border: isSelected
-                                ? Border.all(color: Colors.white, width: 3)
-                                : null,
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color: themeData.primaryColor.withValues(alpha:0.6),
-                                      blurRadius: 8,
-                                      spreadRadius: 2,
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: isSelected
-                              ? const Icon(Icons.check, color: Colors.white)
-                              : null,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          themeData.name,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isSelected
-                                ? themeData.primaryColor
-                                : AppColors.textSecondary,
-                            fontWeight:
-                                isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
+  /// 构建数据同步开关
+  Widget _buildSyncToggleItem(BuildContext context) {
+    final autoSync = AutoSyncService();
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        final settings = autoSync.settings;
+        final isEnabled = settings.syncPrivateData;
+
+        return ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              isEnabled ? Icons.sync : Icons.sync_disabled,
+              color: AppColors.primary,
+              size: 22,
+            ),
           ),
-        ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('关闭'),
+          title: const Text(
+            '数据云同步',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: Text(
+            isEnabled ? '已开启，数据自动同步到云端' : '已关闭，数据仅保存在本地',
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          trailing: Switch(
+            value: isEnabled,
+            activeColor: AppColors.primary,
+            onChanged: (value) async {
+              final newSettings = settings.copyWith(syncPrivateData: value);
+              await autoSync.updateSettings(newSettings);
+              setState(() {});
+
+              // 如果开启同步，立即执行一次同步
+              if (value) {
+                autoSync.performSync();
+              }
+
+              // 显示提示
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(value ? '已开启数据云同步' : '已关闭数据云同步，数据将仅保存在本地'),
+                    duration: const Duration(seconds: 2),
                   ),
-                ],
-              );
+                );
+              }
             },
           ),
         );
-  }
-
-
-  void _showNotificationSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('通知设置'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('管理应用通知提醒。'),
-            SizedBox(height: 16),
-            Text('此功能即将上线，敬请期待！',
-              style: TextStyle(color: AppColors.textSecondary)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      },
     );
   }
 
-  void _showSecuritySettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('安全设置'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('设置应用锁、指纹解锁等安全选项。'),
-            SizedBox(height: 16),
-            Text('此功能即将上线，敬请期待！',
-              style: TextStyle(color: AppColors.textSecondary)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAboutDialog(BuildContext context, WidgetRef ref) {
-    final appInfo = ref.read(appInfoSyncProvider);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 28),
-            ),
-            const SizedBox(width: 12),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('AI智能记账', style: TextStyle(fontSize: 18)),
-                Text('智能财务管理助手', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-              ],
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Divider(),
-            const SizedBox(height: 8),
-            _buildAboutInfoRow('版本', BuildInfo.displayVersion),
-            _buildAboutInfoRow('构建号', '${BuildInfo.buildNumber}'),
-            _buildAboutInfoRow('编译时间', BuildInfo.buildTimeFormatted),
-            _buildAboutInfoRow('包名', appInfo.packageName),
-            const SizedBox(height: 16),
-            const Text(
-              'AI智能记账是一款基于人工智能的智能记账应用，帮助您轻松管理个人财务。',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAboutInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Text('$label: ', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-          Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 13), textAlign: TextAlign.right),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLogManagementDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const _LogManagementDialog(),
-    );
-  }
-
-  void _checkForUpdate(BuildContext context, WidgetRef ref) async {
-    // 显示加载对话框
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
-
-    final result = await ref.read(upgradeProvider.notifier).checkUpdate(force: true);
-
-    if (context.mounted) {
-      Navigator.pop(context); // 关闭加载对话框
-
-      if (result != null && result.hasUpdate && result.latestVersion != null) {
-        await AppUpdateDialog.show(
-          context,
-          versionInfo: result.latestVersion!,
-          isForceUpdate: result.isForceUpdate,
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('当前已是最新版本'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    }
-  }
-}
-
-/// Log management dialog widget
-class _LogManagementDialog extends StatefulWidget {
-  const _LogManagementDialog();
-
-  @override
-  State<_LogManagementDialog> createState() => _LogManagementDialogState();
-}
-
-class _LogManagementDialogState extends State<_LogManagementDialog> {
-  int _logSize = 0;
-  int _fileCount = 0;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadLogInfo();
-  }
-
-  Future<void> _loadLogInfo() async {
-    setState(() => _loading = true);
-    try {
-      final size = await logger.getLogSize();
-      final files = await logger.getLogFiles();
-      setState(() {
-        _logSize = size;
-        _fileCount = files.length;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() => _loading = false);
-    }
-  }
-
-  String _formatSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / 1024 / 1024).toStringAsFixed(2)} MB';
-  }
-
-  Future<void> _clearLogs() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认清理'),
-        content: const Text('确定要清理所有日志文件吗？此操作不可恢复。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('清理', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await logger.clearAllLogs();
-      await _loadLogInfo();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('日志已清理')),
-        );
-      }
-    }
-  }
-
-  Future<void> _exportLogs() async {
-    try {
-      final file = await logger.exportLogs();
-      if (file != null && mounted) {
-        await SharePlus.instance.share(
-          ShareParams(
-            files: [XFile(file.path)],
-            subject: 'AI记账日志导出',
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出失败: $e')),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('日志管理'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_loading)
-            const Center(child: CircularProgressIndicator())
-          else ...[
-            ListTile(
-              leading: const Icon(Icons.storage, color: AppColors.primary),
-              title: const Text('日志大小'),
-              subtitle: Text(_formatSize(_logSize)),
-              contentPadding: EdgeInsets.zero,
-            ),
-            ListTile(
-              leading: const Icon(Icons.insert_drive_file, color: AppColors.income),
-              title: const Text('日志文件数'),
-              subtitle: Text('$_fileCount 个文件'),
-              contentPadding: EdgeInsets.zero,
-            ),
-            const Divider(),
-            const Text(
-              '日志自动清理策略：',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              '• 保留最近 7 天的日志\n'
-              '• 单个文件最大 5MB\n'
-              '• 总大小上限 50MB',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ],
-      ),
-      actions: [
-        TextButton.icon(
-          onPressed: _loading ? null : _exportLogs,
-          icon: const Icon(Icons.share, size: 18),
-          label: const Text('导出'),
-        ),
-        TextButton.icon(
-          onPressed: _loading ? null : _clearLogs,
-          icon: const Icon(Icons.delete, size: 18, color: Colors.red),
-          label: const Text('清理', style: TextStyle(color: Colors.red)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('关闭'),
-        ),
-      ],
-    );
-  }
 }

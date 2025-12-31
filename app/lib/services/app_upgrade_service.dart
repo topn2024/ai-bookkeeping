@@ -386,16 +386,27 @@ class AppUpgradeService {
         }
       }
 
-      final dio = Dio();
-      if (config.skipCertificateVerification) {
-        dio.httpClientAdapter = IOHttpClientAdapter(
-          createHttpClient: () {
-            final client = HttpClient();
+      // 为大文件下载配置更长的超时和稳健的连接
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(minutes: 10), // 大文件需要更长时间
+        sendTimeout: const Duration(seconds: 30),
+      ));
+
+      // 配置 HTTP 客户端
+      dio.httpClientAdapter = IOHttpClientAdapter(
+        createHttpClient: () {
+          final client = HttpClient();
+          // 跳过证书验证（如果配置）
+          if (config.skipCertificateVerification) {
             client.badCertificateCallback = (cert, host, port) => true;
-            return client;
-          },
-        );
-      }
+          }
+          // 设置更长的连接超时
+          client.connectionTimeout = const Duration(seconds: 30);
+          client.idleTimeout = const Duration(minutes: 5);
+          return client;
+        },
+      );
 
       // 设置断点续传头
       final options = Options();
@@ -405,20 +416,56 @@ class AppUpgradeService {
         };
       }
 
-      // 下载到临时文件
-      await dio.download(
-        version.downloadUrl!,
-        tempPath,
-        onReceiveProgress: (received, total) {
-          // 断点续传时，received 是本次下载的字节数，total 是剩余字节数
-          final actualReceived = resuming ? received + downloadedBytes : received;
-          final actualTotal = resuming ? total + downloadedBytes : total;
-          onProgress?.call(actualReceived, actualTotal);
-        },
-        cancelToken: cancelToken,
-        options: options,
-        deleteOnError: false, // 保留部分下载的文件
-      );
+      // 下载到临时文件（带重试机制）
+      int retryCount = 0;
+      const maxRetries = 3;
+      Exception? lastError;
+
+      while (retryCount < maxRetries) {
+        try {
+          await dio.download(
+            version.downloadUrl!,
+            tempPath,
+            onReceiveProgress: (received, total) {
+              // 断点续传时，received 是本次下载的字节数，total 是剩余字节数
+              final actualReceived = resuming ? received + downloadedBytes : received;
+              final actualTotal = resuming ? total + downloadedBytes : total;
+              onProgress?.call(actualReceived, actualTotal);
+            },
+            cancelToken: cancelToken,
+            options: options,
+            deleteOnError: false, // 保留部分下载的文件以支持断点续传
+          );
+          break; // 下载成功，退出重试循环
+        } catch (e) {
+          lastError = e as Exception;
+          retryCount++;
+          _logger.warning(
+            'Download attempt $retryCount failed: $e',
+            tag: 'Upgrade',
+          );
+
+          if (retryCount < maxRetries) {
+            // 检查已下载的字节数，更新断点续传位置
+            final tempFileCheck = File(tempPath);
+            if (await tempFileCheck.exists()) {
+              downloadedBytes = await tempFileCheck.length();
+              resuming = true;
+              options.headers = {'Range': 'bytes=$downloadedBytes-'};
+              _logger.info(
+                'Retrying from $downloadedBytes bytes...',
+                tag: 'Upgrade',
+              );
+            }
+            // 等待后重试
+            await Future.delayed(Duration(seconds: 2 * retryCount));
+          }
+        }
+      }
+
+      if (retryCount >= maxRetries && lastError != null) {
+        throw lastError;
+      }
 
       // 下载完成，重命名临时文件
       if (await tempFile.exists()) {
@@ -522,6 +569,79 @@ class AppUpgradeService {
   void clearCache() {
     _lastCheckResult = null;
     _lastCheckTime = null;
+  }
+
+  /// 获取下载缓存大小
+  Future<int> getDownloadCacheSize() async {
+    try {
+      final dir = await getExternalStorageDirectory();
+      if (dir == null) return 0;
+
+      final downloadDir = Directory('${dir.path}/downloads');
+      if (!await downloadDir.exists()) return 0;
+
+      int totalSize = 0;
+      await for (final entity in downloadDir.list(recursive: true)) {
+        if (entity is File) {
+          totalSize += await entity.length();
+        }
+      }
+      return totalSize;
+    } catch (e) {
+      _logger.warning('Failed to get download cache size: $e', tag: 'Upgrade');
+      return 0;
+    }
+  }
+
+  /// 获取下载缓存文件列表
+  Future<List<FileSystemEntity>> getDownloadCacheFiles() async {
+    try {
+      final dir = await getExternalStorageDirectory();
+      if (dir == null) return [];
+
+      final downloadDir = Directory('${dir.path}/downloads');
+      if (!await downloadDir.exists()) return [];
+
+      final files = <FileSystemEntity>[];
+      await for (final entity in downloadDir.list()) {
+        if (entity is File &&
+            (entity.path.endsWith('.apk') || entity.path.endsWith('.tmp') || entity.path.endsWith('.patch'))) {
+          files.add(entity);
+        }
+      }
+      return files;
+    } catch (e) {
+      _logger.warning('Failed to list download cache files: $e', tag: 'Upgrade');
+      return [];
+    }
+  }
+
+  /// 清理下载缓存
+  Future<int> clearDownloadCache() async {
+    try {
+      final dir = await getExternalStorageDirectory();
+      if (dir == null) return 0;
+
+      final downloadDir = Directory('${dir.path}/downloads');
+      if (!await downloadDir.exists()) return 0;
+
+      int deletedSize = 0;
+      await for (final entity in downloadDir.list()) {
+        if (entity is File &&
+            (entity.path.endsWith('.apk') || entity.path.endsWith('.tmp') || entity.path.endsWith('.patch'))) {
+          final size = await entity.length();
+          await entity.delete();
+          deletedSize += size;
+          _logger.info('Deleted cache file: ${entity.path}', tag: 'Upgrade');
+        }
+      }
+
+      _logger.info('Cleared download cache: ${deletedSize ~/ 1024} KB', tag: 'Upgrade');
+      return deletedSize;
+    } catch (e) {
+      _logger.error('Failed to clear download cache: $e', tag: 'Upgrade');
+      return 0;
+    }
   }
 
   /// 下载增量更新包

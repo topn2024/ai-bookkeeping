@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import '../services/app_upgrade_service.dart';
+import '../services/background_download_service.dart';
 import '../theme/app_theme.dart';
 
 /// APP 更新对话框
@@ -253,6 +254,13 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
           child: const Text('取消下载'),
         ),
       );
+      // 后台下载按钮（下载中时显示）
+      actions.add(
+        TextButton(
+          onPressed: _switchToBackground,
+          child: const Text('后台下载'),
+        ),
+      );
     }
 
     // 浏览器下载按钮（下载失败时显示）
@@ -265,8 +273,21 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
       );
     }
 
-    // 立即更新按钮
+    // 立即更新按钮 / 后台下载按钮
     if (!_downloading) {
+      // 后台下载按钮（非强制更新时显示）
+      if (!widget.isForceUpdate && !_downloadFailed) {
+        actions.add(
+          OutlinedButton(
+            onPressed: _startBackgroundDownload,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: BorderSide(color: AppColors.primary),
+            ),
+            child: const Text('后台下载'),
+          ),
+        );
+      }
       actions.add(
         ElevatedButton(
           onPressed: _downloadFailed ? _retryDownload : _startDownload,
@@ -387,6 +408,55 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
       if (success && mounted) {
         Navigator.of(context).pop(true);
       }
+    }
+  }
+
+  /// 直接启动后台下载
+  Future<void> _startBackgroundDownload() async {
+    // 关闭对话框
+    Navigator.of(context).pop(false);
+
+    // 启动后台下载
+    final bgService = BackgroundDownloadService();
+    bgService.startDownload(widget.versionInfo);
+
+    // 显示提示
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('已开始后台下载，完成后将自动安装'),
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: '查看',
+            onPressed: () {
+              // 用户可以在通知栏查看进度
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  /// 切换到后台下载（下载中时调用）
+  Future<void> _switchToBackground() async {
+    // 取消当前对话框内的下载
+    _cancelToken?.cancel();
+
+    // 关闭对话框
+    Navigator.of(context).pop(false);
+
+    // 启动后台下载服务（会从头开始，但支持断点续传）
+    final bgService = BackgroundDownloadService();
+    bgService.startDownload(widget.versionInfo);
+
+    // 显示提示
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('已转入后台下载，完成后将自动安装'),
+          duration: Duration(seconds: 3),
+        ),
+      );
     }
   }
 }
