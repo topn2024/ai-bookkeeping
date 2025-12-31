@@ -480,7 +480,23 @@ class QwenService {
     try {
       final jsonStr = _extractJsonString(content);
       if (jsonStr != null) {
-        final data = jsonDecode(jsonStr);
+        final decoded = jsonDecode(jsonStr);
+
+        // 处理返回值可能是 List 的情况（如 [{...}]）
+        Map<String, dynamic> data;
+        if (decoded is List) {
+          if (decoded.isEmpty) {
+            return MultiRecognitionResult.error('返回的JSON数组为空');
+          }
+          if (decoded[0] is! Map) {
+            return MultiRecognitionResult.error('JSON数组元素格式错误');
+          }
+          data = decoded[0] as Map<String, dynamic>;
+        } else if (decoded is Map<String, dynamic>) {
+          data = decoded;
+        } else {
+          return MultiRecognitionResult.error('JSON格式不正确');
+        }
 
         // 检查转写内容
         final transcription = data['transcription'] as String?;
@@ -767,7 +783,24 @@ class QwenService {
       // 尝试提取JSON
       final jsonStr = _extractJsonString(content);
       if (jsonStr != null) {
-        final data = jsonDecode(jsonStr);
+        final decoded = jsonDecode(jsonStr);
+
+        // 处理返回值可能是 List 的情况（如 [{...}]）
+        Map<String, dynamic> data;
+        if (decoded is List) {
+          if (decoded.isEmpty) {
+            return QwenRecognitionResult.error('返回的JSON数组为空');
+          }
+          if (decoded[0] is! Map) {
+            return QwenRecognitionResult.error('JSON数组元素格式错误');
+          }
+          data = decoded[0] as Map<String, dynamic>;
+        } else if (decoded is Map<String, dynamic>) {
+          data = decoded;
+        } else {
+          return QwenRecognitionResult.error('JSON格式不正确');
+        }
+
         return QwenRecognitionResult(
           amount: (data['amount'] as num?)?.toDouble(),
           merchant: data['merchant'] as String?,
@@ -985,7 +1018,23 @@ class QwenService {
     try {
       final jsonStr = _extractJsonString(content);
       if (jsonStr != null) {
-        final data = jsonDecode(jsonStr);
+        final decoded = jsonDecode(jsonStr);
+
+        // 处理返回值可能是 List 的情况（如 [{...}]）
+        Map<String, dynamic> data;
+        if (decoded is List) {
+          if (decoded.isEmpty) {
+            return QwenRecognitionResult.error('返回的JSON数组为空');
+          }
+          if (decoded[0] is! Map) {
+            return QwenRecognitionResult.error('JSON数组元素格式错误');
+          }
+          data = decoded[0] as Map<String, dynamic>;
+        } else if (decoded is Map<String, dynamic>) {
+          data = decoded;
+        } else {
+          return QwenRecognitionResult.error('JSON格式不正确');
+        }
 
         // 检查转写内容是否为空（可能是麦克风问题或静音）
         final transcription = data['transcription'] as String?;
