@@ -6,8 +6,7 @@ import '../models/category.dart';
 import '../theme/app_theme.dart';
 
 /// 可滑入操作按钮的交易条目组件
-/// 长按触发，左侧滑入编辑按钮，右侧滑入删除按钮
-/// 激活状态下可左右滑动触发操作
+/// 长按或左滑触发，右侧显示编辑和删除按钮
 class SwipeableTransactionItem extends StatefulWidget {
   final Transaction transaction;
   final bool isActive;
@@ -18,8 +17,6 @@ class SwipeableTransactionItem extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback onDismiss;
   final Widget? sourceIndicator;
-  /// 长按触发时间，默认1秒
-  final Duration longPressDuration;
   /// 自定义内容构建器（用于首页等不同样式）
   final Widget Function(Transaction transaction, ThemeColors colors)? contentBuilder;
 
@@ -34,7 +31,6 @@ class SwipeableTransactionItem extends StatefulWidget {
     required this.onTap,
     required this.onDismiss,
     this.sourceIndicator,
-    this.longPressDuration = const Duration(milliseconds: 1000),
     this.contentBuilder,
   });
 
@@ -47,9 +43,10 @@ class _SwipeableTransactionItemState extends State<SwipeableTransactionItem>
   late AnimationController _controller;
   late Animation<double> _slideAnimation;
 
+  static const _buttonsWidth = 128.0; // 两个按钮的总宽度
   static const _buttonWidth = 64.0;
   static const _animationDuration = Duration(milliseconds: 200);
-  static const _swipeThreshold = 60.0; // 滑动触发阈值
+  static const _swipeThreshold = 50.0; // 滑动触发阈值
 
   // 滑动相关
   double _dragOffset = 0;
@@ -85,37 +82,41 @@ class _SwipeableTransactionItemState extends State<SwipeableTransactionItem>
   }
 
   void _handleLongPressStart(LongPressStartDetails details) {
-    HapticFeedback.mediumImpact();
-    widget.onLongPress();
-  }
-
-  void _handleHorizontalDragStart(DragStartDetails details) {
-    if (widget.isActive) {
-      _isDragging = true;
-      _dragOffset = 0;
+    if (!widget.isActive) {
+      HapticFeedback.mediumImpact();
+      widget.onLongPress();
     }
   }
 
+  void _handleHorizontalDragStart(DragStartDetails details) {
+    _isDragging = true;
+    _dragOffset = 0;
+  }
+
   void _handleHorizontalDragUpdate(DragUpdateDetails details) {
-    if (_isDragging && widget.isActive) {
+    if (_isDragging) {
       setState(() {
         _dragOffset += details.delta.dx;
-        // 限制拖动范围
-        _dragOffset = _dragOffset.clamp(-_swipeThreshold * 1.5, _swipeThreshold * 1.5);
+        // 只允许向左滑动（负值），且限制最大滑动距离
+        if (!widget.isActive) {
+          _dragOffset = _dragOffset.clamp(-_buttonsWidth * 1.2, 0);
+        } else {
+          // 激活状态下允许向右滑动收起
+          _dragOffset = _dragOffset.clamp(-_buttonsWidth * 0.3, _buttonsWidth * 1.2);
+        }
       });
     }
   }
 
   void _handleHorizontalDragEnd(DragEndDetails details) {
-    if (_isDragging && widget.isActive) {
-      if (_dragOffset > _swipeThreshold) {
-        // 向右滑动 -> 编辑
+    if (_isDragging) {
+      if (!widget.isActive && _dragOffset < -_swipeThreshold) {
+        // 向左滑动超过阈值，展开按钮
         HapticFeedback.lightImpact();
-        widget.onEdit();
-      } else if (_dragOffset < -_swipeThreshold) {
-        // 向左滑动 -> 删除
-        HapticFeedback.lightImpact();
-        widget.onDelete();
+        widget.onLongPress();
+      } else if (widget.isActive && _dragOffset > _swipeThreshold) {
+        // 向右滑动超过阈值，收起按钮
+        widget.onDismiss();
       }
       setState(() {
         _dragOffset = 0;
@@ -131,96 +132,75 @@ class _SwipeableTransactionItemState extends State<SwipeableTransactionItem>
     final isExpense = transaction.type == TransactionType.expense;
     final isIncome = transaction.type == TransactionType.income;
 
-    // 计算滑动时的视觉反馈
-    final editHighlight = (_dragOffset > 0) ? (_dragOffset / _swipeThreshold).clamp(0.0, 1.0) : 0.0;
-    final deleteHighlight = (_dragOffset < 0) ? (-_dragOffset / _swipeThreshold).clamp(0.0, 1.0) : 0.0;
-
     return GestureDetector(
       onLongPressStart: _handleLongPressStart,
       onTap: widget.isActive ? widget.onDismiss : widget.onTap,
       onHorizontalDragStart: _handleHorizontalDragStart,
       onHorizontalDragUpdate: _handleHorizontalDragUpdate,
       onHorizontalDragEnd: _handleHorizontalDragEnd,
-      child: AnimatedScale(
-        scale: widget.isActive ? 1.02 : 1.0,
+      child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          decoration: BoxDecoration(
-            color: widget.isActive
-                ? Colors.grey.shade100
-                : Colors.white,
-            boxShadow: widget.isActive
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+        decoration: BoxDecoration(
+          color: widget.isActive ? Colors.grey.shade100 : Colors.white,
+          boxShadow: widget.isActive
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Stack(
+          children: [
+            // 右侧按钮区域（编辑 + 删除）
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: AnimatedBuilder(
+                animation: _slideAnimation,
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: Offset(
+                      _buttonsWidth * (1 - _slideAnimation.value),
+                      0,
                     ),
-                  ]
-                : null,
-          ),
-          child: Stack(
-            children: [
-              // 左侧编辑按钮
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                child: AnimatedBuilder(
-                  animation: _slideAnimation,
-                  builder: (context, child) {
-                    return Transform.translate(
-                      offset: Offset(
-                        -_buttonWidth * (1 - _slideAnimation.value),
-                        0,
-                      ),
-                      child: Opacity(
-                        opacity: _slideAnimation.value,
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: _buildEditButton(editHighlight),
+                    child: Opacity(
+                      opacity: _slideAnimation.value,
+                      child: child,
+                    ),
+                  );
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildEditButton(),
+                    _buildDeleteButton(),
+                  ],
                 ),
               ),
-              // 右侧删除按钮
-              Positioned(
-                right: 0,
-                top: 0,
-                bottom: 0,
-                child: AnimatedBuilder(
-                  animation: _slideAnimation,
-                  builder: (context, child) {
-                    return Transform.translate(
-                      offset: Offset(
-                        _buttonWidth * (1 - _slideAnimation.value),
-                        0,
-                      ),
-                      child: Opacity(
-                        opacity: _slideAnimation.value,
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: _buildDeleteButton(deleteHighlight),
-                ),
-              ),
-              // 中间内容（可滑动）
-              AnimatedContainer(
-                duration: _animationDuration,
-                margin: EdgeInsets.symmetric(
-                  horizontal: widget.isActive ? _buttonWidth : 0,
-                ),
-                child: Transform.translate(
-                  offset: Offset(_isDragging ? _dragOffset : 0, 0),
-                  child: widget.contentBuilder != null
-                      ? widget.contentBuilder!(transaction, widget.themeColors)
-                      : _buildDefaultContent(transaction, category, isExpense, isIncome),
-                ),
-              ),
-            ],
-          ),
+            ),
+            // 主内容区域
+            AnimatedBuilder(
+              animation: _slideAnimation,
+              builder: (context, child) {
+                // 滑动时的额外偏移
+                final dragExtra = _isDragging ? _dragOffset : 0.0;
+                return Transform.translate(
+                  offset: Offset(
+                    -_buttonsWidth * _slideAnimation.value + dragExtra,
+                    0,
+                  ),
+                  child: child,
+                );
+              },
+              child: widget.contentBuilder != null
+                  ? widget.contentBuilder!(transaction, widget.themeColors)
+                  : _buildDefaultContent(transaction, category, isExpense, isIncome),
+            ),
+          ],
         ),
       ),
     );
@@ -230,6 +210,7 @@ class _SwipeableTransactionItemState extends State<SwipeableTransactionItem>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
+        color: Colors.white,
         border: Border(
           bottom: BorderSide(color: AppColors.divider, width: 0.5),
         ),
@@ -313,47 +294,23 @@ class _SwipeableTransactionItemState extends State<SwipeableTransactionItem>
     );
   }
 
-  Widget _buildEditButton(double highlight) {
+  Widget _buildEditButton() {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
         widget.onEdit();
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        width: _buttonWidth + (highlight * 16), // 高亮时稍微变宽
-        decoration: BoxDecoration(
-          color: Color.lerp(
-            widget.themeColors.primary,
-            widget.themeColors.primary.withValues(alpha: 0.8),
-            highlight,
-          ),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(12),
-            bottomLeft: Radius.circular(12),
-          ),
-          boxShadow: highlight > 0.5
-              ? [
-                  BoxShadow(
-                    color: widget.themeColors.primary.withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    spreadRadius: 2,
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
+      child: Container(
+        width: _buttonWidth,
+        color: widget.themeColors.primary,
+        child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.edit,
-              color: Colors.white,
-              size: 22 + (highlight * 4),
-            ),
-            const SizedBox(height: 4),
+            Icon(Icons.edit, color: Colors.white, size: 22),
+            SizedBox(height: 4),
             Text(
-              highlight > 0.8 ? '松开编辑' : '编辑',
-              style: const TextStyle(
+              '编辑',
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -365,47 +322,23 @@ class _SwipeableTransactionItemState extends State<SwipeableTransactionItem>
     );
   }
 
-  Widget _buildDeleteButton(double highlight) {
+  Widget _buildDeleteButton() {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
         widget.onDelete();
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        width: _buttonWidth + (highlight * 16),
-        decoration: BoxDecoration(
-          color: Color.lerp(
-            widget.themeColors.expense,
-            widget.themeColors.expense.withValues(alpha: 0.8),
-            highlight,
-          ),
-          borderRadius: const BorderRadius.only(
-            topRight: Radius.circular(12),
-            bottomRight: Radius.circular(12),
-          ),
-          boxShadow: highlight > 0.5
-              ? [
-                  BoxShadow(
-                    color: widget.themeColors.expense.withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    spreadRadius: 2,
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
+      child: Container(
+        width: _buttonWidth,
+        color: widget.themeColors.expense,
+        child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.delete,
-              color: Colors.white,
-              size: 22 + (highlight * 4),
-            ),
-            const SizedBox(height: 4),
+            Icon(Icons.delete, color: Colors.white, size: 22),
+            SizedBox(height: 4),
             Text(
-              highlight > 0.8 ? '松开删除' : '删除',
-              style: const TextStyle(
+              '删除',
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
