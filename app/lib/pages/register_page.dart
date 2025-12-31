@@ -1,7 +1,9 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import 'agreement_page.dart';
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
@@ -188,35 +190,32 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       },
                     ),
                     Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _agreeToTerms = !_agreeToTerms;
-                          });
-                        },
-                        child: RichText(
-                          text: TextSpan(
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 14,
-                            ),
-                            children: [
-                              const TextSpan(text: '我已阅读并同意'),
-                              TextSpan(
-                                text: '《用户协议》',
-                                style: TextStyle(
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                              ),
-                              const TextSpan(text: '和'),
-                              TextSpan(
-                                text: '《隐私政策》',
-                                style: TextStyle(
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                              ),
-                            ],
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
                           ),
+                          children: [
+                            const TextSpan(text: '我已阅读并同意'),
+                            TextSpan(
+                              text: '《用户协议》',
+                              style: TextStyle(
+                                color: Theme.of(context).primaryColor,
+                              ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () => _openAgreement(AgreementType.userAgreement),
+                            ),
+                            const TextSpan(text: '和'),
+                            TextSpan(
+                              text: '《隐私政策》',
+                              style: TextStyle(
+                                color: Theme.of(context).primaryColor,
+                              ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () => _openAgreement(AgreementType.privacyPolicy),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -268,6 +267,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _openAgreement(AgreementType type) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AgreementPage(type: type),
       ),
     );
   }

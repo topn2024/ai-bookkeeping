@@ -9,6 +9,7 @@ import '../providers/app_info_provider.dart';
 import '../providers/upgrade_provider.dart';
 import '../services/app_upgrade_service.dart';
 import '../widgets/app_update_dialog.dart';
+import 'agreement_page.dart';
 import 'help_page.dart';
 
 /// 关于我们页面
@@ -166,14 +167,28 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                     icon: Icons.description,
                     iconColor: AppColors.textSecondary,
                     title: '用户协议',
-                    onTap: () => _showComingSoon(context, '用户协议'),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AgreementPage(
+                          type: AgreementType.userAgreement,
+                        ),
+                      ),
+                    ),
                   ),
                   _buildDivider(),
                   _buildMenuItem(
                     icon: Icons.privacy_tip,
                     iconColor: AppColors.textSecondary,
                     title: '隐私政策',
-                    onTap: () => _showComingSoon(context, '隐私政策'),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AgreementPage(
+                          type: AgreementType.privacyPolicy,
+                        ),
+                      ),
+                    ),
                   ),
                   _buildDivider(),
                   _buildMenuItem(
