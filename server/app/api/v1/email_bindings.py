@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
+from app.core.security import encrypt_sensitive_data
 from app.models.user import User
 from app.models.email_binding import EmailBinding, EmailType
 from app.api.deps import get_current_user
@@ -129,13 +130,16 @@ async def create_email_binding(
             )
 
     # Create binding
+    # Encrypt IMAP password before storing
+    encrypted_password = encrypt_sensitive_data(data.imap_password) if data.imap_password else None
+
     binding = EmailBinding(
         user_id=current_user.id,
         email=data.email,
         email_type=data.email_type,
         imap_server=data.imap_server,
         imap_port=data.imap_port or 993,
-        imap_password=data.imap_password,  # TODO: encrypt this
+        imap_password=encrypted_password,
     )
 
     db.add(binding)
@@ -213,7 +217,8 @@ async def update_email_binding(
 
     # Update fields
     if data.imap_password is not None:
-        binding.imap_password = data.imap_password  # TODO: encrypt
+        # Encrypt IMAP password before storing
+        binding.imap_password = encrypt_sensitive_data(data.imap_password)
     if data.is_active is not None:
         binding.is_active = data.is_active
 

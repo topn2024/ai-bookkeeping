@@ -6,6 +6,9 @@ import '../models/transaction.dart';
 import '../models/category.dart';
 import '../models/account.dart';
 
+/// @deprecated Use [BatchImportService] from 'import/batch_import_service.dart' instead.
+/// This service is kept for backward compatibility but will be removed in a future version.
+///
 /// 导入结果
 class ImportResult {
   final bool success;

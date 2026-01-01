@@ -2305,11 +2305,16 @@ class DatabaseService {
       await db.rawQuery('SELECT COUNT(*) FROM sync_queue WHERE status = 0'),
     ) ?? 0;
 
+    final queueFailedCount = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM sync_queue WHERE status = 3'),
+    ) ?? 0;
+
     return {
       'pending': pendingCount,
       'synced': syncedCount,
       'conflict': conflictCount,
       'queue': queueCount,
+      'queueFailed': queueFailedCount,
     };
   }
 

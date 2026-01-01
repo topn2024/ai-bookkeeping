@@ -18,10 +18,12 @@ from app.api.v1.files import router as files_router
 from app.api.v1.backup import router as backup_router
 from app.api.v1.config import router as config_router
 from app.api.v1.app_upgrade import router as app_upgrade_router
+from app.api.v1.users import router as users_router
 
 api_router = APIRouter()
 
 api_router.include_router(auth_router)
+api_router.include_router(users_router)
 api_router.include_router(oauth_router)
 api_router.include_router(books_router)
 api_router.include_router(book_members_router)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/member.dart';
 import '../providers/member_provider.dart';
+import '../providers/auth_provider.dart';
 
 class JoinInvitePage extends ConsumerStatefulWidget {
   const JoinInvitePage({super.key});
@@ -194,11 +195,12 @@ class _JoinInvitePageState extends ConsumerState<JoinInvitePage> {
   Future<void> _acceptInvite() async {
     if (_foundInvite == null) return;
 
+    final currentUser = ref.read(authProvider).user;
     try {
       await ref.read(memberProvider.notifier).acceptInvite(
         _foundInvite!.id,
-        'current_user_id', // TODO: 替换为实际用户ID
-        '我', // TODO: 替换为实际用户名
+        currentUser?.id ?? '',
+        currentUser?.displayName ?? '我',
       );
 
       if (mounted) {

@@ -16,9 +16,20 @@ from app.core.security import (
 from app.models.user import User
 from app.models.book import Book
 from app.models.account import Account
-from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, RefreshTokenRequest
+from app.schemas.user import (
+    UserCreate, UserLogin, UserResponse, Token, RefreshTokenRequest,
+    UserUpdate, CheckEmailRequest, CheckEmailResponse,
+    ResetPasswordRequest, ResetPasswordResponse, ResetPasswordConfirm,
+)
 from app.api.deps import get_current_user
 from app.services.init_service import init_user_data
+import secrets
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Simple in-memory store for reset codes (in production, use Redis or database)
+_reset_codes: dict[str, tuple[str, float]] = {}  # email -> (code, expire_timestamp)
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -180,3 +191,128 @@ async def refresh_token_endpoint(
         refresh_token=new_refresh_token,
         user=UserResponse.model_validate(user),
     )
+
+
+@router.post("/check-email", response_model=CheckEmailResponse)
+async def check_email(
+    request: CheckEmailRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Check if email is already registered."""
+    result = await db.execute(select(User).where(User.email == request.email))
+    user = result.scalar_one_or_none()
+
+    if user:
+        return CheckEmailResponse(
+            exists=True,
+            message="Email is already registered",
+        )
+    return CheckEmailResponse(
+        exists=False,
+        message="Email is available",
+    )
+
+
+@router.post("/reset-password", response_model=ResetPasswordResponse)
+async def request_password_reset(
+    request: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Request password reset. Generates a reset code and sends it via email."""
+    import time
+
+    result = await db.execute(select(User).where(User.email == request.email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        # Don't reveal if email exists or not for security
+        return ResetPasswordResponse(
+            success=True,
+            message="If the email exists, a reset code has been sent",
+        )
+
+    # Generate 6-digit reset code
+    code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+    expire_at = time.time() + 600  # 10 minutes validity
+
+    # Store the code (in production, use Redis with TTL)
+    _reset_codes[request.email] = (code, expire_at)
+
+    # TODO: Send email with the code
+    # For now, log it (in production, integrate email service)
+    logger.info(f"Password reset code for {request.email}: {code}")
+
+    return ResetPasswordResponse(
+        success=True,
+        message="If the email exists, a reset code has been sent",
+    )
+
+
+@router.post("/reset-password/confirm", response_model=ResetPasswordResponse)
+async def confirm_password_reset(
+    request: ResetPasswordConfirm,
+    db: AsyncSession = Depends(get_db),
+):
+    """Confirm password reset with the code received via email."""
+    import time
+
+    # Check if code exists and is valid
+    if request.email not in _reset_codes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset code",
+        )
+
+    stored_code, expire_at = _reset_codes[request.email]
+
+    if time.time() > expire_at:
+        del _reset_codes[request.email]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset code has expired",
+        )
+
+    if request.code != stored_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid reset code",
+        )
+
+    # Update password
+    result = await db.execute(select(User).where(User.email == request.email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    user.password_hash = get_password_hash(request.new_password)
+    await db.commit()
+
+    # Remove used code
+    del _reset_codes[request.email]
+
+    return ResetPasswordResponse(
+        success=True,
+        message="Password has been reset successfully",
+    )
+
+
+@router.patch("/me", response_model=UserResponse)
+async def update_me(
+    user_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update current user's profile."""
+    if user_data.nickname is not None:
+        current_user.nickname = user_data.nickname
+    if user_data.avatar_url is not None:
+        current_user.avatar_url = user_data.avatar_url
+
+    await db.commit()
+    await db.refresh(current_user)
+
+    return UserResponse.model_validate(current_user)

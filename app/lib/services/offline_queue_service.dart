@@ -351,7 +351,7 @@ class OfflineQueueService {
     final stats = await _db.getSyncStatistics();
     return {
       'pending': stats['queue'] ?? 0,
-      'failed': 0, // TODO: Track failed separately
+      'failed': stats['queueFailed'] ?? 0,
     };
   }
 

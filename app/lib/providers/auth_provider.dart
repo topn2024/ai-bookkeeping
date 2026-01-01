@@ -413,7 +413,6 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   /// 检查邮箱是否已注册
-  /// TODO: 实现服务器端 API
   Future<bool> checkEmailExists({required String email}) async {
     try {
       // 尝试调用服务器 API 检查邮箱
@@ -431,7 +430,6 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   /// 重置密码
-  /// TODO: 实现服务器端 API
   Future<bool> resetPassword({
     required String email,
     required String newPassword,

@@ -9,6 +9,7 @@ import 'bill_format_detector.dart';
 import 'bill_parser.dart';
 import 'wechat_bill_parser.dart';
 import 'alipay_bill_parser.dart';
+import 'generic_bank_parser.dart';
 import 'duplicate_scorer.dart';
 
 /// Import progress callback
@@ -187,9 +188,9 @@ class BatchImportService {
       case BillSourceType.ccbBank:
       case BillSourceType.bocBank:
       case BillSourceType.otherBank:
+        return GenericBankParser(sourceType: sourceType);
       case BillSourceType.generic:
-        // TODO: Implement generic/bank parsers
-        return null;
+        return GenericBankParser(sourceType: BillSourceType.generic);
       case BillSourceType.unknown:
         return null;
     }

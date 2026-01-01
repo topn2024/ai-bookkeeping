@@ -1,15 +1,70 @@
 """Security utilities for authentication."""
 from datetime import datetime, timedelta
 from typing import Optional
+import base64
+import hashlib
 import uuid
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from cryptography.fernet import Fernet
 
 from app.core.config import settings
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def _get_fernet_key() -> bytes:
+    """Derive a Fernet key from JWT_SECRET_KEY."""
+    # Use SHA-256 to hash the secret key and then base64 encode it
+    # Fernet requires a 32-byte base64-encoded key
+    key_bytes = settings.JWT_SECRET_KEY.encode('utf-8')
+    hashed = hashlib.sha256(key_bytes).digest()
+    return base64.urlsafe_b64encode(hashed)
+
+
+def _get_fernet() -> Fernet:
+    """Get Fernet instance for encryption/decryption."""
+    return Fernet(_get_fernet_key())
+
+
+def encrypt_sensitive_data(plaintext: str) -> str:
+    """Encrypt sensitive data (like IMAP passwords) using Fernet.
+
+    Args:
+        plaintext: The string to encrypt
+
+    Returns:
+        Base64 encoded encrypted string
+    """
+    if not plaintext:
+        return plaintext
+
+    fernet = _get_fernet()
+    encrypted = fernet.encrypt(plaintext.encode('utf-8'))
+    return encrypted.decode('utf-8')
+
+
+def decrypt_sensitive_data(ciphertext: str) -> str:
+    """Decrypt sensitive data that was encrypted with encrypt_sensitive_data.
+
+    Args:
+        ciphertext: The base64 encoded encrypted string
+
+    Returns:
+        The original plaintext string
+    """
+    if not ciphertext:
+        return ciphertext
+
+    try:
+        fernet = _get_fernet()
+        decrypted = fernet.decrypt(ciphertext.encode('utf-8'))
+        return decrypted.decode('utf-8')
+    except Exception:
+        # Return original if decryption fails (might be unencrypted legacy data)
+        return ciphertext
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

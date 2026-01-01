@@ -1,10 +1,9 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'source_file_service.dart';
+import 'http_service.dart';
 import '../models/transaction.dart';
 
 /// Service for syncing source files to server when on WiFi.
@@ -21,10 +20,7 @@ class SourceFileSyncService {
 
   final SourceFileService _fileService = SourceFileService();
   final Connectivity _connectivity = Connectivity();
-
-  // API configuration
-  static const String _baseUrlKey = 'api_base_url';
-  static const String _authTokenKey = 'auth_token';
+  final HttpService _http = HttpService();
 
   bool _isSyncing = false;
 
@@ -32,18 +28,6 @@ class SourceFileSyncService {
   Future<bool> isOnWifi() async {
     final result = await _connectivity.checkConnectivity();
     return result.contains(ConnectivityResult.wifi);
-  }
-
-  /// Get saved API base URL
-  Future<String?> _getBaseUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_baseUrlKey);
-  }
-
-  /// Get saved auth token
-  Future<String?> _getAuthToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_authTokenKey);
   }
 
   /// Sync a single file to server
@@ -64,18 +48,9 @@ class SourceFileSyncService {
       return null;
     }
 
-    final baseUrl = await _getBaseUrl();
-    final authToken = await _getAuthToken();
-
-    if (baseUrl == null || authToken == null) {
-      print('Missing API configuration for file sync');
-      return null;
-    }
-
     try {
       final file = File(localPath);
       if (!await file.exists()) {
-        print('Local file not found: $localPath');
         return null;
       }
 
@@ -83,13 +58,10 @@ class SourceFileSyncService {
       final fileName = localPath.split(Platform.pathSeparator).last;
       final base64Data = base64Encode(bytes);
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/v1/files/upload-base64'),
-        headers: {
-          'Authorization': 'Bearer $authToken',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: {
+      // Use httpService for proper token handling and auto-refresh
+      final response = await _http.post(
+        '/files/upload-base64',
+        data: {
           'data': base64Data,
           'filename': fileName,
           'file_type': isImage ? 'image' : 'audio',
@@ -97,7 +69,7 @@ class SourceFileSyncService {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = response.data;
         final serverUrl = data['url'] as String?;
 
         if (serverUrl != null) {
@@ -111,12 +83,9 @@ class SourceFileSyncService {
         }
 
         return serverUrl;
-      } else {
-        print('File upload failed: ${response.statusCode} - ${response.body}');
-        return null;
       }
+      return null;
     } catch (e) {
-      print('Error syncing file: $e');
       return null;
     }
   }
@@ -128,26 +97,17 @@ class SourceFileSyncService {
     String? contentType,
     int? fileSize,
   }) async {
-    final baseUrl = await _getBaseUrl();
-    final authToken = await _getAuthToken();
-
-    if (baseUrl == null || authToken == null) return;
-
     try {
-      await http.post(
-        Uri.parse('$baseUrl/api/v1/files/transactions/$transactionId/source-file'),
-        headers: {
-          'Authorization': 'Bearer $authToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
+      await _http.post(
+        '/files/transactions/$transactionId/source-file',
+        data: {
           'source_file_url': serverUrl,
           'source_file_type': contentType,
           'source_file_size': fileSize,
-        }),
+        },
       );
     } catch (e) {
-      print('Error updating transaction source URL: $e');
+      // Silent failure - transaction URL update is not critical
     }
   }
 

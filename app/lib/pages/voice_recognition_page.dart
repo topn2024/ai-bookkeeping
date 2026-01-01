@@ -583,11 +583,158 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
               Icons.history,
               color: isDark ? Colors.white70 : Colors.black87,
             ),
-            onPressed: () {
-              // TODO: 显示历史记录
-            },
+            onPressed: () => _showVoiceHistory(isDark),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 显示语音记账历史记录
+  void _showVoiceHistory(bool isDark) {
+    final transactions = ref.read(transactionProvider).where(
+      (t) => t.source == TransactionSource.voice,
+    ).toList();
+
+    // 按日期排序，最新的在前
+    transactions.sort((a, b) => b.date.compareTo(a.date));
+
+    // 只显示最近20条
+    final recentTransactions = transactions.take(20).toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // 拖动指示器
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // 标题
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.history,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '语音记账历史',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '共 ${transactions.length} 条',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? Colors.white54 : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // 列表
+              Expanded(
+                child: recentTransactions.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.mic_none,
+                              size: 48,
+                              color: isDark ? Colors.white24 : Colors.grey.shade300,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '暂无语音记账记录',
+                              style: TextStyle(
+                                color: isDark ? Colors.white54 : Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        itemCount: recentTransactions.length,
+                        itemBuilder: (context, index) {
+                          final t = recentTransactions[index];
+                          final isExpense = t.type == TransactionType.expense;
+                          final color = isExpense
+                              ? AppColors.expense
+                              : AppColors.income;
+
+                          return ListTile(
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                isExpense
+                                    ? Icons.arrow_downward
+                                    : Icons.arrow_upward,
+                                color: color,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              t.note ?? DefaultCategories.findById(t.category)?.name ?? t.category,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              AppDateUtils.formatDateTime(t.date),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.white54 : Colors.grey,
+                              ),
+                            ),
+                            trailing: Text(
+                              '${isExpense ? '-' : '+'}¥${t.amount.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: color,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

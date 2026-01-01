@@ -1,7 +1,9 @@
 """Admin authentication endpoints."""
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Set
+import time
 
+import pyotp
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -28,6 +30,13 @@ from admin.schemas.auth import (
     AdminTokenRefreshResponse,
     PasswordChangeRequest,
 )
+
+# Token blacklist for logout invalidation
+# In production, use Redis with TTL for better scalability
+# Format: {token_jti: expire_timestamp}
+_token_blacklist: dict[str, float] = {}
+_BLACKLIST_CLEANUP_INTERVAL = 300  # Clean up every 5 minutes
+_last_cleanup_time = time.time()
 
 
 router = APIRouter(prefix="/auth", tags=["Admin Auth"])
@@ -96,7 +105,18 @@ async def login(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="需要MFA验证码",
             )
-        # TODO: 验证MFA码
+        # 验证MFA码
+        if not admin.mfa_secret:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="MFA配置错误，请联系管理员",
+            )
+        totp = pyotp.TOTP(admin.mfa_secret)
+        if not totp.verify(login_data.mfa_code, valid_window=1):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="MFA验证码错误或已过期",
+            )
 
     # 登录成功，重置失败计数
     admin.failed_login_count = 0
@@ -205,7 +225,11 @@ async def logout(
 
     await db.commit()
 
-    # TODO: 如果使用Redis，可以将Token加入黑名单
+    # 将当前Token加入黑名单
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        add_token_to_blacklist(token)
 
     return {"message": "登出成功"}
 
@@ -290,3 +314,42 @@ def _get_client_ip(request: Request) -> str:
         return request.client.host
 
     return "unknown"
+
+
+def _cleanup_blacklist():
+    """清理已过期的黑名单token"""
+    global _last_cleanup_time
+    current_time = time.time()
+
+    if current_time - _last_cleanup_time < _BLACKLIST_CLEANUP_INTERVAL:
+        return
+
+    _last_cleanup_time = current_time
+    expired_tokens = [
+        token for token, expire_time in _token_blacklist.items()
+        if current_time > expire_time
+    ]
+    for token in expired_tokens:
+        del _token_blacklist[token]
+
+
+def add_token_to_blacklist(token: str):
+    """将token加入黑名单"""
+    _cleanup_blacklist()
+    # Token有效期为ACCESS_TOKEN_EXPIRE_MINUTES分钟
+    expire_time = time.time() + ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    _token_blacklist[token] = expire_time
+
+
+def is_token_blacklisted(token: str) -> bool:
+    """检查token是否在黑名单中"""
+    _cleanup_blacklist()
+    if token not in _token_blacklist:
+        return False
+
+    expire_time = _token_blacklist[token]
+    if time.time() > expire_time:
+        del _token_blacklist[token]
+        return False
+
+    return True

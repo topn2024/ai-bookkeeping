@@ -17,12 +17,26 @@ from admin.core.security import decode_access_token
 security = HTTPBearer()
 
 
+def _check_token_blacklist(token: str) -> bool:
+    """检查token是否在黑名单中（延迟导入避免循环依赖）"""
+    from admin.api.auth import is_token_blacklisted
+    return is_token_blacklisted(token)
+
+
 async def get_current_admin(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> AdminUser:
     """获取当前登录的管理员"""
     token = credentials.credentials
+
+    # 检查Token是否在黑名单中
+    if _check_token_blacklist(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="令牌已失效，请重新登录",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # 解码Token
     payload = decode_access_token(token)

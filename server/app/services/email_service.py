@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import decrypt_sensitive_data
 from app.models.email_binding import EmailBinding, EmailType
 from app.services.ai_service import AIService
 
@@ -147,8 +148,9 @@ class EmailService:
         mail = imaplib.IMAP4_SSL(imap_server, imap_port)
 
         try:
-            # Login
-            mail.login(binding.email, binding.imap_password)
+            # Login with decrypted password
+            decrypted_password = decrypt_sensitive_data(binding.imap_password)
+            mail.login(binding.email, decrypted_password)
 
             # Select inbox
             mail.select("INBOX")
@@ -350,7 +352,9 @@ class EmailService:
                 return False, "IMAP server or password not configured"
 
             mail = imaplib.IMAP4_SSL(imap_server, imap_port)
-            mail.login(binding.email, binding.imap_password)
+            # Login with decrypted password
+            decrypted_password = decrypt_sensitive_data(binding.imap_password)
+            mail.login(binding.email, decrypted_password)
             mail.select("INBOX")
             mail.close()
             mail.logout()

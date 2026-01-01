@@ -53,3 +53,32 @@ class Token(BaseModel):
 class RefreshTokenRequest(BaseModel):
     """Schema for token refresh request."""
     refresh_token: str
+
+
+class CheckEmailRequest(BaseModel):
+    """Schema for checking if email exists."""
+    email: EmailStr
+
+
+class CheckEmailResponse(BaseModel):
+    """Schema for check email response."""
+    exists: bool
+    message: str
+
+
+class ResetPasswordRequest(BaseModel):
+    """Schema for password reset request."""
+    email: EmailStr
+
+
+class ResetPasswordConfirm(BaseModel):
+    """Schema for confirming password reset with code."""
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
+    new_password: str = Field(..., min_length=6, max_length=50)
+
+
+class ResetPasswordResponse(BaseModel):
+    """Schema for reset password response."""
+    success: bool
+    message: str

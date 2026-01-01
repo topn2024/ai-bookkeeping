@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/member.dart';
 import '../providers/member_provider.dart';
+import '../providers/auth_provider.dart';
 
 class MemberManagementPage extends ConsumerStatefulWidget {
   final String ledgerId;
@@ -834,11 +835,12 @@ class _InviteMemberDialogState extends ConsumerState<_InviteMemberDialog> {
   }
 
   Future<void> _createInvite() async {
+    final currentUser = ref.read(authProvider).user;
     final invite = await ref.read(memberProvider.notifier).createInvite(
       ledgerId: widget.ledgerId,
       ledgerName: widget.ledgerName,
-      inviterId: 'current_user_id', // TODO: 替换为实际用户ID
-      inviterName: '我', // TODO: 替换为实际用户名
+      inviterId: currentUser?.id ?? '',
+      inviterName: currentUser?.displayName ?? '我',
       inviteeEmail: _useInviteCode ? null : _emailController.text.trim(),
       role: _selectedRole,
     );
@@ -1055,19 +1057,22 @@ class _ApprovalActionDialogState extends ConsumerState<_ApprovalActionDialog> {
 
   void _submit() {
     final comment = _commentController.text.trim();
+    final currentUser = ref.read(authProvider).user;
+    final userId = currentUser?.id ?? '';
+    final userName = currentUser?.displayName ?? '我';
 
     if (widget.isApprove) {
       ref.read(memberProvider.notifier).approveRequest(
         widget.approval.id,
-        'current_user_id', // TODO: 替换为实际用户ID
-        '我', // TODO: 替换为实际用户名
+        userId,
+        userName,
         comment: comment.isEmpty ? null : comment,
       );
     } else {
       ref.read(memberProvider.notifier).rejectRequest(
         widget.approval.id,
-        'current_user_id', // TODO: 替换为实际用户ID
-        '我', // TODO: 替换为实际用户名
+        userId,
+        userName,
         comment: comment.isEmpty ? null : comment,
       );
     }
