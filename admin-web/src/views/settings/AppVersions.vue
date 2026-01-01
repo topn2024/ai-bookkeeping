@@ -102,6 +102,15 @@
             >
               删除
             </el-button>
+            <el-button
+              v-if="row.status === 2"
+              type="danger"
+              text
+              size="small"
+              @click="handleDeleteDeprecated(row)"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -241,6 +250,40 @@
         <el-button type="primary" :loading="uploading" @click="confirmUpload">上传</el-button>
       </template>
     </el-dialog>
+
+    <!-- Delete Deprecated Version Dialog -->
+    <el-dialog v-model="deleteDialogVisible" title="删除废弃版本" width="450px">
+      <div class="delete-dialog-content">
+        <el-alert
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 16px;"
+        >
+          <template #title>
+            <span>您正在删除废弃版本 <strong>{{ deleteVersionInfo }}</strong></span>
+          </template>
+          <template #default>
+            此操作不可恢复，APK文件也将被删除。请输入管理员密码确认。
+          </template>
+        </el-alert>
+        <el-form @submit.prevent="confirmDeleteDeprecated">
+          <el-form-item label="管理员密码" required>
+            <el-input
+              v-model="deletePassword"
+              type="password"
+              placeholder="请输入您的管理员密码"
+              show-password
+              @keyup.enter="confirmDeleteDeprecated"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <el-button @click="deleteDialogVisible = false">取消</el-button>
+        <el-button type="danger" :loading="deleting" @click="confirmDeleteDeprecated">确认删除</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -257,6 +300,7 @@ import {
   publishVersion,
   deprecateVersion,
   deleteAppVersion,
+  deleteDeprecatedVersion,
   type AppVersion,
   type AppVersionCreate
 } from '@/api/appVersions'
@@ -265,15 +309,20 @@ import {
 const loading = ref(false)
 const creating = ref(false)
 const uploading = ref(false)
+const deleting = ref(false)
 const versions = ref<AppVersion[]>([])
 const currentVersion = ref<AppVersion | null>(null)
 const selectedFile = ref<File | null>(null)
 const uploadVersionId = ref('')
+const deleteVersionId = ref('')
+const deleteVersionInfo = ref('')
+const deletePassword = ref('')
 
 // Dialogs
 const createDialogVisible = ref(false)
 const detailDialogVisible = ref(false)
 const uploadDialogVisible = ref(false)
+const deleteDialogVisible = ref(false)
 
 // Refs
 const createFormRef = ref<FormInstance>()
@@ -456,6 +505,32 @@ const handleDelete = async (row: AppVersion) => {
   }
 }
 
+const handleDeleteDeprecated = (row: AppVersion) => {
+  deleteVersionId.value = row.id
+  deleteVersionInfo.value = `${row.version_name}+${row.version_code}`
+  deletePassword.value = ''
+  deleteDialogVisible.value = true
+}
+
+const confirmDeleteDeprecated = async () => {
+  if (!deletePassword.value) {
+    ElMessage.warning('请输入管理员密码')
+    return
+  }
+
+  deleting.value = true
+  try {
+    await deleteDeprecatedVersion(deleteVersionId.value, deletePassword.value)
+    ElMessage.success('废弃版本已删除')
+    deleteDialogVisible.value = false
+    fetchVersions()
+  } catch (error: any) {
+    ElMessage.error(error.message || '删除失败')
+  } finally {
+    deleting.value = false
+  }
+}
+
 const handleSizeChange = (size: number) => {
   pagination.pageSize = size
   fetchVersions()
@@ -521,5 +596,9 @@ onMounted(() => {
 
 :deep(.el-upload-dragger) {
   width: 100%;
+}
+
+.delete-dialog-content {
+  padding: 0 10px;
 }
 </style>

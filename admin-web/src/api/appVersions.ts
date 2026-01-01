@@ -131,3 +131,13 @@ export const deleteAppVersion = (versionId: string): Promise<{
 }> => {
   return del(`/app-versions/${versionId}`)
 }
+
+/**
+ * Delete deprecated version with password verification
+ */
+export const deleteDeprecatedVersion = (versionId: string, password: string): Promise<{
+  message: string
+  version: string
+}> => {
+  return post(`/app-versions/${versionId}/delete`, { password })
+}

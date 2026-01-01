@@ -59,6 +59,11 @@ class AppVersionUpdate(BaseModel):
     min_supported_version: Optional[str] = None
 
 
+class DeleteVersionRequest(BaseModel):
+    """Delete version request with password verification."""
+    password: str
+
+
 class AppVersionResponse(BaseModel):
     """App version response."""
     id: UUID
@@ -262,7 +267,8 @@ async def update_version(
 ):
     """Update app version info.
 
-    Only draft versions can be updated. Published versions cannot be modified.
+    For draft versions: all fields can be updated.
+    For published versions: only release_notes and release_notes_en can be updated.
     """
     result = await db.execute(
         select(AppVersion).where(AppVersion.id == version_id)
@@ -275,11 +281,13 @@ async def update_version(
             detail="版本不存在",
         )
 
+    # For published versions, only allow updating release notes
     if version.status == 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="已发布版本不能修改",
-        )
+        if data.is_force_update is not None or data.min_supported_version is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="已发布版本只能修改 release notes",
+            )
 
     # Update fields
     if data.release_notes is not None:
@@ -523,9 +531,10 @@ async def delete_version(
     current_admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a version.
+    """Delete a draft version (no password required).
 
-    Only draft versions can be deleted. Published and deprecated versions cannot be deleted.
+    Only draft versions can be deleted with this endpoint.
+    For deprecated versions, use the POST /{version_id}/delete endpoint with password.
     """
     result = await db.execute(
         select(AppVersion).where(AppVersion.id == version_id)
@@ -541,7 +550,7 @@ async def delete_version(
     if version.status != 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="只能删除草稿版本，已发布版本请使用废弃功能",
+            detail="只能删除草稿版本，已发布版本请使用废弃功能，废弃版本请使用密码删除功能",
         )
 
     version_name = version.full_version
@@ -575,5 +584,99 @@ async def delete_version(
 
     return {
         "message": "版本已删除",
+        "version": version_name,
+    }
+
+
+@router.post("/{version_id}/delete")
+async def delete_deprecated_version(
+    request: Request,
+    version_id: UUID,
+    data: DeleteVersionRequest,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a deprecated version with password verification.
+
+    Only deprecated versions (status=2) can be deleted with this endpoint.
+    Requires admin password for verification.
+    """
+    from admin.core.security import verify_password
+
+    result = await db.execute(
+        select(AppVersion).where(AppVersion.id == version_id)
+    )
+    version = result.scalar_one_or_none()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="版本不存在",
+        )
+
+    if version.status == 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="已发布版本不能删除，请先将其废弃",
+        )
+
+    if version.status == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="草稿版本请直接使用删除功能，无需密码验证",
+        )
+
+    # Verify admin password
+    if not verify_password(data.password, current_admin.hashed_password):
+        # Audit log for failed attempt
+        await create_audit_log(
+            db=db,
+            admin_id=current_admin.id,
+            admin_username=current_admin.username,
+            action="app_version.delete_failed",
+            module="app_version",
+            target_type="app_version",
+            target_id=str(version_id),
+            target_name=version.full_version,
+            description=f"删除废弃版本失败(密码错误): {version.full_version}",
+            request=request,
+        )
+        await db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="密码错误",
+        )
+
+    version_name = version.full_version
+
+    # Delete APK file from MinIO if exists
+    if version.file_url:
+        try:
+            settings = get_settings()
+            object_name = f"app-releases/{version.platform}/{version.version_name}/app-release-{version.version_code}.apk"
+            file_storage_service.client.remove_object(settings.MINIO_BUCKET, object_name)
+        except Exception:
+            pass  # Ignore errors when deleting file
+
+    # Audit log
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="app_version.delete_deprecated",
+        module="app_version",
+        target_type="app_version",
+        target_id=str(version_id),
+        target_name=version_name,
+        description=f"删除废弃版本: {version_name} (需密码验证)",
+        request=request,
+    )
+
+    await db.delete(version)
+    await db.commit()
+
+    return {
+        "message": "废弃版本已删除",
         "version": version_name,
     }
