@@ -414,7 +414,7 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
           ),
           child: Icon(account.icon, color: account.color),
         ),
-        title: Text(account.name),
+        title: Text(account.localizedName),
         subtitle: Text(_getAccountTypeName(account.type)),
         trailing: Text(
           '¥${account.balance.toStringAsFixed(2)}',
@@ -973,7 +973,7 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(account.name, style: const TextStyle(fontWeight: FontWeight.w500)),
+                    Text(account.localizedName, style: const TextStyle(fontWeight: FontWeight.w500)),
                     Text(
                       _getAccountTypeName(account.type),
                       style: TextStyle(fontSize: 11, color: Colors.grey[600]),

@@ -390,7 +390,7 @@ class _CustomReportPageState extends ConsumerState<CustomReportPage> {
         return _buildReportItem(
           icon: account?.icon ?? Icons.account_balance_wallet,
           color: account?.color ?? Colors.grey,
-          title: account?.name ?? entry.key,
+          title: account?.localizedName ?? entry.key,
           amount: entry.value,
           percentage: percentage,
         );
@@ -655,7 +655,7 @@ class _CustomReportPageState extends ConsumerState<CustomReportPage> {
                   },
                 ),
                 ...accounts.map((account) => ChoiceChip(
-                  label: Text(account.name),
+                  label: Text(account.localizedName),
                   selected: _selectedAccount == account.id,
                   onSelected: (selected) {
                     if (selected) {

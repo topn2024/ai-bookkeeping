@@ -59,42 +59,42 @@ async def get_dashboard_stats(
     )
     yesterday_new_users_count = yesterday_new_users.scalar() or 0
 
-    # 今日活跃用户（有交易记录）
+    # 今日活跃用户（有交易记录） - 按交易日期统计
     today_active = await db.execute(
         select(func.count(func.distinct(Transaction.user_id)))
-        .where(func.date(Transaction.created_at) == today)
+        .where(Transaction.transaction_date == today)
     )
     today_active_count = today_active.scalar() or 0
 
     yesterday_active = await db.execute(
         select(func.count(func.distinct(Transaction.user_id)))
-        .where(func.date(Transaction.created_at) == yesterday)
+        .where(Transaction.transaction_date == yesterday)
     )
     yesterday_active_count = yesterday_active.scalar() or 0
 
-    # 今日交易笔数
+    # 今日交易笔数 - 按交易日期统计
     today_tx = await db.execute(
         select(func.count(Transaction.id))
-        .where(func.date(Transaction.created_at) == today)
+        .where(Transaction.transaction_date == today)
     )
     today_tx_count = today_tx.scalar() or 0
 
     yesterday_tx = await db.execute(
         select(func.count(Transaction.id))
-        .where(func.date(Transaction.created_at) == yesterday)
+        .where(Transaction.transaction_date == yesterday)
     )
     yesterday_tx_count = yesterday_tx.scalar() or 0
 
-    # 今日交易金额
+    # 今日交易金额 - 按交易日期统计
     today_amount = await db.execute(
         select(func.sum(Transaction.amount))
-        .where(func.date(Transaction.created_at) == today)
+        .where(Transaction.transaction_date == today)
     )
     today_amount_sum = today_amount.scalar() or Decimal("0")
 
     yesterday_amount = await db.execute(
         select(func.sum(Transaction.amount))
-        .where(func.date(Transaction.created_at) == yesterday)
+        .where(Transaction.transaction_date == yesterday)
     )
     yesterday_amount_sum = yesterday_amount.scalar() or Decimal("0")
 
@@ -464,6 +464,15 @@ async def get_recent_transactions(
     )
     transactions = result.scalars().all()
 
+    # 账户类型本地化映射
+    account_type_names = {
+        1: "现金",
+        2: "储蓄卡",
+        3: "信用卡",
+        4: "支付宝",
+        5: "微信",
+    }
+
     items = []
     for tx in transactions:
         # 获取用户
@@ -478,7 +487,25 @@ async def get_recent_transactions(
         )
         category = category_result.scalar_one_or_none()
 
+        # 获取账户
+        account_result = await db.execute(
+            select(Account).where(Account.id == tx.account_id)
+        )
+        account = account_result.scalar_one_or_none()
+
+        # 获取账本
+        book_result = await db.execute(
+            select(Book).where(Book.id == tx.book_id)
+        )
+        book = book_result.scalar_one_or_none()
+
         type_names = {1: "支出", 2: "收入", 3: "转账"}
+
+        # 账户名称本地化：优先使用自定义名称，否则使用类型名称
+        account_name = None
+        if account:
+            # 如果账户名称是英文标准名称，则转换为中文
+            account_name = _localize_account_name(account.name, account.account_type, account_type_names)
 
         items.append(RecentTransaction(
             id=str(tx.id),
@@ -488,11 +515,39 @@ async def get_recent_transactions(
             type_name=type_names.get(tx.transaction_type, "未知"),
             amount=f"¥{tx.amount:,.2f}",
             category_name=category.name if category else "未分类",
+            account_name=account_name,
+            book_name=book.name if book else None,
             note=tx.note[:20] + "..." if tx.note and len(tx.note) > 20 else tx.note,
             created_at=tx.created_at,
         ))
 
     return RecentTransactionsResponse(items=items)
+
+
+def _localize_account_name(name: str, account_type: int, type_names: dict) -> str:
+    """账户名称本地化"""
+    # 英文名称到中文的映射
+    name_mapping = {
+        "cash": "现金",
+        "wechat": "微信",
+        "wechat pay": "微信",
+        "alipay": "支付宝",
+        "bank": "银行卡",
+        "bank card": "银行卡",
+        "credit card": "信用卡",
+        "debit card": "储蓄卡",
+        "savings": "储蓄账户",
+        "investment": "投资账户",
+        "wallet": "钱包",
+    }
+
+    # 尝试通过名称映射
+    lower_name = name.lower() if name else ""
+    if lower_name in name_mapping:
+        return name_mapping[lower_name]
+
+    # 如果名称已经是中文或自定义名称，直接返回
+    return name or type_names.get(account_type, "未知账户")
 
 
 # Helper functions

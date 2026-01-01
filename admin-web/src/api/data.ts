@@ -133,3 +133,25 @@ export const updateBackupPolicy = (data: any): Promise<any> => {
 export const checkDataIntegrity = (): Promise<any> => {
   return get('/data/integrity-check')
 }
+
+// Category detail
+export const getCategoryDetail = (categoryId: string): Promise<any> => {
+  return get(`/categories/${categoryId}`)
+}
+
+// Backup operations
+export const createBackup = (data: { user_id?: string; description?: string }): Promise<any> => {
+  return post('/backups', data)
+}
+
+export const downloadBackup = (backupId: string): Promise<Blob> => {
+  return download(`/backups/${backupId}/download`, {})
+}
+
+export const restoreBackup = (backupId: string): Promise<any> => {
+  return post(`/backups/${backupId}/restore`)
+}
+
+export const deleteBackup = (backupId: string): Promise<any> => {
+  return del(`/backups/${backupId}`)
+}

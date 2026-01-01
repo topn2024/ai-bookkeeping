@@ -113,17 +113,17 @@
             </div>
           </template>
           <el-table :data="recentTransactions" size="small" stripe @row-click="handleTransactionClick" style="cursor: pointer;">
-            <el-table-column prop="type" label="类型" width="80">
+            <el-table-column prop="type_name" label="类型" width="80">
               <template #default="{ row }">
-                <el-tag :type="row.type === 'income' ? 'success' : 'danger'" size="small">
-                  {{ row.type === 'income' ? '收入' : '支出' }}
+                <el-tag :type="row.transaction_type === 2 ? 'success' : 'danger'" size="small">
+                  {{ row.type_name || (row.transaction_type === 2 ? '收入' : '支出') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="amount" label="金额" width="100">
+            <el-table-column prop="amount" label="金额" width="120">
               <template #default="{ row }">
-                <span :class="row.type === 'income' ? 'text-success' : 'text-danger'">
-                  {{ row.type === 'income' ? '+' : '-' }}{{ formatMoney(row.amount) }}
+                <span :class="row.transaction_type === 2 ? 'text-success' : 'text-danger'">
+                  {{ row.amount }}
                 </span>
               </template>
             </el-table-column>
@@ -142,12 +142,12 @@
     <el-dialog v-model="transactionDetailVisible" title="交易详情" width="450px">
       <el-descriptions v-if="currentTransaction" :column="1" border size="small">
         <el-descriptions-item label="类型">
-          <el-tag :type="currentTransaction.type === 'income' ? 'success' : 'danger'" size="small">
-            {{ currentTransaction.type_name || (currentTransaction.type === 'income' ? '收入' : '支出') }}
+          <el-tag :type="currentTransaction.transaction_type === 2 ? 'success' : 'danger'" size="small">
+            {{ currentTransaction.type_name || (currentTransaction.transaction_type === 2 ? '收入' : '支出') }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="金额">
-          <span :class="currentTransaction.type === 'income' ? 'text-success' : 'text-danger'">
+          <span :class="currentTransaction.transaction_type === 2 ? 'text-success' : 'text-danger'">
             {{ currentTransaction.amount }}
           </span>
         </el-descriptions-item>
@@ -167,6 +167,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import * as dashboardApi from '@/api/dashboard'
+import { getTypeDistribution } from '@/api/dashboard'
 import { formatMoney, formatShortDate } from '@/utils'
 import type { DashboardStats } from '@/types'
 
@@ -184,6 +185,7 @@ const recentUsers = ref<any[]>([])
 const recentTransactions = ref<any[]>([])
 const transactionDetailVisible = ref(false)
 const currentTransaction = ref<any>(null)
+const typeDistribution = ref<any>(null)
 
 // Chart instances
 let userTrendChartInstance: echarts.ECharts | null = null
@@ -321,6 +323,16 @@ const fetchHeatmap = async () => {
   }
 }
 
+const fetchTypeDistribution = async () => {
+  try {
+    const data = await getTypeDistribution('30d')
+    typeDistribution.value = data
+    renderTransactionPieChart()
+  } catch (e) {
+    console.error('Failed to fetch type distribution:', e)
+  }
+}
+
 // Render charts
 const renderUserTrendChart = (data: any) => {
   if (!userTrendChart.value) return
@@ -392,10 +404,15 @@ const renderTransactionPieChart = () => {
     transactionPieChartInstance = echarts.init(transactionPieChart.value)
   }
 
+  const dist = typeDistribution.value || {}
+  const incomeCount = dist.income_count || 0
+  const expenseCount = dist.expense_count || 0
+  const transferCount = dist.transfer_count || 0
+
   const option = {
     tooltip: {
       trigger: 'item',
-      formatter: '{b}: {c} ({d}%)',
+      formatter: '{b}: {c}笔 ({d}%)',
     },
     legend: {
       orient: 'vertical',
@@ -424,9 +441,10 @@ const renderTransactionPieChart = () => {
           },
         },
         data: [
-          { value: (stats as any).income_count || 0, name: '收入', itemStyle: { color: '#52c41a' } },
-          { value: (stats as any).expense_count || 0, name: '支出', itemStyle: { color: '#ff4d4f' } },
-        ],
+          { value: incomeCount, name: '收入', itemStyle: { color: '#52c41a' } },
+          { value: expenseCount, name: '支出', itemStyle: { color: '#ff4d4f' } },
+          { value: transferCount, name: '转账', itemStyle: { color: '#1890ff' } },
+        ].filter(item => item.value > 0),
       },
     ],
   }
@@ -520,8 +538,7 @@ const handleResize = () => {
 
 // Lifecycle
 onMounted(async () => {
-  await Promise.all([fetchStats(), fetchTrends(), fetchRecentData(), fetchHeatmap()])
-  renderTransactionPieChart()
+  await Promise.all([fetchStats(), fetchTrends(), fetchRecentData(), fetchHeatmap(), fetchTypeDistribution()])
   window.addEventListener('resize', handleResize)
 })
 

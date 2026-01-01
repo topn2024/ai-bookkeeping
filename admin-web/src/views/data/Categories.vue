@@ -279,8 +279,11 @@ const renderUsageChart = (data: any[]) => {
 }
 
 // Formatters
-const formatDateTime = (date: string) => {
-  return new Date(date).toLocaleString('zh-CN')
+const formatDateTime = (date: string | null | undefined) => {
+  if (!date) return '-'
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return '-'
+  return d.toLocaleString('zh-CN')
 }
 
 // Init

@@ -127,3 +127,48 @@ export const getPermissions = (): Promise<any> => {
 export const initAdminData = (): Promise<any> => {
   return post('/admins/init-data')
 }
+
+// System settings (aggregate)
+export const getSystemSettings = (): Promise<any> => {
+  return get('/settings/all')
+}
+
+export const updateSystemSettings = (section: string, data: any): Promise<any> => {
+  return put(`/settings/${section}`, data)
+}
+
+// Logo upload
+export const uploadLogo = (file: File): Promise<any> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return post('/settings/logo', formData)
+}
+
+// Email test
+export const testEmailSettings = (email?: string): Promise<any> => {
+  return post('/settings/email-service/test', { email })
+}
+
+// Webhook test
+export const testWebhook = (url: string): Promise<any> => {
+  return post('/settings/webhook/test', { url })
+}
+
+// Security settings (aggregate)
+export const getSecuritySettings = (): Promise<any> => {
+  return get('/settings/security')
+}
+
+export const updateSecuritySettings = (data: any): Promise<any> => {
+  return put('/settings/security', data)
+}
+
+// Admin password reset
+export const resetAdminPassword = (adminId: string): Promise<any> => {
+  return post(`/admins/${adminId}/reset-password`)
+}
+
+// Admin status toggle
+export const toggleAdminStatus = (adminId: string, isActive: boolean): Promise<any> => {
+  return put(`/admins/${adminId}/status`, { is_active: isActive })
+}

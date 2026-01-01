@@ -66,10 +66,15 @@
     <!-- Backup Table -->
     <div class="table-container">
       <el-table v-loading="loading" :data="backups" stripe>
+        <el-table-column prop="user_email" label="用户" width="180">
+          <template #default="{ row }">
+            {{ row.user_email || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="type" label="类型" width="120">
           <template #default="{ row }">
-            <el-tag :type="getBackupTypeTag(row.type)" size="small">
-              {{ getBackupTypeText(row.type) }}
+            <el-tag :type="getBackupTypeTag(row.type || row.backup_type)" size="small">
+              {{ getBackupTypeText(row.type || row.backup_type) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -333,8 +338,11 @@ const handleDelete = async (backup: Backup) => {
 }
 
 // Formatters
-const formatDateTime = (date: string) => {
-  return new Date(date).toLocaleString('zh-CN')
+const formatDateTime = (date: string | null | undefined) => {
+  if (!date) return '-'
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return '-'
+  return d.toLocaleString('zh-CN')
 }
 
 const formatFileSize = (bytes: number) => {

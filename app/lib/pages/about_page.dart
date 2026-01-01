@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+import '../l10n/l10n.dart';
 import '../theme/app_theme.dart';
 import '../core/build_info.dart';
 import '../core/logger.dart';
@@ -59,13 +60,13 @@ class _AboutPageState extends ConsumerState<AboutPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('关于我们'),
+        title: Text(context.l10n.about),
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
             // App Logo and Info
-            _buildAppHeader(),
+            _buildAppHeader(context),
             const SizedBox(height: 24),
 
             // Menu Items
@@ -87,26 +88,26 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                   _buildMenuItem(
                     icon: Icons.system_update,
                     iconColor: AppColors.primary,
-                    title: '检查更新',
-                    subtitle: '当前版本 ${BuildInfo.displayVersion}',
+                    title: context.l10n.checkUpdateTitle,
+                    subtitle: context.l10n.currentVersionLabel(BuildInfo.displayVersion),
                     onTap: () => _checkForUpdate(context),
                   ),
                   _buildDivider(),
                   _buildMenuItem(
                     icon: Icons.cleaning_services,
                     iconColor: const Color(0xFFFF9800),
-                    title: '清理下载缓存',
+                    title: context.l10n.cleanDownloadCache,
                     subtitle: _loadingCache
-                        ? '正在计算...'
-                        : (_cacheSize > 0 ? '已缓存 ${_formatSize(_cacheSize)}' : '暂无缓存'),
+                        ? context.l10n.calculating
+                        : (_cacheSize > 0 ? context.l10n.cachedSize(_formatSize(_cacheSize)) : context.l10n.noCache),
                     onTap: () => _showDownloadCacheDialog(context),
                   ),
                   _buildDivider(),
                   _buildMenuItem(
                     icon: Icons.help_outline,
                     iconColor: const Color(0xFF2196F3),
-                    title: '帮助与反馈',
-                    subtitle: '使用指南、常见问题',
+                    title: context.l10n.helpAndFeedback,
+                    subtitle: context.l10n.helpAndFeedbackDesc,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -136,11 +137,11 @@ class _AboutPageState extends ConsumerState<AboutPage> {
               ),
               child: Column(
                 children: [
-                  _buildInfoItem('版本号', BuildInfo.fullVersion),
+                  _buildInfoItem(context.l10n.versionNumber, BuildInfo.fullVersion),
                   _buildDivider(),
-                  _buildInfoItem('构建时间', BuildInfo.buildTimeFormatted),
+                  _buildInfoItem(context.l10n.buildTime, BuildInfo.buildTimeFormatted),
                   _buildDivider(),
-                  _buildInfoItem('包名', appInfo.packageName),
+                  _buildInfoItem(context.l10n.packageName, appInfo.packageName),
                 ],
               ),
             ),
@@ -166,7 +167,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                   _buildMenuItem(
                     icon: Icons.description,
                     iconColor: AppColors.textSecondary,
-                    title: '用户协议',
+                    title: context.l10n.userAgreement,
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -180,7 +181,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                   _buildMenuItem(
                     icon: Icons.privacy_tip,
                     iconColor: AppColors.textSecondary,
-                    title: '隐私政策',
+                    title: context.l10n.privacyPolicy,
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -194,8 +195,8 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                   _buildMenuItem(
                     icon: Icons.bug_report,
                     iconColor: const Color(0xFF795548),
-                    title: '日志管理',
-                    subtitle: '查看和清理应用日志',
+                    title: context.l10n.logManagement,
+                    subtitle: context.l10n.logManagementDesc,
                     onTap: () => _showLogManagementDialog(context),
                   ),
                 ],
@@ -208,7 +209,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                '© ${DateTime.now().year} AI智能记账\n智能财务管理助手',
+                context.l10n.copyrightText(DateTime.now().year),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 12,
@@ -225,7 +226,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
     );
   }
 
-  Widget _buildAppHeader() {
+  Widget _buildAppHeader(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -251,9 +252,9 @@ class _AboutPageState extends ConsumerState<AboutPage> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'AI智能记账',
-            style: TextStyle(
+          Text(
+            context.l10n.appName,
+            style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
@@ -267,9 +268,9 @@ class _AboutPageState extends ConsumerState<AboutPage> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            '智能财务管理助手',
-            style: TextStyle(
+          Text(
+            context.l10n.smartFinanceAssistant,
+            style: const TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
             ),
@@ -382,8 +383,8 @@ class _AboutPageState extends ConsumerState<AboutPage> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('当前已是最新版本'),
+          SnackBar(
+            content: Text(context.l10n.alreadyLatest),
             backgroundColor: Colors.green,
           ),
         );
@@ -478,17 +479,17 @@ class _DownloadCacheDialogState extends State<_DownloadCacheDialog> {
   Future<void> _clearAllCache() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认清理'),
-        content: const Text('确定要清理所有下载的安装包和缓存文件吗？'),
+      builder: (ctx) => AlertDialog(
+        title: Text(context.l10n.confirmDelete),
+        content: Text(context.l10n.confirmClearCache),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(context.l10n.cancel),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('清理', style: TextStyle(color: Colors.red)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(context.l10n.cleanupText, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -534,11 +535,11 @@ class _DownloadCacheDialogState extends State<_DownloadCacheDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.cleaning_services, color: Color(0xFFFF9800)),
-          SizedBox(width: 8),
-          Text('下载缓存管理'),
+          const Icon(Icons.cleaning_services, color: Color(0xFFFF9800)),
+          const SizedBox(width: 8),
+          Text(context.l10n.downloadCacheManagement),
         ],
       ),
       content: SizedBox(
@@ -555,14 +556,14 @@ class _DownloadCacheDialogState extends State<_DownloadCacheDialog> {
                 ),
               )
             else if (_cacheFiles.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.folder_open, size: 48, color: AppColors.textHint),
-                      SizedBox(height: 8),
-                      Text('暂无缓存文件', style: TextStyle(color: AppColors.textSecondary)),
+                      const Icon(Icons.folder_open, size: 48, color: AppColors.textHint),
+                      const SizedBox(height: 8),
+                      Text(context.l10n.noCacheFiles, style: const TextStyle(color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
@@ -591,9 +592,9 @@ class _DownloadCacheDialogState extends State<_DownloadCacheDialog> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                '缓存文件列表：',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              Text(
+                context.l10n.cacheFileList,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
               const SizedBox(height: 8),
               ConstrainedBox(
@@ -629,6 +630,7 @@ class _DownloadCacheDialogState extends State<_DownloadCacheDialog> {
                       title: Text(
                         name,
                         style: const TextStyle(fontSize: 13),
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       subtitle: Text(
@@ -638,7 +640,7 @@ class _DownloadCacheDialogState extends State<_DownloadCacheDialog> {
                       trailing: IconButton(
                         icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
                         onPressed: () => _deleteFile(path),
-                        tooltip: '删除',
+                        tooltip: context.l10n.delete,
                       ),
                     );
                   },
@@ -660,13 +662,13 @@ class _DownloadCacheDialogState extends State<_DownloadCacheDialog> {
                   )
                 : const Icon(Icons.delete_sweep, size: 18, color: Colors.red),
             label: Text(
-              _clearing ? '清理中...' : '清理全部',
+              _clearing ? context.l10n.clearingCache : context.l10n.clearAllCache,
               style: TextStyle(color: _clearing ? AppColors.textSecondary : Colors.red),
             ),
           ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('关闭'),
+          child: Text(context.l10n.close),
         ),
       ],
     );

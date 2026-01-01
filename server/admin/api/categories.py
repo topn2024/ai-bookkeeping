@@ -18,6 +18,7 @@ from admin.core.audit import create_audit_log
 from admin.schemas.data_management import (
     CategoryItem,
     CategoryListResponse,
+    CategoryStats,
     CategoryCreate,
     CategoryUpdate,
     CategoryUsageStats,
@@ -84,9 +85,29 @@ async def list_categories(
             created_at=cat.created_at,
         ))
 
+    # Calculate stats
+    from sqlalchemy import Integer
+    stats_result = await db.execute(
+        select(
+            func.count(Category.id).label("total"),
+            func.sum(func.cast(Category.category_type == 2, Integer)).label("income"),
+            func.sum(func.cast(Category.category_type == 1, Integer)).label("expense"),
+            func.sum(func.cast(Category.is_system == False, Integer)).label("custom"),
+        )
+    )
+    stats_row = stats_result.one()
+
+    stats = CategoryStats(
+        total_count=stats_row.total or 0,
+        income_count=stats_row.income or 0,
+        expense_count=stats_row.expense or 0,
+        custom_count=stats_row.custom or 0,
+    )
+
     return CategoryListResponse(
         items=items,
         total=len(items),
+        stats=stats,
     )
 
 
@@ -439,3 +460,73 @@ async def get_category_usage_stats(
         items=items,
         total_categories=total,
     )
+
+
+@router.get("/{category_id}")
+async def get_category_detail(
+    category_id: UUID,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("data:category:view")),
+):
+    """获取分类详情"""
+    result = await db.execute(
+        select(Category).where(Category.id == category_id)
+    )
+    category = result.scalar_one_or_none()
+
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="分类不存在",
+        )
+
+    # Get usage count
+    usage_result = await db.execute(
+        select(func.count(Transaction.id)).where(Transaction.category_id == category_id)
+    )
+    usage_count = usage_result.scalar() or 0
+
+    # Get parent name if exists
+    parent_name = None
+    if category.parent_id:
+        parent_result = await db.execute(
+            select(Category.name).where(Category.id == category.parent_id)
+        )
+        parent_name = parent_result.scalar()
+
+    # Get usage trend (last 30 days)
+    from datetime import date, timedelta
+    start_date = date.today() - timedelta(days=29)
+    trend_result = await db.execute(
+        select(
+            Transaction.transaction_date,
+            func.count(Transaction.id).label("count"),
+        ).where(
+            and_(
+                Transaction.category_id == category_id,
+                Transaction.transaction_date >= start_date,
+            )
+        ).group_by(Transaction.transaction_date).order_by(Transaction.transaction_date)
+    )
+    usage_trend = [
+        {"date": row.transaction_date.isoformat(), "count": row.count}
+        for row in trend_result.all()
+    ]
+
+    return {
+        "id": category.id,
+        "user_id": category.user_id,
+        "parent_id": category.parent_id,
+        "parent_name": parent_name,
+        "name": category.name,
+        "icon": category.icon,
+        "category_type": category.category_type,
+        "type": "income" if category.category_type == 2 else "expense",
+        "level": 2 if category.parent_id else 1,
+        "sort_order": category.sort_order,
+        "is_system": category.is_system,
+        "usage_count": usage_count,
+        "usage_trend": usage_trend,
+        "created_at": category.created_at.isoformat() if category.created_at else None,
+    }

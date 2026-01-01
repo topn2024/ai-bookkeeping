@@ -1,14 +1,22 @@
 """Authentication endpoints."""
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
-from app.core.security import verify_password, get_password_hash, create_access_token
+from app.core.security import (
+    verify_password,
+    get_password_hash,
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
+)
 from app.models.user import User
 from app.models.book import Book
 from app.models.account import Account
-from app.schemas.user import UserCreate, UserLogin, UserResponse, Token
+from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, RefreshTokenRequest
 from app.api.deps import get_current_user
 from app.services.init_service import init_user_data
 
@@ -61,11 +69,13 @@ async def register(
     await db.commit()
     await db.refresh(user)
 
-    # Generate token
+    # Generate tokens
     access_token = create_access_token(str(user.id))
+    refresh_token = create_refresh_token(str(user.id))
 
     return Token(
         access_token=access_token,
+        refresh_token=refresh_token,
         user=UserResponse.model_validate(user),
     )
 
@@ -103,11 +113,13 @@ async def login(
             detail="User is inactive",
         )
 
-    # Generate token
+    # Generate tokens
     access_token = create_access_token(str(user.id))
+    refresh_token = create_refresh_token(str(user.id))
 
     return Token(
         access_token=access_token,
+        refresh_token=refresh_token,
         user=UserResponse.model_validate(user),
     )
 
@@ -121,13 +133,50 @@ async def get_me(
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(
-    current_user: User = Depends(get_current_user),
+async def refresh_token_endpoint(
+    request: RefreshTokenRequest,
+    db: AsyncSession = Depends(get_db),
 ):
-    """Refresh access token."""
-    access_token = create_access_token(str(current_user.id))
+    """Refresh access token using refresh token."""
+    # Decode and validate refresh token
+    user_id = decode_refresh_token(request.refresh_token)
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Get user from database
+    try:
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
+
+    result = await db.execute(select(User).where(User.id == user_uuid))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is inactive",
+        )
+
+    # Generate new tokens
+    access_token = create_access_token(str(user.id))
+    new_refresh_token = create_refresh_token(str(user.id))
 
     return Token(
         access_token=access_token,
-        user=UserResponse.model_validate(current_user),
+        refresh_token=new_refresh_token,
+        user=UserResponse.model_validate(user),
     )

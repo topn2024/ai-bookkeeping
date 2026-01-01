@@ -308,7 +308,7 @@ class MultiCurrencyReportPage extends ConsumerWidget {
                     size: 20,
                   ),
                 ),
-                title: Text(account.name),
+                title: Text(account.localizedName),
                 trailing: Text(
                   account.formattedBalance,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(

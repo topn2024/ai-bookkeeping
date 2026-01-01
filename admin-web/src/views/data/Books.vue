@@ -30,14 +30,18 @@
     <div class="table-container">
       <el-table v-loading="loading" :data="books" stripe>
         <el-table-column prop="name" label="账本名称" min-width="150" />
-        <el-table-column prop="type" label="类型" width="120">
+        <el-table-column prop="book_type" label="类型" width="120">
           <template #default="{ row }">
-            <el-tag :type="getBookTypeTag(row.type)" size="small">
-              {{ getBookTypeText(row.type) }}
+            <el-tag :type="getBookTypeTag(row.book_type)" size="small">
+              {{ getBookTypeText(row.book_type) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="currency" label="货币" width="80" />
+        <el-table-column prop="currency" label="货币" width="80">
+          <template #default="{ row }">
+            {{ row.currency || 'CNY' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="transaction_count" label="交易数" width="100" />
         <el-table-column prop="total_income" label="总收入" width="120">
           <template #default="{ row }">
@@ -60,7 +64,7 @@
             {{ formatDateTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" text size="small" @click="viewTransactions(row)">交易</el-button>
             <el-button type="info" text size="small" @click="handleView(row)">详情</el-button>
@@ -86,11 +90,11 @@
       <el-descriptions v-if="currentBook" :column="2" border>
         <el-descriptions-item label="账本名称">{{ currentBook.name }}</el-descriptions-item>
         <el-descriptions-item label="类型">
-          <el-tag :type="getBookTypeTag(currentBook.type)">
-            {{ getBookTypeText(currentBook.type) }}
+          <el-tag :type="getBookTypeTag(currentBook.book_type)">
+            {{ getBookTypeText(currentBook.book_type) }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="货币">{{ currentBook.currency }}</el-descriptions-item>
+        <el-descriptions-item label="货币">{{ currentBook.currency || 'CNY' }}</el-descriptions-item>
         <el-descriptions-item label="默认账本">{{ currentBook.is_default ? '是' : '否' }}</el-descriptions-item>
         <el-descriptions-item label="交易数">{{ currentBook.transaction_count }}</el-descriptions-item>
         <el-descriptions-item label="成员数">{{ currentBook.member_count || 1 }}</el-descriptions-item>
@@ -106,7 +110,7 @@
       </el-descriptions>
 
       <!-- Book Members (if family/business) -->
-      <div v-if="currentBook && currentBook.type !== 'personal'" class="mt-20">
+      <div v-if="currentBook && currentBook.book_type !== 0" class="mt-20">
         <h4>账本成员</h4>
         <el-table :data="currentBook.members || []" size="small" stripe>
           <el-table-column prop="nickname" label="昵称" />
@@ -211,8 +215,11 @@ const viewTransactions = (book: Book) => {
 }
 
 // Formatters
-const formatDateTime = (date: string) => {
-  return new Date(date).toLocaleString('zh-CN')
+const formatDateTime = (date: string | null | undefined) => {
+  if (!date) return '-'
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return '-'
+  return d.toLocaleString('zh-CN')
 }
 
 const formatMoney = (amount: number | string | null | undefined) => {
@@ -221,22 +228,24 @@ const formatMoney = (amount: number | string | null | undefined) => {
   return isNaN(num) ? '0.00' : num.toFixed(2)
 }
 
-const getBookTypeTag = (type: string) => {
-  const map: Record<string, string> = {
-    personal: '',
-    family: 'warning',
-    business: 'danger',
+const getBookTypeTag = (type: number | string) => {
+  const typeNum = typeof type === 'string' ? parseInt(type) : type
+  const map: Record<number, string> = {
+    0: '',
+    1: 'warning',
+    2: 'danger',
   }
-  return map[type] || ''
+  return map[typeNum] || ''
 }
 
-const getBookTypeText = (type: string) => {
-  const map: Record<string, string> = {
-    personal: '个人账本',
-    family: '家庭账本',
-    business: '商业账本',
+const getBookTypeText = (type: number | string) => {
+  const typeNum = typeof type === 'string' ? parseInt(type) : type
+  const map: Record<number, string> = {
+    0: '个人账本',
+    1: '家庭账本',
+    2: '商业账本',
   }
-  return map[type] || type
+  return map[typeNum] || `类型${type}`
 }
 
 // Init

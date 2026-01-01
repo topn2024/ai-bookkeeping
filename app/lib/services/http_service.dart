@@ -153,10 +153,32 @@ class HttpService {
   /// 尝试刷新Token
   Future<bool> _tryRefreshToken() async {
     final refreshToken = await _secureStorage.getRefreshToken();
-    if (refreshToken == null) return false;
+    if (refreshToken == null || refreshToken.isEmpty) return false;
 
     try {
-      final response = await _dio.post(
+      // Create a new Dio instance without interceptors to avoid infinite loop
+      final refreshDio = Dio(BaseOptions(
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ));
+
+      // Skip SSL verification if needed
+      if (_skipCertificateVerification) {
+        refreshDio.httpClientAdapter = IOHttpClientAdapter(
+          createHttpClient: () {
+            final client = HttpClient();
+            client.badCertificateCallback = (cert, host, port) => true;
+            return client;
+          },
+        );
+      }
+
+      final response = await refreshDio.post(
         '/auth/refresh',
         data: {'refresh_token': refreshToken},
       );

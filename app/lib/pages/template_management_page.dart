@@ -362,7 +362,7 @@ class _TemplateDialogState extends ConsumerState<_TemplateDialog> {
                     children: [
                       Icon(account.icon, size: 20, color: account.color),
                       const SizedBox(width: 8),
-                      Text(account.name),
+                      Text(account.localizedName),
                     ],
                   ),
                 );

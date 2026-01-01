@@ -24,6 +24,133 @@ class QwenService {
   static const String _audioApiUrl =
       'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
 
+  /// 二级分类提示词 - 用于 AI 精确分类
+  static const String _categoryPrompt = '''
+【分类规则 - 请返回最精确的分类ID】
+
+支出分类（优先返回二级分类ID，无法确定时返回一级分类ID）：
+
+food(餐饮) - 用于无法确定具体餐饮类型时
+  - food_breakfast: 早餐（早点、早饭、包子、豆浆、油条）
+  - food_lunch: 午餐（午饭、工作餐、午间、中餐）
+  - food_dinner: 晚餐（晚饭、晚餐、夜宵、宵夜）
+  - food_snack: 零食（零食、小吃、糖果、薯片、饼干）
+  - food_drink: 饮料（咖啡、奶茶、饮料、星巴克、瑞幸、喜茶、奈雪、茶）
+  - food_delivery: 外卖（美团外卖、饿了么、外卖）
+  - food_fruit: 水果（水果、苹果、香蕉、橙子）
+
+transport(交通) - 用于无法确定具体交通类型时
+  - transport_taxi: 打车（滴滴、出租车、网约车、打的、快车、专车）
+  - transport_public: 公共交通（地铁、公交、公交卡、地铁卡）
+  - transport_fuel: 加油（加油、加油站、中国石化、中国石油、汽油）
+  - transport_parking: 停车（停车费、停车场）
+  - transport_train: 火车（火车票、高铁、动车、12306）
+  - transport_flight: 飞机（机票、飞机票、航班）
+  - transport_ship: 轮船（船票、轮渡）
+
+shopping(购物) - 用于无法确定具体购物类型时
+  - shopping_daily: 日用品（牙膏、洗发水、纸巾、日用、超市日用）
+  - shopping_digital: 数码产品（手机、电脑、数码、电子产品、耳机）
+  - shopping_appliance: 家电（冰箱、洗衣机、空调、电视、家电）
+  - shopping_furniture: 家居（家具、床、沙发、桌子、椅子）
+  - shopping_gift: 礼物（礼物、礼品、送人）
+
+entertainment(娱乐) - 用于无法确定具体娱乐类型时
+  - entertainment_movie: 电影（电影票、看电影、影院）
+  - entertainment_game: 游戏（游戏充值、游戏、网游）
+  - entertainment_travel: 旅游（旅游、景点、门票、酒店住宿）
+  - entertainment_sport: 运动（运动、球场、球馆）
+  - entertainment_ktv: KTV（KTV、唱歌、卡拉OK）
+  - entertainment_party: 聚会（聚会、派对）
+  - entertainment_fitness: 健身（健身、健身房、游泳、瑜伽）
+
+housing(居住) - 用于无法确定具体居住类型时
+  - housing_rent: 房租（房租、租金、月租）
+  - housing_mortgage: 房贷（房贷、按揭、还贷）
+  - housing_property: 物业费（物业、物业费）
+  - housing_repair: 维修（维修、修理、装修）
+
+utilities(水电燃气) - 用于无法确定具体类型时
+  - utilities_electric: 电费（电费、充电费）
+  - utilities_water: 水费（水费）
+  - utilities_gas: 燃气费（燃气、天然气、煤气）
+  - utilities_heating: 暖气费（暖气、供暖）
+
+medical(医疗) - 用于无法确定具体医疗类型时
+  - medical_clinic: 门诊（挂号、看病、门诊）
+  - medical_medicine: 药品（买药、药店、药品）
+  - medical_hospital: 住院（住院）
+  - medical_checkup: 体检（体检、健康检查）
+  - medical_supplement: 保健品（保健品、维生素）
+
+education(教育) - 用于无法确定具体教育类型时
+  - education_tuition: 学费（学费、报名费）
+  - education_books: 书籍（买书、书籍、图书）
+  - education_training: 培训（培训、课程、网课）
+  - education_exam: 考试（考试、报名）
+
+communication(通讯)
+  - communication_phone: 话费（话费、充值、手机费）
+  - communication_internet: 网费（网费、宽带）
+
+clothing(服饰) - 用于无法确定具体类型时
+  - clothing_clothes: 衣服（衣服、上衣、裤子、外套）
+  - clothing_shoes: 鞋子（鞋子、运动鞋、皮鞋）
+  - clothing_accessories: 配饰（配饰、手表、项链、包）
+
+beauty(美容) - 用于无法确定具体类型时
+  - beauty_skincare: 护肤（护肤品、面膜、水乳）
+  - beauty_cosmetics: 化妆品（化妆品、口红、粉底）
+  - beauty_haircut: 美发（理发、美发、剪头发）
+  - beauty_nails: 美甲（美甲、指甲）
+
+subscription(会员订阅)
+  - subscription_video: 视频会员（爱奇艺、腾讯视频、优酷、B站、Netflix）
+  - subscription_music: 音乐会员（网易云、QQ音乐、Spotify）
+  - subscription_cloud: 网盘会员（百度网盘、iCloud）
+  - subscription_shopping: 购物会员（88VIP、京东Plus）
+
+social(人情往来) - 用于无法确定具体类型时
+  - social_gift_money: 份子钱（份子钱、随份子、红包钱）
+  - social_festival: 节日送礼（送礼、过节）
+  - social_treat: 请客吃饭（请客、请吃饭）
+  - social_redpacket: 红包支出（发红包）
+  - social_elder: 孝敬长辈（给父母、孝敬）
+
+finance(金融保险) - 用于无法确定具体类型时
+  - finance_life_insurance: 人寿保险（人寿、寿险）
+  - finance_medical_insurance: 医疗保险（医保、医疗险）
+  - finance_car_insurance: 车险（车险、交强险）
+  - finance_fee: 手续费（手续费、转账费）
+  - finance_loan_interest: 贷款利息（利息、贷款利息）
+
+pet(宠物)
+  - pet_food: 宠物食品（猫粮、狗粮、宠物食品）
+  - pet_supplies: 宠物用品（猫砂、宠物玩具）
+  - pet_medical: 宠物医疗（宠物医院、宠物看病）
+
+other_expense: 其他支出（无法归类的支出）
+
+收入分类（优先返回二级分类ID）：
+
+salary(工资) - 用于无法确定具体类型时
+  - salary_base: 基本工资（工资、月薪、薪资）
+  - salary_performance: 绩效奖金（绩效、绩效奖）
+  - salary_overtime: 加班费（加班费、加班工资）
+  - salary_annual: 年终奖（年终奖、十三薪）
+
+bonus(奖金) - 用于无法确定具体类型时
+  - bonus_project: 项目奖金（项目奖、完成奖）
+  - bonus_quarterly: 季度奖（季度奖）
+
+investment(投资收益): 投资收益（理财、利息、分红、股票收益）
+parttime(兼职): 兼职（兼职、副业、外快）
+redpacket(红包): 收到红包（收红包、微信红包）
+reimburse(报销): 报销（报销、公司报销）
+business(经营所得): 经营收入（生意、店铺、营业）
+other_income: 其他收入（无法归类的收入）
+''';
+
   late Dio _dio;
   bool _initialized = false;
   String? _lastApiKey;
@@ -108,35 +235,13 @@ class QwenService {
                   {
                     'text': '''请仔细分析这张小票/收据图片，综合商户名称、商品明细、支付方式等信息，准确提取记账信息。
 
-【分类规则 - 请严格按照以下规则分类】
-
-支出分类：
-- food(餐饮): 餐厅、外卖、咖啡店、奶茶店、快餐、便利店食品、超市食品、水果店、面包店、火锅、烧烤、小吃
-  常见商户：美团外卖、饿了么、麦当劳、肯德基、星巴克、瑞幸、喜茶、奈雪、盒马、永辉、沃尔玛（食品类）
-- transport(交通): 打车、地铁、公交、加油、停车费、过路费、高铁、火车票、机票、共享单车、网约车
-  常见商户：滴滴出行、高德打车、T3出行、中国石化、中国石油、铁路12306、航空公司、美团单车、哈啰出行
-- shopping(购物): 服装、鞋包、电子产品、日用品、化妆品、家居用品、网购商品
-  常见商户：淘宝、天猫、京东、拼多多、唯品会、优衣库、ZARA、苹果商店、小米、华为
-- entertainment(娱乐): 电影、游戏充值、KTV、景点门票、演出、健身、运动、会员订阅
-  常见商户：猫眼电影、淘票票、腾讯游戏、网易游戏、爱奇艺、腾讯视频、优酷、Keep、各景区
-- housing(住房): 房租、水费、电费、燃气费、物业费、网费、宽带、装修、家具、家电
-  常见商户：物业公司、水务公司、电力公司、燃气公司、中国移动/联通/电信、京东家电
-- medical(医疗): 挂号费、药品、体检、医疗器械、牙科、眼科
-  常见商户：医院、药店（大参林、益丰、老百姓）、美年大健康、爱康国宾
-- education(教育): 学费、培训费、书籍、文具、课程、考试费
-  常见商户：培训机构、书店、学校、网课平台
-
-收入分类：
-- salary(工资): 月薪、工资收入
-- bonus(奖金): 年终奖、绩效奖金、提成
-- parttime(兼职): 兼职收入、副业收入
-- investment(投资收益): 理财收益、股票分红、利息
+$_categoryPrompt
 
 请返回JSON格式：
 {
   "amount": 金额数字,
   "merchant": "商户名称",
-  "category": "分类ID（如food/transport/shopping等）",
+  "category": "最精确的分类ID（优先使用二级分类如food_lunch，无法确定时使用一级分类如food）",
   "type": "expense或income",
   "date": "YYYY-MM-DD或null",
   "items": [{"name": "商品名", "price": 价格}],
@@ -182,39 +287,13 @@ class QwenService {
                 'role': 'system',
                 'content': '''你是一个智能记账助手。根据用户描述的消费或收入，综合分析商户、商品、场景等信息，准确分类。
 
-【分类规则 - 请严格按照以下规则分类】
-
-支出分类（使用英文ID）：
-- food: 餐饮相关（吃饭、外卖、咖啡、奶茶、水果、零食、超市买菜、便利店食品）
-- transport: 交通出行（打车、地铁、公交、加油、停车、高铁、机票、共享单车）
-- shopping: 购物消费（买衣服、日用品、电子产品、化妆品、网购）
-- entertainment: 娱乐休闲（电影、游戏、KTV、旅游、景点、健身、视频会员）
-- housing: 住房相关（房租、水电燃气、物业费、网费、家具家电）
-- medical: 医疗健康（看病、买药、体检、牙科）
-- education: 教育学习（学费、培训、买书、课程）
-- other: 其他支出（无法归类的支出）
-
-收入分类（使用英文ID）：
-- salary: 工资收入
-- bonus: 奖金（年终奖、绩效、提成）
-- parttime: 兼职副业
-- investment: 投资理财收益
-- other: 其他收入
-
-【关键词示例】
-- 打车/滴滴/出租车/高德 → transport
-- 午饭/晚饭/外卖/美团/饿了么/咖啡/奶茶 → food
-- 淘宝/京东/买了/购买 → shopping（除非是食品）
-- 电影/游戏/充值/会员 → entertainment
-- 房租/水电/物业 → housing
-- 医院/药/体检 → medical
-- 工资/薪水/到账 → salary (income)
+$_categoryPrompt
 
 请返回JSON：
 {
   "amount": 金额数字,
   "type": "expense"或"income",
-  "category": "分类ID",
+  "category": "最精确的分类ID（优先使用二级分类如food_lunch，无法确定时使用一级分类如food）",
   "description": "简短描述",
   "date": "YYYY-MM-DD或null"
 }
@@ -279,40 +358,24 @@ class QwenService {
                   {
                     'text': '''请仔细听这段语音，准确转写并提取记账信息。
 
-【分类规则 - 请根据语音内容准确分类】
+$_categoryPrompt
 
-支出分类（使用英文ID）：
-- food: 吃饭、外卖、咖啡、奶茶、水果、零食、买菜、餐厅
-- transport: 打车、滴滴、地铁、公交、加油、停车、高铁、机票
-- shopping: 买东西、购物、淘宝、京东、衣服、日用品
-- entertainment: 电影、游戏、KTV、旅游、景点、健身、会员
-- housing: 房租、水电、物业、网费、家具
-- medical: 看病、买药、体检、医院
-- education: 学费、培训、买书、课程
-- other: 其他支出
-
-收入分类（使用英文ID）：
-- salary: 工资、薪水
-- bonus: 奖金、年终奖、提成
-- parttime: 兼职、副业
-- investment: 理财、利息、分红
-- other: 其他收入
-
-【常见表达对应分类】
-- "打车花了XX" → transport
-- "吃饭/午饭/晚饭花了XX" → food
-- "买了XX东西" → shopping
-- "看电影/充游戏" → entertainment
-- "交房租/水电费" → housing
-- "发工资了" → salary (income)
+【日期识别规则】
+- "今天" → 返回今天的日期
+- "昨天" → 返回昨天的日期
+- "前天" → 返回前天的日期
+- "上周X/上个星期X" → 返回对应日期
+- 具体日期如"12月30日"、"1号" → 返回对应日期
+- 如果没有提及时间，date字段返回null
 
 请返回JSON：
 {
   "transcription": "语音转写文字",
   "amount": 金额数字,
   "type": "expense"或"income",
-  "category": "分类ID",
-  "description": "简短描述"
+  "category": "最精确的分类ID（优先使用二级分类如food_lunch，无法确定时使用一级分类如food）",
+  "description": "简短描述",
+  "date": "YYYY-MM-DD格式日期或null"
 }
 
 重要：金额必须是准确的数字。只返回JSON。'''
@@ -384,38 +447,30 @@ class QwenService {
                     'text': '''请仔细听这段语音，识别其中提到的所有消费或收入记录。
 用户可能在一段语音中提到多笔交易，请全部提取出来。
 
-【分类规则 - 请根据语音内容准确分类】
+$_categoryPrompt
 
-支出分类（使用英文ID）：
-- food: 吃饭、外卖、咖啡、奶茶、水果、零食、买菜、餐厅
-- transport: 打车、滴滴、地铁、公交、加油、停车、高铁、机票
-- shopping: 买东西、购物、淘宝、京东、衣服、日用品
-- entertainment: 电影、游戏、KTV、旅游、景点、健身、会员
-- housing: 房租、水电、物业、网费、家具
-- medical: 看病、买药、体检、医院
-- education: 学费、培训、买书、课程
-- other: 其他支出
-
-收入分类（使用英文ID）：
-- salary: 工资、薪水
-- bonus: 奖金、年终奖、提成
-- parttime: 兼职、副业
-- investment: 理财、利息、分红
-- other: 其他收入
+【日期识别规则】
+- "今天" → 返回今天的日期
+- "昨天" → 返回昨天的日期
+- "前天" → 返回前天的日期
+- "上周X/上个星期X" → 返回对应日期
+- 具体日期如"12月30日"、"1号" → 返回对应日期
+- 如果没有提及时间，date字段返回null
 
 请返回JSON格式（注意是数组，即使只有一笔也返回数组）：
 {
   "transcription": "完整的语音转写文字",
   "transactions": [
-    {"type": "expense", "amount": 15.0, "category": "food", "description": "咖啡"},
-    {"type": "expense", "amount": 35.0, "category": "food", "description": "午餐"}
+    {"type": "expense", "amount": 15.0, "category": "food_drink", "description": "咖啡", "date": null},
+    {"type": "expense", "amount": 35.0, "category": "food_lunch", "description": "午餐", "date": "2026-01-01"}
   ]
 }
 
 重要：
 1. 金额必须是准确的数字
 2. 每笔交易单独列出
-3. 只返回JSON，不要其他文字'''
+3. 分类请使用最精确的二级分类ID（如food_lunch而不是food）
+4. 只返回JSON，不要其他文字'''
                   }
                 ]
               }
@@ -578,6 +633,7 @@ class QwenService {
         category: data['category'] as String?,
         description: data['description'] as String? ?? transcription,
         type: data['type'] as String? ?? 'expense',
+        date: data['date'] as String?,
         success: true,
         confidence: 0.9,
       );
@@ -1086,6 +1142,7 @@ class QwenService {
           category: data['category'] as String?,
           description: description ?? transcription,
           type: data['type'] as String? ?? 'expense',
+          date: data['date'] as String?,
           success: true,
           confidence: 0.9,
         );

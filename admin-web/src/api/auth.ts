@@ -10,6 +10,10 @@ export const logout = (): Promise<void> => {
   return post('/auth/logout')
 }
 
+export const refreshToken = (refresh_token: string): Promise<{ access_token: string; token_type: string; expires_in: number }> => {
+  return post('/auth/refresh', { refresh_token })
+}
+
 export const getCurrentAdmin = (): Promise<AdminUser> => {
   return get('/admins/me')
 }
@@ -46,4 +50,19 @@ export const getNotificationPrefs = (): Promise<any> => {
 
 export const updateNotificationPrefs = (data: any): Promise<any> => {
   return put('/admins/me/notifications', data)
+}
+
+// Profile management
+export const getProfile = (): Promise<AdminUser> => {
+  return get('/admins/me')
+}
+
+export const getLoginHistory = (params?: { page?: number; page_size?: number }): Promise<any> => {
+  return get('/admins/me/login-history', { params })
+}
+
+export const uploadAvatar = (file: File): Promise<{ avatar_url: string }> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return post('/admins/me/avatar', formData)
 }

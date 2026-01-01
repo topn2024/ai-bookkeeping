@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../l10n/l10n.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../models/account.dart';
@@ -38,8 +39,6 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
   String _toAccountId = 'cash';
   DateTime _selectedDate = DateTime.now();
   bool _isReimbursable = false;  // 是否可报销
-  final List<String> _tags = [];       // 标签列表
-  final _tagController = TextEditingController();
   // 缓存 ScaffoldMessenger 用于安全清除 SnackBar
   ScaffoldMessengerState? _scaffoldMessenger;
 
@@ -80,9 +79,6 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
       _toAccountId = t.toAccountId ?? 'cash';
       _selectedDate = t.date;
       _isReimbursable = t.isReimbursable;
-      if (t.tags != null) {
-        _tags.addAll(t.tags!);
-      }
     }
 
     // 监听备注输入，触发智能分类建议
@@ -124,7 +120,6 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
     _tabController.dispose();
     _amountController.dispose();
     _noteController.dispose();
-    _tagController.dispose();
     super.dispose();
   }
 
@@ -187,12 +182,12 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? '编辑交易' : '记一笔'),
+        title: Text(_isEditing ? context.l10n.editTransactionTitle : context.l10n.addTransactionTitle),
         actions: [
           // 拆分记账入口
           IconButton(
             icon: const Icon(Icons.call_split),
-            tooltip: '拆分记账',
+            tooltip: context.l10n.splitTransaction,
             onPressed: () {
               Navigator.pushReplacement(
                 context,
@@ -203,13 +198,13 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
           // 语音记账入口
           IconButton(
             icon: const Icon(Icons.mic),
-            tooltip: '语音记账',
+            tooltip: context.l10n.voiceRecord,
             onPressed: _openVoiceRecognition,
           ),
           // 图片识别入口
           IconButton(
             icon: const Icon(Icons.camera_alt),
-            tooltip: '拍照记账',
+            tooltip: context.l10n.photoRecord,
             onPressed: _openImageRecognition,
           ),
         ],
@@ -218,10 +213,10 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(text: '支出'),
-            Tab(text: '收入'),
-            Tab(text: '转账'),
+          tabs: [
+            Tab(text: context.l10n.expense),
+            Tab(text: context.l10n.income),
+            Tab(text: context.l10n.transfer),
           ],
         ),
       ),
@@ -288,20 +283,15 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
               Expanded(
                 child: TextField(
                   controller: _noteController,
-                  decoration: const InputDecoration(
-                    hintText: '添加备注...',
+                  decoration: InputDecoration(
+                    hintText: context.l10n.addNoteHint,
                     border: InputBorder.none,
-                    prefixIcon: Icon(Icons.edit_note, color: AppColors.textSecondary),
+                    prefixIcon: const Icon(Icons.edit_note, color: AppColors.textSecondary),
                   ),
                 ),
               ),
             ],
           ),
-          // 标签输入区域
-          if (_type == TransactionType.expense || _type == TransactionType.income) ...[
-            const Divider(),
-            _buildTagsInput(),
-          ],
           // 报销选项（仅支出）
           if (_type == TransactionType.expense) ...[
             const Divider(),
@@ -312,79 +302,13 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
     );
   }
 
-  /// 构建标签输入区域
-  Widget _buildTagsInput() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(Icons.label_outline, color: AppColors.textSecondary, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: _tagController,
-                decoration: const InputDecoration(
-                  hintText: '添加标签...',
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                onSubmitted: (value) {
-                  _addTag(value);
-                },
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
-              onPressed: () {
-                _addTag(_tagController.text);
-              },
-            ),
-          ],
-        ),
-        if (_tags.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: _tags.map((tag) => Chip(
-                label: Text(tag),
-                deleteIcon: const Icon(Icons.close, size: 16),
-                onDeleted: () {
-                  setState(() {
-                    _tags.remove(tag);
-                  });
-                },
-                backgroundColor: AppColors.primary.withValues(alpha:0.1),
-                labelStyle: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 12,
-                ),
-              )).toList(),
-            ),
-          ),
-      ],
-    );
-  }
-
-  void _addTag(String tag) {
-    final trimmedTag = tag.trim();
-    if (trimmedTag.isNotEmpty && !_tags.contains(trimmedTag)) {
-      setState(() {
-        _tags.add(trimmedTag);
-        _tagController.clear();
-      });
-    }
-  }
-
   /// 构建报销开关
   Widget _buildReimbursableToggle() {
     return Row(
       children: [
         const Icon(Icons.receipt_long, color: AppColors.textSecondary, size: 20),
         const SizedBox(width: 8),
-        const Text('可报销', style: TextStyle(color: AppColors.textSecondary)),
+        Text(context.l10n.reimbursable, style: const TextStyle(color: AppColors.textSecondary)),
         const Spacer(),
         Switch(
           value: _isReimbursable,
@@ -582,7 +506,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                   size: 16, color: parentCategory?.color ?? Colors.grey),
               const SizedBox(width: 4),
               Text(
-                '${parentCategory?.name ?? ""} 的子分类',
+                context.l10n.subcategoryOf(parentCategory?.localizedName ?? ""),
                 style: TextStyle(
                   fontSize: 12,
                   color: parentCategory?.color ?? AppColors.textSecondary,
@@ -598,8 +522,8 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                   });
                 },
                 child: Text(
-                  '使用父分类',
-                  style: TextStyle(
+                  context.l10n.useParentCategory,
+                  style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.primary,
                     fontWeight: FontWeight.w500,
@@ -638,7 +562,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                       Icon(child.icon, size: 16, color: child.color),
                       const SizedBox(width: 4),
                       Text(
-                        child.name,
+                        child.localizedName,
                         style: TextStyle(
                           fontSize: 12,
                           color: isSelected ? child.color : AppColors.textPrimary,
@@ -684,7 +608,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'AI推荐分类: ${suggestedCat.name}',
+              context.l10n.aiRecommendedCategory(suggestedCat.localizedName),
               style: TextStyle(
                 color: Colors.orange.shade800,
                 fontSize: 13,
@@ -704,7 +628,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             child: Text(
-              '使用',
+              context.l10n.useCategory,
               style: TextStyle(
                 color: Colors.orange.shade800,
                 fontWeight: FontWeight.bold,
@@ -722,7 +646,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          _buildAccountSelector('转出账户', _selectedAccount, (value) {
+          _buildAccountSelector(context.l10n.fromAccount, _selectedAccount, (value) {
             setState(() {
               _selectedAccount = value;
               if (_toAccountId == value) {
@@ -741,7 +665,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
             child: const Icon(Icons.arrow_downward, color: AppColors.transfer),
           ),
           const SizedBox(height: 16),
-          _buildAccountSelector('转入账户', _toAccountId, (value) {
+          _buildAccountSelector(context.l10n.toAccount, _toAccountId, (value) {
             setState(() {
               _toAccountId = value;
               if (_selectedAccount == value) {
@@ -798,7 +722,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                       Icon(account.icon, color: account.color, size: 18),
                       const SizedBox(width: 8),
                       Text(
-                        account.name,
+                        account.localizedName,
                         style: TextStyle(
                           color: isSelected ? account.color : AppColors.textPrimary,
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -819,7 +743,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
     String accountName = '微信';
     final account = DefaultAccounts.accounts.where((a) => a.id == _selectedAccount).firstOrNull;
     if (account != null) {
-      accountName = account.name;
+      accountName = account.localizedName;
     }
 
     return Container(
@@ -881,7 +805,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               ),
-              child: const Text('保存'),
+              child: Text(context.l10n.save),
             ),
           ],
         ),
@@ -902,9 +826,9 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '选择账户',
-                style: TextStyle(
+              Text(
+                context.l10n.selectAccount,
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -921,7 +845,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
                     ),
                     child: Icon(account.icon, color: account.color),
                   ),
-                  title: Text(account.name),
+                  title: Text(account.localizedName),
                   trailing: isSelected
                       ? const Icon(Icons.check, color: AppColors.primary)
                       : null,
@@ -959,21 +883,21 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
     final amountText = _amountController.text;
     if (amountText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入金额')),
+        SnackBar(content: Text(context.l10n.pleaseEnterAmount)),
       );
       return;
     }
 
     if (_type != TransactionType.transfer && _selectedCategory == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请选择分类')),
+        SnackBar(content: Text(context.l10n.pleaseSelectCategory)),
       );
       return;
     }
 
     if (_type == TransactionType.transfer && _selectedAccount == _toAccountId) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('转出和转入账户不能相同')),
+        SnackBar(content: Text(context.l10n.accountsCannotBeSame)),
       );
       return;
     }
@@ -981,7 +905,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
     final amount = double.tryParse(amountText) ?? 0;
     if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入有效金额')),
+        SnackBar(content: Text(context.l10n.pleaseEnterValidAmount)),
       );
       return;
     }
@@ -996,7 +920,6 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
       accountId: _selectedAccount,
       toAccountId: _type == TransactionType.transfer ? _toAccountId : null,
       isReimbursable: _isReimbursable,
-      tags: _tags.isEmpty ? null : _tags,
     );
 
     if (_isEditing) {

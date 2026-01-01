@@ -6,6 +6,7 @@ import * as authApi from '@/api/auth'
 export const useAuthStore = defineStore('auth', () => {
   // State
   const token = ref<string | null>(localStorage.getItem('admin_token'))
+  const refreshToken = ref<string | null>(localStorage.getItem('admin_refresh_token'))
   const admin = ref<AdminUser | null>(null)
 
   // Getters
@@ -19,6 +20,23 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('admin_token', newToken)
   }
 
+  const setRefreshToken = (newRefreshToken: string) => {
+    refreshToken.value = newRefreshToken
+    localStorage.setItem('admin_refresh_token', newRefreshToken)
+  }
+
+  const refreshAccessToken = async (): Promise<boolean> => {
+    if (!refreshToken.value) return false
+    try {
+      const response = await authApi.refreshToken(refreshToken.value)
+      setToken(response.access_token)
+      return true
+    } catch (e) {
+      // Refresh failed, clear tokens
+      return false
+    }
+  }
+
   const setAdmin = (newAdmin: AdminUser) => {
     admin.value = newAdmin
   }
@@ -26,6 +44,9 @@ export const useAuthStore = defineStore('auth', () => {
   const login = async (username: string, password: string, mfaCode?: string) => {
     const response = await authApi.login({ username, password, mfa_code: mfaCode })
     setToken(response.access_token)
+    if (response.refresh_token) {
+      setRefreshToken(response.refresh_token)
+    }
     setAdmin(response.admin)
     return response
   }
@@ -37,8 +58,10 @@ export const useAuthStore = defineStore('auth', () => {
       // Ignore logout errors
     }
     token.value = null
+    refreshToken.value = null
     admin.value = null
     localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_refresh_token')
   }
 
   const fetchCurrentAdmin = async () => {
@@ -65,15 +88,18 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     token,
+    refreshToken,
     admin,
     isLoggedIn,
     permissions,
     isSuperAdmin,
     setToken,
+    setRefreshToken,
     setAdmin,
     login,
     logout,
     fetchCurrentAdmin,
+    refreshAccessToken,
     hasPermission,
     hasAnyPermission,
   }

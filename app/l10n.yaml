@@ -1,0 +1,23 @@
+# Flutter localization configuration
+# https://docs.flutter.dev/ui/accessibility-and-internationalization/internationalization
+
+# Directory containing ARB files
+arb-dir: lib/l10n
+
+# Template ARB file (source of truth)
+template-arb-file: app_en.arb
+
+# Output directory for generated localization files
+output-dir: lib/l10n/generated
+
+# Output localization file
+output-localization-file: app_localizations.dart
+
+# Output class name
+output-class: S
+
+# Use nullable getter for optional translations
+nullable-getter: false
+
+# Generate all localizations even if some translations are missing
+untranslated-messages-file: untranslated_messages.txt

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/l10n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../models/account.dart';
@@ -14,7 +15,7 @@ class AccountManagementPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('账户管理'),
+        title: Text(context.l10n.accountManagement),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -24,7 +25,7 @@ class AccountManagementPage extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          _buildTotalBalanceCard(totalBalance),
+          _buildTotalBalanceCard(context, totalBalance),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -40,7 +41,7 @@ class AccountManagementPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildTotalBalanceCard(double totalBalance) {
+  Widget _buildTotalBalanceCard(BuildContext context, double totalBalance) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -62,9 +63,9 @@ class AccountManagementPage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '总资产',
-            style: TextStyle(
+          Text(
+            context.l10n.totalAssets,
+            style: const TextStyle(
               color: Colors.white70,
               fontSize: 14,
             ),
@@ -102,7 +103,7 @@ class AccountManagementPage extends ConsumerWidget {
         title: Row(
           children: [
             Text(
-              account.name,
+              account.localizedName,
               style: const TextStyle(fontWeight: FontWeight.w500),
             ),
             if (account.isDefault) ...[
@@ -113,9 +114,9 @@ class AccountManagementPage extends ConsumerWidget {
                   color: AppColors.primary.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Text(
-                  '默认',
-                  style: TextStyle(
+                child: Text(
+                  context.l10n.defaultAccount,
+                  style: const TextStyle(
                     fontSize: 10,
                     color: AppColors.primary,
                   ),
@@ -125,7 +126,7 @@ class AccountManagementPage extends ConsumerWidget {
           ],
         ),
         subtitle: Text(
-          _getAccountTypeName(account.type),
+          _getAccountTypeName(context, account.type),
           style: const TextStyle(
             color: AppColors.textSecondary,
             fontSize: 12,
@@ -157,36 +158,36 @@ class AccountManagementPage extends ConsumerWidget {
                     break;
                 }
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
+              itemBuilder: (ctx) => [
+                PopupMenuItem(
                   value: 'edit',
                   child: Row(
                     children: [
                       Icon(Icons.edit, size: 20),
                       SizedBox(width: 8),
-                      Text('编辑'),
+                      Text(context.l10n.edit),
                     ],
                   ),
                 ),
                 if (!account.isDefault)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'default',
                     child: Row(
                       children: [
                         Icon(Icons.star, size: 20),
                         SizedBox(width: 8),
-                        Text('设为默认'),
+                        Text(context.l10n.setAsDefault),
                       ],
                     ),
                   ),
                 if (!account.isDefault)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'delete',
                     child: Row(
                       children: [
                         Icon(Icons.delete, size: 20, color: AppColors.expense),
                         SizedBox(width: 8),
-                        Text('删除', style: TextStyle(color: AppColors.expense)),
+                        Text(context.l10n.delete, style: TextStyle(color: AppColors.expense)),
                       ],
                     ),
                   ),
@@ -198,18 +199,18 @@ class AccountManagementPage extends ConsumerWidget {
     );
   }
 
-  String _getAccountTypeName(AccountType type) {
+  String _getAccountTypeName(BuildContext context, AccountType type) {
     switch (type) {
       case AccountType.cash:
-        return '现金';
+        return context.l10n.cash;
       case AccountType.bankCard:
-        return '银行卡';
+        return context.l10n.bankCard;
       case AccountType.creditCard:
-        return '信用卡';
+        return context.l10n.creditCard;
       case AccountType.eWallet:
-        return '电子钱包';
+        return context.l10n.eWallet;
       case AccountType.investment:
-        return '投资账户';
+        return context.l10n.investmentAccount;
     }
   }
 
@@ -255,7 +256,7 @@ class AccountManagementPage extends ConsumerWidget {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text(isEdit ? '编辑账户' : '添加账户'),
+              title: Text(isEdit ? context.l10n.editAccount : context.l10n.addAccount),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -263,8 +264,8 @@ class AccountManagementPage extends ConsumerWidget {
                   children: [
                     TextField(
                       controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: '账户名称',
+                      decoration: InputDecoration(
+                        labelText: context.l10n.accountName,
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -272,14 +273,14 @@ class AccountManagementPage extends ConsumerWidget {
                     TextField(
                       controller: balanceController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: '初始余额',
+                      decoration: InputDecoration(
+                        labelText: context.l10n.initialBalance,
                         prefixText: '¥ ',
                         border: OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text('账户类型', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    Text(context.l10n.accountType, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -287,7 +288,7 @@ class AccountManagementPage extends ConsumerWidget {
                       children: AccountType.values.map((type) {
                         final isSelected = type == selectedType;
                         return ChoiceChip(
-                          label: Text(_getAccountTypeName(type)),
+                          label: Text(_getAccountTypeName(context, type)),
                           selected: isSelected,
                           onSelected: (selected) {
                             if (selected) {
@@ -298,7 +299,7 @@ class AccountManagementPage extends ConsumerWidget {
                       }).toList(),
                     ),
                     const SizedBox(height: 16),
-                    const Text('图标颜色', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    Text(context.l10n.iconColor, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -324,7 +325,7 @@ class AccountManagementPage extends ConsumerWidget {
                       }).toList(),
                     ),
                     const SizedBox(height: 16),
-                    const Text('图标', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    Text(context.l10n.iconText, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -353,14 +354,14 @@ class AccountManagementPage extends ConsumerWidget {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('取消'),
+                  child: Text(context.l10n.cancel),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     final name = nameController.text.trim();
                     if (name.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('请输入账户名称')),
+                        SnackBar(content: Text(context.l10n.pleaseEnter)),
                       );
                       return;
                     }
@@ -385,7 +386,7 @@ class AccountManagementPage extends ConsumerWidget {
 
                     Navigator.pop(context);
                   },
-                  child: Text(isEdit ? '保存' : '添加'),
+                  child: Text(isEdit ? context.l10n.save : context.l10n.add),
                 ),
               ],
             );
@@ -400,12 +401,12 @@ class AccountManagementPage extends ConsumerWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('删除账户'),
-          content: Text('确定要删除"${account.name}"吗？此操作不可恢复。'),
+          title: Text(context.l10n.deleteAccount),
+          content: Text(context.l10n.confirmDeleteAccount(account.localizedName)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
+              child: Text(context.l10n.cancel),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -415,7 +416,7 @@ class AccountManagementPage extends ConsumerWidget {
                 ref.read(accountProvider.notifier).deleteAccount(account.id);
                 Navigator.pop(context);
               },
-              child: const Text('删除'),
+              child: Text(context.l10n.delete),
             ),
           ],
         );

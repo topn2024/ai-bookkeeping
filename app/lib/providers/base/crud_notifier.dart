@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/result.dart';
 import '../../services/database_service.dart';
 import '../../services/offline_queue_service.dart';
+import '../../services/auto_sync_service.dart';
 
 /// CRUD 操作的统一状态
 class CrudState<T> {
@@ -279,10 +280,11 @@ abstract class CrudNotifier<T, ID> extends Notifier<CrudState<T>> {
 /// 简化版 CRUD Notifier（使用 List 作为状态）
 ///
 /// 适用于不需要 isLoading/error 状态的简单场景
-/// 自动集成同步钩子，所有CRUD操作都会标记为待同步
+/// 自动集成同步钩子，所有CRUD操作都会标记为待同步并触发自动同步
 abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
   DatabaseService get db => DatabaseService();
   OfflineQueueService get _offlineQueue => OfflineQueueService();
+  AutoSyncService get _autoSync => AutoSyncService();
 
   String get tableName;
   ID getId(T entity);
@@ -318,6 +320,8 @@ abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
     state = [...state, entity];
     // 同步钩子：标记为待同步
     await _markForSync(getId(entity).toString(), QueueOperation.create, entity);
+    // 触发自动同步
+    _autoSync.markDataChanged();
   }
 
   Future<void> update(T entity) async {
@@ -327,6 +331,8 @@ abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
     }).toList();
     // 同步钩子：标记为待同步
     await _markForSync(getId(entity).toString(), QueueOperation.update, entity);
+    // 触发自动同步
+    _autoSync.markDataChanged();
   }
 
   Future<void> delete(ID id) async {
@@ -334,6 +340,8 @@ abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
     state = state.where((item) => getId(item) != id).toList();
     // 同步钩子：标记为待同步
     await _markForSync(id.toString(), QueueOperation.delete, null);
+    // 触发自动同步
+    _autoSync.markDataChanged();
   }
 
   /// 标记实体为待同步
@@ -391,6 +399,8 @@ abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
       await _markForSync(getId(entity).toString(), QueueOperation.create, entity);
     }
     state = [...state, ...entities];
+    // 触发自动同步
+    if (entities.isNotEmpty) _autoSync.markDataChanged();
   }
 
   /// 批量更新
@@ -407,6 +417,8 @@ abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
       );
       return updated;
     }).toList();
+    // 触发自动同步
+    if (entities.isNotEmpty) _autoSync.markDataChanged();
   }
 
   /// 批量删除
@@ -418,6 +430,8 @@ abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
       await _markForSync(getId(item).toString(), QueueOperation.delete, null);
     }
     state = state.where((item) => !test(item)).toList();
+    // 触发自动同步
+    if (toDelete.isNotEmpty) _autoSync.markDataChanged();
   }
 
   /// 判断是否存在

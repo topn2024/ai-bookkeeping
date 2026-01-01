@@ -514,3 +514,119 @@ async def get_all_settings(
                     settings[key][k] = mask_secret(v) if v else None
 
     return settings
+
+
+@router.get("/security")
+async def get_security_settings(
+    current_admin: AdminUser = Depends(get_current_admin),
+    _: bool = Depends(has_permission("setting:view")),
+):
+    """获取安全配置汇总"""
+    return {
+        "login_security": _settings_store["login_security"],
+        "ip_whitelist": _settings_store["ip_whitelist"],
+        "operation_confirm": _settings_store["operation_confirm"],
+    }
+
+
+@router.put("/security")
+async def update_security_settings(
+    request: Request,
+    data: Dict[str, Any],
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("setting:edit")),
+):
+    """更新安全配置汇总"""
+    if "login_security" in data:
+        _settings_store["login_security"].update(data["login_security"])
+    if "ip_whitelist" in data:
+        _settings_store["ip_whitelist"].update(data["ip_whitelist"])
+    if "operation_confirm" in data:
+        _settings_store["operation_confirm"].update(data["operation_confirm"])
+
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="setting.update",
+        module="setting",
+        target_type="security",
+        description="更新安全配置",
+        request=request,
+    )
+    await db.commit()
+
+    return {"message": "Security settings updated"}
+
+
+@router.post("/logo")
+async def upload_logo(
+    request: Request,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("setting:edit")),
+):
+    """上传系统Logo"""
+    # In production, this would save to MinIO/S3
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="setting.upload_logo",
+        module="setting",
+        description="上传系统Logo",
+        request=request,
+    )
+    await db.commit()
+
+    return {"logo_url": "/static/logo.png", "message": "Logo upload not yet implemented"}
+
+
+@router.post("/email-service/test")
+async def test_email_service(
+    request: Request,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("setting:edit")),
+):
+    """测试邮件服务"""
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="setting.test_email",
+        module="setting",
+        description="测试邮件服务",
+        request=request,
+    )
+    await db.commit()
+
+    return {"success": False, "message": "Email service not configured"}
+
+
+@router.post("/webhook/test")
+async def test_webhook(
+    request: Request,
+    data: Dict[str, Any],
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("setting:edit")),
+):
+    """测试Webhook"""
+    url = data.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="setting.test_webhook",
+        module="setting",
+        description=f"测试Webhook: {url}",
+        request=request,
+    )
+    await db.commit()
+
+    return {"success": False, "message": "Webhook test not yet implemented"}

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../l10n/l10n.dart';
 import 'account_management_page.dart';
 import 'category_management_page.dart';
 import 'ledger_management_page.dart';
@@ -31,13 +32,13 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('我的'),
+        title: Text(context.l10n.settings),
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
             _buildUserHeader(context, ref),
-            _buildMemberCard(),
+            _buildMemberCard(context),
             _buildMenuSection(context),
             _buildSettingsSection(context, ref),
             const SizedBox(height: 32),
@@ -101,7 +102,7 @@ class SettingsPage extends ConsumerWidget {
                   Text(
                     authState.isAuthenticated
                         ? authState.user!.displayName
-                        : '点击登录',
+                        : context.l10n.login,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,
@@ -112,7 +113,7 @@ class SettingsPage extends ConsumerWidget {
                   Text(
                     authState.isAuthenticated
                         ? authState.user!.accountIdentifier
-                        : '登录后可同步数据到云端',
+                        : context.l10n.dataSync,
                     style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 14,
@@ -140,7 +141,7 @@ class SettingsPage extends ConsumerWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('编辑资料'),
+              title: Text(context.l10n.edit),
               onTap: () {
                 Navigator.pop(context);
                 _showEditProfileDialog(context, ref);
@@ -148,7 +149,7 @@ class SettingsPage extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('退出登录', style: TextStyle(color: Colors.red)),
+              title: Text(context.l10n.logout, style: const TextStyle(color: Colors.red)),
               onTap: () {
                 Navigator.pop(context);
                 _confirmLogout(context, ref);
@@ -157,7 +158,7 @@ class SettingsPage extends ConsumerWidget {
             const SizedBox(height: 8),
             ListTile(
               leading: const Icon(Icons.cancel),
-              title: const Text('取消'),
+              title: Text(context.l10n.cancel),
               onTap: () => Navigator.pop(context),
             ),
           ],
@@ -175,18 +176,18 @@ class SettingsPage extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('编辑资料'),
+        title: Text(context.l10n.profile),
         content: TextField(
           controller: nameController,
-          decoration: const InputDecoration(
-            labelText: '昵称',
-            hintText: '请输入昵称',
+          decoration: InputDecoration(
+            labelText: context.l10n.username,
+            hintText: context.l10n.pleaseEnter,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(context.l10n.cancel),
           ),
           TextButton(
             onPressed: () {
@@ -197,10 +198,10 @@ class SettingsPage extends ConsumerWidget {
               );
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('资料已更新')),
+                SnackBar(content: Text(context.l10n.operationSuccess)),
               );
             },
-            child: const Text('保存'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),
@@ -211,29 +212,29 @@ class SettingsPage extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('确认退出'),
-        content: const Text('确定要退出登录吗？'),
+        title: Text(context.l10n.confirm),
+        content: Text(context.l10n.logout),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(context.l10n.cancel),
           ),
           TextButton(
             onPressed: () {
               ref.read(authProvider.notifier).logout();
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('已退出登录')),
+                SnackBar(content: Text(context.l10n.logoutSuccess)),
               );
             },
-            child: const Text('退出', style: TextStyle(color: Colors.red)),
+            child: Text(context.l10n.logout, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMemberCard() {
+  Widget _buildMemberCard(BuildContext context) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -256,22 +257,22 @@ class SettingsPage extends ConsumerWidget {
         children: [
           const Icon(Icons.workspace_premium, color: Colors.white, size: 40),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '开通会员',
-                  style: TextStyle(
+                  context.l10n.openMembership,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  '解锁AI智能记账功能',
-                  style: TextStyle(
+                  context.l10n.unlockAIFeatures,
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
                   ),
@@ -285,9 +286,9 @@ class SettingsPage extends ConsumerWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Text(
-              '立即开通',
-              style: TextStyle(
+            child: Text(
+              context.l10n.openNow,
+              style: const TextStyle(
                 color: Color(0xFFFF8C00),
                 fontWeight: FontWeight.bold,
               ),
@@ -315,9 +316,10 @@ class SettingsPage extends ConsumerWidget {
       child: Column(
         children: [
           _buildMenuItem(
+            context: context,
             icon: Icons.book,
             iconColor: AppColors.primary,
-            title: '账本管理',
+            title: context.l10n.ledgerManagement,
             onTap: () {
               Navigator.push(
                 context,
@@ -329,7 +331,7 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.account_balance_wallet,
             iconColor: AppColors.income,
-            title: '账户管理',
+            title: context.l10n.accountManagement,
             onTap: () {
               Navigator.push(
                 context,
@@ -341,7 +343,7 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.credit_card,
             iconColor: const Color(0xFF2196F3),
-            title: '信用卡管理',
+            title: context.l10n.creditCard,
             onTap: () {
               Navigator.push(
                 context,
@@ -353,7 +355,7 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.trending_up,
             iconColor: const Color(0xFFE91E63),
-            title: '投资账户',
+            title: context.l10n.investmentAccount,
             onTap: () {
               Navigator.push(
                 context,
@@ -365,7 +367,7 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.category,
             iconColor: AppColors.transfer,
-            title: '分类管理',
+            title: context.l10n.categoryManagement,
             onTap: () {
               Navigator.push(
                 context,
@@ -377,7 +379,7 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.savings,
             iconColor: const Color(0xFF9C27B0),
-            title: '预算设置',
+            title: context.l10n.budgetManagement,
             onTap: () {
               Navigator.push(
                 context,
@@ -389,7 +391,7 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.flag,
             iconColor: const Color(0xFF4CAF50),
-            title: '储蓄目标',
+            title: context.l10n.savingsGoal,
             onTap: () {
               Navigator.push(
                 context,
@@ -401,7 +403,7 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.receipt_long,
             iconColor: const Color(0xFFFF5722),
-            title: '报销管理',
+            title: context.l10n.reimbursement,
             onTap: () {
               Navigator.push(
                 context,
@@ -413,7 +415,7 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.label,
             iconColor: const Color(0xFF3F51B5),
-            title: '标签统计',
+            title: context.l10n.tagStatistics,
             onTap: () {
               Navigator.push(
                 context,
@@ -425,7 +427,7 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.flash_on,
             iconColor: AppColors.transfer,
-            title: '记账模板',
+            title: context.l10n.templateManagement,
             onTap: () {
               Navigator.push(
                 context,
@@ -437,7 +439,7 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.schedule,
             iconColor: AppColors.primary,
-            title: '定时记账',
+            title: context.l10n.recurringManagement,
             onTap: () {
               Navigator.push(
                 context,
@@ -449,7 +451,7 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.notifications_active,
             iconColor: const Color(0xFFE91E63),
-            title: '账单提醒',
+            title: context.l10n.billReminder,
             onTap: () {
               Navigator.push(
                 context,
@@ -483,8 +485,8 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.cloud_sync,
             iconColor: AppColors.primary,
-            title: '数据备份',
-            subtitle: '备份到云端',
+            title: context.l10n.dataBackupTitle,
+            subtitle: context.l10n.backupToCloud,
             onTap: () {
               Navigator.push(
                 context,
@@ -496,8 +498,8 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.download,
             iconColor: AppColors.income,
-            title: '数据导出',
-            subtitle: '导出CSV文件',
+            title: context.l10n.dataExportTitle,
+            subtitle: context.l10n.exportToCSV,
             onTap: () {
               Navigator.push(
                 context,
@@ -509,8 +511,8 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.upload_file,
             iconColor: const Color(0xFF4CAF50),
-            title: '数据导入',
-            subtitle: '从CSV文件导入',
+            title: context.l10n.dataImportTitle,
+            subtitle: context.l10n.importFromCSV,
             onTap: () {
               Navigator.push(
                 context,
@@ -522,8 +524,8 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.assessment,
             iconColor: const Color(0xFF673AB7),
-            title: '年度报告',
-            subtitle: '查看年度财务总结',
+            title: context.l10n.annualReportTitle,
+            subtitle: context.l10n.viewAnnualSummary,
             onTap: () {
               Navigator.push(
                 context,
@@ -535,8 +537,8 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.analytics,
             iconColor: const Color(0xFF009688),
-            title: '自定义报表',
-            subtitle: '多维度自定义分析',
+            title: context.l10n.customReportTitle,
+            subtitle: context.l10n.multiDimensionalAnalysis,
             onTap: () {
               Navigator.push(
                 context,
@@ -548,8 +550,8 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.account_balance,
             iconColor: const Color(0xFF00897B),
-            title: '资产概览',
-            subtitle: '净资产、趋势与分布',
+            title: context.l10n.assetOverview,
+            subtitle: context.l10n.netAssetsTrendDistribution,
             onTap: () {
               Navigator.push(
                 context,
@@ -561,8 +563,8 @@ class SettingsPage extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.settings,
             iconColor: const Color(0xFF607D8B),
-            title: '系统设置',
-            subtitle: '主题、语言、安全等',
+            title: context.l10n.systemSettings,
+            subtitle: context.l10n.themeLanguageSecurity,
             onTap: () {
               Navigator.push(
                 context,
@@ -576,6 +578,7 @@ class SettingsPage extends ConsumerWidget {
   }
 
   Widget _buildMenuItem({
+    BuildContext? context,
     required IconData icon,
     required Color iconColor,
     required String title,
@@ -645,15 +648,15 @@ class SettingsPage extends ConsumerWidget {
               size: 22,
             ),
           ),
-          title: const Text(
-            '数据云同步',
-            style: TextStyle(
+          title: Text(
+            context.l10n.dataCloudSync,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
           ),
           subtitle: Text(
-            isEnabled ? '已开启，数据自动同步到云端' : '已关闭，数据仅保存在本地',
+            isEnabled ? context.l10n.cloudSyncEnabled : context.l10n.cloudSyncDisabled,
             style: const TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
@@ -676,7 +679,7 @@ class SettingsPage extends ConsumerWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(value ? '已开启数据云同步' : '已关闭数据云同步，数据将仅保存在本地'),
+                    content: Text(value ? context.l10n.cloudSyncTurnedOn : context.l10n.cloudSyncTurnedOff),
                     duration: const Duration(seconds: 2),
                   ),
                 );

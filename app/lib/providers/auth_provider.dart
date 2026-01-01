@@ -144,10 +144,14 @@ class AuthNotifier extends Notifier<AuthState> {
       if (response.statusCode == 200) {
         final data = response.data;
         final accessToken = data['access_token'] as String;
+        final refreshToken = data['refresh_token'] as String?;
         final userData = data['user'] as Map<String, dynamic>;
 
-        // 保存 token
-        await _http.setAuthToken(accessToken);
+        // 保存 tokens
+        await _http.setTokens(
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        );
 
         // 解析用户信息
         final user = User.fromJson(userData);
@@ -216,10 +220,14 @@ class AuthNotifier extends Notifier<AuthState> {
       if (response.statusCode == 200) {
         final data = response.data;
         final accessToken = data['access_token'] as String;
+        final refreshToken = data['refresh_token'] as String?;
         final userData = data['user'] as Map<String, dynamic>;
 
-        // 保存 token
-        await _http.setAuthToken(accessToken);
+        // 保存 tokens
+        await _http.setTokens(
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        );
 
         // 解析用户信息
         final user = User.fromJson(userData);
@@ -318,8 +326,11 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   /// 设置 OAuth 登录用户（供 OAuth Provider 调用）
-  Future<void> setUserFromOAuth(User user, String accessToken) async {
-    await _http.setAuthToken(accessToken);
+  Future<void> setUserFromOAuth(User user, String accessToken, {String? refreshToken}) async {
+    await _http.setTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    );
     await _secureStorage.write('current_user_data', jsonEncode(user.toJson()));
     await _secureStorage.saveUserId(user.id);
 

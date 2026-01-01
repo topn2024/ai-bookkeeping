@@ -89,15 +89,20 @@ class OAuthNotifier extends Notifier<OAuthState> {
     try {
       final result = await _oauthService.loginWithOAuth(provider, authCode);
 
-      // Save token
+      // Save tokens
       final token = result['access_token'] as String;
+      final refreshToken = result['refresh_token'] as String?;
 
       // Save user data
       final userData = result['user'] as Map<String, dynamic>;
       final user = User.fromJson(userData);
 
       // Update auth provider (this also saves token and user data)
-      await ref.read(authProvider.notifier).setUserFromOAuth(user, token);
+      await ref.read(authProvider.notifier).setUserFromOAuth(
+        user,
+        token,
+        refreshToken: refreshToken,
+      );
 
       state = state.copyWith(isLoading: false);
       return true;

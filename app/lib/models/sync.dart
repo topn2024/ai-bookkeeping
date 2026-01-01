@@ -424,17 +424,19 @@ class SyncSettings {
   final bool backupBeforeSync;
   final int maxBackupCount;
   final DateTime? lastSyncTime;
+  final bool syncPrivateData;  // 是否同步隐私数据（交易、账户等）
 
   const SyncSettings({
-    this.enabled = false,
+    this.enabled = true,  // 默认开启同步
     this.provider = CloudProvider.local,
-    this.frequency = SyncFrequency.manual,
-    this.wifiOnly = true,
-    this.autoResolveConflicts = false,
+    this.frequency = SyncFrequency.realtime,  // 默认实时同步
+    this.wifiOnly = false,  // 不限制仅WiFi
+    this.autoResolveConflicts = true,  // 自动解决冲突
     this.defaultResolution = ConflictResolution.keepLocal,
-    this.backupBeforeSync = true,
+    this.backupBeforeSync = false,  // 不需要同步前备份
     this.maxBackupCount = 5,
     this.lastSyncTime,
+    this.syncPrivateData = true,  // 默认同步隐私数据
   });
 
   SyncSettings copyWith({
@@ -447,6 +449,7 @@ class SyncSettings {
     bool? backupBeforeSync,
     int? maxBackupCount,
     DateTime? lastSyncTime,
+    bool? syncPrivateData,
   }) {
     return SyncSettings(
       enabled: enabled ?? this.enabled,
@@ -458,6 +461,7 @@ class SyncSettings {
       backupBeforeSync: backupBeforeSync ?? this.backupBeforeSync,
       maxBackupCount: maxBackupCount ?? this.maxBackupCount,
       lastSyncTime: lastSyncTime ?? this.lastSyncTime,
+      syncPrivateData: syncPrivateData ?? this.syncPrivateData,
     );
   }
 
@@ -472,22 +476,24 @@ class SyncSettings {
       'backupBeforeSync': backupBeforeSync,
       'maxBackupCount': maxBackupCount,
       'lastSyncTime': lastSyncTime?.millisecondsSinceEpoch,
+      'syncPrivateData': syncPrivateData,
     };
   }
 
   factory SyncSettings.fromMap(Map<String, dynamic> map) {
     return SyncSettings(
-      enabled: map['enabled'] as bool? ?? false,
+      enabled: map['enabled'] as bool? ?? true,  // 默认开启
       provider: CloudProvider.values[map['provider'] as int? ?? 0],
-      frequency: SyncFrequency.values[map['frequency'] as int? ?? 0],
-      wifiOnly: map['wifiOnly'] as bool? ?? true,
-      autoResolveConflicts: map['autoResolveConflicts'] as bool? ?? false,
+      frequency: SyncFrequency.values[map['frequency'] as int? ?? 1],  // 默认实时同步
+      wifiOnly: map['wifiOnly'] as bool? ?? false,  // 默认不限制
+      autoResolveConflicts: map['autoResolveConflicts'] as bool? ?? true,
       defaultResolution: ConflictResolution.values[map['defaultResolution'] as int? ?? 0],
-      backupBeforeSync: map['backupBeforeSync'] as bool? ?? true,
+      backupBeforeSync: map['backupBeforeSync'] as bool? ?? false,
       maxBackupCount: map['maxBackupCount'] as int? ?? 5,
       lastSyncTime: map['lastSyncTime'] != null
           ? DateTime.fromMillisecondsSinceEpoch(map['lastSyncTime'] as int)
           : null,
+      syncPrivateData: map['syncPrivateData'] as bool? ?? true,
     );
   }
 }

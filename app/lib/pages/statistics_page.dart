@@ -24,10 +24,22 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
   StatsPeriod _selectedPeriod = StatsPeriod.month;
   DateTime _currentDate = DateTime.now();
 
+  // 二级分类展开状态
+  String? _expandedCategory; // 当前展开的一级分类ID（null表示显示一级分类）
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // 切换 Tab 时重置展开状态
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging && _expandedCategory != null) {
+        setState(() {
+          _expandedCategory = null;
+          _touchedIndex = -1;
+        });
+      }
+    });
   }
 
   @override
@@ -91,6 +103,8 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
                   setState(() {
                     _selectedPeriod = period;
                     _currentDate = DateTime.now();
+                    _expandedCategory = null; // 重置展开状态
+                    _touchedIndex = -1;
                   });
                 }
               },
@@ -346,8 +360,40 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
 
   Map<String, double> _groupByCategory(List<Transaction> transactions) {
     final map = <String, double>{};
-    for (final t in transactions) {
-      map[t.category] = (map[t.category] ?? 0) + t.amount;
+
+    if (_expandedCategory == null) {
+      // 按一级分类分组（将二级分类归入父类）
+      for (final t in transactions) {
+        final category = DefaultCategories.findById(t.category);
+        // 如果是二级分类，找到父类；否则使用自身ID
+        String categoryKey;
+        if (category != null && category.parentId != null) {
+          categoryKey = category.parentId!;
+        } else {
+          categoryKey = category?.id ?? t.category;
+        }
+        map[categoryKey] = (map[categoryKey] ?? 0) + t.amount;
+      }
+    } else {
+      // 按二级分类分组（仅显示指定一级分类下的子分类）
+      for (final t in transactions) {
+        final category = DefaultCategories.findById(t.category);
+        if (category == null) continue;
+
+        // 检查是否属于当前展开的一级分类
+        bool belongsToParent = false;
+        if (category.parentId == _expandedCategory) {
+          // 直接是该一级分类的二级分类
+          belongsToParent = true;
+        } else if (category.id == _expandedCategory && category.parentId == null) {
+          // 就是该一级分类本身（无更细分）
+          belongsToParent = true;
+        }
+
+        if (belongsToParent) {
+          map[category.id] = (map[category.id] ?? 0) + t.amount;
+        }
+      }
     }
     return map;
   }
@@ -833,6 +879,11 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
     final total = data.values.fold(0.0, (sum, v) => sum + v);
     final entries = data.entries.toList();
 
+    // 获取当前展开分类的信息
+    final expandedCategoryInfo = _expandedCategory != null
+        ? DefaultCategories.findById(_expandedCategory!)
+        : null;
+
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -849,13 +900,44 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
       ),
       child: Column(
         children: [
-          const Text(
-            '分类占比',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+          // 标题行（包含返回按钮）
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_expandedCategory != null)
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, size: 20),
+                  onPressed: () {
+                    setState(() {
+                      _expandedCategory = null;
+                      _touchedIndex = -1;
+                    });
+                  },
+                  tooltip: '返回一级分类',
+                ),
+              Text(
+                _expandedCategory != null
+                    ? '${expandedCategoryInfo?.localizedName ?? _expandedCategory} 明细'
+                    : '分类占比',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (_expandedCategory != null) const SizedBox(width: 40), // 平衡左侧按钮
+            ],
           ),
+          if (_expandedCategory != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '点击返回查看所有分类',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
           const SizedBox(height: 20),
           SizedBox(
             height: 200,
@@ -863,16 +945,38 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
               PieChartData(
                 pieTouchData: PieTouchData(
                   touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                    setState(() {
-                      if (!event.isInterestedForInteractions ||
-                          pieTouchResponse == null ||
-                          pieTouchResponse.touchedSection == null) {
-                        _touchedIndex = -1;
-                        return;
+                    // 处理触摸高亮
+                    if (!event.isInterestedForInteractions ||
+                        pieTouchResponse == null ||
+                        pieTouchResponse.touchedSection == null) {
+                      if (_touchedIndex != -1) {
+                        setState(() => _touchedIndex = -1);
                       }
-                      _touchedIndex =
-                          pieTouchResponse.touchedSection!.touchedSectionIndex;
-                    });
+                      return;
+                    }
+
+                    final touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+
+                    // 处理点击事件（展开一级分类）
+                    if (event is FlTapUpEvent && _expandedCategory == null && touchedIndex >= 0 && touchedIndex < entries.length) {
+                      final categoryId = entries[touchedIndex].key;
+                      final category = DefaultCategories.findById(categoryId);
+
+                      // 只有一级分类才能展开
+                      if (category != null && category.parentId == null) {
+                        // 检查是否有子分类
+                        final hasSubcategories = DefaultCategories.getSubCategories(categoryId).isNotEmpty;
+                        if (hasSubcategories) {
+                          setState(() {
+                            _expandedCategory = categoryId;
+                            _touchedIndex = -1;
+                          });
+                          return;
+                        }
+                      }
+                    }
+
+                    setState(() => _touchedIndex = touchedIndex);
                   },
                 ),
                 sectionsSpace: 2,
@@ -900,6 +1004,18 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
               ),
             ),
           ),
+          // 提示文字
+          if (_expandedCategory == null && entries.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                '点击扇区查看子分类明细',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -909,6 +1025,11 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
     final total = data.values.fold(0.0, (sum, v) => sum + v);
     final sortedEntries = data.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
+
+    // 获取当前展开分类的信息
+    final expandedCategoryInfo = _expandedCategory != null
+        ? DefaultCategories.findById(_expandedCategory!)
+        : null;
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -926,21 +1047,55 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              '分类明细',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+          // 标题行（包含返回按钮）
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                if (_expandedCategory != null)
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _expandedCategory = null;
+                        _touchedIndex = -1;
+                      });
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.only(right: 8),
+                      child: Icon(Icons.arrow_back, size: 20),
+                    ),
+                  ),
+                Text(
+                  _expandedCategory != null
+                      ? '${expandedCategoryInfo?.localizedName ?? _expandedCategory} 明细'
+                      : '分类明细',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ),
           ...sortedEntries.map((entry) {
             final category = DefaultCategories.findById(entry.key);
             final percentage = entry.value / total;
 
+            // 检查是否有子分类（仅一级分类显示展开箭头）
+            final hasSubcategories = _expandedCategory == null &&
+                category != null &&
+                category.parentId == null &&
+                DefaultCategories.getSubCategories(entry.key).isNotEmpty;
+
             return ListTile(
+              onTap: hasSubcategories
+                  ? () {
+                      setState(() {
+                        _expandedCategory = entry.key;
+                        _touchedIndex = -1;
+                      });
+                    }
+                  : null,
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -987,12 +1142,26 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
                   ),
                 ],
               ),
-              trailing: Text(
-                '¥${entry.value.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '¥${entry.value.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  if (hasSubcategories)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: Icon(
+                        Icons.chevron_right,
+                        size: 20,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                ],
               ),
             );
           }),

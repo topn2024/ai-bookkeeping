@@ -37,6 +37,34 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    chunkSizeWarningLimit: 2000,
+    chunkSizeWarningLimit: 500,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+    rollupOptions: {
+      output: {
+        // 代码分割策略
+        manualChunks: {
+          // Vue核心
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          // Element Plus单独打包
+          'element-plus': ['element-plus'],
+          // 图表库
+          'charts': ['echarts'],
+          // 工具库
+          'utils': ['axios', 'dayjs'],
+        },
+        // 优化chunk文件名
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
+      },
+    },
+    // CSS代码分割
+    cssCodeSplit: true,
   },
 })

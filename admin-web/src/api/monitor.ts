@@ -1,4 +1,4 @@
-import { get, put } from './request'
+import { get, put, post, del } from './request'
 import type { SystemHealth, SystemResources } from '@/types'
 
 // Health check
@@ -59,4 +59,44 @@ export const getNotificationConfig = (): Promise<any> => {
 
 export const updateNotificationConfig = (config: any): Promise<any> => {
   return put('/monitoring/alerts/notifications', config)
+}
+
+// Health events
+export const getHealthEvents = (params?: { hours?: number; limit?: number }): Promise<any> => {
+  return get('/monitoring/health/events', { params })
+}
+
+// Resource trends
+export const getResourceTrends = (hours: number = 24): Promise<any> => {
+  return get('/monitoring/resources/trends', { params: { hours } })
+}
+
+// Active alerts
+export const getActiveAlerts = (params?: { severity?: string; limit?: number }): Promise<any> => {
+  return get('/monitoring/alerts/active', { params })
+}
+
+export const acknowledgeAlert = (alertId: string): Promise<any> => {
+  return put(`/monitoring/alerts/${alertId}/acknowledge`)
+}
+
+export const resolveAlert = (alertId: string): Promise<any> => {
+  return put(`/monitoring/alerts/${alertId}/resolve`)
+}
+
+export const acknowledgeAllAlerts = (): Promise<any> => {
+  return put('/monitoring/alerts/acknowledge-all')
+}
+
+// Alert rule management
+export const createAlertRule = (data: any): Promise<any> => {
+  return post('/monitoring/alerts/rules', data)
+}
+
+export const toggleAlertRule = (ruleId: string, enabled: boolean): Promise<any> => {
+  return put(`/monitoring/alerts/rules/${ruleId}`, { enabled })
+}
+
+export const deleteAlertRule = (ruleId: string): Promise<any> => {
+  return del(`/monitoring/alerts/rules/${ruleId}`)
 }

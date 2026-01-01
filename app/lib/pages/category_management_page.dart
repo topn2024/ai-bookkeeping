@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
+import '../l10n/l10n.dart';
 import '../models/category.dart';
 import '../providers/category_provider.dart';
 
@@ -24,6 +25,8 @@ class _CategoryManagementPageState
     extends ConsumerState<CategoryManagementPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  // 记录展开的分类ID
+  final Set<String> _expandedCategories = {};
 
   @override
   void initState() {
@@ -37,6 +40,16 @@ class _CategoryManagementPageState
     super.dispose();
   }
 
+  void _toggleExpand(String categoryId) {
+    setState(() {
+      if (_expandedCategories.contains(categoryId)) {
+        _expandedCategories.remove(categoryId);
+      } else {
+        _expandedCategories.add(categoryId);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final expenseCategories = ref.watch(expenseCategoriesProvider);
@@ -44,15 +57,15 @@ class _CategoryManagementPageState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('分类管理'),
+        title: Text(context.l10n.categoryManagement),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(text: '支出分类'),
-            Tab(text: '收入分类'),
+          tabs: [
+            Tab(text: context.l10n.expenseCategories),
+            Tab(text: context.l10n.incomeCategories),
           ],
         ),
         actions: [
@@ -81,12 +94,15 @@ class _CategoryManagementPageState
     final categoryTree =
         ref.read(categoryProvider.notifier).getCategoryTree(isExpense: isExpense);
 
-    // 构建扁平化的列表，包含父分类和子分类
+    // 构建扁平化的列表，只包含父分类和已展开的子分类
     final flatList = <_CategoryListItem>[];
     for (final item in categoryTree) {
       flatList.add(_CategoryListItem(category: item.category, isChild: false));
-      for (final child in item.children) {
-        flatList.add(_CategoryListItem(category: child, isChild: true));
+      // 只有展开的分类才显示子分类
+      if (_expandedCategories.contains(item.category.id)) {
+        for (final child in item.children) {
+          flatList.add(_CategoryListItem(category: child, isChild: true));
+        }
       }
     }
 
@@ -98,6 +114,7 @@ class _CategoryManagementPageState
         final category = item.category;
         final hasChildren =
             ref.read(categoryProvider.notifier).hasChildren(category.id);
+        final isExpanded = _expandedCategories.contains(category.id);
 
         return Card(
           key: ValueKey(category.id),
@@ -109,6 +126,9 @@ class _CategoryManagementPageState
             borderRadius: BorderRadius.circular(12),
           ),
           child: ListTile(
+            onTap: hasChildren && !item.isChild
+                ? () => _toggleExpand(category.id)
+                : null,
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -124,9 +144,21 @@ class _CategoryManagementPageState
                       size: 16, color: AppColors.textSecondary),
                   const SizedBox(width: 4),
                 ],
-                Text(
-                  category.localizedName,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+                // 有子分类的父分类显示展开/收起图标
+                if (hasChildren && !item.isChild) ...[
+                  Icon(
+                    isExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 20,
+                    color: category.color,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Flexible(
+                  child: Text(
+                    category.localizedName,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 if (category.isCustom) ...[
                   const SizedBox(width: 8),
@@ -137,8 +169,8 @@ class _CategoryManagementPageState
                       color: AppColors.primary.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text(
-                      '自定义',
+                    child: Text(
+                      context.l10n.customCategory,
                       style: TextStyle(
                         fontSize: 10,
                         color: AppColors.primary,
@@ -146,20 +178,21 @@ class _CategoryManagementPageState
                     ),
                   ),
                 ],
-                if (hasChildren) ...[
+                // 显示子分类数量
+                if (hasChildren && !item.isChild) ...[
                   const SizedBox(width: 8),
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha:0.1),
+                      color: category.color.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text(
-                      '父分类',
+                    child: Text(
+                      context.l10n.subcategoriesCount(ref.read(categoryProvider.notifier).getChildCategories(category.id).length),
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.blue,
+                        color: category.color,
                       ),
                     ),
                   ),
@@ -174,7 +207,7 @@ class _CategoryManagementPageState
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline,
                         color: AppColors.primary),
-                    tooltip: '添加子分类',
+                    tooltip: context.l10n.addCategory,
                     onPressed: () =>
                         _showAddSubcategoryDialog(context, ref, category),
                   ),
@@ -243,12 +276,12 @@ class _CategoryManagementPageState
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('删除分类'),
+          title: Text(context.l10n.deleteCategory),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('确定要删除"${category.localizedName}"吗？此操作不可恢复。'),
+              Text(context.l10n.confirmDeleteCategoryMsg(category.localizedName)),
               if (hasChildren) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -257,13 +290,13 @@ class _CategoryManagementPageState
                     color: Colors.orange.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
                       Icon(Icons.warning_amber, color: Colors.orange, size: 20),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '此分类包含子分类，删除后所有子分类也将被删除',
+                          context.l10n.deleteWithSubcategories,
                           style: TextStyle(fontSize: 12, color: Colors.orange),
                         ),
                       ),
@@ -276,7 +309,7 @@ class _CategoryManagementPageState
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
+              child: Text(context.l10n.cancel),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -292,7 +325,7 @@ class _CategoryManagementPageState
                 }
                 Navigator.pop(context);
               },
-              child: const Text('删除'),
+              child: Text(context.l10n.delete),
             ),
           ],
         );
@@ -376,8 +409,8 @@ class _CategoryEditPageState extends ConsumerState<_CategoryEditPage> {
   Widget build(BuildContext context) {
     final isEdit = widget.category != null;
     final title = isEdit
-        ? '编辑分类'
-        : (_selectedParentId != null ? '添加子分类' : '添加分类');
+        ? context.l10n.editCategory
+        : (_selectedParentId != null ? context.l10n.addCategory : context.l10n.addCategory);
 
     return Scaffold(
       appBar: AppBar(
@@ -385,7 +418,7 @@ class _CategoryEditPageState extends ConsumerState<_CategoryEditPage> {
         actions: [
           TextButton(
             onPressed: _save,
-            child: const Text('保存', style: TextStyle(color: Colors.white)),
+            child: Text(context.l10n.save, style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -397,8 +430,8 @@ class _CategoryEditPageState extends ConsumerState<_CategoryEditPage> {
             // 分类名称
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: '分类名称',
+              decoration: InputDecoration(
+                labelText: context.l10n.categoryName,
                 border: OutlineInputBorder(),
               ),
               autofocus: true,
@@ -406,7 +439,7 @@ class _CategoryEditPageState extends ConsumerState<_CategoryEditPage> {
             const SizedBox(height: 24),
 
             // 图标颜色
-            const Text('图标颜色', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            Text(context.l10n.iconColor, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 12,
@@ -438,7 +471,7 @@ class _CategoryEditPageState extends ConsumerState<_CategoryEditPage> {
             const SizedBox(height: 24),
 
             // 图标选择
-            const Text('图标', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            Text(context.l10n.iconText, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
             const SizedBox(height: 12),
             GridView.builder(
               shrinkWrap: true,
@@ -479,7 +512,7 @@ class _CategoryEditPageState extends ConsumerState<_CategoryEditPage> {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入分类名称')),
+        SnackBar(content: Text(context.l10n.pleaseEnter)),
       );
       return;
     }

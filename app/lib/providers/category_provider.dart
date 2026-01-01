@@ -29,15 +29,32 @@ class CategoryNotifier extends SimpleCrudNotifier<Category, String> {
   Future<List<Category>> fetchAll() async {
     final categories = await db.getCategories();
     if (categories.isEmpty) {
-      // Initialize with default categories
+      // Initialize with all default categories (including subcategories)
       final defaults = [
         ...DefaultCategories.expenseCategories,
+        ...DefaultCategories.expenseSubCategories,
         ...DefaultCategories.incomeCategories,
+        ...DefaultCategories.incomeSubCategories,
       ];
       for (final category in defaults) {
         await db.insertCategory(category);
       }
       return defaults;
+    }
+    // Check if we need to add new subcategories (for existing users)
+    final existingIds = categories.map((c) => c.id).toSet();
+    final allDefaults = [
+      ...DefaultCategories.expenseCategories,
+      ...DefaultCategories.expenseSubCategories,
+      ...DefaultCategories.incomeCategories,
+      ...DefaultCategories.incomeSubCategories,
+    ];
+    final newCategories = allDefaults.where((c) => !existingIds.contains(c.id)).toList();
+    if (newCategories.isNotEmpty) {
+      for (final category in newCategories) {
+        await db.insertCategory(category);
+      }
+      return [...categories, ...newCategories];
     }
     return categories;
   }

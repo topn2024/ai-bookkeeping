@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import create_access_token
+from app.core.security import create_access_token, create_refresh_token
 from app.models.user import User
 from app.models.oauth_provider import OAuthProviderType
 from app.schemas.user import Token, UserResponse
@@ -53,11 +53,13 @@ async def oauth_login(
         await db.commit()
         await db.refresh(user)
 
-        # Generate token
+        # Generate tokens
         access_token = create_access_token(str(user.id))
+        refresh_token = create_refresh_token(str(user.id))
 
         return Token(
             access_token=access_token,
+            refresh_token=refresh_token,
             user=UserResponse.model_validate(user),
         )
 

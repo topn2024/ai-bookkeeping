@@ -92,6 +92,8 @@ class RecentTransaction(BaseModel):
     type_name: str
     amount: str
     category_name: str
+    account_name: Optional[str] = None
+    book_name: Optional[str] = None
     note: Optional[str] = None
     created_at: datetime
 

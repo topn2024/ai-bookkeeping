@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/budget.dart';
+import '../l10n/l10n.dart';
 import '../providers/budget_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/ledger_provider.dart';
@@ -21,7 +22,7 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('预算管理'),
+        title: Text(context.l10n.budgetManagement),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -47,14 +48,14 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          '暂无预算',
+                          context.l10n.noBudget,
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: theme.colorScheme.outline,
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '点击右上角添加预算',
+                          context.l10n.clickToAddBudget,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.outline,
                           ),
@@ -136,7 +137,7 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                     Row(
                       children: [
                         Text(
-                          '钱龄',
+                          context.l10n.moneyAge,
                           style: theme.textTheme.titleMedium,
                         ),
                         const SizedBox(width: 8),
@@ -164,7 +165,7 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${moneyAge.days} 天',
+                      context.l10n.moneyAgeDays(moneyAge.days),
                       style: theme.textTheme.headlineSmall?.copyWith(
                         color: statusColor,
                         fontWeight: FontWeight.bold,
@@ -213,39 +214,39 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                   const Icon(Icons.access_time, size: 28),
                   const SizedBox(width: 12),
                   Text(
-                    '什么是钱龄？',
+                    context.l10n.whatIsMoneyAge,
                     style: theme.textTheme.titleLarge,
                   ),
                 ],
               ),
               const SizedBox(height: 16),
               Text(
-                '钱龄（Age of Money）是YNAB预算法的核心指标之一。它表示您当前花费的钱是多少天前赚到的。',
+                context.l10n.moneyAgeDescription,
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 16),
               _buildMoneyAgeInfoRow(
-                '优秀',
-                '≥ 30天',
-                '资金周转非常健康',
+                context.l10n.excellent,
+                context.l10n.daysOrMore(30),
+                context.l10n.healthyCashFlow,
                 Colors.green,
               ),
               _buildMoneyAgeInfoRow(
-                '良好',
-                '14-29天',
-                '资金周转较好',
+                context.l10n.good,
+                context.l10n.daysRange(14, 29),
+                context.l10n.goodCashFlow,
                 Colors.blue,
               ),
               _buildMoneyAgeInfoRow(
-                '一般',
-                '7-13天',
-                '建议增加储蓄缓冲',
+                context.l10n.fair,
+                context.l10n.daysRange(7, 13),
+                context.l10n.considerSavingsBuffer,
                 Colors.orange,
               ),
               _buildMoneyAgeInfoRow(
-                '需改善',
-                '< 7天',
-                '可能在花费刚收到的钱',
+                context.l10n.needsImprovement,
+                context.l10n.lessThanDays(7),
+                context.l10n.spendingRecentIncome,
                 Colors.red,
               ),
               const SizedBox(height: 16),
@@ -264,7 +265,7 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        '提高钱龄的方法：控制支出、增加收入、建立应急储蓄',
+                        context.l10n.improveMoneyAgeTip,
                         style: TextStyle(
                           color: theme.colorScheme.primary,
                           fontSize: 13,
@@ -385,9 +386,9 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                                 color: Colors.purple.withValues(alpha:0.1),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text(
-                                '零基',
-                                style: TextStyle(
+                              child: Text(
+                                context.l10n.custom,
+                                style: const TextStyle(
                                   fontSize: 10,
                                   color: Colors.purple,
                                 ),
@@ -403,9 +404,9 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                                 color: Colors.blue.withValues(alpha:0.1),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text(
-                                '结转',
-                                style: TextStyle(
+                              child: Text(
+                                context.l10n.budgetCarryover,
+                                style: const TextStyle(
                                   fontSize: 10,
                                   color: Colors.blue,
                                 ),
@@ -428,13 +429,13 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                     }
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'edit',
                       child: Row(
                         children: [
                           Icon(Icons.edit),
                           SizedBox(width: 8),
-                          Text('编辑'),
+                          Text(context.l10n.edit),
                         ],
                       ),
                     ),
@@ -444,17 +445,17 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                         children: [
                           Icon(budget.isEnabled ? Icons.pause : Icons.play_arrow),
                           const SizedBox(width: 8),
-                          Text(budget.isEnabled ? '暂停' : '启用'),
+                          Text(budget.isEnabled ? context.l10n.pauseBudget : context.l10n.enableBudget),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'delete',
                       child: Row(
                         children: [
                           Icon(Icons.delete, color: Colors.red),
                           SizedBox(width: 8),
-                          Text('删除', style: TextStyle(color: Colors.red)),
+                          Text(context.l10n.delete, style: TextStyle(color: Colors.red)),
                         ],
                       ),
                     ),
@@ -467,11 +468,11 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '已使用 ¥${usage.spent.toStringAsFixed(2)}',
+                  context.l10n.budgetSpent(usage.spent.toStringAsFixed(2)),
                   style: theme.textTheme.bodyMedium,
                 ),
                 Text(
-                  '预算 ¥${budget.amount.toStringAsFixed(2)}',
+                  context.l10n.budgetTotal(budget.amount.toStringAsFixed(2)),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.outline,
                   ),
@@ -501,8 +502,8 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
                 ),
                 Text(
                   usage.remaining >= 0
-                      ? '剩余 ¥${usage.remaining.toStringAsFixed(2)}'
-                      : '超支 ¥${(-usage.remaining).toStringAsFixed(2)}',
+                      ? context.l10n.budgetRemainingAmount(usage.remaining.toStringAsFixed(2))
+                      : context.l10n.budgetOverspentAmount((-usage.remaining).toStringAsFixed(2)),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: usage.remaining >= 0 ? Colors.green : Colors.red,
                   ),
@@ -518,20 +519,20 @@ class _BudgetManagementPageState extends ConsumerState<BudgetManagementPage> {
   void _confirmDelete(BuildContext context, Budget budget) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('确定要删除预算"${budget.name}"吗？'),
+      builder: (ctx) => AlertDialog(
+        title: Text(context.l10n.confirmDelete),
+        content: Text(context.l10n.confirmDeleteBudgetMsg(budget.name)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(context.l10n.cancel),
           ),
           TextButton(
             onPressed: () {
               ref.read(budgetProvider.notifier).deleteBudget(budget.id);
-              Navigator.pop(context);
+              Navigator.pop(ctx);
             },
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
+            child: Text(context.l10n.delete, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -618,7 +619,7 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      title: Text(widget.budget == null ? '添加预算' : '编辑预算'),
+      title: Text(widget.budget == null ? context.l10n.addBudget : context.l10n.editBudget),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -626,22 +627,22 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
           children: [
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: '预算名称',
-                hintText: '例如：月度总预算',
+              decoration: InputDecoration(
+                labelText: context.l10n.budgetName,
+                hintText: context.l10n.budgetNameHint,
               ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _amountController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: '预算金额',
+              decoration: InputDecoration(
+                labelText: context.l10n.budgetAmount,
                 prefixText: '¥ ',
               ),
             ),
             const SizedBox(height: 16),
-            Text('预算周期', style: theme.textTheme.bodySmall),
+            Text(context.l10n.budgetPeriod, style: theme.textTheme.bodySmall),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -650,13 +651,13 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
                 String label;
                 switch (period) {
                   case BudgetPeriod.daily:
-                    label = '每日';
+                    label = context.l10n.daily;
                   case BudgetPeriod.weekly:
-                    label = '每周';
+                    label = context.l10n.weekly;
                   case BudgetPeriod.monthly:
-                    label = '每月';
+                    label = context.l10n.monthly;
                   case BudgetPeriod.yearly:
-                    label = '每年';
+                    label = context.l10n.yearly;
                 }
                 return ChoiceChip(
                   label: Text(label),
@@ -670,7 +671,7 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
               }).toList(),
             ),
             const SizedBox(height: 16),
-            Text('预算类型', style: theme.textTheme.bodySmall),
+            Text(context.l10n.budgetType, style: theme.textTheme.bodySmall),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -680,11 +681,11 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
                 String hint;
                 switch (type) {
                   case BudgetType.traditional:
-                    label = '传统预算';
-                    hint = '设定固定预算额度';
+                    label = context.l10n.traditionalBudget;
+                    hint = context.l10n.traditionalBudgetHint;
                   case BudgetType.zeroBased:
-                    label = '零基预算';
-                    hint = 'YNAB式，为每一分钱分配用途';
+                    label = context.l10n.zeroBudget;
+                    hint = context.l10n.zeroBudgetHint;
                 }
                 return Tooltip(
                   message: hint,
@@ -701,18 +702,18 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
               }).toList(),
             ),
             const SizedBox(height: 16),
-            Text('关联分类（可选）', style: theme.textTheme.bodySmall),
+            Text(context.l10n.linkedCategory, style: theme.textTheme.bodySmall),
             const SizedBox(height: 8),
             DropdownButtonFormField<String?>(
               initialValue: _selectedCategoryId,
-              decoration: const InputDecoration(
-                hintText: '全部分类',
+              decoration: InputDecoration(
+                hintText: context.l10n.allCategories,
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               items: [
-                const DropdownMenuItem<String?>(
+                DropdownMenuItem<String?>(
                   value: null,
-                  child: Text('全部分类'),
+                  child: Text(context.l10n.allCategories),
                 ),
                 ...expenseCategories.map((category) => DropdownMenuItem(
                   value: category.id,
@@ -730,7 +731,7 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
               },
             ),
             const SizedBox(height: 16),
-            Text('颜色', style: theme.textTheme.bodySmall),
+            Text(context.l10n.colorText, style: theme.textTheme.bodySmall),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -757,7 +758,7 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
               }).toList(),
             ),
             const SizedBox(height: 16),
-            Text('图标', style: theme.textTheme.bodySmall),
+            Text(context.l10n.iconText, style: theme.textTheme.bodySmall),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -789,20 +790,20 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
             const SizedBox(height: 24),
             const Divider(),
             const SizedBox(height: 16),
-            Text('预算结转', style: theme.textTheme.titleSmall),
+            Text(context.l10n.budgetCarryover, style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
             SwitchListTile(
               value: _enableCarryover,
               onChanged: (value) {
                 setState(() => _enableCarryover = value);
               },
-              title: const Text('启用预算结转'),
-              subtitle: const Text('将剩余/超支金额结转至下一周期'),
+              title: Text(context.l10n.budgetCarryover),
+              subtitle: Text(context.l10n.carryoverToNextPeriod),
               contentPadding: EdgeInsets.zero,
             ),
             if (_enableCarryover) ...[
               const SizedBox(height: 8),
-              Text('结转模式', style: theme.textTheme.bodySmall),
+              Text(context.l10n.carryoverMode, style: theme.textTheme.bodySmall),
               const SizedBox(height: 8),
               RadioListTile<bool>(
                 value: true,
@@ -810,8 +811,8 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
                 onChanged: (value) {
                   setState(() => _carryoverSurplusOnly = value!);
                 },
-                title: const Text('仅结转剩余'),
-                subtitle: const Text('只有剩余金额会结转，超支不累计'),
+                title: Text(context.l10n.carryoverSurplusOnly),
+                subtitle: Text(context.l10n.carryoverSurplusOnlyDesc),
                 contentPadding: EdgeInsets.zero,
                 dense: true,
               ),
@@ -821,8 +822,8 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
                 onChanged: (value) {
                   setState(() => _carryoverSurplusOnly = value!);
                 },
-                title: const Text('结转所有'),
-                subtitle: const Text('剩余和超支金额都会结转'),
+                title: Text(context.l10n.carryoverAll),
+                subtitle: Text(context.l10n.carryoverAllDesc),
                 contentPadding: EdgeInsets.zero,
                 dense: true,
               ),
@@ -833,11 +834,11 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
+          child: Text(context.l10n.cancel),
         ),
         TextButton(
           onPressed: _saveBudget,
-          child: const Text('保存'),
+          child: Text(context.l10n.save),
         ),
       ],
     );
@@ -849,7 +850,7 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入预算名称')),
+        SnackBar(content: Text(context.l10n.pleaseEnter)),
       );
       return;
     }
@@ -857,7 +858,7 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
     final amount = double.tryParse(amountText);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入有效的预算金额')),
+        SnackBar(content: Text(context.l10n.pleaseEnterValidAmount)),
       );
       return;
     }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'currency.dart';
+import '../services/account_localization_service.dart';
 
 enum AccountType {
   cash,
@@ -19,6 +20,7 @@ class Account {
   final bool isDefault;
   final DateTime createdAt;
   final CurrencyType currency; // 账户货币类型
+  final bool isCustom; // 是否为用户自定义账户
 
   const Account({
     required this.id,
@@ -30,7 +32,17 @@ class Account {
     this.isDefault = false,
     required this.createdAt,
     this.currency = CurrencyType.cny, // 默认人民币
+    this.isCustom = false,
   });
+
+  /// 获取本地化的账户名称
+  ///
+  /// 对于系统默认账户，返回当前语言的翻译
+  /// 对于用户自定义账户，返回原始名称
+  String get localizedName {
+    if (isCustom) return name;
+    return AccountLocalizationService.instance.getAccountName(id, originalName: name);
+  }
 
   Account copyWith({
     String? id,
@@ -41,6 +53,7 @@ class Account {
     Color? color,
     bool? isDefault,
     CurrencyType? currency,
+    bool? isCustom,
   }) {
     return Account(
       id: id ?? this.id,
@@ -52,6 +65,7 @@ class Account {
       isDefault: isDefault ?? this.isDefault,
       createdAt: createdAt,
       currency: currency ?? this.currency,
+      isCustom: isCustom ?? this.isCustom,
     );
   }
 

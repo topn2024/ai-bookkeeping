@@ -104,7 +104,7 @@ class BuildInfo {
   static const String buildType = '$buildTypeLabel';
 
   /// 带类型的完整版本号
-  static const String displayVersion = '$major.$minor.$patch ($buildTypeLabel)';
+  static const String displayVersion = '$major.$minor.$patch';
 }
 ''';
 
@@ -164,7 +164,7 @@ class BuildInfo {
   static const String buildType = '$typeLabel';
 
   /// 带类型的完整版本号
-  static const String displayVersion = '$major.$minor.$patch ($typeLabel)';
+  static const String displayVersion = '$major.$minor.$patch';
 }
 ''';
       buildInfoFile.writeAsStringSync(updatedBuildInfoContent);

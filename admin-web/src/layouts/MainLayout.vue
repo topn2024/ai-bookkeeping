@@ -211,9 +211,12 @@ const handleCommand = async (command: string) => {
   background-color: #001529;
   transition: width 0.3s;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 
   .logo {
     height: 64px;
+    min-height: 64px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -234,7 +237,28 @@ const handleCommand = async (command: string) => {
   }
 
   .sidebar-menu {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
     border-right: none;
+
+    // 自定义滚动条样式
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #001529;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #1890ff;
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: #40a9ff;
+    }
 
     :deep(.el-menu-item.is-active) {
       background-color: #1890ff !important;

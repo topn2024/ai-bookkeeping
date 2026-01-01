@@ -8,11 +8,13 @@ import 'pages/main_navigation.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
 import 'l10n/app_localizations.dart';
+import 'l10n/generated/app_localizations.dart' as gen;
 import 'core/logger.dart';
 import 'services/cleanup_scheduler.dart';
 import 'services/app_config_service.dart';
 import 'services/http_service.dart';
 import 'services/app_upgrade_service.dart';
+import 'services/auto_sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,12 +52,28 @@ void main() async {
     logger.warning('Failed to initialize app config: $e', tag: 'App');
   }
 
+  // Initialize HTTP service (load auth token from secure storage)
+  try {
+    await HttpService().initialize();
+    logger.info('HTTP service initialized with auth token', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize HTTP service: $e', tag: 'App');
+  }
+
   // Initialize cleanup scheduler for source files
   try {
     await CleanupScheduler().initialize();
     logger.info('Cleanup scheduler initialized', tag: 'App');
   } catch (e) {
     logger.warning('Failed to initialize cleanup scheduler: $e', tag: 'App');
+  }
+
+  // Initialize auto-sync service
+  try {
+    await AutoSyncService().initialize();
+    logger.info('Auto-sync service initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize auto-sync service: $e', tag: 'App');
   }
 
   // Check for app updates (non-blocking)
@@ -131,8 +149,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       darkTheme: darkTheme,
       themeMode: themeNotifier.themeMode,
       locale: localeState.locale,
-      supportedLocales: AppLanguages.supportedLocales,
+      supportedLocales: gen.S.supportedLocales,
       localizationsDelegates: [
+        gen.S.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,

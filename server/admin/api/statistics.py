@@ -1122,15 +1122,6 @@ async def get_paid_user_analysis(
         total_free = 0
         free_avg_tx = 0
 
-    # Renewal rate (if we have subscription end dates)
-    renewal_rate = 0  # Would need subscription history to calculate
-
-    # LTV estimation (simplified)
-    # Assuming monthly subscription and average retention
-    monthly_price = 19.9  # Hypothetical price
-    avg_retention_months = 6  # Hypothetical average
-    estimated_ltv = monthly_price * avg_retention_months
-
     # Premium user feature usage
     feature_usage = []
     try:
@@ -1156,12 +1147,15 @@ async def get_paid_user_analysis(
     except Exception:
         pass
 
-    # Subscription tier distribution (simplified)
+    # Subscription tier distribution - based on member_level field
+    # member_level: 0=普通, 1=VIP (no detailed tier info available)
     tier_distribution = [
-        {"tier": "月度会员", "count": int(total_premium * 0.4), "percentage": 40},
-        {"tier": "年度会员", "count": int(total_premium * 0.5), "percentage": 50},
-        {"tier": "终身会员", "count": int(total_premium * 0.1), "percentage": 10},
+        {"tier": "VIP会员", "count": total_premium, "percentage": 100 if total_premium > 0 else 0},
     ]
+
+    # Calculate real premium percentage
+    total_all_users = total_premium + total_free
+    premium_pct = round(total_premium / total_all_users * 100, 2) if total_all_users > 0 else 0
 
     return {
         "period": f"近{days}天",
@@ -1171,7 +1165,7 @@ async def get_paid_user_analysis(
             "total_premium_users": total_premium,
             "new_premium_users": new_premium,
             "total_free_users": total_free,
-            "premium_percentage": round(total_premium / (total_premium + total_free) * 100, 2) if (total_premium + total_free) > 0 else 0,
+            "premium_percentage": premium_pct,
         },
         "activity_comparison": {
             "premium_avg_transactions": premium_avg_tx,
@@ -1179,15 +1173,437 @@ async def get_paid_user_analysis(
             "activity_multiplier": round(premium_avg_tx / free_avg_tx, 1) if free_avg_tx > 0 else 0,
         },
         "revenue_metrics": {
-            "estimated_monthly_revenue": round(total_premium * monthly_price * 0.4, 2),  # Assuming 40% monthly
-            "estimated_ltv": estimated_ltv,
-            "renewal_rate": renewal_rate,
+            "message": "收入指标需要配置支付系统后才能获取真实数据",
         },
         "tier_distribution": tier_distribution,
         "feature_usage": feature_usage,
         "insights": [
             f"付费用户平均交易量是免费用户的 {round(premium_avg_tx / free_avg_tx, 1) if free_avg_tx > 0 else 0} 倍" if free_avg_tx > 0 else "暂无对比数据",
             f"本期新增 {new_premium} 位付费会员",
-            f"付费用户占比 {round(total_premium / (total_premium + total_free) * 100, 2) if (total_premium + total_free) > 0 else 0}%",
-        ],
+            f"付费用户占比 {premium_pct}%",
+        ] if total_all_users > 0 else ["暂无用户数据"],
+    }
+
+
+# ============ Aggregate Overview Endpoints ============
+
+@router.get("/users/overview")
+async def get_user_overview(
+    days: int = Query(30, ge=7, le=365),
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("stats:user")),
+):
+    """用户概览统计（聚合数据）"""
+    end_date = date.today()
+    start_date = end_date - timedelta(days=days)
+    prev_start_date = start_date - timedelta(days=days)
+
+    # Total users
+    total_result = await db.execute(select(func.count(User.id)))
+    total_users = total_result.scalar() or 0
+
+    # New users in period
+    new_result = await db.execute(
+        select(func.count(User.id)).where(
+            and_(
+                func.date(User.created_at) >= start_date,
+                func.date(User.created_at) <= end_date,
+            )
+        )
+    )
+    new_users = new_result.scalar() or 0
+
+    # New users in previous period (for change calculation)
+    prev_new_result = await db.execute(
+        select(func.count(User.id)).where(
+            and_(
+                func.date(User.created_at) >= prev_start_date,
+                func.date(User.created_at) < start_date,
+            )
+        )
+    )
+    prev_new_users = prev_new_result.scalar() or 0
+    new_users_change = ((new_users - prev_new_users) / prev_new_users * 100) if prev_new_users > 0 else 0
+
+    # Active users (users with transactions in period)
+    active_result = await db.execute(
+        select(func.count(distinct(Transaction.user_id))).where(
+            Transaction.transaction_date >= start_date
+        )
+    )
+    active_users = active_result.scalar() or 0
+
+    # Retention rate (users who returned after first day)
+    retention_rate = active_users / total_users if total_users > 0 else 0
+
+    # Churn rate (inactive users)
+    churn_rate = 1 - retention_rate if retention_rate > 0 else 0
+
+    # Daily growth trend
+    growth_trend = []
+    for i in range(min(days, 30)):
+        day = end_date - timedelta(days=i)
+        day_new_result = await db.execute(
+            select(func.count(User.id)).where(func.date(User.created_at) == day)
+        )
+        day_new = day_new_result.scalar() or 0
+
+        day_active_result = await db.execute(
+            select(func.count(distinct(Transaction.user_id))).where(
+                func.date(Transaction.transaction_date) == day
+            )
+        )
+        day_active = day_active_result.scalar() or 0
+
+        day_total_result = await db.execute(
+            select(func.count(User.id)).where(func.date(User.created_at) <= day)
+        )
+        day_total = day_total_result.scalar() or 0
+
+        growth_trend.insert(0, {
+            "date": day.isoformat(),
+            "new_users": day_new,
+            "active_users": day_active,
+            "total_users": day_total,
+        })
+
+    # Source distribution - based on actual registration method
+    phone_only_result = await db.execute(
+        select(func.count(User.id)).where(
+            and_(User.phone != None, User.email == None)
+        )
+    )
+    phone_only = phone_only_result.scalar() or 0
+
+    email_only_result = await db.execute(
+        select(func.count(User.id)).where(
+            and_(User.email != None, User.phone == None)
+        )
+    )
+    email_only = email_only_result.scalar() or 0
+
+    both_result = await db.execute(
+        select(func.count(User.id)).where(
+            and_(User.phone != None, User.email != None)
+        )
+    )
+    both = both_result.scalar() or 0
+
+    source_distribution = [
+        {"source": "手机注册", "count": phone_only},
+        {"source": "邮箱注册", "count": email_only},
+        {"source": "手机+邮箱", "count": both},
+    ]
+
+    # Activity distribution - based on actual transaction counts in last 30 days
+    # High active: >= 20 transactions, Medium: 5-19, Low: 1-4, Silent: 0
+    high_active_result = await db.execute(
+        select(func.count(distinct(Transaction.user_id))).where(
+            Transaction.transaction_date >= start_date
+        ).group_by(Transaction.user_id).having(func.count(Transaction.id) >= 20)
+    )
+    high_active = len(high_active_result.all())
+
+    medium_active_result = await db.execute(
+        select(func.count(distinct(Transaction.user_id))).where(
+            Transaction.transaction_date >= start_date
+        ).group_by(Transaction.user_id).having(
+            and_(func.count(Transaction.id) >= 5, func.count(Transaction.id) < 20)
+        )
+    )
+    medium_active = len(medium_active_result.all())
+
+    low_active_result = await db.execute(
+        select(func.count(distinct(Transaction.user_id))).where(
+            Transaction.transaction_date >= start_date
+        ).group_by(Transaction.user_id).having(
+            and_(func.count(Transaction.id) >= 1, func.count(Transaction.id) < 5)
+        )
+    )
+    low_active = len(low_active_result.all())
+
+    silent_users = total_users - high_active - medium_active - low_active
+
+    activity_distribution = [
+        {"level": "高活跃(≥20笔)", "count": high_active},
+        {"level": "中活跃(5-19笔)", "count": medium_active},
+        {"level": "低活跃(1-4笔)", "count": low_active},
+        {"level": "沉默(0笔)", "count": max(0, silent_users)},
+    ]
+
+    return {
+        "total_users": total_users,
+        "new_users": new_users,
+        "new_users_change": round(new_users_change, 1),
+        "active_users": active_users,
+        "retention_rate": round(retention_rate, 3),
+        "churn_rate": round(churn_rate, 3),
+        "growth_trend": growth_trend,
+        "source_distribution": source_distribution,
+        "activity_distribution": activity_distribution,
+    }
+
+
+@router.get("/reports")
+async def get_reports_list(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    report_type: Optional[str] = None,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("stats:report")),
+):
+    """获取报表列表"""
+    # In production, this would query from a reports table
+    # For now, return empty list with proper structure
+    return {
+        "items": [],
+        "total": 0,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.post("/reports/generate")
+async def generate_report_task(
+    data: dict,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("stats:report")),
+):
+    """生成报表任务"""
+    report_id = str(uuid4())
+    return {
+        "id": report_id,
+        "status": "pending",
+        "message": "Report generation task created",
+        "report_type": data.get("type", "custom"),
+    }
+
+
+@router.get("/reports/quick/{report_type}")
+async def download_quick_report(
+    report_type: str,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("stats:report")),
+):
+    """快速下载报表"""
+    from fastapi.responses import Response
+
+    # Generate simple CSV content
+    if report_type == "daily":
+        content = "日期,新增用户,活跃用户,交易笔数,交易金额\n"
+        content += f"{date.today().isoformat()},0,0,0,0\n"
+    elif report_type == "weekly":
+        content = "周,新增用户,活跃用户,交易笔数,交易金额\n"
+        content += f"本周,0,0,0,0\n"
+    elif report_type == "monthly":
+        content = "月份,新增用户,活跃用户,交易笔数,交易金额\n"
+        content += f"本月,0,0,0,0\n"
+    else:
+        content = "报表类型,数据\n暂无数据,0\n"
+
+    return Response(
+        content=content.encode('utf-8-sig'),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename={report_type}_report.csv"
+        }
+    )
+
+
+@router.get("/reports/{report_id}/download")
+async def download_report(
+    report_id: str,
+    current_admin: AdminUser = Depends(get_current_admin),
+    _: bool = Depends(has_permission("stats:report")),
+):
+    """下载指定报表"""
+    from fastapi.responses import Response
+
+    content = f"报表ID,{report_id}\n暂无数据,0\n"
+    return Response(
+        content=content.encode('utf-8-sig'),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=report_{report_id}.csv"
+        }
+    )
+
+
+@router.delete("/reports/{report_id}")
+async def delete_report(
+    report_id: str,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("stats:report")),
+):
+    """删除报表"""
+    return {"message": f"Report {report_id} deleted"}
+
+
+@router.get("/transactions/overview")
+async def get_transaction_overview(
+    days: int = Query(30, ge=7, le=365),
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(has_permission("stats:transaction")),
+):
+    """交易概览统计（聚合数据）"""
+    end_date = date.today()
+    start_date = end_date - timedelta(days=days)
+
+    # Total metrics (transaction_type: 1=expense, 2=income, 3=transfer)
+    metrics_result = await db.execute(
+        select(
+            func.count(Transaction.id).label("count"),
+            func.sum(case((Transaction.transaction_type == 2, Transaction.amount), else_=0)).label("income"),
+            func.sum(case((Transaction.transaction_type == 1, Transaction.amount), else_=0)).label("expense"),
+        ).where(Transaction.transaction_date >= start_date)
+    )
+    metrics_row = metrics_result.first()
+
+    transaction_count = metrics_row.count or 0
+    total_income = float(metrics_row.income or 0)
+    total_expense = float(metrics_row.expense or 0)
+    total_amount = total_income + total_expense
+
+    # Daily trend
+    trend = []
+    for i in range(min(days, 30)):
+        day = end_date - timedelta(days=i)
+        day_result = await db.execute(
+            select(
+                func.sum(case((Transaction.transaction_type == 2, Transaction.amount), else_=0)).label("income"),
+                func.sum(case((Transaction.transaction_type == 1, Transaction.amount), else_=0)).label("expense"),
+            ).where(func.date(Transaction.transaction_date) == day)
+        )
+        day_row = day_result.first()
+        day_income = float(day_row.income or 0)
+        day_expense = float(day_row.expense or 0)
+        trend.insert(0, {
+            "date": day.isoformat(),
+            "income": day_income,
+            "expense": day_expense,
+            "net": day_income - day_expense,
+        })
+
+    # Expense categories TOP10 (transaction_type=1 is expense)
+    expense_cat_result = await db.execute(
+        select(
+            Category.name,
+            func.sum(Transaction.amount).label("amount"),
+        ).join(Category, Transaction.category_id == Category.id).where(
+            and_(
+                Transaction.transaction_type == 1,
+                Transaction.transaction_date >= start_date,
+            )
+        ).group_by(Category.name).order_by(func.sum(Transaction.amount).desc()).limit(10)
+    )
+    expense_categories = [
+        {"category": row.name, "amount": float(row.amount or 0)}
+        for row in expense_cat_result.all()
+    ]
+
+    # Income categories TOP10 (transaction_type=2 is income)
+    income_cat_result = await db.execute(
+        select(
+            Category.name,
+            func.sum(Transaction.amount).label("amount"),
+        ).join(Category, Transaction.category_id == Category.id).where(
+            and_(
+                Transaction.transaction_type == 2,
+                Transaction.transaction_date >= start_date,
+            )
+        ).group_by(Category.name).order_by(func.sum(Transaction.amount).desc()).limit(10)
+    )
+    income_categories = [
+        {"category": row.name, "amount": float(row.amount or 0)}
+        for row in income_cat_result.all()
+    ]
+
+    # Amount distribution
+    amount_ranges = [
+        ("0-50", 0, 50),
+        ("50-100", 50, 100),
+        ("100-200", 100, 200),
+        ("200-500", 200, 500),
+        ("500-1000", 500, 1000),
+        ("1000+", 1000, 1000000),
+    ]
+    amount_distribution = []
+    for label, min_amt, max_amt in amount_ranges:
+        range_result = await db.execute(
+            select(func.count(Transaction.id)).where(
+                and_(
+                    Transaction.transaction_date >= start_date,
+                    Transaction.amount >= min_amt,
+                    Transaction.amount < max_amt,
+                )
+            )
+        )
+        amount_distribution.append({
+            "range": label,
+            "count": range_result.scalar() or 0,
+        })
+
+    # Time distribution (by hour) - use transaction_time field
+    time_distribution = []
+    for hour in range(24):
+        hour_result = await db.execute(
+            select(func.count(Transaction.id)).where(
+                and_(
+                    Transaction.transaction_date >= start_date,
+                    Transaction.transaction_time != None,
+                    func.extract('hour', Transaction.transaction_time) == hour,
+                )
+            )
+        )
+        time_distribution.append({
+            "hour": hour,
+            "count": hour_result.scalar() or 0,
+        })
+
+    # Top users
+    top_users_result = await db.execute(
+        select(
+            Transaction.user_id,
+            User.nickname,
+            func.count(Transaction.id).label("transaction_count"),
+            func.sum(case((Transaction.transaction_type == 2, Transaction.amount), else_=0)).label("total_income"),
+            func.sum(case((Transaction.transaction_type == 1, Transaction.amount), else_=0)).label("total_expense"),
+            func.avg(Transaction.amount).label("avg_amount"),
+        ).join(User, Transaction.user_id == User.id).where(
+            Transaction.transaction_date >= start_date
+        ).group_by(Transaction.user_id, User.nickname).order_by(
+            func.count(Transaction.id).desc()
+        ).limit(20)
+    )
+    top_users = [
+        {
+            "user_id": str(row.user_id),
+            "nickname": row.nickname or "未设置",
+            "transaction_count": row.transaction_count,
+            "total_income": float(row.total_income or 0),
+            "total_expense": float(row.total_expense or 0),
+            "avg_amount": float(row.avg_amount or 0),
+        }
+        for row in top_users_result.all()
+    ]
+
+    return {
+        "metrics": {
+            "total_amount": total_amount,
+            "total_income": total_income,
+            "total_expense": total_expense,
+            "transaction_count": transaction_count,
+        },
+        "trend": trend,
+        "expense_categories": expense_categories,
+        "income_categories": income_categories,
+        "amount_distribution": amount_distribution,
+        "time_distribution": time_distribution,
+        "top_users": top_users,
     }

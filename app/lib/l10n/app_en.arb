@@ -675,5 +675,125 @@
     "placeholders": {
       "feature": {"type": "String"}
     }
-  }
+  },
+
+  "checkUpdateTitle": "Check Update",
+  "currentVersionLabel": "Current Version {version}",
+  "@currentVersionLabel": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "cleanDownloadCache": "Clean Download Cache",
+  "calculating": "Calculating...",
+  "cachedSize": "Cached {size}",
+  "@cachedSize": {
+    "placeholders": {
+      "size": {"type": "String"}
+    }
+  },
+  "noCache": "No cache",
+  "helpAndFeedback": "Help & Feedback",
+  "helpAndFeedbackDesc": "User guide, FAQ",
+  "versionNumber": "Version",
+  "buildTime": "Build Time",
+  "packageName": "Package Name",
+  "userAgreement": "User Agreement",
+  "logManagement": "Log Management",
+  "logManagementDesc": "View and clean app logs",
+  "copyrightText": "© {year} AI Bookkeeping\nSmart Finance Assistant",
+  "@copyrightText": {
+    "placeholders": {
+      "year": {"type": "int"}
+    }
+  },
+  "smartFinanceAssistant": "Smart Finance Assistant",
+  "downloadCacheManagement": "Download Cache Management",
+  "noCacheFiles": "No cache files",
+  "cacheFileList": "Cache files:",
+  "clearingCache": "Clearing...",
+  "clearAllCache": "Clear All",
+  "confirmClearCache": "Are you sure you want to clear all downloaded APKs and cache files?",
+  "pauseBudget": "Pause",
+  "enableBudget": "Enable",
+  "clickToAddBudget": "Click top-right to add budget",
+  "confirmDeleteBudgetMsg": "Are you sure you want to delete budget \"{name}\"?",
+  "@confirmDeleteBudgetMsg": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "budgetNameHint": "e.g. Monthly Total Budget",
+  "allCategories": "All Categories",
+  "carryoverToNextPeriod": "Carry surplus/overspent to next period",
+  "carryoverSurplusOnly": "Surplus only",
+  "carryoverSurplusOnlyDesc": "Only carry positive balance to next period",
+  "carryoverAll": "Surplus and deficit",
+  "carryoverAllDesc": "Carry positive or negative balance to next period",
+  "traditionalBudget": "Traditional",
+  "traditionalBudgetHint": "Set fixed budget amount",
+  "zeroBudget": "Zero-based",
+  "zeroBudgetHint": "YNAB-style, allocate every dollar",
+  "moneyAge": "Money Age",
+  "moneyAgeDays": "{days} days",
+  "@moneyAgeDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "whatIsMoneyAge": "What is Money Age?",
+  "moneyAgeDescription": "Money Age (Age of Money) is a key metric in the YNAB budgeting method. It shows how many days ago the money you're spending today was earned.",
+  "excellent": "Excellent",
+  "good": "Good",
+  "fair": "Fair",
+  "needsImprovement": "Needs Improvement",
+  "daysOrMore": "≥ {days} days",
+  "@daysOrMore": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "daysRange": "{min}-{max} days",
+  "@daysRange": {
+    "placeholders": {
+      "min": {"type": "int"},
+      "max": {"type": "int"}
+    }
+  },
+  "lessThanDays": "< {days} days",
+  "@lessThanDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "healthyCashFlow": "Very healthy cash flow",
+  "goodCashFlow": "Good cash flow",
+  "considerSavingsBuffer": "Consider adding savings buffer",
+  "spendingRecentIncome": "May be spending recent income",
+  "improveMoneyAgeTip": "How to improve: Control spending, increase income, build emergency fund",
+  "budgetSpent": "Spent ¥{amount}",
+  "@budgetSpent": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "budgetTotal": "Budget ¥{amount}",
+  "@budgetTotal": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "budgetRemainingAmount": "Remaining ¥{amount}",
+  "@budgetRemainingAmount": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "budgetOverspentAmount": "Overspent ¥{amount}",
+  "@budgetOverspentAmount": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "budgetName": "Budget Name"
 }

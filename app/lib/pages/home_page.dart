@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../l10n/l10n.dart';
 import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
@@ -37,7 +38,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI智能记账'),
+        title: Text(context.l10n.aiSmartBookkeeping),
         actions: const [
           BudgetAlertIconButton(),
         ],
@@ -69,7 +70,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       BuildContext context, double income, double expense, ThemeColors colors) {
     final balance = income - expense;
     final now = DateTime.now();
-    final monthName = DateFormat('yyyy年MM月').format(now);
+    final monthName = DateFormat('yyyy/MM').format(now);
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -95,30 +96,49 @@ class _HomePageState extends ConsumerState<HomePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                monthName,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
+              GestureDetector(
+                onTap: () => _navigateToStatistics(context),
+                child: Row(
+                  children: [
+                    Text(
+                      monthName,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right, color: Colors.white70, size: 16),
+                  ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  '本月',
-                  style: TextStyle(color: Colors.white, fontSize: 12),
+              GestureDetector(
+                onTap: () => _navigateToStatistics(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        context.l10n.thisMonthLabel,
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.analytics, color: Colors.white, size: 14),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          const Text(
-            '结余',
-            style: TextStyle(color: Colors.white70, fontSize: 14),
+          Text(
+            context.l10n.balance,
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
           ),
           const SizedBox(height: 4),
           Text(
@@ -136,14 +156,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.arrow_downward,
+                        const Icon(Icons.arrow_downward,
                             color: Colors.white70, size: 16),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text(
-                          '收入',
-                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                          context.l10n.income,
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
                         ),
                       ],
                     ),
@@ -170,15 +190,15 @@ class _HomePageState extends ConsumerState<HomePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.arrow_upward,
+                          const Icon(Icons.arrow_upward,
                               color: Colors.white70, size: 16),
-                          SizedBox(width: 4),
+                          const SizedBox(width: 4),
                           Text(
-                            '支出',
+                            context.l10n.expense,
                             style:
-                                TextStyle(color: Colors.white70, fontSize: 12),
+                                const TextStyle(color: Colors.white70, fontSize: 12),
                           ),
                         ],
                       ),
@@ -211,7 +231,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           _buildActionButton(
             context,
             icon: Icons.flash_on,
-            label: '快速记账',
+            label: context.l10n.quickRecord,
             color: colors.transfer,
             onTap: () {
               Navigator.push(
@@ -223,7 +243,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           _buildActionButton(
             context,
             icon: Icons.camera_alt,
-            label: '拍照记账',
+            label: context.l10n.photoRecord,
             color: colors.primary,
             onTap: () {
               Navigator.push(
@@ -235,7 +255,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           _buildActionButton(
             context,
             icon: Icons.mic,
-            label: '语音记账',
+            label: context.l10n.voiceRecord,
             color: colors.income,
             onTap: () {
               Navigator.push(
@@ -247,7 +267,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           _buildActionButton(
             context,
             icon: Icons.analytics,
-            label: '报表分析',
+            label: context.l10n.reportAnalysis,
             color: colors.expense,
             onTap: () {
               Navigator.push(
@@ -310,7 +330,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '最近交易',
+                context.l10n.recentTransactions,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -324,7 +344,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     MaterialPageRoute(builder: (context) => const TransactionListPage()),
                   );
                 },
-                child: const Text('查看全部'),
+                child: Text(context.l10n.viewAll),
               ),
             ],
           ),
@@ -416,6 +436,14 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
+  /// 跳转到统计分析页面
+  void _navigateToStatistics(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const StatisticsPage()),
+    );
+  }
+
   /// 编辑交易
   void _handleEdit(Transaction transaction) {
     // 先收起按钮
@@ -441,17 +469,17 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: const Text('确定要删除这条记录吗？'),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.l10n.confirmDelete),
+        content: Text(context.l10n.confirmDeleteRecord),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(context.l10n.cancel),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('删除', style: TextStyle(color: colors.expense)),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(context.l10n.delete, style: TextStyle(color: colors.expense)),
           ),
         ],
       ),
@@ -460,7 +488,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (confirmed == true && mounted) {
       ref.read(transactionProvider.notifier).deleteTransaction(transaction.id);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已删除')),
+        SnackBar(content: Text(context.l10n.deleted)),
       );
     }
   }
@@ -556,11 +584,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                     const SizedBox(height: 12),
                     // 详情信息
                     if (transaction.note != null && transaction.note!.isNotEmpty)
-                      _buildDetailRow('备注', transaction.note!),
-                    _buildDetailRow('类型', isExpense ? '支出' : (isIncome ? '收入' : '转账')),
-                    _buildDetailRow('账户', transaction.accountId),
+                      _buildDetailRow(context.l10n.noteLabel, transaction.note!),
+                    _buildDetailRow(context.l10n.typeLabel, isExpense ? context.l10n.expense : (isIncome ? context.l10n.income : context.l10n.transfer)),
+                    _buildDetailRow(context.l10n.accountLabel, transaction.accountId),
                     if (transaction.aiConfidence != null)
-                      _buildDetailRow('AI置信度', '${(transaction.aiConfidence! * 100).toStringAsFixed(0)}%'),
+                      _buildDetailRow(context.l10n.aiConfidenceLabel, '${(transaction.aiConfidence! * 100).toStringAsFixed(0)}%'),
 
                     // Source data section
                     if (transaction.source == TransactionSource.image &&
@@ -568,9 +596,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                       const SizedBox(height: 20),
                       const Divider(),
                       const SizedBox(height: 12),
-                      const Text(
-                        '原始图片',
-                        style: TextStyle(
+                      Text(
+                        context.l10n.originalImage,
+                        style: const TextStyle(
                           fontWeight: FontWeight.w500,
                           fontSize: 14,
                         ),
@@ -609,17 +637,17 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     switch (source) {
       case TransactionSource.image:
-        label = '拍照';
+        label = context.l10n.sourcePhoto;
         icon = Icons.camera_alt;
         color = Colors.blue;
         break;
       case TransactionSource.voice:
-        label = '语音';
+        label = context.l10n.sourceVoice;
         icon = Icons.mic;
         color = Colors.green;
         break;
       case TransactionSource.email:
-        label = '邮件';
+        label = context.l10n.sourceEmail;
         icon = Icons.email;
         color = Colors.orange;
         break;
@@ -727,7 +755,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     );
                   },
                   icon: const Icon(Icons.fullscreen, size: 16),
-                  label: const Text('查看大图'),
+                  label: Text(context.l10n.viewLargeImage),
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(0, 0),
@@ -750,15 +778,15 @@ class _HomePageState extends ConsumerState<HomePage> {
   String _getExpiryText(DateTime expiresAt) {
     final now = DateTime.now();
     if (expiresAt.isBefore(now)) {
-      return '已过期';
+      return context.l10n.expired;
     }
     final diff = expiresAt.difference(now);
     if (diff.inDays > 0) {
-      return '${diff.inDays}天后过期';
+      return context.l10n.expiresInDays(diff.inDays);
     }
     if (diff.inHours > 0) {
-      return '${diff.inHours}小时后过期';
+      return context.l10n.expiresInHours(diff.inHours);
     }
-    return '即将过期';
+    return context.l10n.expiringSoon;
   }
 }

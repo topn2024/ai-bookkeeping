@@ -766,6 +766,173 @@ async def list_permissions(
     return AdminPermissionListResponse(modules=modules)
 
 
+@router.post("/{admin_id}/reset-password")
+async def reset_admin_password(
+    request: Request,
+    admin_id: UUID,
+    current_admin: AdminUser = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db),
+):
+    """重置管理员密码"""
+    result = await db.execute(
+        select(AdminUser).where(AdminUser.id == admin_id)
+    )
+    admin = result.scalar_one_or_none()
+
+    if not admin:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="管理员不存在",
+        )
+
+    if admin.is_superadmin and admin.id != current_admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="不能重置其他超级管理员的密码",
+        )
+
+    # Generate temporary password
+    import secrets
+    temp_password = secrets.token_urlsafe(12)
+    admin.password_hash = get_password_hash(temp_password)
+
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="admin.reset_password",
+        module="admin",
+        target_type="admin",
+        target_id=str(admin_id),
+        target_name=admin.username,
+        description=f"重置管理员密码: {admin.username}",
+        request=request,
+    )
+    await db.commit()
+
+    return {"message": "密码已重置", "temp_password": temp_password}
+
+
+@router.put("/{admin_id}/status")
+async def toggle_admin_status(
+    request: Request,
+    admin_id: UUID,
+    status_data: dict,
+    current_admin: AdminUser = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db),
+):
+    """切换管理员状态"""
+    result = await db.execute(
+        select(AdminUser).where(AdminUser.id == admin_id)
+    )
+    admin = result.scalar_one_or_none()
+
+    if not admin:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="管理员不存在",
+        )
+
+    if admin.is_superadmin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="不能禁用超级管理员",
+        )
+
+    is_active = status_data.get("is_active", True)
+    old_status = admin.is_active
+    admin.is_active = is_active
+
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="admin.toggle_status",
+        module="admin",
+        target_type="admin",
+        target_id=str(admin_id),
+        target_name=admin.username,
+        description=f"{'启用' if is_active else '禁用'}管理员: {admin.username}",
+        changes={"is_active": {"before": old_status, "after": is_active}},
+        request=request,
+    )
+    await db.commit()
+
+    return {"message": f"管理员已{'启用' if is_active else '禁用'}", "is_active": is_active}
+
+
+@router.get("/me/login-history")
+async def get_login_history(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取登录历史"""
+    from admin.models.admin_log import AdminLog
+
+    offset = (page - 1) * page_size
+
+    # Query login logs
+    result = await db.execute(
+        select(AdminLog)
+        .where(
+            AdminLog.admin_id == current_admin.id,
+            AdminLog.action.like("auth.login%"),
+        )
+        .order_by(AdminLog.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+    )
+    logs = result.scalars().all()
+
+    count_result = await db.execute(
+        select(func.count(AdminLog.id)).where(
+            AdminLog.admin_id == current_admin.id,
+            AdminLog.action.like("auth.login%"),
+        )
+    )
+    total = count_result.scalar() or 0
+
+    return {
+        "items": [
+            {
+                "id": str(log.id),
+                "login_time": log.created_at.isoformat() if log.created_at else None,
+                "ip_address": log.ip_address,
+                "user_agent": log.user_agent,
+                "status": "success" if log.status == 1 else "failed",
+            }
+            for log in logs
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.post("/me/avatar")
+async def upload_avatar(
+    request: Request,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """上传头像"""
+    # In production, this would save to MinIO/S3
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="admin.upload_avatar",
+        module="admin",
+        description="上传头像",
+        request=request,
+    )
+    await db.commit()
+
+    return {"avatar_url": "/static/avatar.png", "message": "Avatar upload not yet implemented"}
+
+
 @router.post("/init-data")
 async def init_admin_data(
     request: Request,

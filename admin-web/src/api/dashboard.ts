@@ -1,5 +1,5 @@
 import { get } from './request'
-import type { DashboardStats, TrendData, HeatmapData, PaginatedResponse, Transaction } from '@/types'
+import type { DashboardStats, HeatmapData } from '@/types'
 
 // Dashboard APIs
 export const getStats = (): Promise<DashboardStats> => {

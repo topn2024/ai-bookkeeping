@@ -80,12 +80,12 @@
             {{ formatDateTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column prop="last_login_at" label="最后登录" width="180">
+        <el-table-column prop="last_login_at" label="最后活跃" width="180">
           <template #default="{ row }">
             {{ row.last_login_at ? formatDateTime(row.last_login_at) : '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" text size="small" @click="handleView(row)">查看</el-button>
             <el-button

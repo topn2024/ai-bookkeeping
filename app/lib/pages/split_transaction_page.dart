@@ -488,7 +488,7 @@ class _SplitTransactionPageState extends ConsumerState<SplitTransactionPage> {
     String accountName = '微信';
     final account = DefaultAccounts.accounts.where((a) => a.id == _selectedAccount).firstOrNull;
     if (account != null) {
-      accountName = account.name;
+      accountName = account.localizedName;
     }
 
     return Container(
@@ -622,7 +622,7 @@ class _SplitTransactionPageState extends ConsumerState<SplitTransactionPage> {
                     ),
                     child: Icon(account.icon, color: account.color),
                   ),
-                  title: Text(account.name),
+                  title: Text(account.localizedName),
                   trailing: isSelected
                       ? const Icon(Icons.check, color: AppColors.primary)
                       : null,
