@@ -5,6 +5,133 @@ import '../models/transaction.dart';
 ///
 /// 提供常用的日期计算和范围操作，消除代码中重复的日期逻辑
 class AppDateUtils {
+  // ==================== 时区处理 ====================
+
+  /// 北京时区偏移（UTC+8）
+  static const Duration beijingOffset = Duration(hours: 8);
+
+  /// 解析服务器返回的日期时间（北京时间）为本地时间
+  ///
+  /// 服务器使用北京时间存储和返回日期，此方法将其转换为用户本地时间
+  static DateTime parseServerDateTime(String? dateStr, [String? timeStr]) {
+    if (dateStr == null || dateStr.isEmpty) return DateTime.now();
+
+    try {
+      DateTime date;
+      if (dateStr.contains('T')) {
+        // ISO 8601 format with time
+        date = DateTime.parse(dateStr);
+      } else {
+        // Date only format (YYYY-MM-DD)
+        date = DateTime.parse(dateStr);
+      }
+
+      // Apply time if provided
+      if (timeStr != null && timeStr.isNotEmpty) {
+        final timeParts = timeStr.split(':');
+        if (timeParts.length >= 2) {
+          date = DateTime(
+            date.year,
+            date.month,
+            date.day,
+            int.parse(timeParts[0]),
+            int.parse(timeParts[1]),
+            timeParts.length > 2 ? int.parse(timeParts[2].split('.')[0]) : 0,
+          );
+        }
+      }
+
+      // Server time is Beijing time (UTC+8)
+      // Convert to UTC first, then to local
+      final utcTime = date.subtract(beijingOffset);
+      return utcTime.toLocal();
+    } catch (e) {
+      return DateTime.now();
+    }
+  }
+
+  /// 将本地时间转换为服务器时间（北京时间）格式
+  static String toServerDateString(DateTime localDateTime) {
+    // Convert local time to UTC, then to Beijing time
+    final utcTime = localDateTime.toUtc();
+    final beijingTime = utcTime.add(beijingOffset);
+    return '${beijingTime.year}-${beijingTime.month.toString().padLeft(2, '0')}-${beijingTime.day.toString().padLeft(2, '0')}';
+  }
+
+  /// 将本地时间转换为服务器时间格式（时间部分）
+  static String toServerTimeString(DateTime localDateTime) {
+    final utcTime = localDateTime.toUtc();
+    final beijingTime = utcTime.add(beijingOffset);
+    return '${beijingTime.hour.toString().padLeft(2, '0')}:${beijingTime.minute.toString().padLeft(2, '0')}:${beijingTime.second.toString().padLeft(2, '0')}';
+  }
+
+  // ==================== AI识别日期解析 ====================
+
+  /// 解析AI识别的日期字符串（支持相对日期和绝对日期）
+  ///
+  /// 支持的格式：
+  /// - 相对日期：今天、昨天、前天、大前天、明天、后天、today、yesterday、tomorrow
+  /// - 完整日期：YYYY-MM-DD、YYYY/MM/DD、YYYY年MM月DD日
+  /// - 短日期：MM-DD、MM/DD、MM月DD日（使用当前年份）
+  static DateTime parseRecognizedDate(String? dateStr) {
+    final now = DateTime.now();
+    if (dateStr == null || dateStr.isEmpty) return now;
+
+    final trimmedStr = dateStr.trim();
+    final lowerStr = trimmedStr.toLowerCase();
+
+    // 相对日期（中文和英文）
+    if (lowerStr == '今天' || lowerStr == 'today') return now;
+    if (lowerStr == '昨天' || lowerStr == 'yesterday') {
+      return now.subtract(const Duration(days: 1));
+    }
+    if (lowerStr == '前天') return now.subtract(const Duration(days: 2));
+    if (lowerStr == '大前天') return now.subtract(const Duration(days: 3));
+    if (lowerStr == '明天' || lowerStr == 'tomorrow') {
+      return now.add(const Duration(days: 1));
+    }
+    if (lowerStr == '后天') return now.add(const Duration(days: 2));
+
+    // 日期格式正则表达式列表（按优先级排序）
+    final patterns = [
+      // 完整日期格式
+      (RegExp(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$'), true),  // YYYY-MM-DD or YYYY/MM/DD
+      (RegExp(r'^(\d{4})年(\d{1,2})月(\d{1,2})日?$'), true),   // YYYY年MM月DD日
+      // 短日期格式（使用当前年份）
+      (RegExp(r'^(\d{1,2})[-/](\d{1,2})$'), false),            // MM-DD or MM/DD
+      (RegExp(r'^(\d{1,2})月(\d{1,2})日?$'), false),           // MM月DD日
+    ];
+
+    for (final (pattern, hasYear) in patterns) {
+      final match = pattern.firstMatch(trimmedStr);
+      if (match != null) {
+        try {
+          if (hasYear) {
+            return DateTime(
+              int.parse(match.group(1)!),
+              int.parse(match.group(2)!),
+              int.parse(match.group(3)!),
+            );
+          } else {
+            return DateTime(
+              now.year,
+              int.parse(match.group(1)!),
+              int.parse(match.group(2)!),
+            );
+          }
+        } catch (_) {
+          continue;
+        }
+      }
+    }
+
+    // 尝试标准 DateTime.parse
+    try {
+      return DateTime.parse(dateStr);
+    } catch (_) {
+      return now;
+    }
+  }
   // ==================== 月份计算 ====================
 
   /// 获取月份起始日期

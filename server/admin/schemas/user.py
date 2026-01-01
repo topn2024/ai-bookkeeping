@@ -1,10 +1,10 @@
 """User management schemas (for managing app users)."""
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Literal
 from uuid import UUID
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class AppUserListItem(BaseModel):
@@ -94,7 +94,15 @@ class AppUserTransaction(BaseModel):
     account_name: str
     note_masked: Optional[str] = None  # 脱敏后的备注
     transaction_date: str
+    transaction_time: Optional[str] = None  # Time part for display
     created_at: datetime
+
+    @computed_field
+    @property
+    def type(self) -> Literal["expense", "income", "transfer"]:
+        """Computed type string from transaction_type."""
+        type_map = {1: "expense", 2: "income", 3: "transfer"}
+        return type_map.get(self.transaction_type, "expense")
 
 
 class AppUserTransactionsResponse(BaseModel):

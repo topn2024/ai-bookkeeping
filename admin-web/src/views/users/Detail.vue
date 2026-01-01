@@ -97,9 +97,9 @@
                 {{ row.note || '-' }}
               </template>
             </el-table-column>
-            <el-table-column prop="transaction_time" label="时间" width="160">
+            <el-table-column label="时间" width="160">
               <template #default="{ row }">
-                {{ formatDateTime(row.transaction_time) }}
+                {{ formatTransactionDateTime(row) }}
               </template>
             </el-table-column>
           </el-table>
@@ -240,6 +240,24 @@ const viewAllTransactions = () => {
 const formatDateTime = (date: string | undefined) => {
   if (!date) return '-'
   return new Date(date).toLocaleString('zh-CN')
+}
+
+const formatTransactionDateTime = (row: any) => {
+  // Combine transaction_date and transaction_time
+  const dateStr = row.transaction_date
+  const timeStr = row.transaction_time
+  if (!dateStr) return '-'
+  if (timeStr) {
+    // Combine date and time
+    const d = new Date(`${dateStr}T${timeStr}`)
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleString('zh-CN')
+    }
+  }
+  // Fallback to date only
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return '-'
+  return d.toLocaleDateString('zh-CN')
 }
 
 const formatMoney = (amount: number | string | null | undefined) => {

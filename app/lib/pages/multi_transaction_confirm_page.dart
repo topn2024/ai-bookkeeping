@@ -10,6 +10,7 @@ import '../providers/transaction_provider.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
 import '../services/category_localization_service.dart';
+import '../utils/date_utils.dart';
 
 /// 多笔交易确认页面
 /// 用于展示和编辑语音识别出的多笔交易
@@ -56,30 +57,30 @@ class _MultiTransactionConfirmPageState
     if (category == null) {
       return type == 'income' ? 'other_income' : 'other_expense';
     }
-    // 已经是英文ID直接返回
-    final validCategories = [
-      'food', 'transport', 'shopping', 'entertainment', 'housing',
-      'medical', 'education', 'other_expense', 'other_income',
-      'salary', 'bonus', 'parttime', 'investment', 'other',
-    ];
-    if (validCategories.contains(category)) {
-      if (category == 'other') {
-        return type == 'income' ? 'other_income' : 'other_expense';
-      }
+
+    // 使用 AIRecognitionResult 的有效分类ID列表（包含所有二级分类）
+    if (AIRecognitionResult.validCategoryIds.contains(category)) {
       return category;
     }
+
+    // 处理 'other' 特殊情况
+    if (category == 'other') {
+      return type == 'income' ? 'other_income' : 'other_expense';
+    }
+
+    // 尝试通过 DefaultCategories 查找
+    final cat = DefaultCategories.findById(category);
+    if (cat != null) {
+      return cat.id;
+    }
+
     return type == 'income' ? 'other_income' : 'other_expense';
   }
 
+  /// 解析AI识别的日期字符串
+  /// 使用集中的日期解析工具类 AppDateUtils.parseRecognizedDate
   DateTime _parseDate(String? dateStr) {
-    if (dateStr == null || dateStr.isEmpty) {
-      return DateTime.now();
-    }
-    try {
-      return DateTime.parse(dateStr);
-    } catch (_) {
-      return DateTime.now();
-    }
+    return AppDateUtils.parseRecognizedDate(dateStr);
   }
 
   double get _totalAmount =>
@@ -696,6 +697,14 @@ class _MultiTransactionConfirmPageState
   }
 
   String _getCategoryIcon(String categoryId) {
+    // 尝试通过 DefaultCategories 获取图标
+    final category = DefaultCategories.findById(categoryId);
+    if (category != null) {
+      // 获取对应的 emoji，根据图标类型映射
+      return _iconToEmoji(category.icon);
+    }
+
+    // 回退到默认图标
     const icons = {
       'food': '🍜',
       'transport': '🚗',
@@ -713,6 +722,56 @@ class _MultiTransactionConfirmPageState
       'other': '📦',
     };
     return icons[categoryId] ?? '📦';
+  }
+
+  String _iconToEmoji(IconData icon) {
+    // 根据常见图标映射到 emoji
+    if (icon == Icons.restaurant) return '🍜';
+    if (icon == Icons.directions_car) return '🚗';
+    if (icon == Icons.local_taxi) return '🚕';
+    if (icon == Icons.directions_bus) return '🚌';
+    if (icon == Icons.train) return '🚆';
+    if (icon == Icons.flight) return '✈️';
+    if (icon == Icons.local_gas_station) return '⛽';
+    if (icon == Icons.local_parking) return '🅿️';
+    if (icon == Icons.shopping_cart) return '🛒';
+    if (icon == Icons.phone_android) return '📱';
+    if (icon == Icons.tv) return '📺';
+    if (icon == Icons.weekend) return '🛋️';
+    if (icon == Icons.card_giftcard) return '🎁';
+    if (icon == Icons.movie) return '🎬';
+    if (icon == Icons.sports_esports) return '🎮';
+    if (icon == Icons.beach_access) return '🏖️';
+    if (icon == Icons.sports) return '⚽';
+    if (icon == Icons.mic) return '🎤';
+    if (icon == Icons.celebration) return '🎉';
+    if (icon == Icons.fitness_center) return '💪';
+    if (icon == Icons.home) return '🏠';
+    if (icon == Icons.bolt) return '⚡';
+    if (icon == Icons.water_drop) return '💧';
+    if (icon == Icons.local_fire_department) return '🔥';
+    if (icon == Icons.ac_unit) return '❄️';
+    if (icon == Icons.local_hospital) return '🏥';
+    if (icon == Icons.medication) return '💊';
+    if (icon == Icons.school) return '🎓';
+    if (icon == Icons.menu_book) return '📖';
+    if (icon == Icons.phone) return '📞';
+    if (icon == Icons.wifi) return '📶';
+    if (icon == Icons.checkroom) return '👔';
+    if (icon == Icons.spa) return '💆';
+    if (icon == Icons.subscriptions) return '📺';
+    if (icon == Icons.people) return '👥';
+    if (icon == Icons.account_balance) return '🏦';
+    if (icon == Icons.pets) return '🐾';
+    if (icon == Icons.account_balance_wallet) return '💰';
+    if (icon == Icons.emoji_events) return '🏆';
+    if (icon == Icons.trending_up) return '📈';
+    if (icon == Icons.work) return '💼';
+    if (icon == Icons.redeem) return '🧧';
+    if (icon == Icons.receipt_long) return '🧾';
+    if (icon == Icons.store) return '🏪';
+    if (icon == Icons.more_horiz) return '📦';
+    return '📦';
   }
 
   String _getCategoryName(String? categoryId) {

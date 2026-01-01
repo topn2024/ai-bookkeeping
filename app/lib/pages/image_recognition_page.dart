@@ -13,6 +13,7 @@ import '../models/category.dart';
 import '../models/transaction.dart';
 import '../widgets/duplicate_transaction_dialog.dart';
 import '../services/category_localization_service.dart';
+import '../utils/date_utils.dart';
 
 /// 图片识别记账页面
 class ImageRecognitionPage extends ConsumerStatefulWidget {
@@ -108,48 +109,10 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
     );
   }
 
-  /// 解析日期字符串
+  /// 解析AI识别的日期字符串
+  /// 使用集中的日期解析工具类 AppDateUtils.parseRecognizedDate
   DateTime _parseDate(String? dateStr) {
-    if (dateStr == null || dateStr.isEmpty || dateStr == '今天') {
-      return DateTime.now();
-    }
-
-    try {
-      // 尝试多种日期格式
-      final patterns = [
-        RegExp(r'(\d{4})-(\d{1,2})-(\d{1,2})'),  // 2024-12-30
-        RegExp(r'(\d{4})/(\d{1,2})/(\d{1,2})'),  // 2024/12/30
-        RegExp(r'(\d{4})年(\d{1,2})月(\d{1,2})日'), // 2024年12月30日
-        RegExp(r'(\d{1,2})-(\d{1,2})'),           // 12-30
-        RegExp(r'(\d{1,2})/(\d{1,2})'),           // 12/30
-        RegExp(r'(\d{1,2})月(\d{1,2})日'),        // 12月30日
-      ];
-
-      for (final pattern in patterns) {
-        final match = pattern.firstMatch(dateStr);
-        if (match != null) {
-          final groups = match.groups([1, 2, 3]).whereType<String>().toList();
-          if (groups.length >= 3) {
-            // 完整日期
-            return DateTime(
-              int.parse(groups[0]),
-              int.parse(groups[1]),
-              int.parse(groups[2]),
-            );
-          } else if (groups.length == 2) {
-            // 只有月日，使用当前年份
-            return DateTime(
-              DateTime.now().year,
-              int.parse(groups[0]),
-              int.parse(groups[1]),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      // 解析失败，使用当前日期
-    }
-    return DateTime.now();
+    return AppDateUtils.parseRecognizedDate(dateStr);
   }
 
   Future<void> _confirmAndCreateTransaction() async {

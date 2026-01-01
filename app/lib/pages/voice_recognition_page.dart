@@ -15,6 +15,7 @@ import '../models/category.dart';
 import '../models/transaction.dart';
 import '../widgets/duplicate_transaction_dialog.dart';
 import '../services/category_localization_service.dart';
+import '../utils/date_utils.dart';
 import 'multi_transaction_confirm_page.dart';
 
 /// 语音记账页面 - 单手操作优化设计
@@ -355,39 +356,10 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
     );
   }
 
+  /// 解析AI识别的日期字符串
+  /// 使用集中的日期解析工具类 AppDateUtils.parseRecognizedDate
   DateTime _parseDate(String? dateStr) {
-    if (dateStr == null || dateStr.isEmpty || dateStr == '今天') {
-      return DateTime.now();
-    }
-
-    try {
-      final patterns = [
-        RegExp(r'(\d{4})-(\d{1,2})-(\d{1,2})'),
-        RegExp(r'(\d{4})/(\d{1,2})/(\d{1,2})'),
-        RegExp(r'(\d{4})年(\d{1,2})月(\d{1,2})日'),
-        RegExp(r'(\d{1,2})-(\d{1,2})'),
-        RegExp(r'(\d{1,2})/(\d{1,2})'),
-        RegExp(r'(\d{1,2})月(\d{1,2})日'),
-      ];
-
-      for (final pattern in patterns) {
-        final match = pattern.firstMatch(dateStr);
-        if (match != null) {
-          final groups =
-              match.groups([1, 2, 3]).whereType<String>().toList();
-          if (groups.length >= 3) {
-            return DateTime(
-                int.parse(groups[0]), int.parse(groups[1]), int.parse(groups[2]));
-          } else if (groups.length == 2) {
-            return DateTime(
-                DateTime.now().year, int.parse(groups[0]), int.parse(groups[1]));
-          }
-        }
-      }
-    } catch (e) {
-      // 解析失败，使用当前日期
-    }
-    return DateTime.now();
+    return AppDateUtils.parseRecognizedDate(dateStr);
   }
 
   // 确认记账

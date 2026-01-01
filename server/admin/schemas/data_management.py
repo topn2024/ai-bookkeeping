@@ -1,10 +1,10 @@
 """Schemas for data management module."""
-from datetime import datetime, date
+from datetime import datetime, date, time
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 # ============ Transaction Schemas ============
@@ -24,6 +24,7 @@ class TransactionItem(BaseModel):
     amount: Decimal
     fee: Decimal = Decimal("0")
     transaction_date: date
+    transaction_time: Optional[time] = None  # Time part for display
     note: Optional[str] = None
     tags: Optional[List[str]] = None
     source: int = 0  # 0: manual, 1: image, 2: voice, 3: email
@@ -31,8 +32,23 @@ class TransactionItem(BaseModel):
     is_reimbursed: bool = False
     created_at: datetime
 
+    @computed_field
+    @property
+    def type(self) -> Literal["expense", "income", "transfer"]:
+        """Computed type string from transaction_type."""
+        type_map = {1: "expense", 2: "income", 3: "transfer"}
+        return type_map.get(self.transaction_type, "expense")
+
     class Config:
         from_attributes = True
+
+
+class TransactionSummary(BaseModel):
+    """Transaction summary statistics."""
+    total_count: int = 0
+    total_income: Decimal = Decimal("0")
+    total_expense: Decimal = Decimal("0")
+    net_income: Decimal = Decimal("0")
 
 
 class TransactionListResponse(BaseModel):
@@ -41,6 +57,7 @@ class TransactionListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+    summary: Optional[TransactionSummary] = None
 
 
 class TransactionDetail(TransactionItem):
@@ -170,10 +187,19 @@ class CategoryItem(BaseModel):
         from_attributes = True
 
 
+class CategoryStats(BaseModel):
+    """Category statistics."""
+    total_count: int = 0
+    income_count: int = 0
+    expense_count: int = 0
+    custom_count: int = 0
+
+
 class CategoryListResponse(BaseModel):
     """Category list response."""
     items: List[CategoryItem]
     total: int
+    stats: Optional[CategoryStats] = None
 
 
 class CategoryCreate(BaseModel):

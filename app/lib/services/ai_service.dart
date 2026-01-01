@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'qwen_service.dart';
+import '../models/category.dart';
 
 /// AI识别结果模型
 class AIRecognitionResult {
@@ -109,12 +110,9 @@ class AIRecognitionResult {
     return 'other_expense';
   }
 
-  /// 有效的分类ID列表
-  static const Set<String> validCategoryIds = {
-    'food', 'transport', 'shopping', 'entertainment', 'housing',
-    'medical', 'education', 'other_expense', 'other_income',
-    'salary', 'bonus', 'parttime', 'investment',
-  };
+  /// 有效的分类ID列表（包含一级和二级分类）
+  /// 使用 DefaultCategories.allCategoryIds 作为唯一来源
+  static Set<String> get validCategoryIds => DefaultCategories.allCategoryIds;
 
   /// 分类映射表 - 精确匹配
   static const Map<String, String> categoryMap = {
@@ -396,120 +394,354 @@ class AIService {
   }
 
   /// 本地智能分类（离线模式）
-  /// 使用关键词匹配进行分类推荐，按优先级排序
+  /// 使用关键词匹配进行分类推荐，优先返回二级分类
   String localSuggestCategory(String description) {
     final text = description.toLowerCase();
 
-    // 交通关键词（优先级高，避免被其他分类误判）
-    if (_containsAny(text, [
-      '打车', '滴滴', '出租车', '高德打车', 'T3', '曹操', '首汽',
-      '地铁', '公交', '公共交通',
-      '高铁', '火车', '12306', '铁路',
-      '飞机', '机票', '航班', '航空',
-      '加油', '中国石化', '中国石油', '壳牌', '加油站',
-      '停车', '停车费', '过路费', 'ETC', '高速',
-      '哈啰', '美团单车', '青桔', '共享单车',
-      '车费', '路费', '交通',
-    ])) {
+    // ========== 交通分类（优先级高，避免被其他分类误判）==========
+    // 打车
+    if (_containsAny(text, ['打车', '滴滴', '出租车', '高德打车', 'T3', '曹操', '首汽', '网约车', '快车', '专车'])) {
+      return 'transport_taxi';
+    }
+    // 公共交通
+    if (_containsAny(text, ['地铁', '公交', '公交卡', '地铁卡', '公共交通'])) {
+      return 'transport_public';
+    }
+    // 火车
+    if (_containsAny(text, ['高铁', '火车', '12306', '铁路', '动车'])) {
+      return 'transport_train';
+    }
+    // 飞机
+    if (_containsAny(text, ['飞机', '机票', '航班', '航空'])) {
+      return 'transport_flight';
+    }
+    // 加油
+    if (_containsAny(text, ['加油', '中国石化', '中国石油', '壳牌', '加油站', '汽油'])) {
+      return 'transport_fuel';
+    }
+    // 停车
+    if (_containsAny(text, ['停车', '停车费', '停车场'])) {
+      return 'transport_parking';
+    }
+    // 轮船
+    if (_containsAny(text, ['船票', '轮渡', '轮船'])) {
+      return 'transport_ship';
+    }
+    // 通用交通
+    if (_containsAny(text, ['过路费', 'ETC', '高速', '哈啰', '美团单车', '青桔', '共享单车', '车费', '路费', '交通'])) {
       return 'transport';
     }
 
-    // 餐饮关键词（包含常见商户）
-    if (_containsAny(text, [
-      '早餐', '午餐', '晚餐', '夜宵', '早饭', '午饭', '晚饭',
-      '外卖', '美团外卖', '饿了么',
-      '饭', '菜', '餐', '吃', '喝',
-      '咖啡', '星巴克', '瑞幸', 'Luckin',
-      '奶茶', '喜茶', '奈雪', '蜜雪', '茶百道', 'COCO', '一点点',
-      '麦当劳', '肯德基', 'KFC', '必胜客', '汉堡王', '德克士',
-      '海底捞', '火锅', '烧烤', '小吃', '快餐', '便当',
-      '面包', '蛋糕', '烘焙', '甜品',
-      '盒马', '永辉', '沃尔玛', '超市食品',
-      '便利店', '全家', '711', '罗森', '便利蜂',
-      '水果', '零食',
-    ])) {
+    // ========== 餐饮分类 ==========
+    // 早餐
+    if (_containsAny(text, ['早餐', '早饭', '早点', '包子', '豆浆', '油条'])) {
+      return 'food_breakfast';
+    }
+    // 午餐
+    if (_containsAny(text, ['午餐', '午饭', '中餐', '工作餐', '午间'])) {
+      return 'food_lunch';
+    }
+    // 晚餐
+    if (_containsAny(text, ['晚餐', '晚饭', '夜宵', '宵夜'])) {
+      return 'food_dinner';
+    }
+    // 饮品
+    if (_containsAny(text, ['咖啡', '星巴克', '瑞幸', 'Luckin', '奶茶', '喜茶', '奈雪', '蜜雪', '茶百道', 'COCO', '一点点', '饮料', '茶'])) {
+      return 'food_drink';
+    }
+    // 外卖
+    if (_containsAny(text, ['外卖', '美团外卖', '饿了么'])) {
+      return 'food_delivery';
+    }
+    // 水果
+    if (_containsAny(text, ['水果', '苹果', '香蕉', '橙子', '果汁'])) {
+      return 'food_fruit';
+    }
+    // 零食
+    if (_containsAny(text, ['零食', '小吃', '糖果', '薯片', '饼干'])) {
+      return 'food_snack';
+    }
+    // 通用餐饮
+    if (_containsAny(text, ['饭', '菜', '餐', '吃', '喝', '麦当劳', '肯德基', 'KFC', '必胜客', '汉堡王', '德克士',
+      '海底捞', '火锅', '烧烤', '快餐', '便当', '面包', '蛋糕', '烘焙', '甜品',
+      '盒马', '永辉', '沃尔玛', '便利店', '全家', '711', '罗森', '便利蜂'])) {
       return 'food';
     }
 
-    // 购物关键词
-    if (_containsAny(text, [
-      '淘宝', '天猫', '京东', '拼多多', '唯品会', '苏宁', '国美',
-      '超市', '商场', '百货',
-      '衣服', '服装', '鞋', '包', '帽子',
-      '优衣库', 'ZARA', 'HM', 'GAP', '无印良品',
-      '化妆品', '护肤', '口红', '丝芙兰', '屈臣氏',
-      '日用品', '生活用品',
-      '苹果', 'Apple', '小米', '华为', '手机', '电脑', '数码',
-      '购物', '网购', '买',
-    ])) {
+    // ========== 购物分类 ==========
+    // 日用品
+    if (_containsAny(text, ['日用品', '牙膏', '洗发水', '纸巾', '超市日用', '生活用品'])) {
+      return 'shopping_daily';
+    }
+    // 数码产品
+    if (_containsAny(text, ['手机', '电脑', '数码', '电子产品', '耳机', '苹果', 'Apple', '小米', '华为'])) {
+      return 'shopping_digital';
+    }
+    // 家电
+    if (_containsAny(text, ['冰箱', '洗衣机', '空调', '电视', '家电'])) {
+      return 'shopping_appliance';
+    }
+    // 家具
+    if (_containsAny(text, ['家具', '床', '沙发', '桌子', '椅子', '宜家'])) {
+      return 'shopping_furniture';
+    }
+    // 礼物
+    if (_containsAny(text, ['礼物', '礼品', '送人'])) {
+      return 'shopping_gift';
+    }
+    // 通用购物
+    if (_containsAny(text, ['淘宝', '天猫', '京东', '拼多多', '唯品会', '苏宁', '国美',
+      '超市', '商场', '百货', '购物', '网购', '买'])) {
       return 'shopping';
     }
 
-    // 娱乐关键词
-    if (_containsAny(text, [
-      '电影', '猫眼', '淘票票', '万达影城',
-      '游戏', '充值', '王者', '吃鸡', '原神',
-      'KTV', 'ktv', '唱歌', '卡拉OK',
-      '旅游', '景点', '门票', '酒店',
-      '健身', 'Keep', '瑜伽', '游泳', '运动',
-      '会员', 'VIP', '爱奇艺', '腾讯视频', '优酷', 'B站',
-      '演唱会', '演出', '话剧', '展览',
-      '迪士尼', '环球影城', '欢乐谷',
-      '娱乐', '休闲',
-    ])) {
+    // ========== 娱乐分类 ==========
+    // 电影
+    if (_containsAny(text, ['电影', '猫眼', '淘票票', '万达影城', '影院'])) {
+      return 'entertainment_movie';
+    }
+    // 游戏
+    if (_containsAny(text, ['游戏', '充值', '王者', '吃鸡', '原神', '游戏充值'])) {
+      return 'entertainment_game';
+    }
+    // KTV
+    if (_containsAny(text, ['KTV', 'ktv', '唱歌', '卡拉OK'])) {
+      return 'entertainment_ktv';
+    }
+    // 旅游
+    if (_containsAny(text, ['旅游', '景点', '门票', '酒店', '迪士尼', '环球影城', '欢乐谷'])) {
+      return 'entertainment_travel';
+    }
+    // 健身
+    if (_containsAny(text, ['健身', 'Keep', '瑜伽', '游泳', '健身房'])) {
+      return 'entertainment_fitness';
+    }
+    // 运动
+    if (_containsAny(text, ['运动', '球场', '球馆'])) {
+      return 'entertainment_sport';
+    }
+    // 聚会
+    if (_containsAny(text, ['聚会', '派对'])) {
+      return 'entertainment_party';
+    }
+    // 通用娱乐
+    if (_containsAny(text, ['演唱会', '演出', '话剧', '展览', '娱乐', '休闲'])) {
       return 'entertainment';
     }
 
-    // 住房关键词
-    if (_containsAny(text, [
-      '房租', '租金', '押金',
-      '水电', '水费', '电费', '燃气', '煤气', '暖气',
-      '物业', '物业费', '管理费',
-      '网费', '宽带', '中国移动', '中国联通', '中国电信',
-      '房贷', '按揭',
-      '装修', '家具', '家电', '宜家',
-    ])) {
+    // ========== 会员订阅 ==========
+    if (_containsAny(text, ['爱奇艺', '腾讯视频', '优酷', 'B站', 'Netflix', '视频会员'])) {
+      return 'subscription_video';
+    }
+    if (_containsAny(text, ['网易云', 'QQ音乐', 'Spotify', '音乐会员'])) {
+      return 'subscription_music';
+    }
+    if (_containsAny(text, ['百度网盘', 'iCloud', '网盘'])) {
+      return 'subscription_cloud';
+    }
+    if (_containsAny(text, ['88VIP', '京东Plus', '购物会员'])) {
+      return 'subscription_shopping';
+    }
+    if (_containsAny(text, ['会员', 'VIP'])) {
+      return 'subscription';
+    }
+
+    // ========== 居住分类 ==========
+    if (_containsAny(text, ['房租', '租金', '月租'])) {
+      return 'housing_rent';
+    }
+    if (_containsAny(text, ['房贷', '按揭', '还贷'])) {
+      return 'housing_mortgage';
+    }
+    if (_containsAny(text, ['物业', '物业费'])) {
+      return 'housing_property';
+    }
+    if (_containsAny(text, ['维修', '修理', '装修'])) {
+      return 'housing_repair';
+    }
+    if (_containsAny(text, ['押金'])) {
       return 'housing';
     }
 
-    // 医疗关键词
-    if (_containsAny(text, [
-      '医院', '门诊', '住院', '挂号',
-      '药', '药店', '大参林', '益丰', '老百姓',
-      '看病', '就医', '治疗',
-      '体检', '美年', '爱康',
-      '牙科', '口腔', '眼科',
-      '医疗', '健康',
-    ])) {
+    // ========== 水电燃气 ==========
+    if (_containsAny(text, ['电费', '充电费'])) {
+      return 'utilities_electric';
+    }
+    if (_containsAny(text, ['水费'])) {
+      return 'utilities_water';
+    }
+    if (_containsAny(text, ['燃气', '天然气', '煤气'])) {
+      return 'utilities_gas';
+    }
+    if (_containsAny(text, ['暖气', '供暖'])) {
+      return 'utilities_heating';
+    }
+    if (_containsAny(text, ['水电'])) {
+      return 'utilities';
+    }
+
+    // ========== 通讯 ==========
+    if (_containsAny(text, ['话费', '手机费', '充值'])) {
+      return 'communication_phone';
+    }
+    if (_containsAny(text, ['网费', '宽带', '中国移动', '中国联通', '中国电信'])) {
+      return 'communication_internet';
+    }
+
+    // ========== 医疗分类 ==========
+    if (_containsAny(text, ['挂号', '门诊', '看病'])) {
+      return 'medical_clinic';
+    }
+    if (_containsAny(text, ['药', '药店', '大参林', '益丰', '老百姓', '买药'])) {
+      return 'medical_medicine';
+    }
+    if (_containsAny(text, ['住院'])) {
+      return 'medical_hospital';
+    }
+    if (_containsAny(text, ['体检', '美年', '爱康', '健康检查'])) {
+      return 'medical_checkup';
+    }
+    if (_containsAny(text, ['保健品', '维生素'])) {
+      return 'medical_supplement';
+    }
+    if (_containsAny(text, ['医院', '就医', '治疗', '牙科', '口腔', '眼科', '医疗', '健康'])) {
       return 'medical';
     }
 
-    // 教育关键词
-    if (_containsAny(text, [
-      '学费', '培训', '课程', '网课',
-      '书', '图书', '书店',
-      '教育', '学习', '考试', '补习', '辅导',
-      '新东方', '学而思', '猿辅导', '作业帮',
-      '文具', '笔记本',
-    ])) {
+    // ========== 教育分类 ==========
+    if (_containsAny(text, ['学费', '报名费'])) {
+      return 'education_tuition';
+    }
+    if (_containsAny(text, ['书', '图书', '书店', '买书'])) {
+      return 'education_books';
+    }
+    if (_containsAny(text, ['培训', '课程', '网课', '新东方', '学而思', '猿辅导', '作业帮'])) {
+      return 'education_training';
+    }
+    if (_containsAny(text, ['考试', '报名'])) {
+      return 'education_exam';
+    }
+    if (_containsAny(text, ['教育', '学习', '补习', '辅导', '文具', '笔记本'])) {
       return 'education';
     }
 
-    // 收入关键词（按类型细分）
-    if (_containsAny(text, ['工资', '薪水', '月薪', '底薪', '发工资'])) {
+    // ========== 服饰分类 ==========
+    if (_containsAny(text, ['衣服', '上衣', '裤子', '外套', '服装', '优衣库', 'ZARA', 'HM', 'GAP'])) {
+      return 'clothing_clothes';
+    }
+    if (_containsAny(text, ['鞋子', '运动鞋', '皮鞋', '鞋'])) {
+      return 'clothing_shoes';
+    }
+    if (_containsAny(text, ['配饰', '手表', '项链', '包', '帽子'])) {
+      return 'clothing_accessories';
+    }
+
+    // ========== 美容分类 ==========
+    if (_containsAny(text, ['护肤', '面膜', '水乳', '护肤品'])) {
+      return 'beauty_skincare';
+    }
+    if (_containsAny(text, ['化妆品', '口红', '粉底', '丝芙兰', '屈臣氏'])) {
+      return 'beauty_cosmetics';
+    }
+    if (_containsAny(text, ['理发', '美发', '剪头发'])) {
+      return 'beauty_haircut';
+    }
+    if (_containsAny(text, ['美甲', '指甲'])) {
+      return 'beauty_nails';
+    }
+
+    // ========== 人情往来 ==========
+    if (_containsAny(text, ['份子钱', '随份子', '红包钱'])) {
+      return 'social_gift_money';
+    }
+    if (_containsAny(text, ['送礼', '过节'])) {
+      return 'social_festival';
+    }
+    if (_containsAny(text, ['请客', '请吃饭'])) {
+      return 'social_treat';
+    }
+    if (_containsAny(text, ['发红包'])) {
+      return 'social_redpacket';
+    }
+    if (_containsAny(text, ['给父母', '孝敬'])) {
+      return 'social_elder';
+    }
+
+    // ========== 金融保险 ==========
+    if (_containsAny(text, ['人寿', '寿险'])) {
+      return 'finance_life_insurance';
+    }
+    if (_containsAny(text, ['医保', '医疗险'])) {
+      return 'finance_medical_insurance';
+    }
+    if (_containsAny(text, ['车险', '交强险'])) {
+      return 'finance_car_insurance';
+    }
+    if (_containsAny(text, ['手续费', '转账费'])) {
+      return 'finance_fee';
+    }
+    if (_containsAny(text, ['利息', '贷款利息'])) {
+      return 'finance_loan_interest';
+    }
+
+    // ========== 宠物 ==========
+    if (_containsAny(text, ['猫粮', '狗粮', '宠物食品'])) {
+      return 'pet_food';
+    }
+    if (_containsAny(text, ['猫砂', '宠物玩具', '宠物用品'])) {
+      return 'pet_supplies';
+    }
+    if (_containsAny(text, ['宠物医院', '宠物看病'])) {
+      return 'pet_medical';
+    }
+
+    // ========== 收入分类 ==========
+    // 工资细分
+    if (_containsAny(text, ['基本工资', '底薪'])) {
+      return 'salary_base';
+    }
+    if (_containsAny(text, ['绩效', '绩效奖'])) {
+      return 'salary_performance';
+    }
+    if (_containsAny(text, ['加班费', '加班工资'])) {
+      return 'salary_overtime';
+    }
+    if (_containsAny(text, ['年终奖', '十三薪'])) {
+      return 'salary_annual';
+    }
+    if (_containsAny(text, ['工资', '薪水', '月薪', '发工资', '薪资'])) {
       return 'salary';
     }
-    if (_containsAny(text, ['奖金', '年终奖', '提成', '绩效'])) {
+
+    // 奖金细分
+    if (_containsAny(text, ['项目奖', '完成奖'])) {
+      return 'bonus_project';
+    }
+    if (_containsAny(text, ['季度奖'])) {
+      return 'bonus_quarterly';
+    }
+    if (_containsAny(text, ['奖金', '提成'])) {
       return 'bonus';
     }
+
+    // 其他收入
     if (_containsAny(text, ['兼职', '副业', '外快', '私单'])) {
       return 'parttime';
     }
-    if (_containsAny(text, ['理财', '投资', '收益', '利息', '分红', '股票', '基金', '余额宝'])) {
+    if (_containsAny(text, ['理财', '投资', '收益', '分红', '股票', '基金', '余额宝'])) {
       return 'investment';
     }
-    if (_containsAny(text, ['收入', '到账', '进账', '报销', '红包', '返现', '收到'])) {
-      return 'salary';  // 默认收入分类
+    if (_containsAny(text, ['收红包', '微信红包'])) {
+      return 'redpacket';
+    }
+    if (_containsAny(text, ['报销', '公司报销'])) {
+      return 'reimburse';
+    }
+    if (_containsAny(text, ['生意', '店铺', '营业', '经营'])) {
+      return 'business';
+    }
+    if (_containsAny(text, ['收入', '到账', '进账', '返现', '收到'])) {
+      return 'other_income';
     }
 
     return 'other_expense';  // 默认为支出的其他分类

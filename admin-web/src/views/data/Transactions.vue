@@ -92,9 +92,9 @@
             {{ row.note || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="transaction_time" label="交易时间" width="160">
+        <el-table-column label="交易时间" width="160">
           <template #default="{ row }">
-            {{ formatDateTime(row.transaction_time) }}
+            {{ formatTransactionDateTime(row) }}
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="160">
@@ -139,7 +139,7 @@
         <el-descriptions-item label="账户">{{ currentTransaction.account_name || '-' }}</el-descriptions-item>
         <el-descriptions-item label="账本">{{ currentTransaction.book_name }}</el-descriptions-item>
         <el-descriptions-item label="备注">{{ currentTransaction.note || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="交易时间">{{ formatDateTime(currentTransaction.transaction_time) }}</el-descriptions-item>
+        <el-descriptions-item label="交易时间">{{ formatTransactionDateTime(currentTransaction) }}</el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ formatDateTime(currentTransaction.created_at) }}</el-descriptions-item>
         <el-descriptions-item label="更新时间">{{ formatDateTime(currentTransaction.updated_at) }}</el-descriptions-item>
       </el-descriptions>
@@ -267,8 +267,29 @@ const handleExport = async () => {
 }
 
 // Formatters
-const formatDateTime = (date: string) => {
-  return new Date(date).toLocaleString('zh-CN')
+const formatDateTime = (date: string | null | undefined) => {
+  if (!date) return '-'
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return '-'
+  return d.toLocaleString('zh-CN')
+}
+
+const formatTransactionDateTime = (row: Transaction) => {
+  // Combine transaction_date and transaction_time
+  const dateStr = row.transaction_date
+  const timeStr = row.transaction_time
+  if (!dateStr) return '-'
+  if (timeStr) {
+    // Combine date and time
+    const d = new Date(`${dateStr}T${timeStr}`)
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleString('zh-CN')
+    }
+  }
+  // Fallback to date only
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return '-'
+  return d.toLocaleDateString('zh-CN')
 }
 
 const formatMoney = (amount: number | string | null | undefined) => {

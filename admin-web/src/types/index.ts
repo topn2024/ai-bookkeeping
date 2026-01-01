@@ -21,7 +21,9 @@ export interface LoginForm {
 
 export interface LoginResponse {
   access_token: string
+  refresh_token?: string
   token_type: string
+  expires_in?: number
   admin: AdminUser
 }
 
@@ -85,6 +87,12 @@ export interface AppUser {
   account_count: number
   last_login_at: string | null
   created_at: string
+  // Extended fields from detail API
+  nickname?: string | null
+  phone?: string | null
+  email?: string | null
+  gender?: string | null
+  status?: string
 }
 
 export interface UserDetail extends AppUser {
@@ -94,6 +102,20 @@ export interface UserDetail extends AppUser {
   total_expense: string
   total_balance: string
   last_transaction_at: string | null
+}
+
+// User Detail API Response
+export interface UserDetailResponse {
+  user: AppUser
+  stats: {
+    transaction_count: number
+    total_income: number
+    total_expense: number
+    book_count: number
+  }
+  recent_transactions: any[]
+  books: any[]
+  login_history: any[]
 }
 
 export interface UserBehaviorAnalysis {
@@ -125,12 +147,12 @@ export interface Transaction {
   account_name: string | null
   category_id: string
   category_name: string | null
-  transaction_type: number  // Backend: 0=expense, 1=income, 2=transfer
+  transaction_type: number  // Backend: 1=expense, 2=income, 3=transfer
   type: 'expense' | 'income' | 'transfer'  // Frontend display type
   amount: number
   fee: number | null
-  transaction_date: string
-  transaction_time: string | null  // Alias for transaction_date
+  transaction_date: string  // Date part: "YYYY-MM-DD"
+  transaction_time: string | null  // Time part: "HH:mm:ss"
   note: string | null
   tags: string[] | null
   source: number
@@ -253,3 +275,27 @@ export interface MenuItem {
   children?: MenuItem[]
   permission?: string
 }
+
+// Backup Types
+export interface Backup {
+  id: number
+  user_id: string | null
+  type: string
+  status: string
+  file_path: string | null
+  file_size: number | null
+  record_count: number | null
+  note: string | null
+  created_at: string
+  expires_at: string | null
+}
+
+export interface BackupStats {
+  total_count: number
+  total_size: number
+  today_count: number
+  failed_count: number
+}
+
+// Element Plus Tag Type Helper
+export type TagType = 'success' | 'warning' | 'info' | 'primary' | 'danger' | ''

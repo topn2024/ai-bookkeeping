@@ -27,6 +27,7 @@ from admin.schemas.data_management import (
     TransactionListResponse,
     TransactionDetail,
     TransactionStatsResponse,
+    TransactionSummary,
     AbnormalTransactionItem,
     AbnormalTransactionListResponse,
 )
@@ -37,6 +38,41 @@ router = APIRouter(prefix="/transactions", tags=["Transaction Management"])
 
 TRANSACTION_TYPES = {1: "支出", 2: "收入", 3: "转账"}
 SOURCE_TYPES = {0: "手动", 1: "图片识别", 2: "语音识别", 3: "邮件导入"}
+
+# 账户名称本地化映射
+ACCOUNT_NAME_MAPPING = {
+    "cash": "现金",
+    "wechat": "微信",
+    "wechat pay": "微信",
+    "alipay": "支付宝",
+    "bank": "银行卡",
+    "bank card": "银行卡",
+    "credit card": "信用卡",
+    "debit card": "储蓄卡",
+    "savings": "储蓄账户",
+    "investment": "投资账户",
+    "wallet": "钱包",
+}
+
+ACCOUNT_TYPE_NAMES = {
+    1: "现金",
+    2: "储蓄卡",
+    3: "信用卡",
+    4: "支付宝",
+    5: "微信",
+}
+
+
+def _localize_account_name(name: str, account_type: int = 0) -> str:
+    """账户名称本地化"""
+    if not name:
+        return ACCOUNT_TYPE_NAMES.get(account_type, "未知账户")
+
+    lower_name = name.lower()
+    if lower_name in ACCOUNT_NAME_MAPPING:
+        return ACCOUNT_NAME_MAPPING[lower_name]
+
+    return name
 
 
 @router.get("", response_model=TransactionListResponse)
@@ -123,8 +159,9 @@ async def list_transactions(
         book_result = await db.execute(select(Book.name).where(Book.id == tx.book_id))
         book_name = book_result.scalar()
 
-        account_result = await db.execute(select(Account.name).where(Account.id == tx.account_id))
-        account_name = account_result.scalar()
+        account_result = await db.execute(select(Account).where(Account.id == tx.account_id))
+        account = account_result.scalar_one_or_none()
+        account_name = _localize_account_name(account.name, account.account_type) if account else None
 
         category_result = await db.execute(select(Category.name).where(Category.id == tx.category_id))
         category_name = category_result.scalar()
@@ -143,6 +180,7 @@ async def list_transactions(
             amount=tx.amount,
             fee=tx.fee,
             transaction_date=tx.transaction_date,
+            transaction_time=tx.transaction_time,
             note=tx.note,
             tags=tx.tags,
             source=tx.source,
@@ -151,11 +189,37 @@ async def list_transactions(
             created_at=tx.created_at,
         ))
 
+    # Calculate summary stats based on current filters
+    summary_query = select(
+        func.count(Transaction.id).label("total_count"),
+        func.coalesce(
+            func.sum(case((Transaction.transaction_type == 2, Transaction.amount), else_=0)),
+            0
+        ).label("total_income"),
+        func.coalesce(
+            func.sum(case((Transaction.transaction_type == 1, Transaction.amount), else_=0)),
+            0
+        ).label("total_expense"),
+    )
+    if conditions:
+        summary_query = summary_query.where(and_(*conditions))
+
+    summary_result = await db.execute(summary_query)
+    summary_row = summary_result.one()
+
+    summary = TransactionSummary(
+        total_count=summary_row.total_count or 0,
+        total_income=Decimal(str(summary_row.total_income or 0)),
+        total_expense=Decimal(str(summary_row.total_expense or 0)),
+        net_income=Decimal(str(summary_row.total_income or 0)) - Decimal(str(summary_row.total_expense or 0)),
+    )
+
     return TransactionListResponse(
         items=items,
         total=total,
         page=page,
         page_size=page_size,
+        summary=summary,
     )
 
 
@@ -382,16 +446,18 @@ async def get_transaction_detail(
     book_result = await db.execute(select(Book.name).where(Book.id == tx.book_id))
     book_name = book_result.scalar()
 
-    account_result = await db.execute(select(Account.name).where(Account.id == tx.account_id))
-    account_name = account_result.scalar()
+    account_result = await db.execute(select(Account).where(Account.id == tx.account_id))
+    account = account_result.scalar_one_or_none()
+    account_name = _localize_account_name(account.name, account.account_type) if account else None
 
     category_result = await db.execute(select(Category.name).where(Category.id == tx.category_id))
     category_name = category_result.scalar()
 
     target_account_name = None
     if tx.target_account_id:
-        target_result = await db.execute(select(Account.name).where(Account.id == tx.target_account_id))
-        target_account_name = target_result.scalar()
+        target_result = await db.execute(select(Account).where(Account.id == tx.target_account_id))
+        target_account = target_result.scalar_one_or_none()
+        target_account_name = _localize_account_name(target_account.name, target_account.account_type) if target_account else None
 
     return TransactionDetail(
         id=tx.id,

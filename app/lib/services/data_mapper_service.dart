@@ -5,6 +5,7 @@ import '../models/account.dart';
 import '../models/category.dart';
 import '../models/ledger.dart';
 import '../models/budget.dart';
+import '../utils/date_utils.dart';
 import 'database_service.dart';
 
 /// Data mapping service for converting between local and server data formats
@@ -262,39 +263,27 @@ class DataMapperService {
     return categoryName;
   }
 
+  /// Format date for server (Beijing time)
   String _formatDate(DateTime date) {
+    // For most Chinese users, local time equals Beijing time
+    // So we can use the local date directly
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
+  /// Format time for server (Beijing time)
   String _formatTime(DateTime date) {
     return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')}';
   }
 
+  /// Parse date/time from server (Beijing time) to local DateTime
+  /// Uses AppDateUtils for proper timezone handling
   DateTime _parseDateTime(dynamic dateStr, dynamic timeStr) {
     if (dateStr == null) return DateTime.now();
 
-    DateTime date;
-    if (dateStr is String) {
-      date = DateTime.parse(dateStr);
-    } else {
-      date = DateTime.now();
-    }
-
-    if (timeStr != null && timeStr is String && timeStr.isNotEmpty) {
-      final timeParts = timeStr.split(':');
-      if (timeParts.length >= 2) {
-        date = DateTime(
-          date.year,
-          date.month,
-          date.day,
-          int.parse(timeParts[0]),
-          int.parse(timeParts[1]),
-          timeParts.length > 2 ? int.parse(timeParts[2]) : 0,
-        );
-      }
-    }
-
-    return date;
+    return AppDateUtils.parseServerDateTime(
+      dateStr is String ? dateStr : null,
+      timeStr is String ? timeStr : null,
+    );
   }
 
   String _iconCodeToName(int codePoint) {
