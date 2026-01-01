@@ -109,7 +109,10 @@ export const getBackups = (params: {
   page?: number
   page_size?: number
   user_id?: string
-}): Promise<PaginatedResponse<any>> => {
+  backup_type?: number
+  start_date?: string
+  end_date?: string
+}): Promise<PaginatedResponse<any> & { stats?: any }> => {
   return get('/backups', { params })
 }
 

@@ -13,11 +13,10 @@
         <el-form-item label="用户ID">
           <el-input v-model="filters.user_id" placeholder="用户ID" clearable style="width: 150px;" />
         </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="filters.status" placeholder="全部" clearable style="width: 120px;">
-            <el-option label="进行中" value="pending" />
-            <el-option label="已完成" value="completed" />
-            <el-option label="失败" value="failed" />
+        <el-form-item label="备份类型">
+          <el-select v-model="filters.backup_type" placeholder="全部" clearable style="width: 120px;">
+            <el-option label="手动备份" :value="0" />
+            <el-option label="自动备份" :value="1" />
           </el-select>
         </el-form-item>
         <el-form-item label="日期范围">
@@ -71,56 +70,40 @@
             {{ row.user_email || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="type" label="类型" width="120">
+        <el-table-column prop="name" label="备份名称" min-width="150">
           <template #default="{ row }">
-            <el-tag :type="getBackupTypeTag(row.type || row.backup_type)" size="small">
-              {{ getBackupTypeText(row.type || row.backup_type) }}
+            {{ row.name || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="backup_type" label="类型" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getBackupTypeTag(row.backup_type)" size="small">
+              {{ getBackupTypeText(row.backup_type) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="size" label="大小" width="100">
           <template #default="{ row }">
-            <el-tag :type="getStatusTag(row.status)" size="small">
-              {{ getStatusText(row.status) }}
-            </el-tag>
+            {{ formatFileSize(row.size) }}
           </template>
         </el-table-column>
-        <el-table-column prop="file_size" label="大小" width="100">
+        <el-table-column label="记录数" width="200">
           <template #default="{ row }">
-            {{ formatFileSize(row.file_size) }}
+            交易: {{ row.transaction_count || 0 }}, 账户: {{ row.account_count || 0 }}
           </template>
         </el-table-column>
-        <el-table-column prop="record_count" label="记录数" width="100" />
+        <el-table-column prop="app_version" label="App版本" width="100">
+          <template #default="{ row }">
+            {{ row.app_version || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="160">
           <template #default="{ row }">
             {{ formatDateTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column prop="expires_at" label="过期时间" width="160">
+        <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
-            {{ row.expires_at ? formatDateTime(row.expires_at) : '永不过期' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              v-if="row.status === 'completed'"
-              type="primary"
-              text
-              size="small"
-              @click="handleDownload(row)"
-            >
-              下载
-            </el-button>
-            <el-button
-              v-if="row.status === 'completed'"
-              type="success"
-              text
-              size="small"
-              @click="handleRestore(row)"
-            >
-              恢复
-            </el-button>
             <el-button type="danger" text size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -185,7 +168,7 @@ const stats = reactive({
 })
 const filters = reactive({
   user_id: '',
-  status: '',
+  backup_type: null as number | null,
   dateRange: null as [string, string] | null,
 })
 const pagination = reactive({
@@ -217,7 +200,7 @@ const fetchBackups = async () => {
       page_size: pagination.pageSize,
     }
     if (filters.user_id) params.user_id = filters.user_id
-    if (filters.status) params.status = filters.status
+    if (filters.backup_type !== null) params.backup_type = filters.backup_type
     if (filters.dateRange) {
       params.start_date = filters.dateRange[0]
       params.end_date = filters.dateRange[1]
@@ -245,7 +228,7 @@ const handleSearch = () => {
 
 const handleReset = () => {
   filters.user_id = ''
-  filters.status = ''
+  filters.backup_type = null
   filters.dateRange = null
   handleSearch()
 }
@@ -352,40 +335,14 @@ const formatFileSize = (bytes: number) => {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
-const getBackupTypeTag = (type: string): TagType => {
-  const map: Record<string, TagType> = {
-    full: 'primary',
-    incremental: 'success',
-    transactions: 'info',
-  }
-  return map[type] || ''
+const getBackupTypeTag = (type: number): TagType => {
+  // 0=手动备份, 1=自动备份
+  return type === 1 ? 'success' : 'primary'
 }
 
-const getBackupTypeText = (type: string) => {
-  const map: Record<string, string> = {
-    full: '完整备份',
-    incremental: '增量备份',
-    transactions: '仅交易',
-  }
-  return map[type] || type
-}
-
-const getStatusTag = (status: string): TagType => {
-  const map: Record<string, TagType> = {
-    pending: 'warning',
-    completed: 'success',
-    failed: 'danger',
-  }
-  return map[status] || ''
-}
-
-const getStatusText = (status: string) => {
-  const map: Record<string, string> = {
-    pending: '进行中',
-    completed: '已完成',
-    failed: '失败',
-  }
-  return map[status] || status
+const getBackupTypeText = (type: number) => {
+  // 0=手动备份, 1=自动备份
+  return type === 1 ? '自动备份' : '手动备份'
 }
 
 // Init

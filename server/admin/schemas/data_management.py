@@ -259,12 +259,21 @@ class BackupItem(BaseModel):
         from_attributes = True
 
 
+class BackupListStats(BaseModel):
+    """Backup list statistics for display."""
+    total_count: int = 0
+    total_size: float = 0  # in MB
+    today_count: int = 0
+    failed_count: int = 0  # Always 0 since backups don't have status
+
+
 class BackupListResponse(BaseModel):
     """Backup list response."""
     items: List[BackupItem]
     total: int
     page: int
     page_size: int
+    stats: Optional[BackupListStats] = None
 
 
 class BackupStorageStats(BaseModel):

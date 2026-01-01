@@ -17,6 +17,7 @@ from admin.core.audit import create_audit_log, mask_email
 from admin.schemas.data_management import (
     BackupItem,
     BackupListResponse,
+    BackupListStats,
     BackupStorageStats,
     BackupPolicyConfig,
 )
@@ -84,6 +85,34 @@ async def list_backups(
     result = await db.execute(query)
     backups = result.scalars().all()
 
+    # Calculate stats (total count, total size, today count)
+    stats_result = await db.execute(
+        select(
+            func.count(Backup.id).label("total_count"),
+            func.coalesce(func.sum(Backup.size), 0).label("total_size"),
+        )
+    )
+    stats_row = stats_result.one()
+    total_count = stats_row.total_count or 0
+    total_size_bytes = stats_row.total_size or 0
+    total_size_mb = round(total_size_bytes / (1024 * 1024), 2) if total_size_bytes else 0
+
+    # Today's backup count
+    today = date.today()
+    today_result = await db.execute(
+        select(func.count(Backup.id)).where(
+            func.date(Backup.created_at) == today
+        )
+    )
+    today_count = today_result.scalar() or 0
+
+    stats = BackupListStats(
+        total_count=total_count,
+        total_size=total_size_mb,
+        today_count=today_count,
+        failed_count=0,  # Backups don't have status field
+    )
+
     # Build response
     items = []
     for backup in backups:
@@ -114,6 +143,7 @@ async def list_backups(
         total=total,
         page=page,
         page_size=page_size,
+        stats=stats,
     )
 
 
