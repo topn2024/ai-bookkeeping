@@ -651,6 +651,11 @@ class _HomePageState extends ConsumerState<HomePage> {
         icon = Icons.email;
         color = Colors.orange;
         break;
+      case TransactionSource.import_:
+        label = '导入';
+        icon = Icons.upload_file;
+        color = Colors.indigo;
+        break;
       case TransactionSource.manual:
         return const SizedBox.shrink();
     }

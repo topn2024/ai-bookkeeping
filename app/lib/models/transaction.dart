@@ -12,6 +12,20 @@ enum TransactionSource {
   image,   // 1: Image recognition (receipt scanning)
   voice,   // 2: Voice recognition
   email,   // 3: Email bill parsing
+  import_,  // 4: Batch import from bill files (use import_ to avoid keyword conflict)
+}
+
+/// External source for imported transactions
+enum ExternalSource {
+  wechatPay,    // 微信支付
+  alipay,       // 支付宝
+  cmbBank,      // 招商银行
+  icbcBank,     // 工商银行
+  abcBank,      // 农业银行
+  ccbBank,      // 建设银行
+  bocBank,      // 中国银行
+  otherBank,    // 其他银行
+  generic,      // 通用格式
 }
 
 class Transaction {
@@ -34,7 +48,7 @@ class Transaction {
   final DateTime updatedAt;
 
   // Source file fields for AI recognition
-  final TransactionSource source; // 来源: 手动/图片/语音/邮件
+  final TransactionSource source; // 来源: 手动/图片/语音/邮件/导入
   final double? aiConfidence;     // AI识别置信度 (0-1)
   final String? sourceFileLocalPath;  // 本地源文件路径
   final String? sourceFileServerUrl;  // 服务器源文件URL
@@ -42,6 +56,12 @@ class Transaction {
   final int? sourceFileSize;          // 文件大小(bytes)
   final String? recognitionRawData;   // AI识别原始响应JSON
   final DateTime? sourceFileExpiresAt; // 源文件过期时间
+
+  // Batch import fields
+  final String? externalId;           // 外部交易号(微信/支付宝/银行流水号)
+  final ExternalSource? externalSource; // 外部来源标识
+  final String? importBatchId;        // 导入批次ID(用于批量回滚)
+  final String? rawMerchant;          // 原始商户名(用于AI分类学习)
 
   Transaction({
     required this.id,
@@ -69,6 +89,10 @@ class Transaction {
     this.sourceFileSize,
     this.recognitionRawData,
     this.sourceFileExpiresAt,
+    this.externalId,
+    this.externalSource,
+    this.importBatchId,
+    this.rawMerchant,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
@@ -107,6 +131,10 @@ class Transaction {
     int? sourceFileSize,
     String? recognitionRawData,
     DateTime? sourceFileExpiresAt,
+    String? externalId,
+    ExternalSource? externalSource,
+    String? importBatchId,
+    String? rawMerchant,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -134,6 +162,10 @@ class Transaction {
       sourceFileSize: sourceFileSize ?? this.sourceFileSize,
       recognitionRawData: recognitionRawData ?? this.recognitionRawData,
       sourceFileExpiresAt: sourceFileExpiresAt ?? this.sourceFileExpiresAt,
+      externalId: externalId ?? this.externalId,
+      externalSource: externalSource ?? this.externalSource,
+      importBatchId: importBatchId ?? this.importBatchId,
+      rawMerchant: rawMerchant ?? this.rawMerchant,
     );
   }
 
@@ -163,6 +195,10 @@ class Transaction {
       'sourceFileSize': sourceFileSize,
       'recognitionRawData': recognitionRawData,
       'sourceFileExpiresAt': sourceFileExpiresAt?.toIso8601String(),
+      'externalId': externalId,
+      'externalSource': externalSource?.index,
+      'importBatchId': importBatchId,
+      'rawMerchant': rawMerchant,
     };
   }
 
@@ -201,6 +237,12 @@ class Transaction {
       sourceFileExpiresAt: map['sourceFileExpiresAt'] != null
           ? DateTime.parse(map['sourceFileExpiresAt'])
           : null,
+      externalId: map['externalId'],
+      externalSource: map['externalSource'] != null
+          ? ExternalSource.values[map['externalSource'] as int]
+          : null,
+      importBatchId: map['importBatchId'],
+      rawMerchant: map['rawMerchant'],
     );
   }
 
@@ -225,4 +267,32 @@ class Transaction {
 
   /// Check if source is from voice recognition
   bool get isFromVoice => source == TransactionSource.voice;
+
+  /// Check if source is from batch import
+  bool get isFromImport => source == TransactionSource.import_;
+
+  /// Get external source display name
+  String? get externalSourceName {
+    if (externalSource == null) return null;
+    switch (externalSource!) {
+      case ExternalSource.wechatPay:
+        return '微信支付';
+      case ExternalSource.alipay:
+        return '支付宝';
+      case ExternalSource.cmbBank:
+        return '招商银行';
+      case ExternalSource.icbcBank:
+        return '工商银行';
+      case ExternalSource.abcBank:
+        return '农业银行';
+      case ExternalSource.ccbBank:
+        return '建设银行';
+      case ExternalSource.bocBank:
+        return '中国银行';
+      case ExternalSource.otherBank:
+        return '其他银行';
+      case ExternalSource.generic:
+        return '通用导入';
+    }
+  }
 }

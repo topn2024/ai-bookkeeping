@@ -648,6 +648,10 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
         icon = Icons.email;
         color = Colors.orange;
         break;
+      case TransactionSource.import_:
+        icon = Icons.upload_file;
+        color = Colors.indigo;
+        break;
       case TransactionSource.manual:
         return const SizedBox.shrink();
     }
@@ -1024,6 +1028,11 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
         label = '邮件';
         icon = Icons.email;
         color = Colors.orange;
+        break;
+      case TransactionSource.import_:
+        label = '导入';
+        icon = Icons.upload_file;
+        color = Colors.indigo;
         break;
       case TransactionSource.manual:
         return const SizedBox.shrink();

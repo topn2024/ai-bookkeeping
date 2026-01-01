@@ -14,6 +14,7 @@ import '../models/bill_reminder.dart';
 import '../models/investment_account.dart';
 import '../models/debt.dart';
 import '../models/member.dart';
+import '../models/import_batch.dart';
 import 'package:flutter/material.dart';
 import 'database_migration_service.dart';
 import '../core/logger.dart';
@@ -25,7 +26,7 @@ class DatabaseService {
   final Logger _logger = Logger();
 
   // 当前数据库版本
-  static const int currentVersion = 13;
+  static const int currentVersion = 14;
 
   factory DatabaseService() => _instance;
 
@@ -119,9 +120,40 @@ class DatabaseService {
         sourceFileType TEXT,
         sourceFileSize INTEGER,
         recognitionRawData TEXT,
-        sourceFileExpiresAt INTEGER
+        sourceFileExpiresAt INTEGER,
+        externalId TEXT,
+        externalSource INTEGER,
+        importBatchId TEXT,
+        rawMerchant TEXT
       )
     ''');
+
+    // Import batches table
+    await db.execute('''
+      CREATE TABLE import_batches (
+        id TEXT PRIMARY KEY,
+        fileName TEXT NOT NULL,
+        fileFormat TEXT NOT NULL,
+        totalCount INTEGER NOT NULL,
+        importedCount INTEGER NOT NULL,
+        skippedCount INTEGER NOT NULL,
+        failedCount INTEGER NOT NULL DEFAULT 0,
+        totalExpense REAL DEFAULT 0,
+        totalIncome REAL DEFAULT 0,
+        dateRangeStart INTEGER,
+        dateRangeEnd INTEGER,
+        createdAt INTEGER NOT NULL,
+        status INTEGER NOT NULL DEFAULT 0,
+        revokedAt INTEGER,
+        errorLog TEXT
+      )
+    ''');
+
+    // Create indexes for import deduplication
+    await db.execute('CREATE INDEX idx_transactions_external ON transactions(externalId, externalSource)');
+    await db.execute('CREATE INDEX idx_transactions_import_batch ON transactions(importBatchId)');
+    await db.execute('CREATE INDEX idx_transactions_dedup ON transactions(date, amount, type, category)');
+    await db.execute('CREATE INDEX idx_import_batches_status ON import_batches(status)');
 
     // Transaction splits table
     await db.execute('''
@@ -846,6 +878,41 @@ class DatabaseService {
       await db.execute('ALTER TABLE transactions ADD COLUMN recognitionRawData TEXT');
       await db.execute('ALTER TABLE transactions ADD COLUMN sourceFileExpiresAt INTEGER');
     }
+
+    if (oldVersion < 14) {
+      // Add batch import fields to transactions table
+      await db.execute('ALTER TABLE transactions ADD COLUMN externalId TEXT');
+      await db.execute('ALTER TABLE transactions ADD COLUMN externalSource INTEGER');
+      await db.execute('ALTER TABLE transactions ADD COLUMN importBatchId TEXT');
+      await db.execute('ALTER TABLE transactions ADD COLUMN rawMerchant TEXT');
+
+      // Create import batches table
+      await db.execute('''
+        CREATE TABLE import_batches (
+          id TEXT PRIMARY KEY,
+          fileName TEXT NOT NULL,
+          fileFormat TEXT NOT NULL,
+          totalCount INTEGER NOT NULL,
+          importedCount INTEGER NOT NULL,
+          skippedCount INTEGER NOT NULL,
+          failedCount INTEGER NOT NULL DEFAULT 0,
+          totalExpense REAL DEFAULT 0,
+          totalIncome REAL DEFAULT 0,
+          dateRangeStart INTEGER,
+          dateRangeEnd INTEGER,
+          createdAt INTEGER NOT NULL,
+          status INTEGER NOT NULL DEFAULT 0,
+          revokedAt INTEGER,
+          errorLog TEXT
+        )
+      ''');
+
+      // Create indexes for efficient deduplication and batch management
+      await db.execute('CREATE INDEX idx_transactions_external ON transactions(externalId, externalSource)');
+      await db.execute('CREATE INDEX idx_transactions_import_batch ON transactions(importBatchId)');
+      await db.execute('CREATE INDEX idx_transactions_dedup ON transactions(date, amount, type, category)');
+      await db.execute('CREATE INDEX idx_import_batches_status ON import_batches(status)');
+    }
   }
 
   // ==================== 事务支持 ====================
@@ -919,6 +986,10 @@ class DatabaseService {
       'sourceFileSize': transaction.sourceFileSize,
       'recognitionRawData': transaction.recognitionRawData,
       'sourceFileExpiresAt': transaction.sourceFileExpiresAt?.millisecondsSinceEpoch,
+      'externalId': transaction.externalId,
+      'externalSource': transaction.externalSource?.index,
+      'importBatchId': transaction.importBatchId,
+      'rawMerchant': transaction.rawMerchant,
     });
 
     // Insert splits if this is a split transaction
@@ -973,6 +1044,12 @@ class DatabaseService {
         sourceFileExpiresAt: sourceFileExpiresAtMs != null
             ? DateTime.fromMillisecondsSinceEpoch(sourceFileExpiresAtMs)
             : null,
+        externalId: map['externalId'] as String?,
+        externalSource: map['externalSource'] != null
+            ? model.ExternalSource.values[map['externalSource'] as int]
+            : null,
+        importBatchId: map['importBatchId'] as String?,
+        rawMerchant: map['rawMerchant'] as String?,
       ));
     }
 
@@ -1005,6 +1082,10 @@ class DatabaseService {
         'sourceFileSize': transaction.sourceFileSize,
         'recognitionRawData': transaction.recognitionRawData,
         'sourceFileExpiresAt': transaction.sourceFileExpiresAt?.millisecondsSinceEpoch,
+        'externalId': transaction.externalId,
+        'externalSource': transaction.externalSource?.index,
+        'importBatchId': transaction.importBatchId,
+        'rawMerchant': transaction.rawMerchant,
       },
       where: 'id = ?',
       whereArgs: [transaction.id],
@@ -2240,5 +2321,319 @@ class DatabaseService {
     );
     final lastSync = result.first['lastSync'] as int?;
     return lastSync != null ? DateTime.fromMillisecondsSinceEpoch(lastSync) : null;
+  }
+
+  // ==================== Import Batch CRUD ====================
+
+  /// Insert import batch
+  Future<int> insertImportBatch(ImportBatch batch) async {
+    final db = await database;
+    return await db.insert('import_batches', batch.toMap());
+  }
+
+  /// Get all import batches
+  Future<List<ImportBatch>> getImportBatches() async {
+    final db = await database;
+    final maps = await db.query('import_batches', orderBy: 'createdAt DESC');
+    return maps.map((map) => ImportBatch.fromMap(map)).toList();
+  }
+
+  /// Get import batch by ID
+  Future<ImportBatch?> getImportBatch(String id) async {
+    final db = await database;
+    final maps = await db.query(
+      'import_batches',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) return null;
+    return ImportBatch.fromMap(maps.first);
+  }
+
+  /// Get active import batches (not revoked)
+  Future<List<ImportBatch>> getActiveImportBatches() async {
+    final db = await database;
+    final maps = await db.query(
+      'import_batches',
+      where: 'status = ?',
+      whereArgs: [ImportBatchStatus.active.index],
+      orderBy: 'createdAt DESC',
+    );
+    return maps.map((map) => ImportBatch.fromMap(map)).toList();
+  }
+
+  /// Update import batch
+  Future<int> updateImportBatch(ImportBatch batch) async {
+    final db = await database;
+    return await db.update(
+      'import_batches',
+      batch.toMap(),
+      where: 'id = ?',
+      whereArgs: [batch.id],
+    );
+  }
+
+  /// Revoke an import batch and delete all associated transactions
+  Future<void> revokeImportBatch(String batchId) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // Delete all transactions with this batch ID
+      await txn.delete(
+        'transactions',
+        where: 'importBatchId = ?',
+        whereArgs: [batchId],
+      );
+
+      // Update batch status to revoked
+      await txn.update(
+        'import_batches',
+        {
+          'status': ImportBatchStatus.revoked.index,
+          'revokedAt': DateTime.now().millisecondsSinceEpoch,
+        },
+        where: 'id = ?',
+        whereArgs: [batchId],
+      );
+    });
+  }
+
+  /// Delete import batch (only for testing/cleanup)
+  Future<int> deleteImportBatch(String id) async {
+    final db = await database;
+    return await db.delete('import_batches', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Get transactions by import batch ID
+  Future<List<model.Transaction>> getTransactionsByBatchId(String batchId) async {
+    final db = await database;
+    final maps = await db.query(
+      'transactions',
+      where: 'importBatchId = ?',
+      whereArgs: [batchId],
+      orderBy: 'date DESC',
+    );
+
+    final transactions = <model.Transaction>[];
+    for (final map in maps) {
+      final isSplit = (map['isSplit'] as int?) == 1;
+      List<TransactionSplit>? splits;
+
+      if (isSplit) {
+        splits = await getTransactionSplits(map['id'] as String);
+      }
+
+      final tagsString = map['tags'] as String?;
+      final sourceFileExpiresAtMs = map['sourceFileExpiresAt'] as int?;
+
+      transactions.add(model.Transaction(
+        id: map['id'] as String,
+        type: model.TransactionType.values[map['type'] as int],
+        amount: map['amount'] as double,
+        category: map['category'] as String,
+        note: map['note'] as String?,
+        date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
+        accountId: map['accountId'] as String,
+        toAccountId: map['toAccountId'] as String?,
+        isSplit: isSplit,
+        splits: splits,
+        isReimbursable: (map['isReimbursable'] as int?) == 1,
+        isReimbursed: (map['isReimbursed'] as int?) == 1,
+        tags: tagsString != null && tagsString.isNotEmpty
+            ? tagsString.split(',')
+            : null,
+        source: model.TransactionSource.values[(map['source'] as int?) ?? 0],
+        aiConfidence: map['aiConfidence'] as double?,
+        sourceFileLocalPath: map['sourceFileLocalPath'] as String?,
+        sourceFileServerUrl: map['sourceFileServerUrl'] as String?,
+        sourceFileType: map['sourceFileType'] as String?,
+        sourceFileSize: map['sourceFileSize'] as int?,
+        recognitionRawData: map['recognitionRawData'] as String?,
+        sourceFileExpiresAt: sourceFileExpiresAtMs != null
+            ? DateTime.fromMillisecondsSinceEpoch(sourceFileExpiresAtMs)
+            : null,
+        externalId: map['externalId'] as String?,
+        externalSource: map['externalSource'] != null
+            ? model.ExternalSource.values[map['externalSource'] as int]
+            : null,
+        importBatchId: map['importBatchId'] as String?,
+        rawMerchant: map['rawMerchant'] as String?,
+      ));
+    }
+
+    return transactions;
+  }
+
+  /// Find transaction by external ID and source (for deduplication)
+  Future<model.Transaction?> findTransactionByExternalId(
+    String externalId,
+    model.ExternalSource externalSource,
+  ) async {
+    final db = await database;
+    final maps = await db.query(
+      'transactions',
+      where: 'externalId = ? AND externalSource = ?',
+      whereArgs: [externalId, externalSource.index],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) return null;
+
+    final map = maps.first;
+    final isSplit = (map['isSplit'] as int?) == 1;
+    List<TransactionSplit>? splits;
+
+    if (isSplit) {
+      splits = await getTransactionSplits(map['id'] as String);
+    }
+
+    final tagsString = map['tags'] as String?;
+    final sourceFileExpiresAtMs = map['sourceFileExpiresAt'] as int?;
+
+    return model.Transaction(
+      id: map['id'] as String,
+      type: model.TransactionType.values[map['type'] as int],
+      amount: map['amount'] as double,
+      category: map['category'] as String,
+      note: map['note'] as String?,
+      date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
+      accountId: map['accountId'] as String,
+      toAccountId: map['toAccountId'] as String?,
+      isSplit: isSplit,
+      splits: splits,
+      isReimbursable: (map['isReimbursable'] as int?) == 1,
+      isReimbursed: (map['isReimbursed'] as int?) == 1,
+      tags: tagsString != null && tagsString.isNotEmpty
+          ? tagsString.split(',')
+          : null,
+      source: model.TransactionSource.values[(map['source'] as int?) ?? 0],
+      aiConfidence: map['aiConfidence'] as double?,
+      sourceFileLocalPath: map['sourceFileLocalPath'] as String?,
+      sourceFileServerUrl: map['sourceFileServerUrl'] as String?,
+      sourceFileType: map['sourceFileType'] as String?,
+      sourceFileSize: map['sourceFileSize'] as int?,
+      recognitionRawData: map['recognitionRawData'] as String?,
+      sourceFileExpiresAt: sourceFileExpiresAtMs != null
+          ? DateTime.fromMillisecondsSinceEpoch(sourceFileExpiresAtMs)
+          : null,
+      externalId: map['externalId'] as String?,
+      externalSource: map['externalSource'] != null
+          ? model.ExternalSource.values[map['externalSource'] as int]
+          : null,
+      importBatchId: map['importBatchId'] as String?,
+      rawMerchant: map['rawMerchant'] as String?,
+    );
+  }
+
+  /// Find potential duplicate transactions for deduplication
+  /// Returns transactions within the date range with matching amount
+  Future<List<model.Transaction>> findPotentialDuplicates({
+    required DateTime date,
+    required double amount,
+    required model.TransactionType type,
+    int dayRange = 1,
+  }) async {
+    final db = await database;
+    final startDate = date.subtract(Duration(days: dayRange));
+    final endDate = date.add(Duration(days: dayRange));
+
+    final maps = await db.query(
+      'transactions',
+      where: 'date >= ? AND date <= ? AND amount = ? AND type = ?',
+      whereArgs: [
+        startDate.millisecondsSinceEpoch,
+        endDate.millisecondsSinceEpoch,
+        amount,
+        type.index,
+      ],
+      orderBy: 'date DESC',
+    );
+
+    final transactions = <model.Transaction>[];
+    for (final map in maps) {
+      final isSplit = (map['isSplit'] as int?) == 1;
+      List<TransactionSplit>? splits;
+
+      if (isSplit) {
+        splits = await getTransactionSplits(map['id'] as String);
+      }
+
+      final tagsString = map['tags'] as String?;
+      final sourceFileExpiresAtMs = map['sourceFileExpiresAt'] as int?;
+
+      transactions.add(model.Transaction(
+        id: map['id'] as String,
+        type: model.TransactionType.values[map['type'] as int],
+        amount: map['amount'] as double,
+        category: map['category'] as String,
+        note: map['note'] as String?,
+        date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
+        accountId: map['accountId'] as String,
+        toAccountId: map['toAccountId'] as String?,
+        isSplit: isSplit,
+        splits: splits,
+        isReimbursable: (map['isReimbursable'] as int?) == 1,
+        isReimbursed: (map['isReimbursed'] as int?) == 1,
+        tags: tagsString != null && tagsString.isNotEmpty
+            ? tagsString.split(',')
+            : null,
+        source: model.TransactionSource.values[(map['source'] as int?) ?? 0],
+        aiConfidence: map['aiConfidence'] as double?,
+        sourceFileLocalPath: map['sourceFileLocalPath'] as String?,
+        sourceFileServerUrl: map['sourceFileServerUrl'] as String?,
+        sourceFileType: map['sourceFileType'] as String?,
+        sourceFileSize: map['sourceFileSize'] as int?,
+        recognitionRawData: map['recognitionRawData'] as String?,
+        sourceFileExpiresAt: sourceFileExpiresAtMs != null
+            ? DateTime.fromMillisecondsSinceEpoch(sourceFileExpiresAtMs)
+            : null,
+        externalId: map['externalId'] as String?,
+        externalSource: map['externalSource'] != null
+            ? model.ExternalSource.values[map['externalSource'] as int]
+            : null,
+        importBatchId: map['importBatchId'] as String?,
+        rawMerchant: map['rawMerchant'] as String?,
+      ));
+    }
+
+    return transactions;
+  }
+
+  /// Batch insert transactions (for import)
+  Future<void> batchInsertTransactions(List<model.Transaction> transactions) async {
+    final db = await database;
+    final batch = db.batch();
+
+    for (final transaction in transactions) {
+      batch.insert('transactions', {
+        'id': transaction.id,
+        'type': transaction.type.index,
+        'amount': transaction.amount,
+        'category': transaction.category,
+        'note': transaction.note,
+        'date': transaction.date.millisecondsSinceEpoch,
+        'accountId': transaction.accountId,
+        'toAccountId': transaction.toAccountId,
+        'ledgerId': 'default',
+        'isSplit': transaction.isSplit ? 1 : 0,
+        'isReimbursable': transaction.isReimbursable ? 1 : 0,
+        'isReimbursed': transaction.isReimbursed ? 1 : 0,
+        'tags': transaction.tags?.join(','),
+        'createdAt': DateTime.now().millisecondsSinceEpoch,
+        'source': transaction.source.index,
+        'aiConfidence': transaction.aiConfidence,
+        'sourceFileLocalPath': transaction.sourceFileLocalPath,
+        'sourceFileServerUrl': transaction.sourceFileServerUrl,
+        'sourceFileType': transaction.sourceFileType,
+        'sourceFileSize': transaction.sourceFileSize,
+        'recognitionRawData': transaction.recognitionRawData,
+        'sourceFileExpiresAt': transaction.sourceFileExpiresAt?.millisecondsSinceEpoch,
+        'externalId': transaction.externalId,
+        'externalSource': transaction.externalSource?.index,
+        'importBatchId': transaction.importBatchId,
+        'rawMerchant': transaction.rawMerchant,
+      });
+    }
+
+    await batch.commit(noResult: true);
   }
 }

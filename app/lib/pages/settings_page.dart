@@ -16,6 +16,7 @@ import 'annual_report_page.dart';
 import 'asset_overview_page.dart';
 import 'export_page.dart';
 import 'import_page.dart';
+import 'import/smart_import_page.dart';
 import 'investment_page.dart';
 import 'login_page.dart';
 import 'reimbursement_page.dart';
@@ -517,6 +518,19 @@ class SettingsPage extends ConsumerWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ImportPage()),
+              );
+            },
+          ),
+          _buildDivider(),
+          _buildMenuItem(
+            icon: Icons.auto_awesome,
+            iconColor: Colors.indigo,
+            title: '智能账单导入',
+            subtitle: '自动识别微信/支付宝账单，智能去重',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SmartImportPage()),
               );
             },
           ),
