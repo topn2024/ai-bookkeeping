@@ -17775,6 +17775,96 @@ class ReportInsight {
 
 ## 12. 技术架构设计
 
+### 12.0 设计原则回顾
+
+在深入技术架构细节之前，让我们回顾本章如何体现2.0版本的核心设计原则：
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                      技术架构设计 - 设计原则矩阵                              │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
+│  │  分层单一    │  │  数据一致    │  │  架构极简    │  │  水平扩展    │       │
+│  │  职责       │  │  性          │  │  设计       │  │  性          │       │
+│  │             │  │             │  │             │  │             │       │
+│  │ 每层职责    │  │ 离线优先    │  │ 最少依赖    │  │ 无状态服务  │       │
+│  │ 边界清晰    │  │ 最终一致    │  │ 组件解耦    │  │ 弹性伸缩    │       │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘       │
+│         │                │                │                │              │
+│         ▼                ▼                ▼                ▼              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
+│  │  性能优化    │  │  可观测性    │  │  安全优先    │  │  容错设计    │       │
+│  │             │  │             │  │             │  │             │       │
+│  │ 本地缓存    │  │ 全链路追踪  │  │ 端到端加密  │  │ 熔断降级    │       │
+│  │ 懒加载      │  │ 指标监控    │  │ 最小权限    │  │ 优雅降级    │       │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘       │
+│                                                                            │
+│  技术架构核心理念：                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐   │
+│  │  "离线优先，本地为王，云端增强，安全至上"                              │   │
+│  │                                                                    │   │
+│  │   离线优先 ──→ 所有核心功能离线可用                                  │   │
+│  │   本地为王 ──→ 本地数据库为主，服务端为备份同步                       │   │
+│  │   云端增强 ──→ AI识别、跨设备同步等增值功能依赖云端                   │   │
+│  │   安全至上 ──→ 财务数据全程加密，隐私保护第一                         │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 12.0.1 设计原则在技术架构中的体现
+
+| 设计原则 | 架构应用 | 具体措施 | 效果指标 |
+|---------|---------|---------|---------|
+| **单一职责** | 分层架构 | 表现层/状态层/领域层/数据层分离 | 模块可独立测试 |
+| **数据一致性** | 离线同步 | CRDT冲突解决、版本向量、最终一致 | 同步成功率>99.9% |
+| **极简设计** | 最少依赖 | 核心功能零外部依赖 | 冷启动<2秒 |
+| **可扩展性** | 插件架构 | Provider注入、服务发现、模块热插拔 | 新功能<1天集成 |
+| **性能优化** | 多级缓存 | 内存→本地DB→远程API | 首屏<500ms |
+| **可观测性** | 全链路追踪 | TraceID贯穿、结构化日志、指标埋点 | 问题定位<5分钟 |
+
+#### 12.0.2 与其他2.0模块的技术支撑关系
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                       技术架构支撑全景图                                      │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│                        ┌─────────────────┐                                 │
+│                        │   技术架构层     │                                 │
+│                        │  Infrastructure │                                 │
+│                        └────────┬────────┘                                 │
+│                                 │                                          │
+│           ┌─────────────────────┼─────────────────────┐                    │
+│           │                     │                     │                    │
+│           ▼                     ▼                     ▼                    │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐            │
+│  │    数据存储      │  │    网络通信      │  │    安全服务      │            │
+│  │                 │  │                 │  │                 │            │
+│  │ • sqflite本地   │  │ • Dio HTTP     │  │ • 端到端加密    │            │
+│  │ • PostgreSQL   │  │ • WebSocket    │  │ • JWT认证      │            │
+│  │ • Redis缓存    │  │ • gRPC         │  │ • 生物识别      │            │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘            │
+│           │                     │                     │                    │
+│           └─────────────────────┼─────────────────────┘                    │
+│                                 │                                          │
+│  ┌──────────────────────────────┴──────────────────────────────┐           │
+│  │                       业务模块支撑                            │           │
+│  ├──────────────────────────────────────────────────────────────┤           │
+│  │                                                              │           │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │           │
+│  │  │ 钱龄系统  │ │ 预算系统  │ │ 同步系统  │ │ AI智能化  │        │           │
+│  │  │          │ │          │ │          │ │          │        │           │
+│  │  │ 资源池表  │ │ 小金库表  │ │ 离线队列  │ │ API调用   │        │           │
+│  │  │ FIFO计算 │ │ 周期重置  │ │ 冲突解决  │ │ 模型推理  │        │           │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘        │           │
+│  │                                                              │           │
+│  └──────────────────────────────────────────────────────────────┘           │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
 ### 12.1 整体技术栈
 
 ```
@@ -23546,6 +23636,39 @@ enum SyncAlignmentStatus {
 
 本章节定义2.0版本的全面测试策略，确保产品质量和用户体验。
 
+### 18.0 设计原则与测试目标
+
+#### 18.0.1 测试设计原则
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                          测试设计原则                                        │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐ │
+│  │  质量优先   │    │  自动化驱动  │    │  快速反馈   │    │  持续改进   │ │
+│  │  Quality    │    │  Automation │    │    Fast     │    │  Continuous │ │
+│  │   First     │    │   Driven    │    │  Feedback   │    │ Improvement │ │
+│  └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘ │
+│       ↓                  ↓                  ↓                  ↓          │
+│   功能正确性优先     测试代码即文档       CI/CD快速验证      测试覆盖率持续   │
+│   用户体验保障       减少手工测试         本地验证秒级        追踪和提升       │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 18.0.2 2.0版本测试重点
+
+| 测试重点 | 描述 | 优先级 |
+|----------|------|--------|
+| **钱龄计算** | FIFO算法正确性、边界条件、性能 | P0 |
+| **零基预算** | 分配逻辑、结转规则、预警触发 | P0 |
+| **小金库系统** | 余额计算、分配验证、展示正确 | P0 |
+| **AI语音识别** | 识别准确率、多交易解析、错误恢复 | P1 |
+| **数据联动** | 下钻导航、状态同步、刷新机制 | P1 |
+| **离线同步** | 冲突解决、队列处理、断点续传 | P1 |
+| **国际化** | 多语言显示、货币格式、日期格式 | P2 |
+
 ### 18.1 测试金字塔
 
 ```
@@ -23555,31 +23678,39 @@ enum SyncAlignmentStatus {
 │                                                                           │
 │                              ┌───────┐                                    │
 │                              │ E2E   │  5%   端到端测试                    │
-│                             ─┴───────┴─                                   │
+│                             ─┴───────┴─      (关键用户旅程)                │
 │                           ┌─────────────┐                                 │
-│                           │  集成测试    │  15%                            │
+│                           │  集成测试    │  15%  (API/数据库/服务集成)      │
 │                          ─┴─────────────┴─                                │
 │                        ┌───────────────────┐                              │
-│                        │    Widget测试     │  25%                          │
+│                        │    Widget测试     │  25%  (UI组件/页面交互)        │
 │                       ─┴───────────────────┴─                             │
 │                     ┌───────────────────────────┐                         │
-│                     │        单元测试            │  55%                     │
+│                     │        单元测试            │  55%  (业务逻辑/模型)     │
 │                    ─┴───────────────────────────┴─                        │
+│                                                                           │
+│  执行频率:   每次提交    ───────────────────────────────────────>   每日    │
+│  执行速度:   毫秒级      ───────────────────────────────────────>   分钟级  │
+│  维护成本:   低          ───────────────────────────────────────>   高      │
 │                                                                           │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 18.2 单元测试策略
 
+#### 18.2.1 覆盖率要求
+
 ```dart
 /// 单元测试覆盖要求
 class UnitTestCoverage {
-  /// 核心业务逻辑 - 必须覆盖
+  /// 核心业务逻辑 - 最高优先级
   static const coreLogicCoverage = {
     'MoneyAgeCalculator': 95,      // 钱龄计算 ≥95%
-    'BudgetAllocationService': 90, // 预算分配 ≥90%
+    'BudgetAllocationService': 95, // 预算分配 ≥95%
+    'VaultBalanceService': 90,     // 小金库余额 ≥90%
     'TransactionMatcher': 90,      // 交易匹配 ≥90%
     'DataSyncService': 85,         // 数据同步 ≥85%
+    'ConflictResolver': 90,        // 冲突解决 ≥90%
   };
 
   /// 数据模型 - 高覆盖要求
@@ -23587,7 +23718,15 @@ class UnitTestCoverage {
     'Transaction': 90,
     'Budget': 90,
     'BudgetVault': 90,
-    'MoneyAge': 85,
+    'MoneyAge': 90,
+    'SyncQueue': 85,
+  };
+
+  /// AI服务 - 中高覆盖
+  static const aiServiceCoverage = {
+    'QwenService': 80,
+    'VoiceRecognitionParser': 85,
+    'TransactionExtractor': 85,
   };
 
   /// 工具类 - 中等覆盖要求
@@ -23595,11 +23734,16 @@ class UnitTestCoverage {
     'DateUtils': 80,
     'CurrencyUtils': 80,
     'ValidationUtils': 85,
+    'LocalizationService': 75,
   };
 }
+```
 
-/// 钱龄计算单元测试示例
-@Tags(['unit', 'money-age'])
+#### 18.2.2 钱龄计算单元测试
+
+```dart
+/// 钱龄计算单元测试
+@Tags(['unit', 'money-age', 'core'])
 void main() {
   group('MoneyAgeCalculator', () {
     late MoneyAgeCalculator calculator;
@@ -23610,48 +23754,247 @@ void main() {
       calculator = MoneyAgeCalculator(repository: mockRepo);
     });
 
-    test('计算空交易列表应返回零钱龄', () {
-      when(mockRepo.getTransactions(any)).thenReturn([]);
+    group('基础场景', () {
+      test('空交易列表应返回零钱龄', () {
+        when(mockRepo.getTransactions(any)).thenReturn([]);
 
-      final result = calculator.calculate(DateTime.now());
+        final result = calculator.calculate(DateTime.now());
 
-      expect(result.days, equals(0));
-      expect(result.level, equals(MoneyAgeLevel.danger));
+        expect(result.days, equals(0));
+        expect(result.level, equals(MoneyAgeLevel.danger));
+      });
+
+      test('只有收入无支出应返回最大钱龄', () {
+        final income = Transaction(
+          type: TransactionType.income,
+          amount: 10000,
+          date: DateTime.now().subtract(Duration(days: 60)),
+        );
+        when(mockRepo.getTransactions(any)).thenReturn([income]);
+
+        final result = calculator.calculate(DateTime.now());
+
+        expect(result.days, greaterThanOrEqualTo(60));
+        expect(result.level, equals(MoneyAgeLevel.excellent));
+      });
     });
 
-    test('只有收入无支出应返回最大钱龄', () {
-      final income = Transaction(
-        type: TransactionType.income,
-        amount: 10000,
-        date: DateTime.now().subtract(Duration(days: 60)),
-      );
-      when(mockRepo.getTransactions(any)).thenReturn([income]);
+    group('FIFO算法验证', () {
+      test('FIFO算法正确消耗收入', () {
+        final incomes = [
+          Transaction(type: TransactionType.income, amount: 1000,
+            date: DateTime.now().subtract(Duration(days: 30))),
+          Transaction(type: TransactionType.income, amount: 2000,
+            date: DateTime.now().subtract(Duration(days: 15))),
+        ];
+        final expense = Transaction(
+          type: TransactionType.expense,
+          amount: 1500,
+          date: DateTime.now(),
+        );
+        when(mockRepo.getTransactions(any)).thenReturn([...incomes, expense]);
 
-      final result = calculator.calculate(DateTime.now());
+        final result = calculator.calculate(DateTime.now());
 
-      expect(result.days, greaterThanOrEqualTo(60));
-      expect(result.level, equals(MoneyAgeLevel.excellent));
+        // 1500支出应先消耗30天前的1000，再消耗15天前的500
+        // 加权平均: (1000*30 + 500*15) / 1500 = 25天
+        expect(result.days, closeTo(25, 1));
+      });
+
+      test('支出大于总收入时钱龄为0', () {
+        final income = Transaction(
+          type: TransactionType.income,
+          amount: 1000,
+          date: DateTime.now().subtract(Duration(days: 30)),
+        );
+        final expense = Transaction(
+          type: TransactionType.expense,
+          amount: 2000,
+          date: DateTime.now(),
+        );
+        when(mockRepo.getTransactions(any)).thenReturn([income, expense]);
+
+        final result = calculator.calculate(DateTime.now());
+
+        expect(result.days, equals(0));
+        expect(result.isNegativeBalance, isTrue);
+      });
     });
 
-    test('FIFO算法正确消耗收入', () {
-      final incomes = [
-        Transaction(type: TransactionType.income, amount: 1000,
-          date: DateTime.now().subtract(Duration(days: 30))),
-        Transaction(type: TransactionType.income, amount: 2000,
-          date: DateTime.now().subtract(Duration(days: 15))),
-      ];
-      final expense = Transaction(
-        type: TransactionType.expense,
-        amount: 1500,
-        date: DateTime.now(),
+    group('钱龄等级判定', () {
+      test('0-7天为危险等级', () {
+        final result = MoneyAge(days: 5);
+        expect(result.level, equals(MoneyAgeLevel.danger));
+        expect(result.levelColor, equals(Colors.red));
+      });
+
+      test('8-14天为警告等级', () {
+        final result = MoneyAge(days: 10);
+        expect(result.level, equals(MoneyAgeLevel.warning));
+      });
+
+      test('15-29天为良好等级', () {
+        final result = MoneyAge(days: 20);
+        expect(result.level, equals(MoneyAgeLevel.good));
+      });
+
+      test('30天以上为优秀等级', () {
+        final result = MoneyAge(days: 45);
+        expect(result.level, equals(MoneyAgeLevel.excellent));
+      });
+    });
+
+    group('边界条件', () {
+      test('处理同一天的多笔交易', () { /* ... */ });
+      test('处理跨年交易', () { /* ... */ });
+      test('处理大量交易(10000+)性能', () { /* ... */ });
+    });
+  });
+}
+```
+
+#### 18.2.3 零基预算单元测试
+
+```dart
+/// 零基预算单元测试
+@Tags(['unit', 'budget', 'core'])
+void main() {
+  group('BudgetAllocationService', () {
+    late BudgetAllocationService service;
+
+    setUp(() {
+      service = BudgetAllocationService();
+    });
+
+    group('收入分配', () {
+      test('收入应完全分配到各预算类别', () {
+        final income = 10000.0;
+        final allocations = {
+          'food': 3000.0,
+          'transport': 1000.0,
+          'entertainment': 500.0,
+          'savings': 5500.0,
+        };
+
+        final result = service.allocate(income, allocations);
+
+        expect(result.isValid, isTrue);
+        expect(result.unallocated, equals(0));
+        expect(result.totalAllocated, equals(income));
+      });
+
+      test('分配超过收入应报错', () {
+        final income = 10000.0;
+        final allocations = {
+          'food': 6000.0,
+          'transport': 5000.0,
+        };
+
+        expect(
+          () => service.allocate(income, allocations),
+          throwsA(isA<AllocationExceededException>()),
+        );
+      });
+
+      test('部分分配应显示未分配金额', () {
+        final income = 10000.0;
+        final allocations = {'food': 3000.0};
+
+        final result = service.allocate(income, allocations);
+
+        expect(result.unallocated, equals(7000.0));
+        expect(result.allocationRate, equals(0.3));
+      });
+    });
+
+    group('预算结转', () {
+      test('月末结余正确结转到下月', () {
+        final currentBudget = Budget(
+          category: 'food',
+          amount: 3000,
+          spent: 2500,
+          month: DateTime(2024, 12),
+        );
+
+        final nextMonth = service.carryOver(currentBudget);
+
+        expect(nextMonth.carryOverAmount, equals(500));
+        expect(nextMonth.month, equals(DateTime(2025, 1)));
+      });
+
+      test('超支预算不结转负数', () {
+        final overBudget = Budget(
+          category: 'food',
+          amount: 3000,
+          spent: 3500,
+          month: DateTime(2024, 12),
+        );
+
+        final nextMonth = service.carryOver(overBudget);
+
+        expect(nextMonth.carryOverAmount, equals(0));
+        expect(nextMonth.previousOverspend, equals(500));
+      });
+    });
+
+    group('预算预警', () {
+      test('使用率达80%触发预警', () {
+        final budget = Budget(amount: 1000, spent: 800);
+
+        expect(budget.warningLevel, equals(BudgetWarning.approaching));
+        expect(budget.shouldNotify, isTrue);
+      });
+
+      test('使用率达100%触发超支警告', () {
+        final budget = Budget(amount: 1000, spent: 1000);
+
+        expect(budget.warningLevel, equals(BudgetWarning.exceeded));
+      });
+    });
+  });
+}
+```
+
+#### 18.2.4 小金库单元测试
+
+```dart
+/// 小金库单元测试
+@Tags(['unit', 'vault', 'core'])
+void main() {
+  group('VaultService', () {
+    late VaultService service;
+
+    test('创建小金库初始余额为0', () {
+      final vault = service.create(name: '旅游基金', targetAmount: 10000);
+
+      expect(vault.balance, equals(0));
+      expect(vault.progress, equals(0));
+    });
+
+    test('存入金额正确更新余额', () {
+      final vault = Vault(balance: 1000);
+
+      final updated = service.deposit(vault, 500);
+
+      expect(updated.balance, equals(1500));
+    });
+
+    test('取出金额不能超过余额', () {
+      final vault = Vault(balance: 1000);
+
+      expect(
+        () => service.withdraw(vault, 1500),
+        throwsA(isA<InsufficientBalanceException>()),
       );
-      when(mockRepo.getTransactions(any)).thenReturn([...incomes, expense]);
+    });
 
-      final result = calculator.calculate(DateTime.now());
+    test('达到目标金额标记为已完成', () {
+      final vault = Vault(balance: 9500, targetAmount: 10000);
 
-      // 1500支出应先消耗30天前的1000，再消耗15天前的500
-      // 加权平均: (1000*30 + 500*15) / 1500 = 25天
-      expect(result.days, closeTo(25, 1));
+      final updated = service.deposit(vault, 500);
+
+      expect(updated.isCompleted, isTrue);
+      expect(updated.progress, equals(1.0));
     });
   });
 }
@@ -23659,35 +24002,45 @@ void main() {
 
 ### 18.3 Widget测试策略
 
+#### 18.3.1 核心页面测试要求
+
 ```dart
 /// Widget测试要求
 class WidgetTestRequirements {
   /// 核心页面必须有Widget测试
   static const requiredPages = [
-    'HomePage',
-    'BudgetManagementPage',
-    'TransactionListPage',
-    'MoneyAgeDetailPage',
-    'VaultManagementPage',
-    'StatisticsPage',
+    'HomePage',              // 首页仪表盘
+    'BudgetManagementPage',  // 预算管理
+    'VaultManagementPage',   // 小金库管理
+    'TransactionListPage',   // 交易列表
+    'MoneyAgeDetailPage',    // 钱龄详情
+    'StatisticsPage',        // 统计分析
+    'VoiceRecognitionPage',  // 语音记账
+    'QuickEntryPage',        // 快速记账
   ];
 
   /// 核心组件必须有Widget测试
   static const requiredWidgets = [
-    'MoneyAgeCard',
-    'BudgetProgressBar',
-    'VaultBalanceWidget',
-    'TransactionTile',
-    'CategoryPieChart',
-    'TrendLineChart',
+    'MoneyAgeCard',          // 钱龄卡片
+    'MoneyAgeGauge',         // 钱龄仪表盘
+    'BudgetProgressBar',     // 预算进度条
+    'VaultBalanceWidget',    // 小金库余额
+    'TransactionTile',       // 交易项
+    'DrillDownPieChart',     // 可下钻饼图
+    'DrillDownLineChart',    // 可下钻折线图
+    'EnhancedBreadcrumb',    // 面包屑导航
   ];
 }
+```
 
-/// 首页Widget测试示例
+#### 18.3.2 首页Widget测试
+
+```dart
+/// 首页Widget测试
 @Tags(['widget', 'home'])
 void main() {
   group('HomePage Widget Tests', () {
-    testWidgets('显示钱龄卡片', (tester) async {
+    testWidgets('显示钱龄卡片和正确数值', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -23699,8 +24052,36 @@ void main() {
       );
 
       expect(find.text('钱龄'), findsOneWidget);
-      expect(find.text('25 天'), findsOneWidget);
+      expect(find.text('25'), findsOneWidget);
+      expect(find.text('天'), findsOneWidget);
       expect(find.byType(MoneyAgeCard), findsOneWidget);
+    });
+
+    testWidgets('显示预算概览卡片', (tester) async {
+      await tester.pumpWidget(createTestApp(
+        budgetOverview: BudgetOverview(
+          totalBudget: 10000,
+          totalSpent: 6500,
+          remainingDays: 15,
+        ),
+      ));
+
+      expect(find.text('本月预算'), findsOneWidget);
+      expect(find.text('¥10,000'), findsOneWidget);
+      expect(find.text('65%'), findsOneWidget); // 使用率
+    });
+
+    testWidgets('显示小金库概览', (tester) async {
+      await tester.pumpWidget(createTestApp(
+        vaults: [
+          Vault(name: '旅游基金', balance: 5000, targetAmount: 10000),
+          Vault(name: '应急资金', balance: 20000, targetAmount: 20000),
+        ],
+      ));
+
+      expect(find.text('小金库'), findsOneWidget);
+      expect(find.text('旅游基金'), findsOneWidget);
+      expect(find.text('50%'), findsOneWidget);
     });
 
     testWidgets('点击钱龄卡片导航到详情页', (tester) async {
@@ -23712,8 +24093,9 @@ void main() {
       expect(find.byType(MoneyAgeDetailPage), findsOneWidget);
     });
 
-    testWidgets('下拉刷新更新数据', (tester) async {
-      await tester.pumpWidget(createTestApp());
+    testWidgets('下拉刷新更新所有数据', (tester) async {
+      final mockRefresh = MockRefreshCallback();
+      await tester.pumpWidget(createTestApp(onRefresh: mockRefresh));
 
       await tester.fling(
         find.byType(CustomScrollView),
@@ -23722,8 +24104,56 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 验证刷新回调被调用
-      verify(mockRefreshCallback()).called(1);
+      verify(mockRefresh.call()).called(1);
+    });
+  });
+}
+```
+
+#### 18.3.3 数据联动Widget测试
+
+```dart
+/// 数据联动Widget测试
+@Tags(['widget', 'drill-down'])
+void main() {
+  group('DrillDown Widget Tests', () {
+    testWidgets('饼图点击触发下钻', (tester) async {
+      await tester.pumpWidget(createTestApp(
+        pieChartData: [
+          ChartSegment(category: 'food', value: 3000, label: '餐饮'),
+          ChartSegment(category: 'transport', value: 1000, label: '交通'),
+        ],
+      ));
+
+      // 点击餐饮分类
+      await tester.tap(find.text('餐饮'));
+      await tester.pumpAndSettle();
+
+      // 验证下钻到餐饮详情
+      expect(find.text('餐饮支出详情'), findsOneWidget);
+      expect(find.byType(EnhancedBreadcrumb), findsOneWidget);
+    });
+
+    testWidgets('面包屑导航正确显示层级', (tester) async {
+      await tester.pumpWidget(createTestApp(
+        drillDownPath: ['统计', '餐饮', '12月25日'],
+      ));
+
+      expect(find.text('统计'), findsOneWidget);
+      expect(find.text('餐饮'), findsOneWidget);
+      expect(find.text('12月25日'), findsOneWidget);
+    });
+
+    testWidgets('点击面包屑返回上级', (tester) async {
+      await tester.pumpWidget(createTestApp(
+        drillDownPath: ['统计', '餐饮', '12月25日'],
+      ));
+
+      await tester.tap(find.text('餐饮'));
+      await tester.pumpAndSettle();
+
+      // 验证返回到餐饮层级
+      expect(find.text('餐饮支出详情'), findsOneWidget);
     });
   });
 }
@@ -23731,14 +24161,17 @@ void main() {
 
 ### 18.4 集成测试策略
 
+#### 18.4.1 关键用户旅程
+
 ```dart
 /// 集成测试场景
 class IntegrationTestScenarios {
-  /// 关键用户旅程
+  /// 关键用户旅程 - 必须覆盖
   static const criticalJourneys = [
-    'new_user_onboarding',      // 新用户引导流程
+    'new_user_onboarding',       // 新用户引导流程
     'quick_expense_entry',       // 快速记账
     'voice_expense_entry',       // 语音记账
+    'multi_transaction_voice',   // 多笔交易语音记账
     'budget_creation_flow',      // 预算创建流程
     'vault_allocation_flow',     // 小金库分配流程
     'data_drill_down',           // 数据下钻
@@ -23750,41 +24183,101 @@ class IntegrationTestScenarios {
     'offline_to_online_sync',    // 离线转在线同步
     'conflict_resolution',       // 冲突解决
     'partial_sync_recovery',     // 部分同步恢复
+    'incremental_sync',          // 增量同步
+  ];
+
+  /// 2.0核心功能场景
+  static const v2CoreScenarios = [
+    'money_age_calculation',     // 钱龄计算流程
+    'zero_budget_allocation',    // 零基预算分配
+    'vault_management',          // 小金库管理
+    'ai_voice_recognition',      // AI语音识别
+    'cross_page_filter',         // 跨页面筛选
   ];
 }
+```
 
-/// 快速记账集成测试
-integration_test('快速记账流程', () async {
-  final app = await initializeTestApp();
+#### 18.4.2 语音记账集成测试
 
-  // 1. 打开快速记账页
-  await app.tap(find.byIcon(Icons.add));
-  await app.pumpAndSettle();
+```dart
+/// 语音记账集成测试
+@Tags(['integration', 'voice', 'ai'])
+void main() {
+  group('语音记账集成测试', () {
+    integration_test('单笔交易语音记账', () async {
+      final app = await initializeTestApp();
 
-  // 2. 输入金额
-  await app.enterText(find.byType(AmountInput), '88.5');
+      // 1. 打开语音记账
+      await app.tap(find.byIcon(Icons.mic));
+      await app.pumpAndSettle();
 
-  // 3. 选择分类
-  await app.tap(find.text('餐饮'));
+      // 2. 模拟语音输入
+      await app.simulateVoiceInput('午餐花了35块');
+      await app.pumpAndSettle();
 
-  // 4. 添加备注
-  await app.enterText(find.byType(NoteInput), '午餐');
+      // 3. 验证AI解析结果
+      expect(find.text('¥35.00'), findsOneWidget);
+      expect(find.text('餐饮'), findsOneWidget);
+      expect(find.text('午餐'), findsOneWidget);
 
-  // 5. 保存
-  await app.tap(find.text('保存'));
-  await app.pumpAndSettle();
+      // 4. 确认保存
+      await app.tap(find.text('确认'));
+      await app.pumpAndSettle();
 
-  // 6. 验证交易已保存
-  expect(find.text('¥88.50'), findsOneWidget);
-  expect(find.text('餐饮'), findsOneWidget);
-  expect(find.text('午餐'), findsOneWidget);
+      // 5. 验证交易已保存
+      await app.tap(find.byIcon(Icons.list));
+      expect(find.text('¥35.00'), findsOneWidget);
+    });
 
-  // 7. 验证钱龄已更新
-  final moneyAge = app.getMoneyAge();
-  expect(moneyAge.lastUpdated, isNotNull);
-});
+    integration_test('多笔交易语音记账', () async {
+      final app = await initializeTestApp();
 
+      await app.tap(find.byIcon(Icons.mic));
+      await app.simulateVoiceInput('今天早餐15块，午餐28块，晚餐花了45');
+      await app.pumpAndSettle();
+
+      // 验证解析出3笔交易
+      expect(find.byType(TransactionConfirmTile), findsNWidgets(3));
+      expect(find.text('¥15.00'), findsOneWidget);
+      expect(find.text('¥28.00'), findsOneWidget);
+      expect(find.text('¥45.00'), findsOneWidget);
+
+      // 全部确认
+      await app.tap(find.text('全部确认'));
+      await app.pumpAndSettle();
+
+      // 验证钱龄已更新
+      final moneyAge = app.getMoneyAge();
+      expect(moneyAge.lastUpdated, isNotNull);
+    });
+
+    integration_test('语音识别失败重试', () async {
+      final app = await initializeTestApp();
+
+      // 模拟识别失败
+      await app.tap(find.byIcon(Icons.mic));
+      await app.simulateVoiceError(VoiceError.networkTimeout);
+
+      // 验证显示重试选项
+      expect(find.text('识别失败'), findsOneWidget);
+      expect(find.text('重试'), findsOneWidget);
+
+      // 点击重试
+      await app.tap(find.text('重试'));
+      await app.simulateVoiceInput('咖啡25元');
+      await app.pumpAndSettle();
+
+      expect(find.text('¥25.00'), findsOneWidget);
+    });
+  });
+}
+```
+
+#### 18.4.3 数据下钻集成测试
+
+```dart
 /// 数据下钻集成测试
+@Tags(['integration', 'drill-down'])
 integration_test('统计图表下钻流程', () async {
   final app = await initializeTestApp(withSampleData: true);
 
@@ -23800,7 +24293,7 @@ integration_test('统计图表下钻流程', () async {
   expect(find.text('餐饮支出详情'), findsOneWidget);
 
   // 4. 验证面包屑显示
-  expect(find.byType(Breadcrumb), findsOneWidget);
+  expect(find.byType(EnhancedBreadcrumb), findsOneWidget);
   expect(find.text('统计'), findsOneWidget);
   expect(find.text('餐饮'), findsOneWidget);
 
@@ -23811,7 +24304,10 @@ integration_test('统计图表下钻流程', () async {
   // 6. 验证显示当天交易列表
   expect(find.byType(TransactionList), findsOneWidget);
 
-  // 7. 点击面包屑返回
+  // 7. 验证面包屑更新
+  expect(find.text('12月25日'), findsOneWidget);
+
+  // 8. 点击面包屑返回统计页
   await app.tap(find.text('统计'));
   await app.pumpAndSettle();
 
@@ -23819,10 +24315,211 @@ integration_test('统计图表下钻流程', () async {
 });
 ```
 
-### 18.5 端到端测试
+### 18.5 API与后端测试
+
+#### 18.5.1 API测试策略
+
+```python
+# server/tests/test_api.py
+
+import pytest
+from httpx import AsyncClient
+from app.main import app
+
+class TestTransactionAPI:
+    """交易API测试"""
+
+    @pytest.mark.asyncio
+    async def test_create_transaction(self, client: AsyncClient, auth_headers):
+        """创建交易"""
+        response = await client.post(
+            "/api/v1/transactions",
+            json={
+                "type": "expense",
+                "amount": 88.5,
+                "category_id": "food",
+                "date": "2024-12-31",
+                "note": "午餐"
+            },
+            headers=auth_headers
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["amount"] == 88.5
+        assert data["category_id"] == "food"
+        assert "id" in data
+
+    @pytest.mark.asyncio
+    async def test_get_transactions_with_filter(self, client: AsyncClient, auth_headers):
+        """带筛选条件查询交易"""
+        response = await client.get(
+            "/api/v1/transactions",
+            params={
+                "start_date": "2024-12-01",
+                "end_date": "2024-12-31",
+                "category": "food",
+                "type": "expense"
+            },
+            headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+
+    @pytest.mark.asyncio
+    async def test_batch_create_transactions(self, client: AsyncClient, auth_headers):
+        """批量创建交易（语音记账场景）"""
+        response = await client.post(
+            "/api/v1/transactions/batch",
+            json={
+                "transactions": [
+                    {"type": "expense", "amount": 15, "category_id": "food"},
+                    {"type": "expense", "amount": 28, "category_id": "food"},
+                    {"type": "expense", "amount": 45, "category_id": "food"},
+                ]
+            },
+            headers=auth_headers
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert len(data["created"]) == 3
+
+
+class TestBudgetAPI:
+    """预算API测试"""
+
+    @pytest.mark.asyncio
+    async def test_create_zero_based_budget(self, client: AsyncClient, auth_headers):
+        """创建零基预算"""
+        response = await client.post(
+            "/api/v1/budgets",
+            json={
+                "month": "2025-01",
+                "total_income": 15000,
+                "allocations": [
+                    {"category_id": "food", "amount": 3000},
+                    {"category_id": "transport", "amount": 1000},
+                    {"category_id": "savings", "amount": 5000},
+                ]
+            },
+            headers=auth_headers
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["total_allocated"] == 9000
+        assert data["unallocated"] == 6000
+
+    @pytest.mark.asyncio
+    async def test_budget_carryover(self, client: AsyncClient, auth_headers):
+        """预算结转测试"""
+        response = await client.post(
+            "/api/v1/budgets/carryover",
+            json={"from_month": "2024-12", "to_month": "2025-01"},
+            headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "carryover_amounts" in data
+
+
+class TestSyncAPI:
+    """数据同步API测试"""
+
+    @pytest.mark.asyncio
+    async def test_incremental_sync(self, client: AsyncClient, auth_headers):
+        """增量同步测试"""
+        response = await client.post(
+            "/api/v1/sync/pull",
+            json={
+                "last_sync_time": "2024-12-30T00:00:00Z",
+                "device_id": "test-device-001"
+            },
+            headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "changes" in data
+        assert "server_time" in data
+
+    @pytest.mark.asyncio
+    async def test_conflict_resolution(self, client: AsyncClient, auth_headers):
+        """冲突解决测试"""
+        response = await client.post(
+            "/api/v1/sync/push",
+            json={
+                "changes": [
+                    {
+                        "id": "tx-001",
+                        "type": "update",
+                        "data": {"amount": 100},
+                        "client_version": 2,
+                        "server_version": 1  # 模拟冲突
+                    }
+                ]
+            },
+            headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "conflicts" in data
+```
+
+#### 18.5.2 数据库测试
+
+```python
+# server/tests/test_db.py
+
+import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.models import Transaction, Budget, Vault
+
+class TestTransactionRepository:
+    """交易仓库测试"""
+
+    @pytest.mark.asyncio
+    async def test_calculate_money_age(self, session: AsyncSession, user_id: str):
+        """钱龄计算数据库查询测试"""
+        # 插入测试数据
+        await self._insert_test_transactions(session, user_id)
+
+        repo = TransactionRepository(session)
+        result = await repo.calculate_money_age(user_id, datetime.now())
+
+        assert result.total_income > 0
+        assert result.total_expense >= 0
+        assert result.weighted_age >= 0
+
+    @pytest.mark.asyncio
+    async def test_get_category_statistics(self, session: AsyncSession, user_id: str):
+        """分类统计查询测试"""
+        repo = TransactionRepository(session)
+        stats = await repo.get_category_statistics(
+            user_id,
+            start_date=date(2024, 12, 1),
+            end_date=date(2024, 12, 31)
+        )
+
+        assert isinstance(stats, list)
+        for item in stats:
+            assert "category_id" in item
+            assert "total_amount" in item
+            assert "transaction_count" in item
+```
+
+### 18.6 端到端测试
+
+#### 18.6.1 E2E测试场景
 
 ```dart
-/// E2E测试场景
+/// E2E测试场景定义
 class E2ETestScenarios {
   /// 完整用户流程
   static const fullUserFlows = [
@@ -23830,20 +24527,37 @@ class E2ETestScenarios {
       name: '月度财务管理完整流程',
       steps: [
         '登录应用',
-        '查看本月概览',
+        '查看本月概览（钱龄、预算、小金库）',
         '记录收入（工资）',
-        '分配收入到各小金库',
-        '记录多笔支出',
-        '查看钱龄变化',
+        '创建零基预算分配收入',
+        '分配资金到各小金库',
+        '记录多笔日常支出',
+        '查看钱龄变化趋势',
         '检查预算执行情况',
-        '生成月度报表',
-        '设置下月预算',
+        '查看统计图表并下钻',
+        '生成月度财务报告',
       ],
-      expectedDuration: Duration(minutes: 15),
+      expectedDuration: Duration(minutes: 20),
+    ),
+    E2EFlow(
+      name: '语音记账完整流程',
+      steps: [
+        '打开语音记账',
+        '语音输入多笔交易',
+        '确认AI识别结果',
+        '修改错误识别的项目',
+        '保存所有交易',
+        '验证首页数据更新',
+      ],
+      expectedDuration: Duration(minutes: 5),
     ),
   ];
 }
+```
 
+#### 18.6.2 月度财务管理E2E测试
+
+```dart
 /// 月度财务管理E2E测试
 @Tags(['e2e', 'slow'])
 e2e_test('月度财务管理完整流程', () async {
@@ -23854,26 +24568,49 @@ e2e_test('月度财务管理完整流程', () async {
     await driver.tap(find.byValueKey('login_button'));
     await driver.waitFor(find.byType('HomePage'));
 
-    // 2. 记录收入
+    // 2. 验证首页显示钱龄
+    await driver.waitFor(find.text('钱龄'));
+
+    // 3. 记录收入
     await driver.tap(find.byValueKey('add_transaction'));
     await driver.tap(find.text('收入'));
     await driver.enterText(find.byType('AmountInput'), '15000');
     await driver.tap(find.text('工资'));
     await driver.tap(find.text('保存'));
 
-    // 3. 分配到小金库
-    await driver.tap(find.byValueKey('vault_allocation'));
-    await driver.enterText(find.byValueKey('vault_food'), '3000');
-    await driver.enterText(find.byValueKey('vault_transport'), '1000');
-    await driver.enterText(find.byValueKey('vault_savings'), '5000');
+    // 4. 创建零基预算
+    await driver.tap(find.byValueKey('budget_tab'));
+    await driver.tap(find.text('创建本月预算'));
+    await driver.enterText(find.byValueKey('budget_food'), '3000');
+    await driver.enterText(find.byValueKey('budget_transport'), '1000');
+    await driver.enterText(find.byValueKey('budget_entertainment'), '500');
+    await driver.tap(find.text('确认'));
+
+    // 5. 分配到小金库
+    await driver.tap(find.byValueKey('vault_tab'));
+    await driver.tap(find.text('分配资金'));
+    await driver.enterText(find.byValueKey('vault_travel'), '2000');
+    await driver.enterText(find.byValueKey('vault_emergency'), '3000');
     await driver.tap(find.text('确认分配'));
 
-    // 4. 验证钱龄
-    await driver.waitFor(find.text('钱龄'));
+    // 6. 验证钱龄更新
+    await driver.tap(find.byValueKey('home_tab'));
     final moneyAgeText = await driver.getText(find.byValueKey('money_age_days'));
     expect(int.parse(moneyAgeText), greaterThan(0));
 
-    // 5. 生成报表
+    // 7. 记录支出
+    await driver.tap(find.byValueKey('add_transaction'));
+    await driver.enterText(find.byType('AmountInput'), '88.5');
+    await driver.tap(find.text('餐饮'));
+    await driver.tap(find.text('保存'));
+
+    // 8. 查看统计并下钻
+    await driver.tap(find.byValueKey('stats_tab'));
+    await driver.waitFor(find.byType('PieChart'));
+    await driver.tap(find.text('餐饮'));
+    await driver.waitFor(find.text('餐饮支出详情'));
+
+    // 9. 生成报告
     await driver.tap(find.byValueKey('reports'));
     await driver.tap(find.text('生成月度报表'));
     await driver.waitFor(find.text('报表已生成'));
@@ -23884,7 +24621,9 @@ e2e_test('月度财务管理完整流程', () async {
 });
 ```
 
-### 18.6 性能测试
+### 18.7 性能测试
+
+#### 18.7.1 性能基准
 
 ```dart
 /// 性能测试基准
@@ -23895,6 +24634,8 @@ class PerformanceBenchmarks {
     'TransactionListPage': 800,
     'StatisticsPage': 1000,
     'MoneyAgeDetailPage': 600,
+    'BudgetManagementPage': 700,
+    'VaultManagementPage': 600,
   };
 
   /// 操作响应时间基准 (毫秒)
@@ -23902,7 +24643,9 @@ class PerformanceBenchmarks {
     'save_transaction': 200,
     'calculate_money_age': 100,
     'generate_chart': 500,
+    'voice_recognition': 2000,
     'sync_data': 3000,
+    'export_report': 5000,
   };
 
   /// 内存使用基准 (MB)
@@ -23910,13 +24653,25 @@ class PerformanceBenchmarks {
     'idle': 150,
     'active': 250,
     'peak': 400,
+    'after_gc': 180,
+  };
+
+  /// 帧率基准
+  static const frameRateLimits = {
+    'scroll_list': 55,      // 列表滚动 ≥55fps
+    'chart_animation': 50,  // 图表动画 ≥50fps
+    'page_transition': 55,  // 页面切换 ≥55fps
   };
 }
+```
 
-/// 性能测试示例
+#### 18.7.2 性能测试用例
+
+```dart
+/// 性能测试
 @Tags(['performance'])
 void main() {
-  group('Performance Tests', () {
+  group('页面加载性能', () {
     test('首页加载时间 < 500ms', () async {
       final stopwatch = Stopwatch()..start();
 
@@ -23928,7 +24683,19 @@ void main() {
         lessThan(PerformanceBenchmarks.pageLoadTimes['HomePage']!));
     });
 
-    test('钱龄计算时间 < 100ms (1000条交易)', () async {
+    test('统计页图表渲染 < 1000ms', () async {
+      final stopwatch = Stopwatch()..start();
+
+      await tester.pumpWidget(StatisticsPage(data: largeDataSet));
+      await tester.pumpAndSettle();
+
+      stopwatch.stop();
+      expect(stopwatch.elapsedMilliseconds, lessThan(1000));
+    });
+  });
+
+  group('核心算法性能', () {
+    test('钱龄计算 < 100ms (1000条交易)', () async {
       final transactions = generateTransactions(1000);
       final calculator = MoneyAgeCalculator();
 
@@ -23939,8 +24706,23 @@ void main() {
       expect(stopwatch.elapsedMilliseconds, lessThan(100));
     });
 
+    test('钱龄计算 < 500ms (10000条交易)', () async {
+      final transactions = generateTransactions(10000);
+      final calculator = MoneyAgeCalculator();
+
+      final stopwatch = Stopwatch()..start();
+      calculator.calculate(transactions, DateTime.now());
+      stopwatch.stop();
+
+      expect(stopwatch.elapsedMilliseconds, lessThan(500));
+    });
+  });
+
+  group('UI流畅度', () {
     test('交易列表滚动帧率 >= 55fps', () async {
-      await tester.pumpWidget(TransactionListPage());
+      await tester.pumpWidget(TransactionListPage(
+        transactions: generateTransactions(500),
+      ));
 
       final timeline = await tester.traceAction(() async {
         await tester.fling(
@@ -23954,60 +24736,558 @@ void main() {
       final summary = TimelineSummary.summarize(timeline);
       expect(summary.averageFrameBuildTimeMillis, lessThan(18)); // ~55fps
     });
+
+    test('饼图动画帧率 >= 50fps', () async {
+      await tester.pumpWidget(DrillDownPieChart(data: testData));
+
+      final timeline = await tester.traceAction(() async {
+        await tester.tap(find.byType(DrillDownPieChart));
+        await tester.pumpAndSettle();
+      });
+
+      final summary = TimelineSummary.summarize(timeline);
+      expect(summary.averageFrameBuildTimeMillis, lessThan(20)); // ~50fps
+    });
+  });
+
+  group('内存使用', () {
+    test('空闲状态内存 < 150MB', () async {
+      await tester.pumpWidget(HomePage());
+      await tester.pumpAndSettle();
+
+      // 等待稳定
+      await Future.delayed(Duration(seconds: 2));
+
+      final memoryUsage = await getMemoryUsage();
+      expect(memoryUsage, lessThan(150 * 1024 * 1024));
+    });
   });
 }
 ```
 
-### 18.7 测试自动化与CI/CD
+### 18.8 AI功能测试
+
+#### 18.8.1 语音识别测试
+
+```dart
+/// AI语音识别测试
+@Tags(['ai', 'voice'])
+void main() {
+  group('VoiceRecognitionParser', () {
+    late VoiceRecognitionParser parser;
+
+    setUp(() {
+      parser = VoiceRecognitionParser();
+    });
+
+    group('单笔交易解析', () {
+      test('解析简单支出', () {
+        final result = parser.parse('午餐花了35块');
+
+        expect(result.transactions.length, equals(1));
+        expect(result.transactions[0].amount, equals(35));
+        expect(result.transactions[0].type, equals(TransactionType.expense));
+        expect(result.transactions[0].category, equals('food'));
+      });
+
+      test('解析带小数金额', () {
+        final result = parser.parse('打车花了28.5元');
+
+        expect(result.transactions[0].amount, equals(28.5));
+        expect(result.transactions[0].category, equals('transport'));
+      });
+
+      test('解析收入', () {
+        final result = parser.parse('收到工资15000');
+
+        expect(result.transactions[0].type, equals(TransactionType.income));
+        expect(result.transactions[0].amount, equals(15000));
+        expect(result.transactions[0].category, equals('salary'));
+      });
+    });
+
+    group('多笔交易解析', () {
+      test('解析逗号分隔的多笔交易', () {
+        final result = parser.parse('早餐15块，午餐28块，晚餐45块');
+
+        expect(result.transactions.length, equals(3));
+        expect(result.transactions[0].amount, equals(15));
+        expect(result.transactions[1].amount, equals(28));
+        expect(result.transactions[2].amount, equals(45));
+      });
+
+      test('解析混合类型交易', () {
+        final result = parser.parse('收到红包200，买了杯咖啡25');
+
+        expect(result.transactions.length, equals(2));
+        expect(result.transactions[0].type, equals(TransactionType.income));
+        expect(result.transactions[1].type, equals(TransactionType.expense));
+      });
+    });
+
+    group('边界情况', () {
+      test('无法解析时返回空列表', () {
+        final result = parser.parse('今天天气真好');
+
+        expect(result.transactions, isEmpty);
+        expect(result.confidence, lessThan(0.5));
+      });
+
+      test('处理模糊金额', () {
+        final result = parser.parse('买东西花了几十块');
+
+        expect(result.needsConfirmation, isTrue);
+        expect(result.suggestedAmount, isNull);
+      });
+    });
+  });
+}
+```
+
+#### 18.8.2 AI服务Mock测试
+
+```dart
+/// AI服务Mock测试
+@Tags(['ai', 'mock'])
+void main() {
+  group('QwenService', () {
+    late QwenService service;
+    late MockHttpClient mockClient;
+
+    setUp(() {
+      mockClient = MockHttpClient();
+      service = QwenService(httpClient: mockClient);
+    });
+
+    test('正常响应解析', () async {
+      when(mockClient.post(any, any)).thenAnswer((_) async => Response(
+        statusCode: 200,
+        body: jsonEncode({
+          'output': {
+            'text': '{"transactions":[{"amount":35,"category":"food"}]}'
+          }
+        }),
+      ));
+
+      final result = await service.parseVoiceInput('午餐35元');
+
+      expect(result.isSuccess, isTrue);
+      expect(result.transactions.length, equals(1));
+    });
+
+    test('网络超时重试', () async {
+      var callCount = 0;
+      when(mockClient.post(any, any)).thenAnswer((_) async {
+        callCount++;
+        if (callCount < 3) {
+          throw TimeoutException('Connection timeout');
+        }
+        return Response(statusCode: 200, body: '{"output":{"text":"{}"}}');
+      });
+
+      final result = await service.parseVoiceInput('测试');
+
+      expect(callCount, equals(3));
+      expect(result.isSuccess, isTrue);
+    });
+
+    test('API限流处理', () async {
+      when(mockClient.post(any, any)).thenAnswer((_) async => Response(
+        statusCode: 429,
+        body: '{"error":"rate_limited"}',
+      ));
+
+      final result = await service.parseVoiceInput('测试');
+
+      expect(result.isSuccess, isFalse);
+      expect(result.error, equals(AIError.rateLimited));
+    });
+  });
+}
+```
+
+### 18.9 安全测试
+
+#### 18.9.1 安全测试策略
+
+```dart
+/// 安全测试要求
+class SecurityTestRequirements {
+  /// 必须覆盖的安全测试场景
+  static const requiredTests = [
+    'sql_injection_prevention',
+    'xss_prevention',
+    'authentication_bypass',
+    'authorization_check',
+    'sensitive_data_encryption',
+    'token_expiration',
+    'rate_limiting',
+  ];
+}
+```
+
+#### 18.9.2 安全测试用例
+
+```python
+# server/tests/test_security.py
+
+import pytest
+
+class TestSecurityVulnerabilities:
+    """安全漏洞测试"""
+
+    @pytest.mark.asyncio
+    async def test_sql_injection_prevention(self, client, auth_headers):
+        """SQL注入防护测试"""
+        malicious_inputs = [
+            "'; DROP TABLE transactions; --",
+            "1 OR 1=1",
+            "1; SELECT * FROM users",
+        ]
+
+        for payload in malicious_inputs:
+            response = await client.get(
+                f"/api/v1/transactions?category={payload}",
+                headers=auth_headers
+            )
+            # 应该返回空结果或错误，而不是执行注入
+            assert response.status_code in [200, 400]
+            assert "error" not in response.text.lower() or "invalid" in response.text.lower()
+
+    @pytest.mark.asyncio
+    async def test_xss_prevention(self, client, auth_headers):
+        """XSS防护测试"""
+        xss_payloads = [
+            "<script>alert('xss')</script>",
+            "javascript:alert(1)",
+            "<img src=x onerror=alert(1)>",
+        ]
+
+        for payload in xss_payloads:
+            response = await client.post(
+                "/api/v1/transactions",
+                json={"note": payload, "amount": 100, "category_id": "food"},
+                headers=auth_headers
+            )
+            data = response.json()
+            # 验证输出被转义
+            assert "<script>" not in str(data)
+            assert "javascript:" not in str(data)
+
+    @pytest.mark.asyncio
+    async def test_authentication_required(self, client):
+        """认证要求测试"""
+        protected_endpoints = [
+            "/api/v1/transactions",
+            "/api/v1/budgets",
+            "/api/v1/sync/pull",
+            "/api/v1/user/profile",
+        ]
+
+        for endpoint in protected_endpoints:
+            response = await client.get(endpoint)
+            assert response.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_authorization_isolation(self, client, user1_headers, user2_headers):
+        """用户数据隔离测试"""
+        # 用户1创建交易
+        response = await client.post(
+            "/api/v1/transactions",
+            json={"amount": 100, "category_id": "food"},
+            headers=user1_headers
+        )
+        tx_id = response.json()["id"]
+
+        # 用户2尝试访问用户1的交易
+        response = await client.get(
+            f"/api/v1/transactions/{tx_id}",
+            headers=user2_headers
+        )
+        assert response.status_code == 404  # 应该看不到
+
+    @pytest.mark.asyncio
+    async def test_rate_limiting(self, client, auth_headers):
+        """速率限制测试"""
+        # 快速发送大量请求
+        responses = []
+        for _ in range(100):
+            response = await client.get(
+                "/api/v1/transactions",
+                headers=auth_headers
+            )
+            responses.append(response.status_code)
+
+        # 应该有一些请求被限流
+        assert 429 in responses
+```
+
+### 18.10 测试自动化与CI/CD
+
+#### 18.10.1 CI/CD流水线配置
 
 ```yaml
 # .github/workflows/test.yml
 name: Test Pipeline
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+    branches: [master]
+
+env:
+  FLUTTER_VERSION: '3.24.0'
 
 jobs:
+  # 单元测试
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-      - run: flutter test --coverage
-      - uses: codecov/codecov-action@v3
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
 
+      - name: Install dependencies
+        run: cd app && flutter pub get
+
+      - name: Run unit tests
+        run: cd app && flutter test --coverage --tags=unit
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: app/coverage/lcov.info
+
+  # Widget测试
   widget-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-      - run: flutter test test/widget --tags=widget
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
 
+      - run: cd app && flutter pub get
+      - run: cd app && flutter test --tags=widget
+
+  # 集成测试
   integration-tests:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-      - run: flutter drive --target=test_driver/app.dart
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
 
+      - name: Start iOS Simulator
+        run: |
+          xcrun simctl boot "iPhone 15 Pro"
+
+      - name: Run integration tests
+        run: cd app && flutter drive --target=test_driver/app.dart
+
+  # 后端API测试
+  api-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd server
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run API tests
+        run: |
+          cd server
+          pytest tests/ -v --cov=app
+
+  # 性能测试（仅主分支）
   performance-tests:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-      - run: flutter test --tags=performance
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - run: cd app && flutter pub get
+      - run: cd app && flutter test --tags=performance
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results
+          path: app/build/performance/
+
+  # 安全扫描
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'HIGH,CRITICAL'
 ```
 
-### 18.8 测试覆盖率要求
+#### 18.10.2 本地测试脚本
 
-| 模块 | 最低覆盖率 | 目标覆盖率 |
-|------|-----------|-----------|
-| 核心业务逻辑 | 85% | 95% |
-| 数据模型 | 80% | 90% |
-| Provider/Service | 75% | 85% |
-| UI组件 | 60% | 75% |
-| 工具类 | 70% | 85% |
-| **整体** | **70%** | **80%** |
+```bash
+#!/bin/bash
+# scripts/run_tests.sh
+
+set -e
+
+echo "=== Running AI Bookkeeping Tests ==="
+
+# 单元测试
+echo "📋 Running unit tests..."
+cd app
+flutter test --tags=unit --coverage
+echo "✅ Unit tests passed"
+
+# Widget测试
+echo "📋 Running widget tests..."
+flutter test --tags=widget
+echo "✅ Widget tests passed"
+
+# 后端测试
+echo "📋 Running API tests..."
+cd ../server
+pytest tests/ -v
+echo "✅ API tests passed"
+
+# 代码覆盖率检查
+echo "📊 Checking coverage..."
+cd ../app
+lcov --summary coverage/lcov.info
+
+echo "=== All tests passed! ==="
+```
+
+### 18.11 测试覆盖率要求
+
+#### 18.11.1 覆盖率目标
+
+| 模块 | 最低覆盖率 | 目标覆盖率 | 强制检查 |
+|------|-----------|-----------|----------|
+| 核心业务逻辑（钱龄/预算/小金库） | 90% | 95% | ✅ |
+| 数据模型 | 85% | 90% | ✅ |
+| Provider/Service | 80% | 85% | ✅ |
+| AI服务 | 75% | 85% | ✅ |
+| API端点 | 80% | 90% | ✅ |
+| UI组件 | 60% | 75% | ❌ |
+| 工具类 | 75% | 85% | ❌ |
+| **整体** | **75%** | **85%** | ✅ |
+
+#### 18.11.2 覆盖率监控
+
+```dart
+/// 覆盖率检查脚本
+class CoverageChecker {
+  static const requiredCoverage = {
+    'lib/core/money_age/': 90,
+    'lib/core/budget/': 90,
+    'lib/core/vault/': 90,
+    'lib/services/': 80,
+    'lib/providers/': 80,
+  };
+
+  static Future<bool> check(String lcovPath) async {
+    final coverage = await parseLcov(lcovPath);
+
+    for (final entry in requiredCoverage.entries) {
+      final dirCoverage = coverage.getCoverage(entry.key);
+      if (dirCoverage < entry.value) {
+        print('❌ ${entry.key}: $dirCoverage% < ${entry.value}% required');
+        return false;
+      }
+      print('✅ ${entry.key}: $dirCoverage% >= ${entry.value}%');
+    }
+
+    return true;
+  }
+}
+```
+
+### 18.12 目标达成检测
+
+#### 18.12.1 测试质量目标
+
+```dart
+/// 测试策略目标达成检测（对齐1.4.2节定义）
+class TestingGoalAchievement {
+  static const testingGoal = GoalCriteria(
+    name: '测试质量保障',
+    description: '确保产品质量和稳定性',
+
+    // 功能完整度标准
+    featureCompleteness: [
+      '单元测试覆盖所有核心业务逻辑',
+      'Widget测试覆盖所有核心页面',
+      '集成测试覆盖关键用户旅程',
+      'API测试覆盖所有端点',
+      '性能测试建立基准并持续监控',
+      'AI功能测试覆盖识别准确率',
+      '安全测试覆盖OWASP Top 10',
+    ],
+
+    // 测试效果标准
+    outcomeMetrics: [
+      OutcomeMetric(
+        name: '代码覆盖率',
+        measurement: '整体代码覆盖率',
+        target: 0.80,  // 80%
+        method: 'lcov统计',
+      ),
+      OutcomeMetric(
+        name: '缺陷逃逸率',
+        measurement: '上线后发现的缺陷/总缺陷',
+        target: 0.05,  // <5%
+        method: '缺陷追踪统计',
+      ),
+      OutcomeMetric(
+        name: 'CI通过率',
+        measurement: 'CI流水线首次通过率',
+        target: 0.90,  // 90%
+        method: 'GitHub Actions统计',
+      ),
+      OutcomeMetric(
+        name: '回归缺陷率',
+        measurement: '回归测试发现的新缺陷率',
+        target: 0.02,  // <2%
+        method: '版本迭代缺陷统计',
+      ),
+    ],
+
+    // 满意度标准
+    satisfactionTarget: SatisfactionMetric(
+      appCrashRate: 0.001,  // 崩溃率 <0.1%
+      userReportedBugs: 5,  // 每月用户报告缺陷 <5个
+    ),
+  );
+}
+```
 
 ---
 
@@ -25270,9 +26550,321 @@ class ExceptionUIHandler {
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 20.1 模块化架构设计
+### 20.1 可扩展性架构总览
 
-#### 20.1.1 2.0版本功能模块全景图
+#### 20.1.1 章节定位与设计目标
+
+本章节定义系统的可扩展性架构和演进策略，确保2.0版本的各项创新功能（钱龄系统、零基预算、小金库、金融习惯培养）能够独立扩展、平滑升级，同时为未来版本（2.1协作记账、2.2智能投资）预留扩展接口。
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    第20章 可扩展性与演进架构 - 设计定位                            │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  【章节设计目标】                                                                 │
+│  ═══════════════════════════════════════════════════════════════════════════   │
+│                                                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │                        可扩展性五大支柱                                   │   │
+│  │                                                                          │   │
+│  │   ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐          │   │
+│  │   │  模块化    │ │  插件化    │ │  策略化    │ │  版本化    │          │   │
+│  │   │ Modular    │ │  Plugin    │ │ Strategy   │ │ Versioned  │          │   │
+│  │   │            │ │            │ │            │ │            │          │   │
+│  │   │ • 功能隔离 │ │ • 热插拔   │ │ • 行为替换 │ │ • API版本  │          │   │
+│  │   │ • 依赖管理 │ │ • 按需加载 │ │ • 算法扩展 │ │ • 数据迁移 │          │   │
+│  │   │ • 独立部署 │ │ • 扩展点   │ │ • 规则引擎 │ │ • 向后兼容 │          │   │
+│  │   └────────────┘ └────────────┘ └────────────┘ └────────────┘          │   │
+│  │                                                                          │   │
+│  │                        ┌────────────┐                                   │   │
+│  │                        │  演进化    │                                   │   │
+│  │                        │ Evolution  │                                   │   │
+│  │                        │            │                                   │   │
+│  │                        │ • 灰度发布 │                                   │   │
+│  │                        │ • 功能开关 │                                   │   │
+│  │                        │ • A/B测试  │                                   │   │
+│  │                        └────────────┘                                   │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                 │
+│  【2.0版本可扩展性重点】                                                          │
+│  ═══════════════════════════════════════════════════════════════════════════   │
+│                                                                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │  钱龄系统   │    │  零基预算   │    │  离线优先   │    │  AI识别     │     │
+│  ├─────────────┤    ├─────────────┤    ├─────────────┤    ├─────────────┤     │
+│  │ 计算策略   │    │ 分配策略   │    │ 同步策略   │    │ 识别引擎   │     │
+│  │ 可替换     │    │ 可替换     │    │ 可配置     │    │ 可扩展     │     │
+│  │            │    │            │    │            │    │            │     │
+│  │ • FIFO     │    │ • 信封法   │    │ • 冲突解决 │    │ • 语音     │     │
+│  │ • 加权平均 │    │ • 50/30/20 │    │ • 增量同步 │    │ • 图片     │     │
+│  │ • 自定义   │    │ • 自定义   │    │ • 全量同步 │    │ • NLU      │     │
+│  └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘     │
+│                                                                                 │
+│  【与其他章节关系】                                                               │
+│  ═══════════════════════════════════════════════════════════════════════════   │
+│                                                                                 │
+│        ┌─────────────┐        ┌─────────────┐        ┌─────────────┐          │
+│        │  第4章      │        │  第5章      │        │  第6章      │          │
+│        │  钱龄系统   │───────►│  零基预算   │───────►│  小金库     │          │
+│        └──────┬──────┘        └──────┬──────┘        └──────┬──────┘          │
+│               │                      │                      │                  │
+│               └──────────────────────┼──────────────────────┘                  │
+│                                      │                                         │
+│                             ┌────────▼────────┐                                │
+│                             │    第20章       │                                │
+│                             │ 可扩展性与演进  │                                │
+│                             └────────┬────────┘                                │
+│                                      │                                         │
+│        ┌─────────────────────────────┼─────────────────────────────┐          │
+│        │                             │                             │          │
+│        ▼                             ▼                             ▼          │
+│  ┌───────────┐               ┌───────────┐               ┌───────────┐        │
+│  │ 模块注册  │               │ 版本迁移  │               │ 灰度发布  │        │
+│  │ 依赖管理  │               │ API演进   │               │ 功能开关  │        │
+│  └───────────┘               └───────────┘               └───────────┘        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 20.1.2 可扩展性架构全景图
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         可扩展性架构全景图                                         │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │                          应用层 (Presentation)                           │   │
+│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐               │   │
+│  │  │  页面路由扩展  │  │  主题系统扩展  │  │  组件库扩展   │               │   │
+│  │  │ RouteExtension│  │ ThemeExtension│  │WidgetExtension│               │   │
+│  │  └───────┬───────┘  └───────┬───────┘  └───────┬───────┘               │   │
+│  └──────────┼──────────────────┼──────────────────┼─────────────────────────┘   │
+│             │                  │                  │                             │
+│  ┌──────────▼──────────────────▼──────────────────▼─────────────────────────┐   │
+│  │                        业务模块层 (Business Modules)                      │   │
+│  │                                                                          │   │
+│  │  ┌──────────────────────────────────────────────────────────────────┐   │   │
+│  │  │                     FeatureRegistry (模块注册中心)                 │   │   │
+│  │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │   │   │
+│  │  │  │ 钱龄模块 │ │ 预算模块 │ │ 小金库   │ │ 习惯培养 │            │   │   │
+│  │  │  │ MoneyAge │ │ Budget   │ │ Vault    │ │ Habit    │            │   │   │
+│  │  │  │ Module   │ │ Module   │ │ Module   │ │ Module   │            │   │   │
+│  │  │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘            │   │   │
+│  │  │       │            │            │            │                   │   │   │
+│  │  │       └────────────┴────────────┴────────────┘                   │   │   │
+│  │  │                            │                                      │   │   │
+│  │  │                    ┌───────▼───────┐                             │   │   │
+│  │  │                    │  依赖注入容器  │                             │   │   │
+│  │  │                    │   GetIt.I     │                             │   │   │
+│  │  │                    └───────────────┘                             │   │   │
+│  │  └──────────────────────────────────────────────────────────────────┘   │   │
+│  │                                                                          │   │
+│  │  ┌──────────────────────────────────────────────────────────────────┐   │   │
+│  │  │                  StrategyManager (策略管理器)                      │   │   │
+│  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │   │   │
+│  │  │  │ 记账策略     │  │ 钱龄计算策略 │  │ 预算分配策略 │           │   │   │
+│  │  │  │ Bookkeeping  │  │ MoneyAge     │  │ Budget       │           │   │   │
+│  │  │  │ Strategy     │  │ Strategy     │  │ Strategy     │           │   │   │
+│  │  │  └──────────────┘  └──────────────┘  └──────────────┘           │   │   │
+│  │  └──────────────────────────────────────────────────────────────────┘   │   │
+│  └──────────────────────────────────────────────────────────────────────────┘   │
+│                                      │                                          │
+│  ┌───────────────────────────────────▼──────────────────────────────────────┐   │
+│  │                        基础服务层 (Core Services)                         │   │
+│  │                                                                          │   │
+│  │  ┌──────────────────────────────────────────────────────────────────┐   │   │
+│  │  │                    ExtensionPointRegistry (扩展点注册)             │   │   │
+│  │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐ │   │   │
+│  │  │  │ 交易钩子   │  │ 预算钩子   │  │ AI扩展     │  │ 导出扩展   │ │   │   │
+│  │  │  │Transaction │  │ Budget     │  │ AI         │  │ Export     │ │   │   │
+│  │  │  │ Hooks      │  │ Hooks      │  │ Extensions │  │ Extensions │ │   │   │
+│  │  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘ │   │   │
+│  │  └──────────────────────────────────────────────────────────────────┘   │   │
+│  │                                                                          │   │
+│  │  ┌──────────────────────────────────────────────────────────────────┐   │   │
+│  │  │                    VersionManager (版本管理)                       │   │   │
+│  │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐ │   │   │
+│  │  │  │ API版本    │  │ 数据迁移   │  │ 功能开关   │  │ 灰度控制   │ │   │   │
+│  │  │  │ APIVersion │  │ Migration  │  │ FeatureFlag│  │ GrayScale  │ │   │   │
+│  │  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘ │   │   │
+│  │  └──────────────────────────────────────────────────────────────────┘   │   │
+│  └──────────────────────────────────────────────────────────────────────────┘   │
+│                                      │                                          │
+│  ┌───────────────────────────────────▼──────────────────────────────────────┐   │
+│  │                        数据层 (Data Layer)                                │   │
+│  │  ┌──────────────────────────────────────────────────────────────────┐   │   │
+│  │  │                      ExtensibleEntity (可扩展实体)                 │   │   │
+│  │  │  • extensions: Map<String, dynamic>  // JSON扩展字段              │   │   │
+│  │  │  • metadata: Map<String, dynamic>    // 元数据字段                │   │   │
+│  │  │  • version: int                      // 实体版本号                │   │   │
+│  │  └──────────────────────────────────────────────────────────────────┘   │   │
+│  └──────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 20.1.3 可扩展性服务入口
+
+```dart
+/// 可扩展性核心服务
+/// 统一管理模块注册、策略管理、扩展点、版本控制
+class ExtensibilityService {
+  static final ExtensibilityService _instance = ExtensibilityService._();
+  factory ExtensibilityService() => _instance;
+  ExtensibilityService._();
+
+  late final FeatureRegistry _featureRegistry;
+  late final StrategyManager _strategyManager;
+  late final ExtensionPointRegistry _extensionRegistry;
+  late final VersionManager _versionManager;
+  late final FeatureFlagService _featureFlagService;
+
+  /// 初始化可扩展性服务
+  Future<void> initialize({
+    required ExtensibilityConfig config,
+  }) async {
+    // 初始化功能开关服务
+    _featureFlagService = FeatureFlagService();
+    await _featureFlagService.initialize(config.featureFlags);
+
+    // 初始化版本管理器
+    _versionManager = VersionManager();
+    await _versionManager.initialize(
+      currentVersion: config.appVersion,
+      apiVersion: config.apiVersion,
+    );
+
+    // 初始化扩展点注册表
+    _extensionRegistry = ExtensionPointRegistry();
+    _registerCoreExtensionPoints();
+
+    // 初始化策略管理器
+    _strategyManager = StrategyManager();
+    _registerCoreStrategies();
+
+    // 初始化功能模块注册表
+    _featureRegistry = FeatureRegistry();
+    await _registerCoreModules();
+  }
+
+  /// 注册核心扩展点
+  void _registerCoreExtensionPoints() {
+    _extensionRegistry
+      ..registerPoint(TransactionExtensionPoint())
+      ..registerPoint(BudgetExtensionPoint())
+      ..registerPoint(AIExtensionPoint())
+      ..registerPoint(ExportExtensionPoint())
+      ..registerPoint(SyncExtensionPoint());
+  }
+
+  /// 注册核心策略
+  void _registerCoreStrategies() {
+    // 记账策略
+    _strategyManager.registerBookkeepingStrategy(TraditionalBookkeepingStrategy());
+    _strategyManager.registerBookkeepingStrategy(ZeroBasedBookkeepingStrategy());
+
+    // 钱龄计算策略
+    _strategyManager.registerMoneyAgeStrategy(FIFOMoneyAgeStrategy());
+    _strategyManager.registerMoneyAgeStrategy(WeightedAverageMoneyAgeStrategy());
+
+    // 预算分配策略
+    _strategyManager.registerBudgetStrategy(EnvelopeBudgetStrategy());
+    _strategyManager.registerBudgetStrategy(Rule503020Strategy());
+  }
+
+  /// 注册核心模块
+  Future<void> _registerCoreModules() async {
+    // 基础模块
+    _featureRegistry.register(TransactionModule());
+    _featureRegistry.register(AccountModule());
+    _featureRegistry.register(CategoryModule());
+
+    // 2.0核心模块（按功能开关控制）
+    if (_featureFlagService.isEnabled('money_age')) {
+      _featureRegistry.register(MoneyAgeModule());
+    }
+    if (_featureFlagService.isEnabled('zero_based_budget')) {
+      _featureRegistry.register(ZeroBasedBudgetModule());
+    }
+    if (_featureFlagService.isEnabled('budget_vault')) {
+      _featureRegistry.register(BudgetVaultModule());
+    }
+    if (_featureFlagService.isEnabled('financial_habit')) {
+      _featureRegistry.register(FinancialHabitModule());
+    }
+
+    // 智能模块
+    if (_featureFlagService.isEnabled('ai_recognition')) {
+      _featureRegistry.register(AIRecognitionModule());
+    }
+    if (_featureFlagService.isEnabled('geo_location')) {
+      _featureRegistry.register(GeoLocationModule());
+    }
+
+    await _featureRegistry.initializeAll();
+  }
+
+  /// 获取功能模块
+  T? getModule<T extends FeatureModule>(String id) => _featureRegistry.getModule<T>(id);
+
+  /// 获取策略
+  T getStrategy<T>(String strategyType, String strategyId) =>
+    _strategyManager.getStrategy<T>(strategyType, strategyId);
+
+  /// 获取扩展点
+  ExtensionPoint getExtensionPoint(String pointId) =>
+    _extensionRegistry.getPoint(pointId);
+
+  /// 检查功能是否可用
+  bool isFeatureAvailable(String featureId) =>
+    _featureFlagService.isEnabled(featureId) &&
+    _versionManager.isFeatureSupported(featureId);
+}
+
+/// 可扩展性配置
+class ExtensibilityConfig {
+  final String appVersion;
+  final String apiVersion;
+  final Map<String, bool> featureFlags;
+  final List<String> enabledModules;
+  final Map<String, String> defaultStrategies;
+
+  const ExtensibilityConfig({
+    required this.appVersion,
+    required this.apiVersion,
+    this.featureFlags = const {},
+    this.enabledModules = const [],
+    this.defaultStrategies = const {},
+  });
+
+  /// 2.0版本默认配置
+  factory ExtensibilityConfig.v2Default() => ExtensibilityConfig(
+    appVersion: '2.0.0',
+    apiVersion: 'v2',
+    featureFlags: {
+      'money_age': true,
+      'zero_based_budget': true,
+      'budget_vault': true,
+      'financial_habit': true,
+      'ai_recognition': true,
+      'geo_location': true,
+      'offline_sync': true,
+      'collaborative_budget': false, // 2.1版本
+      'smart_investment': false,      // 2.2版本
+    },
+    defaultStrategies: {
+      'bookkeeping': 'zero_based',
+      'money_age': 'fifo',
+      'budget': 'envelope',
+    },
+  );
+}
+```
+
+### 20.2 模块化架构设计
+
+#### 20.2.1 功能模块全景图
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -25316,7 +26908,7 @@ class ExceptionUIHandler {
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### 20.1.2 插件化功能模块
+#### 20.2.2 插件化功能模块
 
 ```dart
 /// 功能模块注册表
@@ -25565,7 +27157,7 @@ class FinancialHabitModule extends FeatureModule {
 }
 ```
 
-#### 20.1.3 策略模式扩展点
+#### 20.2.3 策略模式扩展点
 
 ```dart
 /// 记账策略扩展点
@@ -25714,9 +27306,9 @@ class BookkeepingStrategyManager {
 }
 ```
 
-### 20.2 数据模型扩展
+### 20.3 数据模型扩展
 
-#### 20.2.1 可扩展的数据模型
+#### 20.3.1 可扩展的数据模型
 
 ```dart
 /// 可扩展实体基类
@@ -25832,7 +27424,7 @@ class Transaction extends ExtensibleEntity {
 }
 ```
 
-#### 20.2.2 数据库迁移框架
+#### 20.3.2 数据库迁移框架
 
 ```dart
 /// 数据库迁移框架
@@ -25971,9 +27563,9 @@ final migration_25_add_location = Migration(
 );
 ```
 
-### 20.3 API版本管理
+### 20.4 API版本管理
 
-#### 20.3.1 API版本控制
+#### 20.4.1 API版本控制
 
 ```dart
 /// API版本管理器
@@ -26045,9 +27637,9 @@ class TransactionApiV1Adapter
 }
 ```
 
-### 20.4 演进式架构路线
+### 20.5 演进式架构路线
 
-#### 20.4.1 架构演进阶段
+#### 20.5.1 架构演进阶段
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -26138,7 +27730,7 @@ class TransactionApiV1Adapter
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### 20.4.2 平滑迁移策略
+#### 20.5.2 平滑迁移策略
 
 ```dart
 /// 服务抽象层（支持平滑迁移）
@@ -26196,9 +27788,9 @@ class ServiceFactory {
 }
 ```
 
-### 20.5 功能开关与灰度发布
+### 20.6 功能开关与灰度发布
 
-#### 20.5.1 2.0版本功能开关清单
+#### 20.6.1 2.0版本功能开关清单
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -26260,7 +27852,7 @@ class ServiceFactory {
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### 20.5.2 功能开关系统实现
+#### 20.6.2 功能开关系统实现
 
 ```dart
 /// 功能开关服务
@@ -26444,9 +28036,9 @@ class FeatureFlagService {
 }
 ```
 
-### 20.6 2.0版本功能扩展规划
+### 20.7 版本功能扩展规划
 
-#### 20.6.1 版本演进路线
+#### 20.7.1 版本演进路线
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -26493,7 +28085,7 @@ class FeatureFlagService {
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### 20.6.2 扩展点预留设计
+#### 20.7.2 扩展点预留设计
 
 ```dart
 /// 2.0版本扩展点预留
@@ -26630,7 +28222,7 @@ class FinancialHabitAnalysisHook implements TransactionHook {
 }
 ```
 
-#### 20.6.3 向后兼容保障
+#### 20.7.3 向后兼容保障
 
 ```dart
 /// 版本兼容性管理
@@ -26732,6 +28324,316 @@ class VersionRequirement {
     this.apiVersion,
     this.requiredPermissions,
   });
+}
+```
+
+### 20.8 离线扩展架构
+
+#### 20.8.1 离线优先扩展设计
+
+离线优先架构是2.0版本的核心设计理念，所有扩展模块都需要支持离线场景。
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          离线扩展架构设计                                          │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │                        离线扩展层级架构                                   │   │
+│  │                                                                          │   │
+│  │  ┌────────────────────────────────────────────────────────────────────┐ │   │
+│  │  │  Level 3: 智能离线 (AI Offline)                                     │ │   │
+│  │  │  • 本地AI模型 (TFLite)    • 离线分类推断    • 缓存的智能建议        │ │   │
+│  │  └────────────────────────────────────────────────────────────────────┘ │   │
+│  │                               │                                          │   │
+│  │  ┌────────────────────────────▼───────────────────────────────────────┐ │   │
+│  │  │  Level 2: 业务离线 (Business Offline)                               │ │   │
+│  │  │  • 钱龄本地计算    • 预算本地分配    • 小金库本地管理               │ │   │
+│  │  └────────────────────────────────────────────────────────────────────┘ │   │
+│  │                               │                                          │   │
+│  │  ┌────────────────────────────▼───────────────────────────────────────┐ │   │
+│  │  │  Level 1: 数据离线 (Data Offline)                                   │ │   │
+│  │  │  • SQLite本地存储    • 操作队列 (OfflineQueue)    • 冲突解决策略    │ │   │
+│  │  └────────────────────────────────────────────────────────────────────┘ │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │  OfflineCapable 接口：所有支持离线的扩展必须实现                          │   │
+│  │  ├── canWorkOffline(): bool         // 是否支持离线                      │   │
+│  │  ├── getOfflineFallback(): T        // 获取离线降级策略                  │   │
+│  │  ├── queueForSync(operation): void  // 入队待同步操作                    │   │
+│  │  └── syncOnReconnect(): Future      // 网络恢复时同步                    │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+```dart
+/// 离线能力扩展接口
+abstract class OfflineCapable<T> {
+  bool get canWorkOffline;
+  OfflineFallbackStrategy<T> get offlineFallback;
+  Future<void> queueForSync(OfflineOperation operation);
+  Future<SyncResult> syncOnReconnect();
+}
+
+/// 钱龄模块离线支持
+class MoneyAgeOfflineCapability implements OfflineCapable<MoneyAgeResult> {
+  final MoneyAgeLocalCalculator _localCalculator;
+  final OfflineQueueService _queue;
+
+  @override
+  bool get canWorkOffline => true;
+
+  @override
+  OfflineFallbackStrategy<MoneyAgeResult> get offlineFallback =>
+    OfflineFallbackStrategy(
+      strategy: FallbackType.useLocalCache,
+      cacheKey: 'money_age_cache',
+      maxAge: Duration(hours: 24),
+    );
+
+  @override
+  Future<void> queueForSync(OfflineOperation operation) async {
+    await _queue.enqueue(operation);
+  }
+
+  @override
+  Future<SyncResult> syncOnReconnect() async {
+    final pending = await _queue.getPending('money_age');
+    for (final op in pending) {
+      await _processOperation(op);
+      await _queue.markCompleted(op.id);
+    }
+    return SyncResult.success(syncedCount: pending.length);
+  }
+}
+```
+
+### 20.9 AI能力扩展框架
+
+#### 20.9.1 AI识别引擎扩展
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          AI能力扩展框架                                           │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │                    AIExtensionRegistry                                   │   │
+│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐        │   │
+│  │  │ 语音识别   │  │ 图片识别   │  │ NLU解析    │  │ 分类推荐   │        │   │
+│  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘        │   │
+│  └───────────────────────────────┬─────────────────────────────────────────┘   │
+│                                  ▼                                              │
+│                    ┌─────────────────────────┐                                 │
+│                    │     AIEngineManager     │                                 │
+│                    │  • 引擎选择 • 降级策略  │                                 │
+│                    └─────────────────────────┘                                 │
+│                                  │                                              │
+│         ┌────────────────────────┼────────────────────────┐                    │
+│         ▼                        ▼                        ▼                    │
+│  ┌────────────┐           ┌────────────┐           ┌────────────┐             │
+│  │  云端AI    │           │  端侧AI    │           │  混合AI    │             │
+│  │ • 千问API  │           │ • TFLite   │           │ • 优先本地 │             │
+│  │ • GPT-4    │           │ • ML Kit   │           │ • 云端增强 │             │
+│  └────────────┘           └────────────┘           └────────────┘             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+```dart
+/// AI引擎扩展接口
+abstract class AIRecognitionEngine<I, O> {
+  String get engineId;
+  String get engineName;
+  AIEngineType get engineType;
+  Future<AIRecognitionResult<O>> recognize(I input, {Map<String, dynamic>? options});
+  Future<bool> isAvailable();
+}
+
+enum AIEngineType { cloud, onDevice, hybrid }
+
+/// AI引擎管理器
+class AIEngineManager {
+  final Map<String, AIRecognitionEngine> _engines = {};
+  final AIEngineSelector _selector;
+
+  void registerEngine(AIRecognitionEngine engine) {
+    _engines[engine.engineId] = engine;
+  }
+
+  Future<AIRecognitionResult<O>> recognize<I, O>(
+    I input, {
+    String? preferredEngine,
+    bool allowFallback = true,
+  }) async {
+    final engine = await _selector.selectBestEngine<I, O>(
+      input: input,
+      preferredEngine: preferredEngine,
+      availableEngines: _engines.values.toList(),
+    );
+
+    try {
+      return await engine.recognize(input);
+    } catch (e) {
+      if (allowFallback) {
+        final fallback = await _selector.getFallbackEngine<I, O>(
+          excludeEngine: engine.engineId,
+          availableEngines: _engines.values.toList(),
+        );
+        return await fallback.recognize(input);
+      }
+      rethrow;
+    }
+  }
+}
+```
+
+### 20.10 目标达成检测
+
+#### 20.10.1 可扩展性目标检测
+
+```dart
+/// 第20章目标达成检测
+class ExtensibilityGoalDetector {
+  Future<GoalDetectionResult> detectGoals() async {
+    final results = <GoalCheckItem>[];
+
+    results.add(await _checkModularArchitecture());
+    results.add(await _checkPluginCapability());
+    results.add(await _checkStrategyPattern());
+    results.add(await _checkVersionCompatibility());
+    results.add(await _checkGrayScaleCapability());
+    results.add(await _checkOfflineExtension());
+    results.add(await _checkAIExtension());
+
+    return GoalDetectionResult(
+      chapterName: '第20章 可扩展性与演进架构',
+      items: results,
+      overallScore: _calculateOverallScore(results),
+    );
+  }
+
+  Future<GoalCheckItem> _checkModularArchitecture() async {
+    final checks = <String, bool>{};
+    final registry = FeatureRegistry();
+
+    checks['钱龄模块已注册'] = registry.hasModule('money_age');
+    checks['预算模块已注册'] = registry.hasModule('budget');
+    checks['小金库模块已注册'] = registry.hasModule('budget_vault');
+    checks['习惯培养模块已注册'] = registry.hasModule('financial_habit');
+    checks['模块依赖无循环'] = await _checkNoCyclicDependencies();
+
+    return GoalCheckItem(
+      name: '模块化架构',
+      description: '核心功能模块独立注册、依赖清晰',
+      checks: checks,
+      passed: checks.values.every((v) => v),
+    );
+  }
+
+  Future<GoalCheckItem> _checkPluginCapability() async {
+    final checks = <String, bool>{};
+    final extensionRegistry = ExtensionPointRegistry();
+
+    checks['交易扩展点可用'] = extensionRegistry.hasPoint('transaction');
+    checks['预算扩展点可用'] = extensionRegistry.hasPoint('budget');
+    checks['AI扩展点可用'] = extensionRegistry.hasPoint('ai');
+    checks['导出扩展点可用'] = extensionRegistry.hasPoint('export');
+
+    return GoalCheckItem(
+      name: '插件化能力',
+      description: '扩展点完整、钩子机制可用',
+      checks: checks,
+      passed: checks.values.every((v) => v),
+    );
+  }
+
+  Future<GoalCheckItem> _checkStrategyPattern() async {
+    final checks = <String, bool>{};
+    final strategyManager = StrategyManager();
+
+    checks['传统记账策略可用'] = strategyManager.hasStrategy('bookkeeping', 'traditional');
+    checks['零基预算策略可用'] = strategyManager.hasStrategy('bookkeeping', 'zero_based');
+    checks['FIFO策略可用'] = strategyManager.hasStrategy('money_age', 'fifo');
+    checks['策略可动态切换'] = await _checkStrategySwitch();
+
+    return GoalCheckItem(
+      name: '策略模式扩展',
+      description: '多种策略可选、支持动态切换',
+      checks: checks,
+      passed: checks.values.every((v) => v),
+    );
+  }
+
+  Future<GoalCheckItem> _checkVersionCompatibility() async {
+    final checks = <String, bool>{};
+
+    checks['API版本v2可用'] = await _checkApiVersion('v2');
+    checks['1.x→2.0迁移路径存在'] = await _checkMigrationPath('1.0', '2.0');
+    checks['旧版API仍可访问'] = await _checkBackwardCompatibility();
+
+    return GoalCheckItem(
+      name: '版本兼容性',
+      description: 'API版本管理、数据迁移、向后兼容',
+      checks: checks,
+      passed: checks.values.every((v) => v),
+    );
+  }
+
+  Future<GoalCheckItem> _checkGrayScaleCapability() async {
+    final checks = <String, bool>{};
+    final featureFlags = FeatureFlagService();
+
+    checks['功能开关服务可用'] = featureFlags.isInitialized;
+    checks['2.0核心功能开关配置'] = featureFlags.hasFlag('money_age');
+    checks['A/B测试框架可用'] = await _checkABTestFramework();
+
+    return GoalCheckItem(
+      name: '灰度发布能力',
+      description: '功能开关、用户分组、A/B测试',
+      checks: checks,
+      passed: checks.values.every((v) => v),
+    );
+  }
+
+  Future<GoalCheckItem> _checkOfflineExtension() async {
+    final checks = <String, bool>{};
+
+    checks['钱龄模块支持离线'] = await _checkModuleOfflineCapability('money_age');
+    checks['预算模块支持离线'] = await _checkModuleOfflineCapability('budget');
+    checks['离线操作队列可用'] = await _checkOfflineQueue();
+    checks['网络恢复自动同步'] = await _checkAutoSync();
+
+    return GoalCheckItem(
+      name: '离线扩展能力',
+      description: '核心模块离线支持、操作队列、自动同步',
+      checks: checks,
+      passed: checks.values.every((v) => v),
+    );
+  }
+
+  Future<GoalCheckItem> _checkAIExtension() async {
+    final checks = <String, bool>{};
+    final aiManager = AIEngineManager();
+
+    checks['语音识别引擎已注册'] = aiManager.hasEngine('voice');
+    checks['图片识别引擎已注册'] = aiManager.hasEngine('image');
+    checks['本地分类引擎已注册'] = aiManager.hasEngine('on_device_category');
+    checks['AI引擎支持降级'] = await _checkAIFallback();
+
+    return GoalCheckItem(
+      name: 'AI能力扩展',
+      description: '多引擎支持、降级策略、可扩展',
+      checks: checks,
+      passed: checks.values.every((v) => v),
+    );
+  }
+
+  double _calculateOverallScore(List<GoalCheckItem> items) {
+    if (items.isEmpty) return 0;
+    return items.where((i) => i.passed).length / items.length;
+  }
 }
 ```
 
@@ -30650,6 +32552,97 @@ class LazyDesignComplianceChecker {
 
 **"伙伴原则"** 是 AI智能记账 2.0 的核心设计哲学。我们相信一个好的记账APP不应该只是冷冰冰的工具，而应该成为用户理财路上的伙伴和助手。在每一次交互中，我们都希望让用户感受到温度、关心和支持。
 
+### 24.0 设计原则回顾
+
+在深入伙伴化设计细节之前，让我们回顾本章如何体现2.0版本的核心设计原则：
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                      伙伴化设计 - 设计原则矩阵                                │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
+│  │  情感单一    │  │  文案一致    │  │  交互极简    │  │  场景扩展    │       │
+│  │  职责       │  │  性          │  │  设计       │  │  性          │       │
+│  │             │  │             │  │             │  │             │       │
+│  │ 情感服务    │  │ 统一人格    │  │ 最少打扰    │  │ 可添加新    │       │
+│  │ 专注关怀    │  │ 语气一致    │  │ 优雅降级    │  │ 场景触发    │       │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘       │
+│         │                │                │                │              │
+│         ▼                ▼                ▼                ▼              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
+│  │  性能优化    │  │  可观测性    │  │  用户中心    │  │  隐私边界    │       │
+│  │             │  │             │  │             │  │             │       │
+│  │ 文案预缓存  │  │ 情感反馈    │  │ 尊重选择    │  │ 不评判      │       │
+│  │ 离线降级    │  │ 效果追踪    │  │ 可自定义    │  │ 不贩卖焦虑  │       │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘       │
+│                                                                            │
+│  伙伴化设计核心理念：                                                        │
+│  ┌────────────────────────────────────────────────────────────────────┐   │
+│  │  "温暖不打扰，关心有边界，鼓励而非说教，陪伴而非控制"                    │   │
+│  │                                                                    │   │
+│  │   温暖 ──→ 每次交互传递关怀                                         │   │
+│  │   不打扰 ──→ 控制消息频率，尊重用户注意力                            │   │
+│  │   有边界 ──→ 明确什么该做什么不该做                                  │   │
+│  │   鼓励 ──→ 正向激励，放大进步                                       │   │
+│  │   陪伴 ──→ 长期稳定的情感连接                                       │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 24.0.1 设计原则在伙伴化中的体现
+
+| 设计原则 | 伙伴化应用 | 具体措施 | 效果指标 |
+|---------|-----------|---------|---------|
+| **单一职责** | 情感服务独立 | CompanionService专注情感交互 | 服务职责清晰 |
+| **数据一致性** | 人格统一 | 统一语气、称呼、表达风格 | 用户认知一致 |
+| **极简设计** | 最少打扰 | 每次≤1条，每日≤3条 | 用户不厌烦 |
+| **可扩展性** | 场景可扩展 | 插件化触发器、可配置文案 | 易于新增场景 |
+| **性能优化** | 预缓存机制 | 离线文案库、LLM预生成 | 响应<100ms |
+| **可观测性** | 效果追踪 | 消息展示率、点击率、关闭率 | 持续优化依据 |
+
+#### 24.0.2 与其他2.0模块的协作
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                       伙伴化系统协作全景图                                    │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│                        ┌─────────────────┐                                 │
+│                        │   伙伴化服务     │                                 │
+│                        │ CompanionService│                                 │
+│                        └────────┬────────┘                                 │
+│                                 │                                          │
+│           ┌─────────────────────┼─────────────────────┐                    │
+│           │                     │                     │                    │
+│           ▼                     ▼                     ▼                    │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐            │
+│  │    触发系统      │  │    文案系统      │  │    呈现系统      │            │
+│  │                 │  │                 │  │                 │            │
+│  │ • 场景检测      │  │ • LLM生成       │  │ • 卡片组件      │            │
+│  │ • 时机判断      │  │ • 模板填充      │  │ • Toast提示     │            │
+│  │ • 频率控制      │  │ • 变体轮换      │  │ • 弹窗动画      │            │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘            │
+│           │                     │                     │                    │
+│           └─────────────────────┼─────────────────────┘                    │
+│                                 │                                          │
+│  ┌──────────────────────────────┴──────────────────────────────┐           │
+│  │                       数据来源系统                            │           │
+│  ├──────────────────────────────────────────────────────────────┤           │
+│  │                                                              │           │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │           │
+│  │  │ 钱龄系统  │ │ 预算系统  │ │ 交易系统  │ │ 用户行为  │        │           │
+│  │  │          │ │          │ │          │ │          │        │           │
+│  │  │ 钱龄变化  │ │ 预算状态  │ │ 记账频率  │ │ 使用时长  │        │           │
+│  │  │ 趋势方向  │ │ 超支预警  │ │ 消费模式  │ │ 活跃天数  │        │           │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘        │           │
+│  │                                                              │           │
+│  └──────────────────────────────────────────────────────────────┘           │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
 ### 24.1 设计理念
 
 #### 24.1.1 核心价值观
@@ -31199,6 +33192,796 @@ enum TonePreference {
 | **降级方案** | 网络不佳时是否有降级文案？ | 有预设模板库 |
 | **多样性** | 文案是否有足够的变体？ | 同场景≥5种表达 |
 | **个性化** | 是否使用了用户的昵称/偏好？ | 根据设置适配 |
+
+### 24.8 与其他系统的集成
+
+#### 24.8.0 系统集成全景图
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                      伙伴化系统 - 集成架构全景                                │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│                        ┌─────────────────────┐                             │
+│                        │   CompanionService   │                             │
+│                        │     伙伴化核心服务    │                             │
+│                        └──────────┬──────────┘                             │
+│                                   │                                        │
+│         ┌─────────────┬───────────┼───────────┬─────────────┐              │
+│         │             │           │           │             │              │
+│         ▼             ▼           ▼           ▼             ▼              │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌──────────┐ │
+│  │  钱龄系统   │ │  预算系统   │ │  交易系统   │ │  储蓄目标   │ │ 智能化   │ │
+│  │            │ │            │ │            │ │            │ │  系统    │ │
+│  │ • 钱龄变化  │ │ • 预算进度  │ │ • 记账事件  │ │ • 目标达成  │ │ • AI洞察 │ │
+│  │ • 趋势方向  │ │ • 超支预警  │ │ • 连续记账  │ │ • 存款变化  │ │ • 智能建议│ │
+│  └────────────┘ └────────────┘ └────────────┘ └────────────┘ └──────────┘ │
+│         │             │           │           │             │              │
+│         └─────────────┴───────────┼───────────┴─────────────┘              │
+│                                   │                                        │
+│                        ┌──────────┴──────────┐                             │
+│                        │    触发事件总线      │                             │
+│                        │  CompanionEventBus   │                             │
+│                        └──────────┬──────────┘                             │
+│                                   │                                        │
+│         ┌─────────────────────────┼─────────────────────────┐              │
+│         │                         │                         │              │
+│         ▼                         ▼                         ▼              │
+│  ┌────────────────┐    ┌────────────────┐    ┌────────────────┐           │
+│  │   场景触发器    │    │   文案生成器    │    │   效果追踪器    │           │
+│  │                │    │                │    │                │           │
+│  │ • 时机判断     │    │ • LLM生成      │    │ • 展示率       │           │
+│  │ • 频率控制     │    │ • 模板渲染      │    │ • 互动率       │           │
+│  │ • 优先级排序   │    │ • 变体选择      │    │ • 关闭率       │           │
+│  └────────────────┘    └────────────────┘    └────────────────┘           │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 24.8.1 集成触发点
+
+| 源系统 | 触发事件 | 伙伴化响应 | 情感基调 | 呈现方式 |
+|--------|----------|-----------|---------|---------|
+| **钱龄系统** | 钱龄提升≥3天 | 鼓励消息 | 欣慰、自豪 | 首页卡片 |
+| **钱龄系统** | 钱龄下降≥5天 | 关心提醒 | 理解、支持 | 温和提示 |
+| **预算系统** | 预算使用≥80% | 温馨预警 | 关心、提醒 | 通知+卡片 |
+| **预算系统** | 月末预算达成 | 庆祝成就 | 兴奋、骄傲 | 成就弹窗 |
+| **交易系统** | 完成记账 | 即时感谢 | 认可、感谢 | 轻量Toast |
+| **交易系统** | 连续记账N天 | 打卡庆祝 | 激励、欣赏 | 成就动画 |
+| **储蓄目标** | 目标达成100% | 梦想实现 | 兴奋、庆贺 | 全屏庆祝 |
+| **储蓄目标** | 存款≥50%进度 | 中途鼓励 | 鼓励、期待 | 进度卡片 |
+| **智能化系统** | 生成AI洞察 | 分享发现 | 好奇、邀请 | 首页卡片 |
+| **用户行为** | 回归用户(>3天) | 欢迎回来 | 温暖、不责备 | 欢迎弹窗 |
+| **系统日历** | 特殊日期 | 节日祝福 | 祝福、惊喜 | 特殊动画 |
+
+#### 24.8.2 钱龄系统集成
+
+```dart
+/// 伙伴化与钱龄系统集成
+class CompanionMoneyAgeIntegration {
+  final CompanionService _companionService;
+  final MoneyAgeService _moneyAgeService;
+
+  /// 订阅钱龄变化事件
+  void initialize() {
+    _moneyAgeService.onAgeChanged.listen(_handleMoneyAgeChange);
+  }
+
+  /// 处理钱龄变化
+  Future<void> _handleMoneyAgeChange(MoneyAgeChangeEvent event) async {
+    final delta = event.newAge - event.previousAge;
+
+    if (delta >= 3) {
+      // 钱龄提升，给予鼓励
+      await _companionService.triggerMessage(
+        scene: CopyScene.moneyAgeImproved,
+        context: {
+          'previousAge': event.previousAge,
+          'newAge': event.newAge,
+          'delta': delta,
+          'level': _getMoneyAgeLevel(event.newAge),
+        },
+        mood: CompanionMood.happy,
+        priority: MessagePriority.medium,
+      );
+    } else if (delta <= -5) {
+      // 钱龄下降，表达关心
+      await _companionService.triggerMessage(
+        scene: CopyScene.moneyAgeDeclined,
+        context: {
+          'previousAge': event.previousAge,
+          'newAge': event.newAge,
+          'possibleReason': await _inferDeclineReason(event),
+        },
+        mood: CompanionMood.caring,
+        priority: MessagePriority.low, // 避免增加用户压力
+      );
+    }
+  }
+
+  /// 推断钱龄下降原因
+  Future<String?> _inferDeclineReason(MoneyAgeChangeEvent event) async {
+    // 分析最近的大额支出
+    final recentLargeExpenses = await _moneyAgeService.getRecentLargeConsumptions(
+      since: DateTime.now().subtract(Duration(days: 7)),
+      minAmount: 500,
+    );
+
+    if (recentLargeExpenses.isNotEmpty) {
+      final categories = recentLargeExpenses
+          .map((e) => e.category)
+          .toSet()
+          .take(2)
+          .join('、');
+      return '可能是最近在$categories方面的支出';
+    }
+    return null;
+  }
+
+  /// 获取钱龄等级描述
+  String _getMoneyAgeLevel(int age) {
+    if (age >= 30) return '理财高手';
+    if (age >= 20) return '稳健型';
+    if (age >= 10) return '成长中';
+    return '起步阶段';
+  }
+}
+
+/// 钱龄相关文案模板
+extension MoneyAgeCopyTemplates on CompanionCopywritingService {
+  static const Map<CopyScene, List<String>> moneyAgeTemplates = {
+    CopyScene.moneyAgeImproved: [
+      '你的钱龄提升到{newAge}天了！理财习惯越来越好 📈',
+      '厉害！钱龄从{previousAge}天涨到{newAge}天，{level}就是你！',
+      '稳扎稳打，钱龄又涨了{delta}天，继续保持 💪',
+      '你的钱在口袋里待得更久了，这就是进步！',
+    ],
+    CopyScene.moneyAgeDeclined: [
+      '最近花销有点大，{possibleReason}，需要我帮你分析一下吗？',
+      '钱龄有点下滑，不过没关系，生活总有需要花钱的时候',
+      '看起来最近有些必要支出，调整一下节奏就好',
+      '偶尔的波动很正常，重要的是长期趋势',
+    ],
+  };
+}
+```
+
+#### 24.8.3 预算系统集成
+
+```dart
+/// 伙伴化与预算系统集成
+class CompanionBudgetIntegration {
+  final CompanionService _companionService;
+  final BudgetService _budgetService;
+
+  /// 订阅预算事件
+  void initialize() {
+    _budgetService.onBudgetStatusChanged.listen(_handleBudgetChange);
+    _budgetService.onMonthEnd.listen(_handleMonthEnd);
+  }
+
+  /// 处理预算状态变化
+  Future<void> _handleBudgetChange(BudgetStatusEvent event) async {
+    final usagePercent = event.usedAmount / event.totalBudget * 100;
+
+    if (usagePercent >= 100 && !event.alreadyNotified) {
+      // 预算超支
+      await _triggerOverspendComfort(event);
+    } else if (usagePercent >= 80 && usagePercent < 100 && !event.warningShown) {
+      // 预算预警
+      await _triggerBudgetWarning(event, usagePercent);
+    } else if (usagePercent >= 50 && usagePercent < 60) {
+      // 中途状态（可选提醒）
+      await _triggerMidwayUpdate(event, usagePercent);
+    }
+  }
+
+  /// 超支安慰
+  Future<void> _triggerOverspendComfort(BudgetStatusEvent event) async {
+    await _companionService.triggerMessage(
+      scene: CopyScene.overspendComfort,
+      context: {
+        'budgetName': event.budgetName,
+        'overspendAmount': event.usedAmount - event.totalBudget,
+        'daysRemaining': event.daysRemaining,
+      },
+      mood: CompanionMood.supportive,
+      priority: MessagePriority.medium,
+    );
+  }
+
+  /// 预算预警
+  Future<void> _triggerBudgetWarning(BudgetStatusEvent event, double percent) async {
+    await _companionService.triggerMessage(
+      scene: CopyScene.budgetWarning,
+      context: {
+        'budgetName': event.budgetName,
+        'usagePercent': percent.toStringAsFixed(0),
+        'remainingAmount': event.totalBudget - event.usedAmount,
+        'daysRemaining': event.daysRemaining,
+        'dailyAllowance': (event.totalBudget - event.usedAmount) / event.daysRemaining,
+      },
+      mood: CompanionMood.caring,
+      priority: MessagePriority.medium,
+    );
+  }
+
+  /// 月末总结
+  Future<void> _handleMonthEnd(MonthEndEvent event) async {
+    if (event.allBudgetsWithinLimit) {
+      // 所有预算达成
+      await _companionService.triggerMessage(
+        scene: CopyScene.achievementCelebration,
+        context: {
+          'achievementType': 'monthly_budget',
+          'savedAmount': event.totalSaved,
+          'budgetCount': event.budgetCount,
+        },
+        mood: CompanionMood.excited,
+        priority: MessagePriority.high,
+      );
+    } else {
+      // 部分超支，给予鼓励
+      await _companionService.triggerMessage(
+        scene: CopyScene.monthlyReview,
+        context: {
+          'successCount': event.successfulBudgets,
+          'totalCount': event.budgetCount,
+          'improvementTip': _generateImprovementTip(event),
+        },
+        mood: CompanionMood.supportive,
+        priority: MessagePriority.medium,
+      );
+    }
+  }
+
+  /// 生成改进建议
+  String _generateImprovementTip(MonthEndEvent event) {
+    final worstCategory = event.overspentCategories.first;
+    return '下个月可以重点关注${worstCategory}的支出';
+  }
+}
+
+/// 预算相关文案模板
+extension BudgetCopyTemplates on CompanionCopywritingService {
+  static const Map<CopyScene, List<String>> budgetTemplates = {
+    CopyScene.budgetWarning: [
+      '{budgetName}已用{usagePercent}%，还剩{remainingAmount}元，每天可用{dailyAllowance}元',
+      '温馨提示：{budgetName}快用完啦，剩下{daysRemaining}天要悠着点哦',
+      '{budgetName}进入冲刺阶段，{remainingAmount}元要撑{daysRemaining}天，加油！',
+    ],
+    CopyScene.monthlyReview: [
+      '这个月{successCount}/{totalCount}个预算达标，已经很棒了！{improvementTip}',
+      '月末总结：大部分预算都控制得不错，{improvementTip}',
+    ],
+  };
+}
+```
+
+#### 24.8.4 交易系统集成
+
+```dart
+/// 伙伴化与交易系统集成
+class CompanionTransactionIntegration {
+  final CompanionService _companionService;
+  final TransactionService _transactionService;
+  final StreakService _streakService;
+
+  /// 订阅交易事件
+  void initialize() {
+    _transactionService.onTransactionAdded.listen(_handleTransactionAdded);
+    _streakService.onStreakUpdated.listen(_handleStreakUpdate);
+  }
+
+  /// 处理新交易
+  Future<void> _handleTransactionAdded(Transaction tx) async {
+    // 1. 轻量感谢（Toast级别）
+    await _companionService.showQuickAcknowledgment(
+      message: _getQuickAckMessage(tx),
+      duration: Duration(seconds: 2),
+    );
+
+    // 2. 检查是否为当天首笔记账
+    final isFirstToday = await _transactionService.isFirstTransactionToday();
+    if (isFirstToday) {
+      await _companionService.triggerMessage(
+        scene: CopyScene.firstRecordToday,
+        context: {'category': tx.category.name},
+        mood: CompanionMood.happy,
+        priority: MessagePriority.low,
+      );
+    }
+
+    // 3. 检查特殊金额（如整数、吉利数字）
+    if (_isSpecialAmount(tx.amount)) {
+      await _showSpecialAmountReaction(tx);
+    }
+  }
+
+  /// 获取快速确认消息
+  String _getQuickAckMessage(Transaction tx) {
+    final templates = [
+      '已记录 ✓',
+      '记好了！',
+      '收到 ✓',
+      'Got it!',
+    ];
+    return templates[DateTime.now().millisecond % templates.length];
+  }
+
+  /// 检查特殊金额
+  bool _isSpecialAmount(double amount) {
+    // 整百、整千、吉利数字等
+    if (amount % 100 == 0 && amount >= 100) return true;
+    if (amount == 66 || amount == 88 || amount == 168 || amount == 888) return true;
+    return false;
+  }
+
+  /// 处理连续记账
+  Future<void> _handleStreakUpdate(StreakEvent event) async {
+    // 里程碑天数
+    const milestones = [3, 7, 14, 30, 60, 100, 365];
+
+    if (milestones.contains(event.currentStreak)) {
+      await _companionService.triggerMessage(
+        scene: CopyScene.streakContinued,
+        context: {
+          'streakDays': event.currentStreak,
+          'milestone': _getMilestoneLabel(event.currentStreak),
+          'totalTransactions': event.totalTransactions,
+        },
+        mood: CompanionMood.excited,
+        priority: MessagePriority.high,
+      );
+    }
+  }
+
+  /// 获取里程碑标签
+  String _getMilestoneLabel(int days) {
+    switch (days) {
+      case 3: return '初试身手';
+      case 7: return '一周达人';
+      case 14: return '双周坚持';
+      case 30: return '月度冠军';
+      case 60: return '双月英雄';
+      case 100: return '百日传奇';
+      case 365: return '年度王者';
+      default: return '记账达人';
+    }
+  }
+}
+
+/// 连续记账文案模板
+extension StreakCopyTemplates on CompanionCopywritingService {
+  static const Map<int, List<String>> streakMilestoneTemplates = {
+    3: [
+      '连续记账3天！好的开始是成功的一半 🌱',
+      '3天连续打卡，习惯正在养成！',
+    ],
+    7: [
+      '一周啦！连续记账7天，你太厉害了 🔥',
+      '7天全勤！这就是自律的力量 💪',
+    ],
+    14: [
+      '两周坚持，{totalTransactions}笔账目，清清楚楚 ✨',
+      '14天连续记账，你已经超过90%的用户！',
+    ],
+    30: [
+      '整整一个月！30天坚持记账，为你骄傲 🏆',
+      '月度冠军！30天不间断，这份坚持太珍贵了',
+    ],
+    100: [
+      '100天！百日记账成就达成，你是真正的理财达人 👑',
+      '坚持100天，{totalTransactions}笔记录，这就是传奇！',
+    ],
+  };
+}
+```
+
+#### 24.8.5 储蓄目标集成
+
+```dart
+/// 伙伴化与储蓄目标集成
+class CompanionSavingsGoalIntegration {
+  final CompanionService _companionService;
+  final SavingsGoalService _savingsService;
+
+  /// 订阅储蓄目标事件
+  void initialize() {
+    _savingsService.onProgressUpdated.listen(_handleProgressUpdate);
+    _savingsService.onGoalAchieved.listen(_handleGoalAchieved);
+  }
+
+  /// 处理进度更新
+  Future<void> _handleProgressUpdate(SavingsProgressEvent event) async {
+    final percent = event.currentAmount / event.targetAmount * 100;
+
+    // 关键进度点
+    const progressMilestones = [25, 50, 75, 90];
+
+    for (final milestone in progressMilestones) {
+      if (percent >= milestone && event.previousPercent < milestone) {
+        await _triggerProgressCelebration(event, milestone);
+        break;
+      }
+    }
+  }
+
+  /// 进度庆祝
+  Future<void> _triggerProgressCelebration(
+    SavingsProgressEvent event,
+    int milestone,
+  ) async {
+    await _companionService.triggerMessage(
+      scene: CopyScene.savingsProgress,
+      context: {
+        'goalName': event.goalName,
+        'milestone': milestone,
+        'currentAmount': event.currentAmount,
+        'targetAmount': event.targetAmount,
+        'remainingAmount': event.targetAmount - event.currentAmount,
+        'emoji': _getMilestoneEmoji(milestone),
+      },
+      mood: CompanionMood.happy,
+      priority: MessagePriority.medium,
+    );
+  }
+
+  /// 目标达成庆祝
+  Future<void> _handleGoalAchieved(SavingsGoalAchievedEvent event) async {
+    // 1. 触发全屏庆祝动画
+    await _companionService.showCelebration(
+      type: CelebrationType.savingsGoalComplete,
+      duration: Duration(seconds: 3),
+    );
+
+    // 2. 显示庆祝消息
+    await _companionService.triggerMessage(
+      scene: CopyScene.savingsGoalAchieved,
+      context: {
+        'goalName': event.goalName,
+        'totalAmount': event.totalAmount,
+        'daysToAchieve': event.daysToAchieve,
+        'averageDaily': event.totalAmount / event.daysToAchieve,
+      },
+      mood: CompanionMood.excited,
+      priority: MessagePriority.high,
+    );
+
+    // 3. 询问是否设定新目标
+    await _companionService.showActionPrompt(
+      message: '要不要设定一个新的储蓄目标？',
+      primaryAction: CompanionAction(
+        label: '设定新目标',
+        onTap: () => NavigationService.to('/savings/new'),
+      ),
+      secondaryAction: CompanionAction(
+        label: '先休息一下',
+        onTap: () {},
+      ),
+    );
+  }
+
+  /// 获取进度里程碑emoji
+  String _getMilestoneEmoji(int milestone) {
+    switch (milestone) {
+      case 25: return '🌱';
+      case 50: return '🌿';
+      case 75: return '🌳';
+      case 90: return '🎯';
+      default: return '✨';
+    }
+  }
+}
+
+/// 储蓄目标文案模板
+extension SavingsCopyTemplates on CompanionCopywritingService {
+  static const Map<CopyScene, List<String>> savingsTemplates = {
+    CopyScene.savingsProgress: [
+      '{goalName}已完成{milestone}%！{emoji} 还差{remainingAmount}元就达成了',
+      '太棒了！{goalName}进度{milestone}%，离目标越来越近！',
+      '{milestone}%达成！{goalName}存到{currentAmount}元了，继续加油！',
+    ],
+    CopyScene.savingsGoalAchieved: [
+      '🎉 {goalName}达成！{daysToAchieve}天存够{totalAmount}元，你太厉害了！',
+      '梦想成真！{goalName}目标完成，{totalAmount}元全部到位 🏆',
+      '恭喜！{goalName}储蓄目标达成！平均每天存{averageDaily}元，坚持就是胜利！',
+    ],
+  };
+}
+```
+
+#### 24.8.6 智能化系统集成
+
+```dart
+/// 伙伴化与智能化系统集成
+class CompanionAIIntegration {
+  final CompanionService _companionService;
+  final AIInsightService _aiService;
+
+  /// 订阅AI洞察事件
+  void initialize() {
+    _aiService.onNewInsight.listen(_handleNewInsight);
+    _aiService.onAnomalyDetected.listen(_handleAnomaly);
+  }
+
+  /// 处理新洞察
+  Future<void> _handleNewInsight(AIInsight insight) async {
+    // 只推送高价值洞察
+    if (insight.valueScore < 0.7) return;
+
+    await _companionService.triggerMessage(
+      scene: CopyScene.aiInsight,
+      context: {
+        'insightType': insight.type.label,
+        'summary': insight.summary,
+        'actionable': insight.hasAction,
+      },
+      mood: CompanionMood.gentle,
+      priority: _getInsightPriority(insight),
+    );
+  }
+
+  /// 处理异常检测
+  Future<void> _handleAnomaly(AnomalyEvent event) async {
+    // 关心语气，不指责
+    await _companionService.triggerMessage(
+      scene: CopyScene.anomalyDetected,
+      context: {
+        'anomalyType': event.type.label,
+        'description': event.friendlyDescription,
+        'suggestion': event.suggestion,
+      },
+      mood: CompanionMood.caring,
+      priority: MessagePriority.medium,
+    );
+  }
+
+  /// 获取洞察优先级
+  MessagePriority _getInsightPriority(AIInsight insight) {
+    if (insight.type == InsightType.savingOpportunity) {
+      return MessagePriority.high;
+    }
+    if (insight.type == InsightType.spendingPattern) {
+      return MessagePriority.medium;
+    }
+    return MessagePriority.low;
+  }
+}
+
+/// AI洞察文案模板
+extension AIInsightCopyTemplates on CompanionCopywritingService {
+  static const Map<CopyScene, List<String>> aiTemplates = {
+    CopyScene.aiInsight: [
+      '发现了一个有趣的规律：{summary} 💡',
+      '我注意到{summary}，要不要看看详情？',
+      '{insightType}分析：{summary}',
+    ],
+    CopyScene.anomalyDetected: [
+      '注意到{description}，{suggestion}',
+      '最近{anomalyType}有点异常，{suggestion}',
+      '{description}，可能需要关注一下',
+    ],
+  };
+}
+```
+
+#### 24.8.7 用户行为系统集成
+
+```dart
+/// 伙伴化与用户行为系统集成
+class CompanionUserBehaviorIntegration {
+  final CompanionService _companionService;
+  final UserBehaviorService _behaviorService;
+  final CalendarService _calendarService;
+
+  /// 订阅用户行为事件
+  void initialize() {
+    _behaviorService.onUserReturn.listen(_handleUserReturn);
+    _behaviorService.onFirstOpenToday.listen(_handleFirstOpen);
+    _calendarService.onSpecialDate.listen(_handleSpecialDate);
+  }
+
+  /// 处理用户回归
+  Future<void> _handleUserReturn(UserReturnEvent event) async {
+    if (event.daysSinceLastVisit >= 3) {
+      await _companionService.triggerMessage(
+        scene: CopyScene.returnUser,
+        context: {
+          'daysAway': event.daysSinceLastVisit,
+          'missedTransactions': event.estimatedMissedTransactions,
+        },
+        mood: CompanionMood.caring,
+        priority: MessagePriority.high,
+      );
+    }
+  }
+
+  /// 处理当天首次打开
+  Future<void> _handleFirstOpen(FirstOpenEvent event) async {
+    final hour = DateTime.now().hour;
+
+    CopyScene scene;
+    if (hour >= 5 && hour < 12) {
+      scene = CopyScene.morningGreeting;
+    } else if (hour >= 12 && hour < 18) {
+      scene = CopyScene.afternoonGreeting;
+    } else if (hour >= 18 && hour < 23) {
+      scene = CopyScene.eveningGreeting;
+    } else {
+      scene = CopyScene.lateNightGreeting;
+    }
+
+    await _companionService.triggerMessage(
+      scene: scene,
+      context: {
+        'userName': event.userName,
+        'usageDays': event.totalUsageDays,
+        'todayBudgetRemaining': event.todayBudgetRemaining,
+      },
+      mood: CompanionMood.happy,
+      priority: MessagePriority.low,
+    );
+  }
+
+  /// 处理特殊日期
+  Future<void> _handleSpecialDate(SpecialDateEvent event) async {
+    await _companionService.triggerMessage(
+      scene: CopyScene.specialDate,
+      context: {
+        'dateType': event.type.label,
+        'dateName': event.name,
+        'customMessage': event.customMessage,
+      },
+      mood: CompanionMood.excited,
+      priority: MessagePriority.high,
+    );
+
+    // 特殊节日可能触发主题皮肤
+    if (event.hasTheme) {
+      await _companionService.activateTheme(event.themeId);
+    }
+  }
+}
+
+/// 用户行为相关文案模板
+extension UserBehaviorCopyTemplates on CompanionCopywritingService {
+  static const Map<CopyScene, List<String>> behaviorTemplates = {
+    CopyScene.returnUser: [
+      '好久不见，{userName}！一切还好吗？😊',
+      '{daysAway}天没见了，想你了！随时欢迎回来记录',
+      '欢迎回来！这段时间辛苦了，我们继续一起加油',
+    ],
+    CopyScene.morningGreeting: [
+      '早上好，{userName}！新的一天，新的开始 ☀️',
+      '早安！今天也要元气满满哦',
+      '美好的一天开始了，{userName}加油！',
+    ],
+    CopyScene.eveningGreeting: [
+      '晚上好！今天过得怎么样？',
+      '{userName}，辛苦一天了，记得记录今天的花销',
+      '晚上好！要不要看看今天的账目？',
+    ],
+    CopyScene.lateNightGreeting: [
+      '这么晚还没休息？记得早点睡哦 🌙',
+      '夜深了，{userName}注意身体，早点休息',
+    ],
+    CopyScene.specialDate: [
+      '{dateName}快乐！🎉 {customMessage}',
+      '今天是{dateName}，祝你{customMessage}！',
+    ],
+  };
+}
+```
+
+#### 24.8.8 伙伴化效果追踪
+
+```dart
+/// 伙伴化效果追踪服务
+class CompanionAnalyticsService {
+  final AnalyticsService _analytics;
+
+  /// 追踪消息展示
+  Future<void> trackMessageShown({
+    required CopyScene scene,
+    required CompanionMood mood,
+    required String messageId,
+  }) async {
+    await _analytics.track('companion_message_shown', {
+      'scene': scene.name,
+      'mood': mood.name,
+      'message_id': messageId,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// 追踪用户互动
+  Future<void> trackUserInteraction({
+    required String messageId,
+    required InteractionType type,
+  }) async {
+    await _analytics.track('companion_interaction', {
+      'message_id': messageId,
+      'interaction_type': type.name,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// 追踪消息关闭
+  Future<void> trackMessageDismissed({
+    required String messageId,
+    required DismissReason reason,
+  }) async {
+    await _analytics.track('companion_message_dismissed', {
+      'message_id': messageId,
+      'dismiss_reason': reason.name,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// 获取场景效果报告
+  Future<SceneEffectivenessReport> getSceneReport(CopyScene scene) async {
+    final data = await _analytics.query(
+      event: 'companion_message_shown',
+      filter: {'scene': scene.name},
+      metrics: ['show_count', 'interaction_rate', 'dismiss_rate'],
+      period: Duration(days: 30),
+    );
+
+    return SceneEffectivenessReport(
+      scene: scene,
+      showCount: data['show_count'],
+      interactionRate: data['interaction_rate'],
+      dismissRate: data['dismiss_rate'],
+      bestPerformingVariant: data['best_variant'],
+    );
+  }
+}
+
+/// 互动类型
+enum InteractionType {
+  tap,          // 点击卡片
+  actionTap,    // 点击操作按钮
+  expand,       // 展开详情
+  share,        // 分享
+}
+
+/// 关闭原因
+enum DismissReason {
+  userDismiss,      // 用户主动关闭
+  timeout,          // 超时自动消失
+  navigation,       // 导航离开
+  newMessage,       // 被新消息替换
+}
+
+/// 场景效果报告
+class SceneEffectivenessReport {
+  final CopyScene scene;
+  final int showCount;
+  final double interactionRate;
+  final double dismissRate;
+  final String? bestPerformingVariant;
+
+  const SceneEffectivenessReport({
+    required this.scene,
+    required this.showCount,
+    required this.interactionRate,
+    required this.dismissRate,
+    this.bestPerformingVariant,
+  });
+
+  /// 场景健康度评分 (0-100)
+  int get healthScore {
+    // 互动率高、关闭率低 = 健康
+    final interactionScore = (interactionRate * 50).clamp(0, 50);
+    final dismissPenalty = (dismissRate * 30).clamp(0, 30);
+    return (interactionScore + 50 - dismissPenalty).round();
+  }
+
+  /// 是否需要优化
+  bool get needsOptimization => healthScore < 60;
+}
+```
 
 ---
 
