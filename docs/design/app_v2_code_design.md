@@ -33715,7 +33715,7 @@ class VoiceExceptionHandler {
     if (recentValidCount > 5) {
       // 可能是正常的批量记账
       return ExceptionResponse(
-        userMessage: "已批量记入${recentValidCount}笔��继续吗？",
+        userMessage: "已批量记入${recentValidCount}笔，继续吗？",
         continueListening: true,
       );
     }

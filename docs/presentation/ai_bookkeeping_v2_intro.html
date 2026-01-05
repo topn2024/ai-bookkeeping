@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI智能记账 2.0 - 产品介绍</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/theme/white.min.css">
+    <style>
+        :root {
+            --primary: #6750A4;
+            --secondary: #625B71;
+            --tertiary: #7D5260;
+            --success: #4CAF50;
+            --warning: #FF9800;
+            --error: #F44336;
+            --surface: #FFFBFE;
+        }
+
+        .reveal {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+
+        .reveal h1, .reveal h2, .reveal h3 {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .reveal h1 {
+            font-size: 2.5em;
+        }
+
+        .reveal h2 {
+            font-size: 1.8em;
+        }
+
+        .reveal .subtitle {
+            color: var(--secondary);
+            font-size: 1.2em;
+            margin-top: -20px;
+        }
+
+        .reveal .highlight {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .reveal .card-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .reveal .card-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .reveal .card {
+            background: #F5F5F5;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: left;
+        }
+
+        .reveal .card.primary {
+            background: linear-gradient(135deg, #6750A4 0%, #9747FF 100%);
+            color: white;
+        }
+
+        .reveal .card.success {
+            background: linear-gradient(135deg, #4CAF50 0%, #81C784 100%);
+            color: white;
+        }
+
+        .reveal .card.warning {
+            background: linear-gradient(135deg, #FF9800 0%, #FFB74D 100%);
+            color: white;
+        }
+
+        .reveal .card-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .reveal .card-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .reveal .card-desc {
+            font-size: 0.85em;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+
+        .reveal .comparison-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.75em;
+        }
+
+        .reveal .comparison-table th {
+            background: var(--primary);
+            color: white;
+            padding: 12px 16px;
+            text-align: left;
+        }
+
+        .reveal .comparison-table th:first-child {
+            border-radius: 12px 0 0 0;
+        }
+
+        .reveal .comparison-table th:last-child {
+            border-radius: 0 12px 0 0;
+        }
+
+        .reveal .comparison-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #E0E0E0;
+        }
+
+        .reveal .comparison-table tr:last-child td:first-child {
+            border-radius: 0 0 0 12px;
+        }
+
+        .reveal .comparison-table tr:last-child td:last-child {
+            border-radius: 0 0 12px 0;
+        }
+
+        .reveal .comparison-table tr:nth-child(even) {
+            background: #FAFAFA;
+        }
+
+        .reveal .tag {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7em;
+            margin: 2px;
+        }
+
+        .reveal .tag.success {
+            background: var(--success);
+        }
+
+        .reveal .tag.warning {
+            background: var(--warning);
+        }
+
+        .reveal .flow-chart {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .reveal .flow-item {
+            background: #F5F5F5;
+            border-radius: 12px;
+            padding: 20px 30px;
+            text-align: center;
+        }
+
+        .reveal .flow-item.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .reveal .flow-arrow {
+            font-size: 1.5em;
+            color: var(--secondary);
+        }
+
+        .reveal .user-card {
+            background: #F5F5F5;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .reveal .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+        }
+
+        .reveal .stat-number {
+            font-size: 3em;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .reveal .stat-label {
+            font-size: 1em;
+            color: var(--secondary);
+        }
+
+        .reveal .timeline {
+            position: relative;
+            padding-left: 40px;
+        }
+
+        .reveal .timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--primary);
+        }
+
+        .reveal .timeline-item {
+            position: relative;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #F5F5F5;
+            border-radius: 12px;
+        }
+
+        .reveal .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -32px;
+            top: 20px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--primary);
+            border: 3px solid white;
+        }
+
+        .reveal .cover-logo {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .reveal .cover-version {
+            background: var(--primary);
+            color: white;
+            padding: 8px 24px;
+            border-radius: 30px;
+            display: inline-block;
+            margin: 20px 0;
+        }
+
+        .reveal section {
+            height: 100%;
+        }
+
+        .reveal .small-text {
+            font-size: 0.7em;
+            color: var(--secondary);
+        }
+
+        .reveal ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .reveal ul li {
+            padding: 8px 0;
+            padding-left: 24px;
+            position: relative;
+        }
+
+        .reveal ul li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="reveal">
+        <div class="slides">
+
+            <!-- 封面 -->
+            <section>
+                <div class="cover-logo">💰</div>
+                <h1>AI智能记账</h1>
+                <div class="cover-version">2.0 版本</div>
+                <p class="subtitle">你的智能理财伙伴<br>让记账从负担变成习惯</p>
+                <p class="small-text">2026年1月</p>
+            </section>
+
+            <!-- 产品愿景 -->
+            <section>
+                <h2>产品愿景</h2>
+                <blockquote style="font-size: 1.3em; border-left: 4px solid var(--primary); padding-left: 20px; margin: 40px 0;">
+                    "不只是记账工具，更是懂你的理财伙伴"
+                </blockquote>
+                <div class="flow-chart">
+                    <div class="flow-item">
+                        <div style="font-size: 2em;">😮‍💨</div>
+                        <div>传统记账</div>
+                        <div class="small-text">繁琐、枯燥</div>
+                    </div>
+                    <div class="flow-arrow">➡️</div>
+                    <div class="flow-item active">
+                        <div style="font-size: 2em;">✨</div>
+                        <div>AI智能记账</div>
+                        <div class="small-text">简单、智能</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 用户痛点 -->
+            <section>
+                <h2>用户痛点</h2>
+                <div class="card-grid">
+                    <div class="card">
+                        <div class="card-icon">😩</div>
+                        <div class="card-title">手动记账太繁琐</div>
+                        <div class="card-desc">每笔消费都要手动输入，分类选择复杂</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">🤷</div>
+                        <div class="card-title">不知道钱花哪了</div>
+                        <div class="card-desc">月底看账单一脸懵，分析报表看不懂</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">💸</div>
+                        <div class="card-title">预算总是超支</div>
+                        <div class="card-desc">设了预算也记不住，控制不住消费冲动</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">😫</div>
+                        <div class="card-title">月月光不知为何</div>
+                        <div class="card-desc">工资不低但存不下钱，不知道问题在哪</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 核心创新 - 概览 -->
+            <section>
+                <h2>四大核心创新</h2>
+                <div class="card-grid">
+                    <div class="card primary">
+                        <div class="card-icon">🎯</div>
+                        <div class="card-title">钱龄分析</div>
+                        <div class="card-desc">知道花的是什么时候赚的钱<br>市面上独一无二的创新功能</div>
+                    </div>
+                    <div class="card success">
+                        <div class="card-icon">💰</div>
+                        <div class="card-title">零基预算 + 小金库</div>
+                        <div class="card-desc">让每一分钱都有归属<br>信封预算法，直观易懂</div>
+                    </div>
+                    <div class="card warning">
+                        <div class="card-icon">🤖</div>
+                        <div class="card-title">AI智能识别</div>
+                        <div class="card-desc">语音、图片、智能分类<br>记账只需1秒</div>
+                    </div>
+                    <div class="card" style="background: linear-gradient(135deg, #2196F3 0%, #64B5F6 100%); color: white;">
+                        <div class="card-icon">🌱</div>
+                        <div class="card-title">金融习惯培养</div>
+                        <div class="card-desc">从月光族到财务自由<br>智能洞察，行为引导</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 钱龄分析详解 -->
+            <section>
+                <h2>🎯 钱龄分析</h2>
+                <p class="subtitle">知道花的是什么时候赚的钱</p>
+                <div style="background: #F5F5F5; border-radius: 16px; padding: 30px; margin: 30px 0;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 40px;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 3em;">☕</div>
+                            <div style="font-size: 1.5em; font-weight: 600;">¥35</div>
+                            <div class="small-text">这杯咖啡</div>
+                        </div>
+                        <div style="font-size: 2em;">👉</div>
+                        <div style="text-align: center; background: var(--primary); color: white; padding: 20px 40px; border-radius: 12px;">
+                            <div style="font-size: 0.9em;">花的是</div>
+                            <div style="font-size: 2em; font-weight: 700;">15天前</div>
+                            <div style="font-size: 0.9em;">赚的钱</div>
+                        </div>
+                    </div>
+                </div>
+                <ul style="text-align: left; max-width: 600px; margin: 0 auto;">
+                    <li>可视化钱龄仪表盘</li>
+                    <li>了解自己是"花上个月的钱"还是"花下个月的钱"</li>
+                    <li>建立对财务状况的深度感知</li>
+                </ul>
+            </section>
+
+            <!-- 零基预算 + 小金库 -->
+            <section>
+                <h2>💰 零基预算 + 小金库</h2>
+                <p class="subtitle">让每一分钱都有归属</p>
+                <div style="display: flex; gap: 20px; margin: 30px 0;">
+                    <div style="flex: 1; background: #E8F5E9; border-radius: 16px; padding: 20px; text-align: center;">
+                        <div style="font-size: 2em;">🍜</div>
+                        <div style="font-weight: 600;">餐饮</div>
+                        <div style="font-size: 1.5em; color: var(--success);">¥2,000</div>
+                    </div>
+                    <div style="flex: 1; background: #E3F2FD; border-radius: 16px; padding: 20px; text-align: center;">
+                        <div style="font-size: 2em;">🚗</div>
+                        <div style="font-weight: 600;">交通</div>
+                        <div style="font-size: 1.5em; color: #2196F3;">¥800</div>
+                    </div>
+                    <div style="flex: 1; background: #FFF3E0; border-radius: 16px; padding: 20px; text-align: center;">
+                        <div style="font-size: 2em;">🎮</div>
+                        <div style="font-weight: 600;">娱乐</div>
+                        <div style="font-size: 1.5em; color: var(--warning);">¥500</div>
+                    </div>
+                    <div style="flex: 1; background: #FCE4EC; border-radius: 16px; padding: 20px; text-align: center;">
+                        <div style="font-size: 2em;">💎</div>
+                        <div style="font-weight: 600;">储蓄</div>
+                        <div style="font-size: 1.5em; color: var(--tertiary);">¥3,000</div>
+                    </div>
+                </div>
+                <ul style="text-align: left; max-width: 600px; margin: 0 auto;">
+                    <li>每月收入自动分配到不同"小金库"</li>
+                    <li>消费时从对应小金库扣除</li>
+                    <li>超支提醒，欠款时智能调拨</li>
+                </ul>
+            </section>
+
+            <!-- AI智能识别 -->
+            <section>
+                <h2>🤖 AI智能识别</h2>
+                <p class="subtitle">记账只需1秒</p>
+                <div class="card-grid-3" style="margin: 40px 0;">
+                    <div class="card" style="text-align: center;">
+                        <div class="card-icon">🎤</div>
+                        <div class="card-title">语音记账</div>
+                        <div class="card-desc" style="font-size: 0.9em;">"午饭花了35，打车18块"</div>
+                        <div style="margin-top: 10px;">
+                            <span class="tag">自动识别</span>
+                            <span class="tag">多笔同时</span>
+                        </div>
+                    </div>
+                    <div class="card" style="text-align: center;">
+                        <div class="card-icon">📷</div>
+                        <div class="card-title">图片识别</div>
+                        <div class="card-desc" style="font-size: 0.9em;">拍照小票、外卖截图、银行账单</div>
+                        <div style="margin-top: 10px;">
+                            <span class="tag success">OCR解析</span>
+                            <span class="tag success">智能提取</span>
+                        </div>
+                    </div>
+                    <div class="card" style="text-align: center;">
+                        <div class="card-icon">🧠</div>
+                        <div class="card-title">智能分类</div>
+                        <div class="card-desc" style="font-size: 0.9em;">基于场景、商户、历史习惯</div>
+                        <div style="margin-top: 10px;">
+                            <span class="tag warning">准确率 >95%</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 金融习惯培养 -->
+            <section>
+                <h2>🌱 金融习惯培养</h2>
+                <p class="subtitle">从月光族到财务自由</p>
+                <div style="display: flex; gap: 20px; margin: 30px 0;">
+                    <div class="card" style="flex: 1;">
+                        <div class="card-icon">🔍</div>
+                        <div class="card-title">消费审视</div>
+                        <ul style="font-size: 0.85em; margin: 0; padding-left: 20px;">
+                            <li style="padding: 4px 0;">识别订阅浪费</li>
+                            <li style="padding: 4px 0;">发现拿铁因子</li>
+                            <li style="padding: 4px 0;">小额高频消费提醒</li>
+                        </ul>
+                    </div>
+                    <div class="card" style="flex: 1;">
+                        <div class="card-icon">🛡️</div>
+                        <div class="card-title">冲动防护</div>
+                        <ul style="font-size: 0.85em; margin: 0; padding-left: 20px;">
+                            <li style="padding: 4px 0;">大额消费冷静期</li>
+                            <li style="padding: 4px 0;">预算预警提醒</li>
+                            <li style="padding: 4px 0;">消费拦截确认</li>
+                        </ul>
+                    </div>
+                    <div class="card" style="flex: 1;">
+                        <div class="card-icon">🏦</div>
+                        <div class="card-title">财务缓冲</div>
+                        <ul style="font-size: 0.85em; margin: 0; padding-left: 20px;">
+                            <li style="padding: 4px 0;">建立应急金</li>
+                            <li style="padding: 4px 0;">储蓄目标追踪</li>
+                            <li style="padding: 4px 0;">摆脱财务焦虑</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 设计理念 -->
+            <section>
+                <h2>两大设计哲学</h2>
+                <div style="display: flex; gap: 40px; margin: 40px 0;">
+                    <div class="card primary" style="flex: 1;">
+                        <div class="card-icon">🛋️</div>
+                        <div class="card-title" style="font-size: 1.3em;">懒人设计</div>
+                        <div class="card-desc" style="margin-bottom: 15px;">"为不想记账的人设计记账APP"</div>
+                        <ul style="font-size: 0.85em; padding-left: 20px; margin: 0;">
+                            <li style="padding: 4px 0; color: white;">高频操作一步完成</li>
+                            <li style="padding: 4px 0; color: white;">能自动的绝不手动</li>
+                            <li style="padding: 4px 0; color: white;">能推断的绝不让用户输入</li>
+                            <li style="padding: 4px 0; color: white;">新用户零配置即可使用</li>
+                            <li style="padding: 4px 0; color: white;">单手可完成所有核心操作</li>
+                        </ul>
+                    </div>
+                    <div class="card" style="flex: 1; background: linear-gradient(135deg, #E91E63 0%, #F48FB1 100%); color: white;">
+                        <div class="card-icon">🤝</div>
+                        <div class="card-title" style="font-size: 1.3em;">伙伴化设计</div>
+                        <div class="card-desc" style="margin-bottom: 15px;">"不是冷冰冰的工具，而是温暖伙伴"</div>
+                        <ul style="font-size: 0.85em; padding-left: 20px; margin: 0;">
+                            <li style="padding: 4px 0; color: white;">温暖不打扰，关心有边界</li>
+                            <li style="padding: 4px 0; color: white;">鼓励而非说教</li>
+                            <li style="padding: 4px 0; color: white;">记账成功时给予肯定</li>
+                            <li style="padding: 4px 0; color: white;">达成目标时真诚庆祝</li>
+                            <li style="padding: 4px 0; color: white;">遇到困难时贴心建议</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 目标用户 -->
+            <section>
+                <h2>目标用户</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>用户类型</th>
+                            <th>痛点</th>
+                            <th>我们的解决方案</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>👔 职场新人</strong></td>
+                            <td>工资不知道花到哪了，月月光</td>
+                            <td>钱龄分析让消费透明，小金库强制储蓄</td>
+                        </tr>
+                        <tr>
+                            <td><strong>👨‍👩‍👧 家庭理财者</strong></td>
+                            <td>家庭开支难以规划和追踪</td>
+                            <td>共享账本、预算分类、支出趋势分析</td>
+                        </tr>
+                        <tr>
+                            <td><strong>📱 理财入门者</strong></td>
+                            <td>想记账但嫌麻烦，坚持不下来</td>
+                            <td>语音/拍照记账，30秒完成一天的账</td>
+                        </tr>
+                        <tr>
+                            <td><strong>💳 预算控制者</strong></td>
+                            <td>预算总超支，控制不住消费</td>
+                            <td>实时预算提醒、冲动消费冷静期</td>
+                        </tr>
+                        <tr>
+                            <td><strong>🎯 储蓄目标者</strong></td>
+                            <td>想存钱但总是存不下来</td>
+                            <td>自动储蓄规划、目标进度可视化</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- 技术亮点 -->
+            <section>
+                <h2>技术亮点</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>能力</th>
+                            <th>技术方案</th>
+                            <th>用户价值</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>🎤 语音识别</strong></td>
+                            <td>通义千问多模态大模型</td>
+                            <td>自然语言输入，支持方言和连续多笔</td>
+                        </tr>
+                        <tr>
+                            <td><strong>📷 图片识别</strong></td>
+                            <td>OCR + LLM语义理解</td>
+                            <td>拍照即记账，支持各类票据和截图</td>
+                        </tr>
+                        <tr>
+                            <td><strong>🧠 智能分类</strong></td>
+                            <td>本地ML模型 + 云端增强</td>
+                            <td>离线可用，在线更准确</td>
+                        </tr>
+                        <tr>
+                            <td><strong>📊 钱龄计算</strong></td>
+                            <td>FIFO资源池算法</td>
+                            <td>毫秒级计算，支持大量交易</td>
+                        </tr>
+                        <tr>
+                            <td><strong>📱 离线优先</strong></td>
+                            <td>本地SQLite + 云端同步</td>
+                            <td>无网络也能正常使用</td>
+                        </tr>
+                        <tr>
+                            <td><strong>🔒 隐私安全</strong></td>
+                            <td>端侧加密 + 最小权限</td>
+                            <td>数据安全，隐私可控</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- 竞品差异化 -->
+            <section>
+                <h2>竞品差异化</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>功能维度</th>
+                            <th>传统记账APP</th>
+                            <th>AI智能记账 2.0</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>记账方式</strong></td>
+                            <td>手动输入 ❌</td>
+                            <td>AI语音/图像识别 + 手动 ✅</td>
+                        </tr>
+                        <tr>
+                            <td><strong>数据分析</strong></td>
+                            <td>简单图表 ❌</td>
+                            <td>钱龄分析 + 智能洞察 ✅</td>
+                        </tr>
+                        <tr>
+                            <td><strong>预算管理</strong></td>
+                            <td>固定预算 ❌</td>
+                            <td>零基预算 + 小金库 ✅</td>
+                        </tr>
+                        <tr>
+                            <td><strong>数据导入</strong></td>
+                            <td>手动录入 ❌</td>
+                            <td>智能解析 + 自动去重 ✅</td>
+                        </tr>
+                        <tr>
+                            <td><strong>交互体验</strong></td>
+                            <td>静态页面 ❌</td>
+                            <td>数据联动 + 下钻探索 ✅</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- 产品价值主张 -->
+            <section>
+                <h2>产品价值主张</h2>
+                <p class="subtitle">三步实现财务自由</p>
+                <div class="flow-chart" style="margin: 50px 0;">
+                    <div style="text-align: center; flex: 1;">
+                        <div style="background: var(--primary); color: white; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 2em;">📝</div>
+                        <h3 style="margin: 15px 0 5px;">记得清楚</h3>
+                        <p class="small-text">AI智能识别<br>自动分类归档</p>
+                        <div class="tag">1秒记一笔</div>
+                    </div>
+                    <div class="flow-arrow">➡️</div>
+                    <div style="text-align: center; flex: 1;">
+                        <div style="background: var(--success); color: white; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 2em;">📊</div>
+                        <h3 style="margin: 15px 0 5px;">看得明白</h3>
+                        <p class="small-text">可视化报表<br>钱龄趋势追踪</p>
+                        <div class="tag success">一眼看全貌</div>
+                    </div>
+                    <div class="flow-arrow">➡️</div>
+                    <div style="text-align: center; flex: 1;">
+                        <div style="background: var(--warning); color: white; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 2em;">💪</div>
+                        <h3 style="margin: 15px 0 5px;">花得值得</h3>
+                        <p class="small-text">消费洞察<br>习惯培养建议</p>
+                        <div class="tag warning">越花越有数</div>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 40px; padding: 20px; background: #F5F5F5; border-radius: 16px;">
+                    <div style="font-size: 1.2em;">🎯 从"不知道钱去哪了" 到 "每一分钱都有意义"</div>
+                </div>
+            </section>
+
+            <!-- 2.0版本核心目标 -->
+            <section>
+                <h2>2.0 版本核心目标</h2>
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin: 40px 0;">
+                    <div style="background: var(--primary); color: white; padding: 20px 30px; border-radius: 12px; text-align: center; min-width: 180px;">
+                        <div style="font-size: 2em;">🎯</div>
+                        <div style="font-weight: 600; margin-top: 10px;">钱龄分析</div>
+                        <div style="font-size: 0.85em; opacity: 0.9;">理解花的是什么时候赚的钱</div>
+                    </div>
+                    <div style="background: var(--success); color: white; padding: 20px 30px; border-radius: 12px; text-align: center; min-width: 180px;">
+                        <div style="font-size: 2em;">💰</div>
+                        <div style="font-weight: 600; margin-top: 10px;">零基预算</div>
+                        <div style="font-size: 0.85em; opacity: 0.9;">让每一分钱都有明确用途</div>
+                    </div>
+                    <div style="background: #2196F3; color: white; padding: 20px 30px; border-radius: 12px; text-align: center; min-width: 180px;">
+                        <div style="font-size: 2em;">🤖</div>
+                        <div style="font-weight: 600; margin-top: 10px;">智能洞察</div>
+                        <div style="font-size: 0.85em; opacity: 0.9;">AI驱动的财务健康分析</div>
+                    </div>
+                    <div style="background: var(--warning); color: white; padding: 20px 30px; border-radius: 12px; text-align: center; min-width: 180px;">
+                        <div style="font-size: 2em;">🔗</div>
+                        <div style="font-weight: 600; margin-top: 10px;">数据联动</div>
+                        <div style="font-size: 0.85em; opacity: 0.9;">任意图表可点击下钻</div>
+                    </div>
+                    <div style="background: var(--tertiary); color: white; padding: 20px 30px; border-radius: 12px; text-align: center; min-width: 180px;">
+                        <div style="font-size: 2em;">✨</div>
+                        <div style="font-weight: 600; margin-top: 10px;">体验升级</div>
+                        <div style="font-size: 0.85em; opacity: 0.9;">更流畅的交互、更美观的界面</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 结尾页 -->
+            <section>
+                <div class="cover-logo">💰</div>
+                <h1>AI智能记账 2.0</h1>
+                <p style="font-size: 1.5em; color: var(--primary); margin: 30px 0;">
+                    让记账从负担变成习惯<br>
+                    让每一分钱都花得明白
+                </p>
+                <div style="margin-top: 50px;">
+                    <span class="tag" style="font-size: 1em; padding: 10px 25px;">开始你的智能理财之旅</span>
+                </div>
+                <p class="small-text" style="margin-top: 40px;">感谢观看</p>
+            </section>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.min.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            slideNumber: true,
+            transition: 'slide',
+            controls: true,
+            progress: true,
+            center: true,
+            width: 1200,
+            height: 700
+        });
+    </script>
+</body>
+</html>

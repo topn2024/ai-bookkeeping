@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>语音记账界面原型 - 高保真设计</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .phone-frame {
+            width: 375px;
+            height: 812px;
+            background: #000;
+            border-radius: 40px;
+            padding: 12px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            position: relative;
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border-radius: 32px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .status-bar {
+            height: 44px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 28px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .notch {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 30px;
+            background: #000;
+            border-radius: 0 0 20px 20px;
+            z-index: 10;
+        }
+
+        .state-label {
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4CAF50;
+            color: #fff;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .content {
+            height: calc(100% - 44px);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* 状态1: 准备录音 */
+        .state1 .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        .hint-text {
+            color: rgba(255,255,255,0.6);
+            font-size: 18px;
+            margin-bottom: 60px;
+            text-align: center;
+        }
+
+        .mic-button {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.4);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+
+        .mic-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 50px rgba(102, 126, 234, 0.5);
+        }
+
+        .mic-button::before {
+            content: '';
+            position: absolute;
+            width: 160px;
+            height: 160px;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            animation: pulse 2s ease-out infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.3); opacity: 0; }
+        }
+
+        .mic-icon {
+            font-size: 56px;
+        }
+
+        .bottom-bar {
+            height: 100px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 40px;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .bottom-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: rgba(255,255,255,0.7);
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .bottom-btn:hover {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+
+        /* 状态2: 录音中 */
+        .state2 .recording-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        .recording-time {
+            font-size: 48px;
+            color: #fff;
+            font-weight: 300;
+            margin-bottom: 20px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .waveform {
+            display: flex;
+            gap: 4px;
+            height: 60px;
+            align-items: center;
+            margin-bottom: 60px;
+        }
+
+        .wave-bar {
+            width: 4px;
+            background: linear-gradient(180deg, #FF6B6B 0%, #FF8E8E 100%);
+            border-radius: 2px;
+            animation: wave 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes wave {
+            from { height: 20px; }
+            to { height: 50px; }
+        }
+
+        .wave-bar:nth-child(1) { animation-delay: 0s; height: 30px; }
+        .wave-bar:nth-child(2) { animation-delay: 0.1s; height: 45px; }
+        .wave-bar:nth-child(3) { animation-delay: 0.2s; height: 35px; }
+        .wave-bar:nth-child(4) { animation-delay: 0.3s; height: 50px; }
+        .wave-bar:nth-child(5) { animation-delay: 0.4s; height: 40px; }
+        .wave-bar:nth-child(6) { animation-delay: 0.5s; height: 55px; }
+        .wave-bar:nth-child(7) { animation-delay: 0.6s; height: 38px; }
+        .wave-bar:nth-child(8) { animation-delay: 0.7s; height: 48px; }
+        .wave-bar:nth-child(9) { animation-delay: 0.8s; height: 32px; }
+        .wave-bar:nth-child(10) { animation-delay: 0.9s; height: 42px; }
+        .wave-bar:nth-child(11) { animation-delay: 1s; height: 36px; }
+        .wave-bar:nth-child(12) { animation-delay: 1.1s; height: 52px; }
+
+        .stop-button {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 40px rgba(255, 107, 107, 0.4);
+            cursor: pointer;
+        }
+
+        .stop-icon {
+            width: 32px;
+            height: 32px;
+            background: #fff;
+            border-radius: 6px;
+        }
+
+        .recording-tip {
+            color: rgba(255,255,255,0.5);
+            font-size: 14px;
+            margin-top: 30px;
+        }
+
+        /* 状态3: 识别结果 */
+        .state3 .result-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .result-card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 24px;
+            padding: 24px;
+            margin-top: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .result-title {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .confidence-badge {
+            background: #E8F5E9;
+            color: #4CAF50;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .amount-display {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .amount-label {
+            font-size: 14px;
+            color: #999;
+            margin-bottom: 8px;
+        }
+
+        .amount-value {
+            font-size: 48px;
+            font-weight: 700;
+            color: #FF6B6B;
+        }
+
+        .amount-value::before {
+            content: '-¥';
+            font-size: 28px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid #f5f5f5;
+        }
+
+        .detail-label {
+            color: #999;
+            font-size: 14px;
+        }
+
+        .detail-value {
+            color: #333;
+            font-size: 16px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .category-icon {
+            width: 32px;
+            height: 32px;
+            background: #FFF3E0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: auto;
+            padding-top: 20px;
+        }
+
+        .btn-secondary {
+            flex: 1;
+            height: 56px;
+            border-radius: 16px;
+            background: #f5f5f5;
+            color: #666;
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            flex: 2;
+            height: 56px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .edit-hint {
+            text-align: center;
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+            padding: 12px;
+        }
+
+        /* 状态4: 编辑模式 */
+        .state4 .edit-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .edit-overlay {
+            position: absolute;
+            top: 44px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+        }
+
+        .edit-panel {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 85%;
+            background: #fff;
+            border-radius: 24px 24px 0 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .edit-handle {
+            width: 40px;
+            height: 4px;
+            background: #ddd;
+            border-radius: 2px;
+            margin: 12px auto;
+        }
+
+        .edit-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 20px 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .edit-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .edit-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 18px;
+            color: #666;
+        }
+
+        .edit-form {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .form-input {
+            width: 100%;
+            height: 52px;
+            border: 2px solid #f0f0f0;
+            border-radius: 12px;
+            padding: 0 16px;
+            font-size: 16px;
+            color: #333;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-input.amount-input {
+            font-size: 28px;
+            font-weight: 600;
+            color: #FF6B6B;
+            text-align: right;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .category-item {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            background: #f8f8f8;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .category-item.selected {
+            background: #EDE7F6;
+            border: 2px solid #667eea;
+        }
+
+        .category-item span:first-child {
+            font-size: 24px;
+        }
+
+        .category-item span:last-child {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .edit-footer {
+            padding: 16px 20px 34px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .save-btn {
+            width: 100%;
+            height: 56px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        /* 成功状态 */
+        .state5 .success-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+        }
+
+        .success-icon {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4CAF50 0%, #81C784 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 60px;
+            margin-bottom: 30px;
+            animation: successPop 0.5s ease-out;
+        }
+
+        @keyframes successPop {
+            0% { transform: scale(0); }
+            70% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .success-text {
+            color: #fff;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .success-detail {
+            color: rgba(255,255,255,0.7);
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .continue-btn {
+            margin-top: 60px;
+            width: 200px;
+            height: 56px;
+            border-radius: 28px;
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+        }
+
+        /* 设计说明 */
+        h1 {
+            width: 100%;
+            text-align: center;
+            color: #333;
+            font-size: 28px;
+            margin: 20px 0 40px;
+        }
+
+        .design-note {
+            width: 100%;
+            max-width: 800px;
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px;
+            margin-top: 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .design-note h3 {
+            color: #333;
+            margin-bottom: 16px;
+            font-size: 18px;
+        }
+
+        .design-note ul {
+            list-style: none;
+            color: #666;
+            line-height: 2;
+        }
+
+        .design-note li::before {
+            content: '✓';
+            color: #4CAF50;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>语音记账 - 单手操作优化设计</h1>
+
+    <!-- 状态1: 准备录音 -->
+    <div class="phone-frame">
+        <div class="state-label">状态1: 准备录音</div>
+        <div class="notch"></div>
+        <div class="phone-screen state1">
+            <div class="status-bar">
+                <span>9:41</span>
+                <span>📶 📡 🔋</span>
+            </div>
+            <div class="content">
+                <div class="main-area">
+                    <div class="hint-text">点击开始语音记账</div>
+                    <div class="mic-button">
+                        <span class="mic-icon">🎙️</span>
+                    </div>
+                </div>
+                <div class="bottom-bar">
+                    <div class="bottom-btn">⌨️</div>
+                    <div class="bottom-btn">📷</div>
+                    <div class="bottom-btn">📋</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 状态2: 录音中 -->
+    <div class="phone-frame">
+        <div class="state-label" style="background: #FF6B6B;">状态2: 录音中</div>
+        <div class="notch"></div>
+        <div class="phone-screen state2">
+            <div class="status-bar">
+                <span>9:41</span>
+                <span>📶 📡 🔋</span>
+            </div>
+            <div class="content">
+                <div class="recording-area">
+                    <div class="recording-time">00:03</div>
+                    <div class="waveform">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                    </div>
+                    <div class="stop-button">
+                        <div class="stop-icon"></div>
+                    </div>
+                    <div class="recording-tip">点击结束录音</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 状态3: 识别结果 -->
+    <div class="phone-frame">
+        <div class="state-label" style="background: #2196F3;">状态3: 识别结果</div>
+        <div class="notch"></div>
+        <div class="phone-screen state3">
+            <div class="status-bar">
+                <span>9:41</span>
+                <span>📶 📡 🔋</span>
+            </div>
+            <div class="content">
+                <div class="result-area">
+                    <div class="result-card">
+                        <div class="result-header">
+                            <span class="result-title">识别结果</span>
+                            <span class="confidence-badge">置信度 95%</span>
+                        </div>
+                        <div class="amount-display">
+                            <div class="amount-label">支出金额</div>
+                            <div class="amount-value">28.50</div>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">分类</span>
+                            <span class="detail-value">
+                                <span class="category-icon">🍜</span>
+                                餐饮
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">备注</span>
+                            <span class="detail-value">午餐吃了一碗拉面</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">日期</span>
+                            <span class="detail-value">今天 12:30</span>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn-secondary">编辑</button>
+                            <button class="btn-primary">确认记账 ✓</button>
+                        </div>
+                    </div>
+                    <div class="edit-hint">向上滑动可编辑详情</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 状态4: 编辑模式 -->
+    <div class="phone-frame">
+        <div class="state-label" style="background: #FF9800;">状态4: 编辑详情</div>
+        <div class="notch"></div>
+        <div class="phone-screen state4">
+            <div class="status-bar">
+                <span>9:41</span>
+                <span>📶 📡 🔋</span>
+            </div>
+            <div class="content">
+                <div class="edit-area">
+                    <div class="edit-overlay"></div>
+                    <div class="edit-panel">
+                        <div class="edit-handle"></div>
+                        <div class="edit-header">
+                            <span class="edit-title">编辑账单</span>
+                            <div class="edit-close">✕</div>
+                        </div>
+                        <div class="edit-form">
+                            <div class="form-group">
+                                <label class="form-label">金额</label>
+                                <input type="text" class="form-input amount-input" value="28.50">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">分类</label>
+                                <div class="category-grid">
+                                    <div class="category-item selected">
+                                        <span>🍜</span>
+                                        <span>餐饮</span>
+                                    </div>
+                                    <div class="category-item">
+                                        <span>🚗</span>
+                                        <span>交通</span>
+                                    </div>
+                                    <div class="category-item">
+                                        <span>🛒</span>
+                                        <span>购物</span>
+                                    </div>
+                                    <div class="category-item">
+                                        <span>🎬</span>
+                                        <span>娱乐</span>
+                                    </div>
+                                    <div class="category-item">
+                                        <span>🏠</span>
+                                        <span>居住</span>
+                                    </div>
+                                    <div class="category-item">
+                                        <span>💊</span>
+                                        <span>医疗</span>
+                                    </div>
+                                    <div class="category-item">
+                                        <span>📚</span>
+                                        <span>教育</span>
+                                    </div>
+                                    <div class="category-item">
+                                        <span>📦</span>
+                                        <span>其他</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">备注</label>
+                                <input type="text" class="form-input" value="午餐吃了一碗拉面">
+                            </div>
+                        </div>
+                        <div class="edit-footer">
+                            <button class="save-btn">保存</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 状态5: 记账成功 -->
+    <div class="phone-frame">
+        <div class="state-label" style="background: #4CAF50;">状态5: 记账成功</div>
+        <div class="notch"></div>
+        <div class="phone-screen state5">
+            <div class="status-bar">
+                <span>9:41</span>
+                <span>📶 📡 🔋</span>
+            </div>
+            <div class="content">
+                <div class="success-area">
+                    <div class="success-icon">✓</div>
+                    <div class="success-text">记账成功</div>
+                    <div class="success-detail">
+                        餐饮 -¥28.50<br>
+                        午餐吃了一碗拉面
+                    </div>
+                    <button class="continue-btn">继续记账</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="design-note">
+        <h3>设计要点</h3>
+        <ul>
+            <li><strong>大按钮设计</strong>: 录音按钮 140px，停止按钮 100px，确认按钮 56px 高度，方便拇指点击</li>
+            <li><strong>底部操作区</strong>: 核心操作按钮集中在屏幕下半部分（拇指热区），单手可达</li>
+            <li><strong>渐进式交互</strong>: 点击录音 → 点击停止 → 点击确认，每步只需一次点击</li>
+            <li><strong>快速确认流程</strong>: 识别结果展示后，一键确认即可完成记账，无需额外操作</li>
+            <li><strong>滑动编辑面板</strong>: 需要修改时向上滑动展开编辑面板，不打断主流程</li>
+            <li><strong>视觉反馈明确</strong>: 录音中红色波形，成功绿色动画，状态一目了然</li>
+            <li><strong>置信度展示</strong>: 显示 AI 识别置信度，让用户了解识别准确性</li>
+            <li><strong>快捷入口</strong>: 底部栏提供键盘输入、拍照记账、历史记录等快捷入口</li>
+        </ul>
+    </div>
+
+    <div class="design-note">
+        <h3>交互流程</h3>
+        <ul>
+            <li><strong>步骤1</strong>: 进入页面，点击中央麦克风按钮开始录音</li>
+            <li><strong>步骤2</strong>: 说出记账内容，如"午餐吃了一碗拉面花了28块5"</li>
+            <li><strong>步骤3</strong>: 点击停止按钮结束录音，系统自动识别</li>
+            <li><strong>步骤4</strong>: 查看识别结果，点击"确认记账"完成，或点击"编辑"修改</li>
+            <li><strong>步骤5</strong>: 显示成功动画，点击"继续记账"可再次录音</li>
+        </ul>
+    </div>
+
+    <div class="design-note">
+        <h3>色彩系统</h3>
+        <ul>
+            <li><strong>主色调</strong>: 渐变紫 #667eea → #764ba2 (品牌色，用于主要按钮)</li>
+            <li><strong>录音状态</strong>: 渐变红 #FF6B6B → #FF8E8E (警示、录音中)</li>
+            <li><strong>成功状态</strong>: 渐变绿 #4CAF50 → #81C784 (成功、完成)</li>
+            <li><strong>背景色</strong>: 深蓝渐变 #1a1a2e → #0f3460 (夜间模式友好)</li>
+            <li><strong>卡片背景</strong>: 白色 #FFFFFF，圆角 24px</li>
+        </ul>
+    </div>
+</body>
+</html>
