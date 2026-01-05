@@ -11762,6 +11762,8 @@ Phase 6 (2周)：协同学习统一接入
 
 ##### 18.12.6.1 异常分类与处理器
 
+> 📄 **代码实现**: 见 [代码设计文档 - 代码块427](app_v2_code_design.md#code-427)
+
 ```dart
 /// 语音交互异常类型定义
 enum VoiceExceptionType {
@@ -12244,6 +12246,8 @@ class VoiceExceptionHandler {
 
 ##### 18.12.6.2 输入预处理与清洗
 
+> 📄 **代码实现**: 见 [代码设计文档 - 代码块428](app_v2_code_design.md#code-428)
+
 ```dart
 /// 语音输入预处理器
 class VoiceInputPreprocessor {
@@ -12371,6 +12375,8 @@ class PreprocessResult {
 ```
 
 ##### 18.12.6.3 对话上下文恢复
+
+> 📄 **代码实现**: 见 [代码设计文档 - 代码块429](app_v2_code_design.md#code-429)
 
 ```dart
 /// 对话上下文管理器
@@ -17739,6 +17745,8 @@ app/
 
 #### 25.2.3 l10n.yaml配置
 
+> 📄 **代码实现**: 见 [代码设计文档 - 代码块430](app_v2_code_design.md#code-430)
+
 ```yaml
 arb-dir: lib/l10n
 template-arb-file: app_en.arb
@@ -20162,6 +20170,8 @@ AI识别引擎的可扩展设计：
 > 📄 **代码实现**: 见 [代码设计文档 - 代码块376](app_v2_code_design.md#code-376)
 
 #### 30.4.3 版本发布元数据
+
+> 📄 **代码实现**: 见 [代码设计文档 - 代码块431](app_v2_code_design.md#code-431)
 
 每次打包发布时，必须在版本元数据中标注是否存在数据库变动，用于客户端智能判断是否需要备份。
 
