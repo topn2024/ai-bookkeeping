@@ -336,6 +336,18 @@ class AppUpgradeService {
 
     try {
       final config = AppConfigService().config;
+
+      // 构建完整的下载 URL
+      String fullDownloadUrl = version.downloadUrl!;
+      if (!fullDownloadUrl.startsWith('http')) {
+        // 相对路径，需要拼接服务器地址
+        // apiBaseUrl 格式: https://160.202.238.29/api/v1
+        // 需要提取 https://160.202.238.29
+        final baseUri = Uri.parse(config.apiBaseUrl);
+        final serverBase = '${baseUri.scheme}://${baseUri.host}${baseUri.port != 80 && baseUri.port != 443 ? ':${baseUri.port}' : ''}';
+        fullDownloadUrl = '$serverBase$fullDownloadUrl';
+        _logger.info('Constructed full download URL: $fullDownloadUrl', tag: 'Upgrade');
+      }
       final dir = await getExternalStorageDirectory();
       if (dir == null) {
         _logger.error('Cannot access external storage', tag: 'Upgrade');
@@ -424,7 +436,7 @@ class AppUpgradeService {
       while (retryCount < maxRetries) {
         try {
           await dio.download(
-            version.downloadUrl!,
+            fullDownloadUrl,
             tempPath,
             onReceiveProgress: (received, total) {
               // 断点续传时，received 是本次下载的字节数，total 是剩余字节数
@@ -655,6 +667,16 @@ class AppUpgradeService {
   }) async {
     try {
       final config = AppConfigService().config;
+
+      // 构建完整的下载 URL
+      String fullDownloadUrl = patch.downloadUrl;
+      if (!fullDownloadUrl.startsWith('http')) {
+        final baseUri = Uri.parse(config.apiBaseUrl);
+        final serverBase = '${baseUri.scheme}://${baseUri.host}${baseUri.port != 80 && baseUri.port != 443 ? ':${baseUri.port}' : ''}';
+        fullDownloadUrl = '$serverBase$fullDownloadUrl';
+        _logger.info('Constructed full patch URL: $fullDownloadUrl', tag: 'Upgrade');
+      }
+
       final dir = await getExternalStorageDirectory();
       if (dir == null) {
         _logger.error('Cannot access external storage', tag: 'Upgrade');
@@ -695,7 +717,7 @@ class AppUpgradeService {
       }
 
       await dio.download(
-        patch.downloadUrl,
+        fullDownloadUrl,
         savePath,
         onReceiveProgress: onProgress,
         cancelToken: cancelToken,

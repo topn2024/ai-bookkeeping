@@ -11,13 +11,13 @@
     <div class="filter-form">
       <el-form :model="filters" inline>
         <el-form-item label="平台">
-          <el-select v-model="filters.platform" style="width: 120px;">
+          <el-select v-model="filters.platform">
             <el-option label="Android" value="android" />
             <el-option label="iOS" value="ios" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="filters.status" placeholder="全部" clearable style="width: 120px;">
+          <el-select v-model="filters.status" placeholder="全部" clearable>
             <el-option label="草稿" :value="0" />
             <el-option label="已发布" :value="1" />
             <el-option label="已废弃" :value="2" />

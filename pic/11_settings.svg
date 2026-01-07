@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="375" height="812" viewBox="0 0 375 812" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="headerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="375" height="812" rx="40" fill="#F5F7FA"/>
+
+  <!-- Header -->
+  <rect x="0" y="0" width="375" height="100" fill="url(#headerGradient)"/>
+  <text x="30" y="50" fill="white" font-family="Arial" font-size="14">9:41</text>
+  <text x="20" y="80" fill="white" font-family="Arial" font-size="24">←</text>
+  <text x="187.5" y="80" fill="white" font-family="Arial" font-size="18" font-weight="bold" text-anchor="middle">设置</text>
+
+  <!-- Section: Display -->
+  <text x="30" y="135" fill="#999" font-family="Arial" font-size="12">显示设置</text>
+  <rect x="20" y="145" width="335" height="180" rx="12" fill="white"/>
+
+  <!-- Theme -->
+  <g transform="translate(40, 180)">
+    <text x="0" y="0" fill="#333" font-family="Arial" font-size="14">主题风格</text>
+    <text x="275" y="0" fill="#667eea" font-family="Arial" font-size="14" text-anchor="end">默认蓝 ></text>
+  </g>
+  <line x1="40" y1="200" x2="315" y2="200" stroke="#F0F0F0"/>
+
+  <!-- Dark Mode -->
+  <g transform="translate(40, 235)">
+    <text x="0" y="0" fill="#333" font-family="Arial" font-size="14">深色模式</text>
+    <rect x="230" y="-12" width="45" height="24" rx="12" fill="#667eea"/>
+    <circle cx="263" cy="0" r="10" fill="white"/>
+  </g>
+  <line x1="40" y1="255" x2="315" y2="255" stroke="#F0F0F0"/>
+
+  <!-- Language -->
+  <g transform="translate(40, 290)">
+    <text x="0" y="0" fill="#333" font-family="Arial" font-size="14">语言</text>
+    <text x="275" y="0" fill="#999" font-family="Arial" font-size="14" text-anchor="end">简体中文 ></text>
+  </g>
+
+  <!-- Section: Currency -->
+  <text x="30" y="355" fill="#999" font-family="Arial" font-size="12">货币与金额</text>
+  <rect x="20" y="365" width="335" height="120" rx="12" fill="white"/>
+
+  <!-- Default Currency -->
+  <g transform="translate(40, 400)">
+    <text x="0" y="0" fill="#333" font-family="Arial" font-size="14">默认货币</text>
+    <text x="275" y="0" fill="#999" font-family="Arial" font-size="14" text-anchor="end">CNY ¥ ></text>
+  </g>
+  <line x1="40" y1="420" x2="315" y2="420" stroke="#F0F0F0"/>
+
+  <!-- Amount Display -->
+  <g transform="translate(40, 455)">
+    <text x="0" y="0" fill="#333" font-family="Arial" font-size="14">金额显示格式</text>
+    <text x="275" y="0" fill="#999" font-family="Arial" font-size="14" text-anchor="end">¥1,234.56 ></text>
+  </g>
+
+  <!-- Section: Notification -->
+  <text x="30" y="515" fill="#999" font-family="Arial" font-size="12">通知提醒</text>
+  <rect x="20" y="525" width="335" height="120" rx="12" fill="white"/>
+
+  <!-- Push Notification -->
+  <g transform="translate(40, 560)">
+    <text x="0" y="0" fill="#333" font-family="Arial" font-size="14">推送通知</text>
+    <rect x="230" y="-12" width="45" height="24" rx="12" fill="#667eea"/>
+    <circle cx="263" cy="0" r="10" fill="white"/>
+  </g>
+  <line x1="40" y1="580" x2="315" y2="580" stroke="#F0F0F0"/>
+
+  <!-- Daily Reminder -->
+  <g transform="translate(40, 615)">
+    <text x="0" y="0" fill="#333" font-family="Arial" font-size="14">每日记账提醒</text>
+    <text x="275" y="0" fill="#999" font-family="Arial" font-size="14" text-anchor="end">21:00 ></text>
+  </g>
+
+  <!-- Section: Security -->
+  <text x="30" y="675" fill="#999" font-family="Arial" font-size="12">安全与隐私</text>
+  <rect x="20" y="685" width="335" height="60" rx="12" fill="white"/>
+
+  <!-- Biometric -->
+  <g transform="translate(40, 720)">
+    <text x="0" y="0" fill="#333" font-family="Arial" font-size="14">指纹/面容解锁</text>
+    <rect x="230" y="-12" width="45" height="24" rx="12" fill="#E0E0E0"/>
+    <circle cx="242" cy="0" r="10" fill="white"/>
+  </g>
+
+  <!-- Version -->
+  <text x="187.5" y="780" fill="#999" font-family="Arial" font-size="12" text-anchor="middle">版本 1.0.0</text>
+</svg>

@@ -245,17 +245,19 @@ body {
   border-radius: 8px;
   margin-bottom: 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden; // 防止内容溢出
 
   .el-form {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
-    gap: 16px;
+    gap: 12px 16px;
 
     &.el-form--inline {
       .el-form-item {
         margin-right: 0;
         margin-bottom: 0;
+        flex-shrink: 0;
 
         // 标签样式优化
         .el-form-item__label {
@@ -263,17 +265,24 @@ body {
           color: #4b5563;
         }
 
-        // 输入框最小宽度
+        // 输入框默认宽度，可被内联样式覆盖
         .el-input {
-          width: 180px;
+          width: 160px;
+          min-width: 120px;
         }
 
         .el-select {
-          width: 140px;
+          width: 120px;
+          min-width: 100px;
         }
 
         .el-date-editor {
           width: auto;
+          max-width: 280px;
+        }
+
+        .el-input-number {
+          width: 110px;
         }
       }
 
@@ -282,7 +291,22 @@ body {
         .el-form-item__content {
           display: flex;
           gap: 8px;
+          flex-wrap: wrap;
         }
+      }
+    }
+  }
+
+  // 响应式：中等屏幕时缩小间距
+  @media (max-width: 1200px) {
+    padding: 16px 20px;
+
+    .el-form.el-form--inline .el-form-item {
+      .el-input {
+        width: 140px;
+      }
+      .el-date-editor {
+        max-width: 240px;
       }
     }
   }
@@ -293,11 +317,14 @@ body {
 
     .el-form.el-form--inline .el-form-item {
       width: 100%;
+      flex: 1 1 100%;
 
       .el-input,
       .el-select,
-      .el-date-editor {
-        width: 100%;
+      .el-date-editor,
+      .el-input-number {
+        width: 100% !important;
+        max-width: none;
       }
     }
   }
@@ -309,7 +336,7 @@ body {
   padding: 0;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  overflow: visible;
+  overflow: hidden; // 防止表格溢出容器
 
   .el-table {
     border-radius: 8px 8px 0 0;
@@ -338,6 +365,35 @@ body {
     padding: 16px 20px;
     background: #fff;
     border-top: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}
+
+// 响应式 el-row 布局
+@media (max-width: 1200px) {
+  .el-row {
+    .el-col-6 {
+      flex: 0 0 50%;
+      max-width: 50%;
+    }
+    .el-col-8 {
+      flex: 0 0 50%;
+      max-width: 50%;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .el-row {
+    .el-col-6,
+    .el-col-8,
+    .el-col-12 {
+      flex: 0 0 100%;
+      max-width: 100%;
+    }
   }
 }
 

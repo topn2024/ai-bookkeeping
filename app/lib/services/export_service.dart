@@ -9,7 +9,8 @@ import '../models/account.dart';
 /// 导出格式
 enum ExportFormat {
   csv,
-  // excel, // 需要额外依赖
+  excel,
+  pdf,
 }
 
 /// 导出选项
@@ -21,6 +22,9 @@ class ExportOptions {
   final ExportFormat format;
   final bool includeHeader;
   final String encoding;
+  final bool includeSummary;
+  final bool includeCategorySummary;
+  final bool includeTrendChart;
 
   ExportOptions({
     this.startDate,
@@ -30,6 +34,9 @@ class ExportOptions {
     this.format = ExportFormat.csv,
     this.includeHeader = true,
     this.encoding = 'utf-8',
+    this.includeSummary = true,
+    this.includeCategorySummary = true,
+    this.includeTrendChart = false,
   });
 }
 

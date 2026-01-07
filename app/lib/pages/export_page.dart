@@ -2,11 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+
+import '../l10n/l10n.dart';
 import '../theme/app_theme.dart';
 import '../models/transaction.dart';
 import '../providers/transaction_provider.dart';
 import '../services/export_service.dart';
+import 'pdf_preview_page.dart';
 
+/// 导出账单页面
+/// 原型设计 5.04：导出账单
+/// - 时间范围 Chip 选择（本月、上月、近3月、自定义）
+/// - 交易类型 Chip 选择（全部、支出、收入、转账）
+/// - 导出格式 Chip 选择（CSV、Excel、PDF）
+/// - 包含内容开关（统计摘要、分类汇总、趋势图表）
+/// - 预览卡片（交易数量、文件大小）
+/// - 导出按钮 ≥52dp
 class ExportPage extends ConsumerStatefulWidget {
   const ExportPage({super.key});
 
@@ -17,497 +28,540 @@ class ExportPage extends ConsumerStatefulWidget {
 class _ExportPageState extends ConsumerState<ExportPage> {
   final _exportService = ExportService();
 
-  DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
-  DateTime _endDate = DateTime.now();
+  // 时间范围选项
+  int _selectedTimeRange = 0; // 0=本月, 1=上月, 2=近3月, 3=自定义
+  DateTime _customStartDate = DateTime.now().subtract(const Duration(days: 30));
+  DateTime _customEndDate = DateTime.now();
+
+  // 交易类型
   TransactionType? _typeFilter;
+
+  // 导出格式
   ExportFormat _format = ExportFormat.csv;
+
+  // 包含内容
+  bool _includeSummary = true;
+  bool _includeCategorySummary = true;
+  bool _includeTrendChart = false;
+
   bool _isExporting = false;
   String? _lastExportPath;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final transactions = ref.watch(transactionProvider);
+    final filteredTransactions = _getFilteredTransactions(transactions);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('数据导出'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInfoCard(),
-            const SizedBox(height: 20),
-            _buildDateRangeSection(),
-            const SizedBox(height: 20),
-            _buildFilterSection(),
-            const SizedBox(height: 20),
-            _buildFormatSection(),
-            const SizedBox(height: 20),
-            _buildQuickExportSection(),
-            const SizedBox(height: 32),
-            _buildExportButton(),
-            if (_lastExportPath != null) ...[
-              const SizedBox(height: 16),
-              _buildLastExportInfo(),
-            ],
+            _buildPageHeader(context, theme),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTimeRangeSection(context, theme),
+                    _buildTransactionTypeSection(context, theme),
+                    _buildExportFormatSection(context, theme),
+                    _buildIncludeOptionsSection(context, theme),
+                    _buildPreviewCard(context, theme, filteredTransactions.length),
+                  ],
+                ),
+              ),
+            ),
+            _buildExportButton(context, theme),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoCard() {
-    final transactions = ref.watch(transactionProvider);
-    final expenseCount = transactions.where((t) => t.type == TransactionType.expense).length;
-    final incomeCount = transactions.where((t) => t.type == TransactionType.income).length;
-
+  Widget _buildPageHeader(BuildContext context, ThemeData theme) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              child: const Icon(Icons.arrow_back),
+            ),
+          ),
+          const Expanded(
+            child: Text(
+              '导出账单',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 40),
+        ],
+      ),
+    );
+  }
+
+  /// 时间范围选择
+  Widget _buildTimeRangeSection(BuildContext context, ThemeData theme) {
+    final timeRangeOptions = ['本月', '上月', '近3月', '自定义'];
+
+    return Padding(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha:0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.download,
-              color: Colors.white,
-              size: 28,
+          Text(
+            '时间范围',
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '数据导出',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(timeRangeOptions.length, (index) {
+              final isSelected = _selectedTimeRange == index;
+              return GestureDetector(
+                onTap: () {
+                  if (index == 3) {
+                    _showCustomDatePicker(context);
+                  }
+                  setState(() => _selectedTimeRange = index);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    timeRangeOptions[index],
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      color: isSelected
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '共 ${transactions.length} 条记录 (支出$expenseCount / 收入$incomeCount)',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
+              );
+            }),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDateRangeSection() {
-    return _buildSection(
-      title: '时间范围',
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildDateButton(
-              label: '开始日期',
-              date: _startDate,
-              onTap: () => _selectDate(true),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: Icon(Icons.arrow_forward, color: AppColors.textSecondary),
-          ),
-          Expanded(
-            child: _buildDateButton(
-              label: '结束日期',
-              date: _endDate,
-              onTap: () => _selectDate(false),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDateButton({
-    required String label,
-    required DateTime date,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 4),
+          if (_selectedTimeRange == 3) ...[
+            const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(Icons.calendar_today, size: 16, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Text(
-                  DateFormat('yyyy-MM-dd').format(date),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _selectCustomDate(context, true),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            size: 16,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            DateFormat('yyyy-MM-dd').format(_customStartDate),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Icon(
+                    Icons.arrow_forward,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _selectCustomDate(context, false),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            size: 16,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            DateFormat('yyyy-MM-dd').format(_customEndDate),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterSection() {
-    return _buildSection(
-      title: '类型筛选',
-      child: Wrap(
-        spacing: 12,
-        children: [
-          _buildFilterChip(
-            label: '全部',
-            isSelected: _typeFilter == null,
-            onTap: () => setState(() => _typeFilter = null),
-          ),
-          _buildFilterChip(
-            label: '支出',
-            isSelected: _typeFilter == TransactionType.expense,
-            onTap: () => setState(() => _typeFilter = TransactionType.expense),
-            color: AppColors.expense,
-          ),
-          _buildFilterChip(
-            label: '收入',
-            isSelected: _typeFilter == TransactionType.income,
-            onTap: () => setState(() => _typeFilter = TransactionType.income),
-            color: AppColors.income,
-          ),
-          _buildFilterChip(
-            label: '转账',
-            isSelected: _typeFilter == TransactionType.transfer,
-            onTap: () => setState(() => _typeFilter = TransactionType.transfer),
-            color: AppColors.transfer,
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildFilterChip({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-    Color? color,
-  }) {
-    final chipColor = color ?? AppColors.primary;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? chipColor.withValues(alpha:0.2) : AppColors.background,
-          borderRadius: BorderRadius.circular(20),
-          border: isSelected ? Border.all(color: chipColor, width: 2) : null,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? chipColor : AppColors.textSecondary,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
+  /// 交易类型选择
+  Widget _buildTransactionTypeSection(BuildContext context, ThemeData theme) {
+    final typeOptions = [
+      (null, '全部'),
+      (TransactionType.expense, context.l10n.expense),
+      (TransactionType.income, context.l10n.income),
+      (TransactionType.transfer, context.l10n.transfer),
+    ];
 
-  Widget _buildFormatSection() {
-    return _buildSection(
-      title: '导出格式',
-      child: Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: _buildFormatOption(
-              format: ExportFormat.csv,
-              title: 'CSV',
-              subtitle: '通用表格格式',
-              icon: Icons.table_chart,
+          Text(
+            '交易类型',
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          // 未来可以添加Excel格式
-          // const SizedBox(width: 12),
-          // Expanded(
-          //   child: _buildFormatOption(
-          //     format: ExportFormat.excel,
-          //     title: 'Excel',
-          //     subtitle: '需要安装Excel',
-          //     icon: Icons.grid_on,
-          //   ),
-          // ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: typeOptions.map((option) {
+              final isSelected = _typeFilter == option.$1;
+              return GestureDetector(
+                onTap: () => setState(() => _typeFilter = option.$1),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    option.$2,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      color: isSelected
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildFormatOption({
-    required ExportFormat format,
+  /// 导出格式选择
+  Widget _buildExportFormatSection(BuildContext context, ThemeData theme) {
+    final formatOptions = [
+      (ExportFormat.csv, 'CSV'),
+      (ExportFormat.excel, 'Excel'),
+      (ExportFormat.pdf, 'PDF'),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '导出格式',
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: formatOptions.map((option) {
+              final isSelected = _format == option.$1;
+              return GestureDetector(
+                onTap: () => setState(() => _format = option.$1),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    option.$2,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      color: isSelected
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 包含内容开关
+  Widget _buildIncludeOptionsSection(BuildContext context, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '包含内容',
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildSwitchItem(
+            context,
+            theme,
+            title: '统计摘要',
+            value: _includeSummary,
+            onChanged: (v) => setState(() => _includeSummary = v),
+          ),
+          const SizedBox(height: 8),
+          _buildSwitchItem(
+            context,
+            theme,
+            title: '分类汇总',
+            value: _includeCategorySummary,
+            onChanged: (v) => setState(() => _includeCategorySummary = v),
+          ),
+          const SizedBox(height: 8),
+          _buildSwitchItem(
+            context,
+            theme,
+            title: '趋势图表',
+            value: _includeTrendChart,
+            onChanged: (v) => setState(() => _includeTrendChart = v),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSwitchItem(
+    BuildContext context,
+    ThemeData theme, {
     required String title,
-    required String subtitle,
-    required IconData icon,
+    required bool value,
+    required ValueChanged<bool> onChanged,
   }) {
-    final isSelected = _format == format;
-    return InkWell(
-      onTap: () => setState(() => _format = format),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withValues(alpha:0.1) : AppColors.background,
-          borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: AppColors.primary, width: 2) : null,
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              size: 32,
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-            const Spacer(),
-            if (isSelected)
-              const Icon(Icons.check_circle, color: AppColors.primary),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickExportSection() {
-    return _buildSection(
-      title: '快捷导出',
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildQuickExportButton(
-              label: '本月',
-              onTap: () {
-                final now = DateTime.now();
-                setState(() {
-                  _startDate = DateTime(now.year, now.month, 1);
-                  _endDate = now;
-                });
-              },
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildQuickExportButton(
-              label: '上月',
-              onTap: () {
-                final now = DateTime.now();
-                final lastMonth = DateTime(now.year, now.month - 1, 1);
-                final lastDay = DateTime(now.year, now.month, 0);
-                setState(() {
-                  _startDate = lastMonth;
-                  _endDate = lastDay;
-                });
-              },
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildQuickExportButton(
-              label: '今年',
-              onTap: () {
-                final now = DateTime.now();
-                setState(() {
-                  _startDate = DateTime(now.year, 1, 1);
-                  _endDate = now;
-                });
-              },
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildQuickExportButton(
-              label: '全部',
-              onTap: () {
-                setState(() {
-                  _startDate = DateTime(2020, 1, 1);
-                  _endDate = DateTime.now();
-                });
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickExportButton({
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExportButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isExporting ? null : _export,
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-        ),
-        child: _isExporting
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.download),
-                  SizedBox(width: 8),
-                  Text('导出数据', style: TextStyle(fontSize: 16)),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _buildLastExportInfo() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.income.withValues(alpha:0.1),
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.income.withValues(alpha:0.3)),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Icon(Icons.check_circle, color: AppColors.income),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '导出成功',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.income,
-                  ),
-                ),
-                Text(
-                  _lastExportPath!.split('/').last,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              color: theme.colorScheme.onSurface,
             ),
           ),
-          TextButton.icon(
-            onPressed: _shareExport,
-            icon: const Icon(Icons.share),
-            label: const Text('分享'),
+          Switch(
+            value: value,
+            onChanged: onChanged,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSection({required String title, required Widget child}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+  /// 预览卡片
+  Widget _buildPreviewCard(BuildContext context, ThemeData theme, int transactionCount) {
+    // 估算文件大小（假设每条记录约0.5KB）
+    final estimatedSize = (transactionCount * 0.5).toStringAsFixed(0);
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '预计导出',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Text(
+                '$transactionCount 笔交易',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 12),
-        child,
-      ],
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '文件大小',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Text(
+                '约 $estimatedSize KB',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  Future<void> _selectDate(bool isStart) async {
-    final initialDate = isStart ? _startDate : _endDate;
+  /// 导出按钮
+  Widget _buildExportButton(BuildContext context, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed: _isExporting ? null : _export,
+            icon: _isExporting
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.colorScheme.onPrimary,
+                    ),
+                  )
+                : const Icon(Icons.file_download),
+            label: Text(
+              _isExporting ? '导出中...' : '导出文件',
+              style: const TextStyle(fontSize: 16),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 获取日期范围
+  (DateTime, DateTime) _getDateRange() {
+    final now = DateTime.now();
+    switch (_selectedTimeRange) {
+      case 0: // 本月
+        return (DateTime(now.year, now.month, 1), now);
+      case 1: // 上月
+        final lastMonth = DateTime(now.year, now.month - 1, 1);
+        final lastDay = DateTime(now.year, now.month, 0);
+        return (lastMonth, lastDay);
+      case 2: // 近3月
+        return (DateTime(now.year, now.month - 2, 1), now);
+      case 3: // 自定义
+        return (_customStartDate, _customEndDate);
+      default:
+        return (DateTime(now.year, now.month, 1), now);
+    }
+  }
+
+  /// 获取筛选后的交易
+  List<Transaction> _getFilteredTransactions(List<Transaction> transactions) {
+    final (startDate, endDate) = _getDateRange();
+    return transactions.where((t) {
+      // 日期筛选
+      if (t.date.isBefore(startDate) || t.date.isAfter(endDate.add(const Duration(days: 1)))) {
+        return false;
+      }
+      // 类型筛选
+      if (_typeFilter != null && t.type != _typeFilter) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  void _showCustomDatePicker(BuildContext context) async {
+    await _selectCustomDate(context, true);
+  }
+
+  Future<void> _selectCustomDate(BuildContext context, bool isStart) async {
+    final initialDate = isStart ? _customStartDate : _customEndDate;
     final firstDate = DateTime(2020);
     final lastDate = DateTime.now();
 
@@ -521,14 +575,14 @@ class _ExportPageState extends ConsumerState<ExportPage> {
     if (date != null) {
       setState(() {
         if (isStart) {
-          _startDate = date;
-          if (_startDate.isAfter(_endDate)) {
-            _endDate = _startDate;
+          _customStartDate = date;
+          if (_customStartDate.isAfter(_customEndDate)) {
+            _customEndDate = _customStartDate;
           }
         } else {
-          _endDate = date;
-          if (_endDate.isBefore(_startDate)) {
-            _startDate = _endDate;
+          _customEndDate = date;
+          if (_customEndDate.isBefore(_customStartDate)) {
+            _customStartDate = _customEndDate;
           }
         }
       });
@@ -539,39 +593,97 @@ class _ExportPageState extends ConsumerState<ExportPage> {
     setState(() => _isExporting = true);
 
     final transactions = ref.read(transactionProvider);
+    final filteredTransactions = _getFilteredTransactions(transactions);
+    final (startDate, endDate) = _getDateRange();
+
     final options = ExportOptions(
-      startDate: _startDate,
-      endDate: DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59),
+      startDate: startDate,
+      endDate: DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59),
       typeFilter: _typeFilter,
       format: _format,
+      includeSummary: _includeSummary,
+      includeCategorySummary: _includeCategorySummary,
+      includeTrendChart: _includeTrendChart,
     );
 
-    final result = await _exportService.exportTransactions(transactions, options);
-
-    setState(() {
-      _isExporting = false;
-      if (result.success) {
-        _lastExportPath = result.filePath;
+    try {
+      // PDF 格式跳转预览页面
+      if (_format == ExportFormat.pdf) {
+        setState(() => _isExporting = false);
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PdfPreviewPage(
+                transactions: filteredTransactions,
+                startDate: startDate,
+                endDate: endDate,
+                includeSummary: _includeSummary,
+                includeCategorySummary: _includeCategorySummary,
+              ),
+            ),
+          );
+        }
+        return;
       }
-    });
 
-    if (mounted) {
-      if (result.success) {
+      final result = await _exportService.exportTransactions(filteredTransactions, options);
+
+      setState(() {
+        _isExporting = false;
+        if (result.success) {
+          _lastExportPath = result.filePath;
+        }
+      });
+
+      if (mounted) {
+        if (result.success) {
+          _showExportSuccessDialog(context, result);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('导出失败: ${result.error}'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _isExporting = false);
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('导出成功: ${result.recordCount} 条记录'),
-            backgroundColor: AppColors.income,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('导出失败: ${result.error}'),
-            backgroundColor: AppColors.expense,
+            content: Text('导出失败: $e'),
+            backgroundColor: AppColors.error,
           ),
         );
       }
     }
+  }
+
+  void _showExportSuccessDialog(BuildContext context, ExportResult result) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: Icon(Icons.check_circle, size: 48, color: AppColors.success),
+        title: const Text('导出成功'),
+        content: Text('已导出 ${result.recordCount} 条交易记录'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _shareExport();
+            },
+            icon: const Icon(Icons.share),
+            label: const Text('分享'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _shareExport() async {

@@ -9,6 +9,17 @@ import 'language_settings_page.dart';
 import 'currency_settings_page.dart';
 import 'source_data_settings_page.dart';
 import 'about_page.dart';
+import 'region_settings_page.dart';
+import 'ai_language_settings_page.dart';
+import 'notification_settings_page.dart';
+import 'security_settings_page.dart';
+import 'location_service_settings_page.dart';
+import 'membership_page.dart';
+import 'accessibility_settings_page.dart';
+import 'ai_learning_curve_page.dart';
+import 'home_layout_page.dart';
+import 'data_management_page.dart';
+import 'app_lock_settings_page.dart';
 
 class SystemSettingsPage extends ConsumerWidget {
   const SystemSettingsPage({super.key});
@@ -45,7 +56,12 @@ class SystemSettingsPage extends ConsumerWidget {
                   iconColor: AppColors.transfer,
                   title: '通知设置',
                   subtitle: '管理推送通知',
-                  onTap: () => _showNotificationSettingsDialog(context),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const NotificationSettingsPage()),
+                    );
+                  },
                 ),
                 _buildDivider(),
                 _buildMenuItem(
@@ -53,7 +69,38 @@ class SystemSettingsPage extends ConsumerWidget {
                   iconColor: AppColors.expense,
                   title: '安全设置',
                   subtitle: '密码、指纹等',
-                  onTap: () => _showSecuritySettingsDialog(context),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SecuritySettingsPage()),
+                    );
+                  },
+                ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.lock_outline,
+                  iconColor: const Color(0xFF795548),
+                  title: '应用锁设置',
+                  subtitle: 'PIN码、指纹解锁',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AppLockSettingsPage()),
+                    );
+                  },
+                ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.location_on,
+                  iconColor: const Color(0xFF00BCD4),
+                  title: '位置服务',
+                  subtitle: '位置权限与围栏',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LocationServiceSettingsPage()),
+                    );
+                  },
                 ),
               ],
             ),
@@ -71,6 +118,115 @@ class SystemSettingsPage extends ConsumerWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const SourceDataSettingsPage()),
+                    );
+                  },
+                ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.storage,
+                  iconColor: const Color(0xFF9C27B0),
+                  title: '数据管理',
+                  subtitle: '存储、缓存、清理',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const DataManagementPage()),
+                    );
+                  },
+                ),
+              ],
+            ),
+            _buildSectionHeader('个性化'),
+            _buildSettingsCard(
+              context,
+              ref,
+              children: [
+                _buildMenuItem(
+                  icon: Icons.public,
+                  iconColor: const Color(0xFF009688),
+                  title: '地区设置',
+                  subtitle: '日期、时间、数字格式',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const RegionSettingsPage()),
+                    );
+                  },
+                ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.dashboard_customize,
+                  iconColor: const Color(0xFFFF5722),
+                  title: '首页布局',
+                  subtitle: '自定义首页卡片',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HomeLayoutPage()),
+                    );
+                  },
+                ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.accessibility,
+                  iconColor: const Color(0xFF3F51B5),
+                  title: '无障碍设置',
+                  subtitle: '字体、对比度、朗读',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AccessibilitySettingsPage()),
+                    );
+                  },
+                ),
+              ],
+            ),
+            _buildSectionHeader('AI智能'),
+            _buildSettingsCard(
+              context,
+              ref,
+              children: [
+                _buildMenuItem(
+                  icon: Icons.translate,
+                  iconColor: const Color(0xFFE91E63),
+                  title: 'AI语言设置',
+                  subtitle: 'AI回复语言偏好',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AILanguageSettingsPage()),
+                    );
+                  },
+                ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.trending_up,
+                  iconColor: const Color(0xFF6495ED),
+                  title: 'AI学习成长',
+                  subtitle: '查看AI准确率提升',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AILearningCurvePage()),
+                    );
+                  },
+                ),
+              ],
+            ),
+            _buildSectionHeader('会员与服务'),
+            _buildSettingsCard(
+              context,
+              ref,
+              children: [
+                _buildMenuItem(
+                  icon: Icons.card_membership,
+                  iconColor: const Color(0xFFFFD700),
+                  title: '会员中心',
+                  subtitle: '管理订阅和权益',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MembershipPage()),
                     );
                   },
                 ),
@@ -341,53 +497,4 @@ class SystemSettingsPage extends ConsumerWidget {
     );
   }
 
-  void _showNotificationSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('通知设置'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('管理应用通知提醒。'),
-            SizedBox(height: 16),
-            Text('此功能即将上线，敬请期待！',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSecuritySettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('安全设置'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('设置应用锁、指纹解锁等安全选项。'),
-            SizedBox(height: 16),
-            Text('此功能即将上线，敬请期待！',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-  }
 }

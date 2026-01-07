@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI智能记账 - 界面预览</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 16px;
+            opacity: 0.8;
+        }
+        .screens-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .screen-section {
+            margin-bottom: 40px;
+        }
+        .section-title {
+            color: white;
+            font-size: 24px;
+            margin-bottom: 20px;
+            padding-left: 10px;
+            border-left: 4px solid #FFD700;
+        }
+        .screen-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 30px;
+        }
+        .screen-card {
+            background: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+        }
+        .screen-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .screen-card img,
+        .screen-card object {
+            width: 100%;
+            height: auto;
+            border-radius: 12px;
+            display: block;
+        }
+        .screen-card h3 {
+            color: #333;
+            font-size: 14px;
+            margin-top: 12px;
+            text-align: center;
+        }
+        .screen-card p {
+            color: #999;
+            font-size: 12px;
+            text-align: center;
+            margin-top: 5px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            max-height: 90vh;
+            max-width: 90vw;
+        }
+        .modal-close {
+            position: fixed;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+        }
+        .tech-stack {
+            background: rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 30px;
+            margin-top: 40px;
+            color: white;
+        }
+        .tech-stack h2 {
+            margin-bottom: 20px;
+        }
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .tech-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .tech-item h4 {
+            margin-bottom: 8px;
+        }
+        .tech-item p {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 AI智能记账</h1>
+        <p>让记账更简单、更智能 - 界面设计预览</p>
+    </div>
+
+    <div class="screens-container">
+        <!-- 入口流程 -->
+        <div class="screen-section">
+            <h2 class="section-title">入口流程</h2>
+            <div class="screen-grid">
+                <div class="screen-card" onclick="openModal('01_splash.svg')">
+                    <object type="image/svg+xml" data="01_splash.svg"></object>
+                    <h3>启动页</h3>
+                    <p>品牌展示与加载</p>
+                </div>
+                <div class="screen-card" onclick="openModal('02_login.svg')">
+                    <object type="image/svg+xml" data="02_login.svg"></object>
+                    <h3>登录页</h3>
+                    <p>账号密码 / 第三方登录</p>
+                </div>
+                <div class="screen-card" onclick="openModal('03_register.svg')">
+                    <object type="image/svg+xml" data="03_register.svg"></object>
+                    <h3>注册页</h3>
+                    <p>新用户注册流程</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 核心功能 -->
+        <div class="screen-section">
+            <h2 class="section-title">核心记账</h2>
+            <div class="screen-grid">
+                <div class="screen-card" onclick="openModal('04_home.svg')">
+                    <object type="image/svg+xml" data="04_home.svg"></object>
+                    <h3>首页</h3>
+                    <p>账单列表与快捷操作</p>
+                </div>
+                <div class="screen-card" onclick="openModal('05_add_transaction.svg')">
+                    <object type="image/svg+xml" data="05_add_transaction.svg"></object>
+                    <h3>手动记账</h3>
+                    <p>传统记账方式</p>
+                </div>
+                <div class="screen-card" onclick="openModal('06_camera_ocr.svg')">
+                    <object type="image/svg+xml" data="06_camera_ocr.svg"></object>
+                    <h3>拍照记账</h3>
+                    <p>OCR智能识别</p>
+                </div>
+                <div class="screen-card" onclick="openModal('13_voice_input.svg')">
+                    <object type="image/svg+xml" data="13_voice_input.svg"></object>
+                    <h3>语音记账</h3>
+                    <p>AI语音识别</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据分析 -->
+        <div class="screen-section">
+            <h2 class="section-title">数据与分析</h2>
+            <div class="screen-grid">
+                <div class="screen-card" onclick="openModal('07_statistics.svg')">
+                    <object type="image/svg+xml" data="07_statistics.svg"></object>
+                    <h3>统计报表</h3>
+                    <p>收支趋势与分类</p>
+                </div>
+                <div class="screen-card" onclick="openModal('08_accounts.svg')">
+                    <object type="image/svg+xml" data="08_accounts.svg"></object>
+                    <h3>账户管理</h3>
+                    <p>银行卡与电子钱包</p>
+                </div>
+                <div class="screen-card" onclick="openModal('09_budget.svg')">
+                    <object type="image/svg+xml" data="09_budget.svg"></object>
+                    <h3>预算管理</h3>
+                    <p>分类预算与目标</p>
+                </div>
+                <div class="screen-card" onclick="openModal('14_ai_insights.svg')">
+                    <object type="image/svg+xml" data="14_ai_insights.svg"></object>
+                    <h3>AI智能分析</h3>
+                    <p>消费洞察与建议</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 个人中心 -->
+        <div class="screen-section">
+            <h2 class="section-title">个人中心</h2>
+            <div class="screen-grid">
+                <div class="screen-card" onclick="openModal('10_profile.svg')">
+                    <object type="image/svg+xml" data="10_profile.svg"></object>
+                    <h3>我的</h3>
+                    <p>个人中心入口</p>
+                </div>
+                <div class="screen-card" onclick="openModal('11_settings.svg')">
+                    <object type="image/svg+xml" data="11_settings.svg"></object>
+                    <h3>设置</h3>
+                    <p>应用配置</p>
+                </div>
+                <div class="screen-card" onclick="openModal('12_membership.svg')">
+                    <object type="image/svg+xml" data="12_membership.svg"></object>
+                    <h3>会员中心</h3>
+                    <p>订阅与权益</p>
+                </div>
+                <div class="screen-card" onclick="openModal('15_theme_selection.svg')">
+                    <object type="image/svg+xml" data="15_theme_selection.svg"></object>
+                    <h3>主题风格</h3>
+                    <p>个性化皮肤</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 技术栈 -->
+        <div class="tech-stack">
+            <h2>📱 技术架构</h2>
+            <div class="tech-grid">
+                <div class="tech-item">
+                    <h4>📱 移动端</h4>
+                    <p>Flutter 3.x + Riverpod</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🖥️ 后端服务</h4>
+                    <p>Python FastAPI</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🗄️ 数据库</h4>
+                    <p>PostgreSQL + Redis</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🤖 AI能力</h4>
+                    <p>PaddleOCR + Whisper + Claude</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal" id="imageModal" onclick="closeModal()">
+        <span class="modal-close">&times;</span>
+        <object class="modal-content" id="modalImage" type="image/svg+xml"></object>
+    </div>
+
+    <script>
+        function openModal(src) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.classList.add('active');
+            modalImg.data = src;
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('imageModal');
+            modal.classList.remove('active');
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

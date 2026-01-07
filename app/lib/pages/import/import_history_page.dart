@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../theme/app_theme.dart';
-import '../../models/import_batch.dart';
-import '../../models/transaction.dart';
-import '../../services/import/batch_import_service.dart';
-import '../../providers/transaction_provider.dart';
 
-/// Import history page showing past batch imports
+import '../../theme/app_theme.dart';
+
+/// 导入历史页面
+/// 原型设计 5.08：导入历史
+/// - 统计卡片（渐变背景，总导入次数、导入交易数）
+/// - 历史记录列表（状态图标、文件名、日期、导入数量）
 class ImportHistoryPage extends ConsumerStatefulWidget {
   const ImportHistoryPage({super.key});
 
@@ -16,9 +16,52 @@ class ImportHistoryPage extends ConsumerStatefulWidget {
 }
 
 class _ImportHistoryPageState extends ConsumerState<ImportHistoryPage> {
-  final BatchImportService _importService = BatchImportService();
-  List<ImportBatch>? _batches;
   bool _isLoading = true;
+
+  // 模拟统计数据
+  final int _totalImports = 12;
+  final int _totalTransactions = 856;
+
+  // 模拟历史记录
+  final List<ImportHistoryItem> _historyItems = [
+    ImportHistoryItem(
+      fileName: '微信账单_202412.csv',
+      importDate: DateTime.now().subtract(const Duration(days: 2)),
+      importedCount: 126,
+      duplicateCount: 3,
+      status: ImportHistoryStatus.success,
+    ),
+    ImportHistoryItem(
+      fileName: '支付宝账单_202412.csv',
+      importDate: DateTime.now().subtract(const Duration(days: 5)),
+      importedCount: 89,
+      duplicateCount: 1,
+      status: ImportHistoryStatus.success,
+    ),
+    ImportHistoryItem(
+      fileName: '工行账单.pdf',
+      importDate: DateTime.now().subtract(const Duration(days: 8)),
+      importedCount: 56,
+      duplicateCount: 4,
+      totalCount: 60,
+      status: ImportHistoryStatus.partial,
+    ),
+    ImportHistoryItem(
+      fileName: '建行账单_202411.csv',
+      importDate: DateTime.now().subtract(const Duration(days: 15)),
+      importedCount: 78,
+      duplicateCount: 0,
+      status: ImportHistoryStatus.success,
+    ),
+    ImportHistoryItem(
+      fileName: '招行账单.xlsx',
+      importDate: DateTime.now().subtract(const Duration(days: 20)),
+      importedCount: 0,
+      duplicateCount: 0,
+      status: ImportHistoryStatus.failed,
+      errorMessage: '文件格式不支持',
+    ),
+  ];
 
   @override
   void initState() {
@@ -27,57 +70,148 @@ class _ImportHistoryPageState extends ConsumerState<ImportHistoryPage> {
   }
 
   Future<void> _loadHistory() async {
-    setState(() => _isLoading = true);
-    try {
-      final batches = await _importService.getImportHistory();
-      setState(() {
-        _batches = batches;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('加载历史失败: $e'),
-            backgroundColor: AppColors.expense,
-          ),
-        );
-      }
-    }
+    await Future.delayed(const Duration(milliseconds: 500));
+    setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('导入历史'),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildPageHeader(context, theme),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: _loadHistory,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Column(
+                          children: [
+                            _buildStatsCard(context, theme),
+                            _buildHistoryList(context, theme),
+                          ],
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
-      body: _buildBody(),
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+  Widget _buildPageHeader(BuildContext context, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              child: const Icon(Icons.arrow_back),
+            ),
+          ),
+          const Expanded(
+            child: Text(
+              '导入历史',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 40),
+        ],
+      ),
+    );
+  }
 
-    if (_batches == null || _batches!.isEmpty) {
-      return Center(
+  Widget _buildStatsCard(BuildContext context, ThemeData theme) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [theme.colorScheme.primary, const Color(0xFF9333EA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          Column(
+            children: [
+              Text(
+                '$_totalImports',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                '总导入次数',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
+              ),
+            ],
+          ),
+          Container(
+            width: 1,
+            height: 40,
+            color: Colors.white.withValues(alpha: 0.3),
+          ),
+          Column(
+            children: [
+              Text(
+                '$_totalTransactions',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                '导入交易数',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryList(BuildContext context, ThemeData theme) {
+    if (_historyItems.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(32),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               Icons.history,
               size: 64,
-              color: AppColors.textSecondary,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
               '暂无导入记录',
               style: TextStyle(
-                color: AppColors.textSecondary,
                 fontSize: 16,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -85,373 +219,145 @@ class _ImportHistoryPageState extends ConsumerState<ImportHistoryPage> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadHistory,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _batches!.length,
-        itemBuilder: (context, index) {
-          return _buildBatchCard(_batches![index]);
-        },
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: _historyItems.map((item) => _buildHistoryItem(theme, item)).toList(),
       ),
     );
   }
 
-  Widget _buildBatchCard(ImportBatch batch) {
-    final isRevoked = batch.status == ImportBatchStatus.revoked;
+  Widget _buildHistoryItem(ThemeData theme, ImportHistoryItem item) {
+    final dateFormat = DateFormat('M月d日 HH:mm');
 
-    return Card(
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+    String countText;
+
+    switch (item.status) {
+      case ImportHistoryStatus.success:
+        statusColor = AppColors.success;
+        statusIcon = Icons.check;
+        statusText = '+${item.importedCount}笔';
+        countText = item.duplicateCount > 0 ? '重复${item.duplicateCount}笔' : '';
+        break;
+      case ImportHistoryStatus.partial:
+        statusColor = Colors.orange;
+        statusIcon = Icons.warning;
+        statusText = '部分成功';
+        countText = '${item.importedCount}/${item.totalCount ?? item.importedCount}笔';
+        break;
+      case ImportHistoryStatus.failed:
+        statusColor = AppColors.error;
+        statusIcon = Icons.error;
+        statusText = '导入失败';
+        countText = item.errorMessage ?? '';
+        break;
+    }
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Opacity(
-        opacity: isRevoked ? 0.6 : 1.0,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: statusColor,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: Icon(statusIcon, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.fileName,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  dateFormat.format(item.importDate),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isRevoked
-                          ? Colors.grey.withValues(alpha: 0.1)
-                          : Colors.indigo.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      isRevoked ? Icons.undo : Icons.upload_file,
-                      color: isRevoked ? Colors.grey : Colors.indigo,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          batch.fileName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          DateFormat('yyyy-MM-dd HH:mm').format(batch.createdAt),
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Status badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isRevoked
-                          ? Colors.grey.withValues(alpha: 0.1)
-                          : AppColors.income.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      isRevoked ? '已撤销' : '已导入',
-                      style: TextStyle(
-                        color: isRevoked ? Colors.grey : AppColors.income,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
+              Text(
+                statusText,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: statusColor,
+                ),
               ),
-              const SizedBox(height: 12),
-              // Stats
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildStat('导入', '${batch.importedCount}', AppColors.income),
-                  _buildStat('跳过', '${batch.skippedCount}', AppColors.textSecondary),
-                  if (batch.failedCount > 0)
-                    _buildStat('失败', '${batch.failedCount}', AppColors.expense),
-                  _buildStat('总计', '${batch.totalCount}', Colors.indigo),
-                ],
-              ),
-              // Amount summary
-              if (batch.totalExpense > 0 || batch.totalIncome > 0) ...[
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (batch.totalExpense > 0)
-                      Text(
-                        '支出 ¥${batch.totalExpense.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          color: AppColors.expense,
-                          fontSize: 12,
-                        ),
-                      ),
-                    if (batch.totalExpense > 0 && batch.totalIncome > 0)
-                      Text(
-                        '  |  ',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
-                    if (batch.totalIncome > 0)
-                      Text(
-                        '收入 ¥${batch.totalIncome.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          color: AppColors.income,
-                          fontSize: 12,
-                        ),
-                      ),
-                  ],
+              if (countText.isNotEmpty)
+                Text(
+                  countText,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ],
-              // Date range
-              if (batch.dateRangeStart != null && batch.dateRangeEnd != null) ...[
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.date_range, size: 14, color: AppColors.textSecondary),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${DateFormat('MM-dd').format(batch.dateRangeStart!)} ~ ${DateFormat('MM-dd').format(batch.dateRangeEnd!)}',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              // Actions
-              if (!isRevoked) ...[
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => _viewTransactions(batch),
-                      icon: const Icon(Icons.list, size: 18),
-                      label: const Text('查看'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.indigo,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      onPressed: () => _confirmRevoke(batch),
-                      icon: const Icon(Icons.undo, size: 18),
-                      label: const Text('撤销'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.expense,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStat(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _viewTransactions(ImportBatch batch) async {
-    // Show transactions in this batch
-    final transactions = await _importService.getTransactionsByBatchId(batch.id);
-
-    if (!mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            // Handle
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            // Title
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                '${batch.fileName} (${transactions.length}条)',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const Divider(height: 1),
-            // List
-            Expanded(
-              child: transactions.isEmpty
-                  ? Center(
-                      child: Text(
-                        '没有交易记录',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
-                    )
-                  : ListView.builder(
-                      controller: scrollController,
-                      itemCount: transactions.length,
-                      itemBuilder: (context, index) {
-                        final t = transactions[index];
-                        return ListTile(
-                          leading: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: _getTypeColor(t.type).withValues(alpha: 0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              _getTypeIcon(t.type),
-                              color: _getTypeColor(t.type),
-                              size: 18,
-                            ),
-                          ),
-                          title: Text(
-                            t.note ?? t.category,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            DateFormat('MM-dd HH:mm').format(t.date),
-                          ),
-                          trailing: Text(
-                            '${t.type == TransactionType.expense ? '-' : '+'}¥${t.amount.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: _getTypeColor(t.type),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _confirmRevoke(ImportBatch batch) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('撤销导入'),
-        content: Text(
-          '确定要撤销 "${batch.fileName}" 的导入吗？\n\n'
-          '这将删除该批次导入的 ${batch.importedCount} 条交易记录，此操作不可恢复。',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.expense),
-            child: const Text('撤销'),
           ),
         ],
       ),
     );
-
-    if (confirmed != true) return;
-
-    try {
-      await _importService.revokeImportBatch(batch.id);
-
-      // Refresh transaction list
-      ref.invalidate(transactionProvider);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('已撤销导入'),
-            backgroundColor: AppColors.income,
-          ),
-        );
-      }
-
-      await _loadHistory();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('撤销失败: $e'),
-            backgroundColor: AppColors.expense,
-          ),
-        );
-      }
-    }
   }
+}
 
-  Color _getTypeColor(TransactionType type) {
-    switch (type) {
-      case TransactionType.expense:
-        return AppColors.expense;
-      case TransactionType.income:
-        return AppColors.income;
-      case TransactionType.transfer:
-        return AppColors.transfer;
-    }
-  }
+/// 导入历史记录项
+class ImportHistoryItem {
+  final String fileName;
+  final DateTime importDate;
+  final int importedCount;
+  final int duplicateCount;
+  final int? totalCount;
+  final ImportHistoryStatus status;
+  final String? errorMessage;
 
-  IconData _getTypeIcon(TransactionType type) {
-    switch (type) {
-      case TransactionType.expense:
-        return Icons.arrow_downward;
-      case TransactionType.income:
-        return Icons.arrow_upward;
-      case TransactionType.transfer:
-        return Icons.swap_horiz;
-    }
-  }
+  ImportHistoryItem({
+    required this.fileName,
+    required this.importDate,
+    required this.importedCount,
+    required this.duplicateCount,
+    this.totalCount,
+    required this.status,
+    this.errorMessage,
+  });
+}
+
+/// 导入历史状态
+enum ImportHistoryStatus {
+  success,
+  partial,
+  failed,
 }

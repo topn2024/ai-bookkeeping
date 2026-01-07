@@ -63,6 +63,10 @@
   "@home": {
     "description": "Bottom navigation - Home"
   },
+  "trends": "Trends",
+  "@trends": {
+    "description": "Bottom navigation - Trends"
+  },
   "statistics": "Statistics",
   "@statistics": {
     "description": "Bottom navigation - Statistics"
@@ -733,7 +737,7 @@
   "traditionalBudget": "Traditional",
   "traditionalBudgetHint": "Set fixed budget amount",
   "zeroBudget": "Zero-based",
-  "zeroBudgetHint": "YNAB-style, allocate every dollar",
+  "zeroBudgetHint": "Allocate every dollar a job",
   "moneyAge": "Money Age",
   "moneyAgeDays": "{days} days",
   "@moneyAgeDays": {
@@ -742,7 +746,7 @@
     }
   },
   "whatIsMoneyAge": "What is Money Age?",
-  "moneyAgeDescription": "Money Age (Age of Money) is a key metric in the YNAB budgeting method. It shows how many days ago the money you're spending today was earned.",
+  "moneyAgeDescription": "Money Age is a key metric in zero-based budgeting. It shows how many days ago the money you're spending today was earned.",
   "excellent": "Excellent",
   "good": "Good",
   "fair": "Fair",
@@ -795,5 +799,95 @@
       "amount": {"type": "String"}
     }
   },
-  "budgetName": "Budget Name"
+  "budgetName": "Budget Name",
+
+  "myAccounts": "My Accounts",
+  "liabilities": "Liabilities",
+  "creditLimit": "Limit",
+  "repaymentDay": "Due",
+  "dayUnit": "th",
+  "transactionRecord": "Transactions",
+  "transactionDetail": "Transaction Details",
+  "merchant": "Merchant",
+  "moneyAgeInfo": "Money Age Info",
+  "moneyAgeUsedPrefix": "This expense used income from",
+  "moneyAgeUsedSuffix": "",
+  "daysAgo": "{days} days ago",
+  "@daysAgo": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "undoDelete": "Undo Delete",
+  "undo": "Undo",
+  "deletedTransaction": "Deleted \"{name} ¥{amount}\"",
+  "@deletedTransaction": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "amount": {"type": "String"}
+    }
+  },
+  "linkVault": "Link to Vault",
+  "noLink": "No Link",
+  "tags": "Tags",
+  "addTag": "Add Tag",
+  "saveTransaction": "Save Transaction",
+  "debtManagement": "Debt Management",
+  "totalDebt": "Total Debt",
+  "dueThisMonth": "Due This Month",
+  "debtPaidPercent": "{percent}% Paid",
+  "@debtPaidPercent": {
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+  "estimatedPayoffMonths": "Est. {months} months to pay off",
+  "@estimatedPayoffMonths": {
+    "placeholders": {
+      "months": {"type": "int"}
+    }
+  },
+  "debtDetails": "Debt Details",
+  "repaymentDayIn": "Due {day}th · {daysLeft}",
+  "@repaymentDayIn": {
+    "placeholders": {
+      "day": {"type": "int"},
+      "daysLeft": {"type": "String"}
+    }
+  },
+  "daysLater": "{days} days",
+  "@daysLater": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "currentBill": "Current Bill",
+  "installmentInProgress": "In Progress",
+  "installmentRemaining": "{count} payments left",
+  "@installmentRemaining": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "remainingPrincipal": "Remaining Principal",
+  "repaymentSuggestion": "Repayment Suggestion",
+  "prioritizeHighInterest": "Prioritize high-interest debt",
+  "consumerLoan": "Consumer Loan",
+
+  "smartAdvice": "Smart Advice",
+  "todayAdvice": "Today's Advice",
+  "manageAdvicePreference": "Manage Advice Preferences",
+  "financialFreedomSimulator": "Financial Freedom Simulator",
+  "yourFinancialFreedomJourney": "Your Financial Freedom Journey",
+  "estimatedTime": "At current savings rate, estimated ",
+  "toAchieveFreedom": " to achieve financial freedom",
+  "accelerateTip": "Acceleration Tip",
+  "adjustParameters": "Adjust parameters to see the effect",
+  "monthlySavings": "Monthly Savings",
+  "annualReturn": "Annual Return",
+  "targetPassiveIncome": "Target Passive Income",
+  "disclaimer": "For reference only, not financial advice",
+  "smartRecommendation": "Smart Recommendation",
+  "discoverNewFeature": "Discover New Feature",
+  "laterRemind": "Maybe Later"
 }

@@ -30,6 +30,9 @@ const Reports = () => import('@/views/statistics/Reports.vue')
 const SystemHealth = () => import('@/views/monitor/Health.vue')
 const SystemResources = () => import('@/views/monitor/Resources.vue')
 const AlertRules = () => import('@/views/monitor/Alerts.vue')
+const SystemLogs = () => import('@/views/monitor/SystemLogs.vue')
+const AIService = () => import('@/views/monitor/AIService.vue')
+const Diagnostics = () => import('@/views/monitor/Diagnostics.vue')
 
 // Settings
 const SystemSettings = () => import('@/views/settings/System.vue')
@@ -133,6 +136,24 @@ const routes: RouteRecordRaw[] = [
         name: 'AlertRules',
         component: AlertRules,
         meta: { title: '告警管理', icon: 'Bell', permission: 'monitor:alert' },
+      },
+      {
+        path: 'monitor/logs',
+        name: 'SystemLogs',
+        component: SystemLogs,
+        meta: { title: '系统日志', icon: 'Document', permission: 'monitor:view' },
+      },
+      {
+        path: 'monitor/ai-service',
+        name: 'AIService',
+        component: AIService,
+        meta: { title: 'AI服务监控', icon: 'MagicStick', permission: 'monitor:view' },
+      },
+      {
+        path: 'monitor/diagnostics',
+        name: 'Diagnostics',
+        component: Diagnostics,
+        meta: { title: '诊断报告', icon: 'FirstAidKit', permission: 'monitor:view' },
       },
       // Settings
       {

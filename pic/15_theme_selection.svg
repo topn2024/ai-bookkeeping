@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="375" height="812" viewBox="0 0 375 812" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="headerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="mintGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#11998e" />
+      <stop offset="100%" style="stop-color:#38ef7d" />
+    </linearGradient>
+    <linearGradient id="orangeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F2994A" />
+      <stop offset="100%" style="stop-color:#F2C94C" />
+    </linearGradient>
+    <linearGradient id="pinkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FDA7DF" />
+      <stop offset="100%" style="stop-color:#D980FA" />
+    </linearGradient>
+    <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8E2DE2" />
+      <stop offset="100%" style="stop-color:#4A00E0" />
+    </linearGradient>
+    <linearGradient id="oceanGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2193b0" />
+      <stop offset="100%" style="stop-color:#6dd5ed" />
+    </linearGradient>
+    <linearGradient id="redGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#C41E3A" />
+      <stop offset="100%" style="stop-color:#FF6B6B" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="375" height="812" rx="40" fill="#F5F7FA"/>
+
+  <!-- Header -->
+  <rect x="0" y="0" width="375" height="100" fill="url(#headerGradient)"/>
+  <text x="30" y="50" fill="white" font-family="Arial" font-size="14">9:41</text>
+  <text x="20" y="80" fill="white" font-family="Arial" font-size="24">←</text>
+  <text x="187.5" y="80" fill="white" font-family="Arial" font-size="18" font-weight="bold" text-anchor="middle">主题风格</text>
+
+  <!-- Free Themes Section -->
+  <text x="30" y="135" fill="#333" font-family="Arial" font-size="14" font-weight="500">免费主题</text>
+
+  <!-- Theme Grid - Free -->
+  <g transform="translate(20, 150)">
+    <!-- Default Blue - Selected -->
+    <rect x="0" y="0" width="160" height="100" rx="12" fill="url(#headerGradient)"/>
+    <text x="80" y="55" fill="white" font-family="Arial" font-size="14" text-anchor="middle">默认蓝</text>
+    <circle cx="140" cy="20" r="12" fill="white"/>
+    <text x="140" y="25" fill="#667eea" font-family="Arial" font-size="14" text-anchor="middle">✓</text>
+
+    <!-- Mint Green -->
+    <rect x="175" y="0" width="160" height="100" rx="12" fill="url(#mintGradient)"/>
+    <text x="255" y="55" fill="white" font-family="Arial" font-size="14" text-anchor="middle">薄荷绿</text>
+  </g>
+
+  <g transform="translate(20, 265)">
+    <!-- Warm Orange -->
+    <rect x="0" y="0" width="160" height="100" rx="12" fill="url(#orangeGradient)"/>
+    <text x="80" y="55" fill="white" font-family="Arial" font-size="14" text-anchor="middle">暖橙色</text>
+
+    <!-- Classic Mono -->
+    <rect x="175" y="0" width="160" height="100" rx="12" fill="#333"/>
+    <text x="255" y="55" fill="white" font-family="Arial" font-size="14" text-anchor="middle">经典黑</text>
+  </g>
+
+  <!-- Premium Themes Section -->
+  <g transform="translate(30, 395)">
+    <text x="0" y="0" fill="#333" font-family="Arial" font-size="14" font-weight="500">会员专属</text>
+    <rect x="80" y="-15" width="45" height="20" rx="10" fill="#FFD700"/>
+    <text x="102.5" y="-1" fill="#333" font-family="Arial" font-size="10" text-anchor="middle">VIP</text>
+  </g>
+
+  <!-- Theme Grid - Premium -->
+  <g transform="translate(20, 410)">
+    <!-- Sakura Pink -->
+    <rect x="0" y="0" width="105" height="90" rx="12" fill="url(#pinkGradient)"/>
+    <text x="52.5" y="50" fill="white" font-family="Arial" font-size="12" text-anchor="middle">樱花粉</text>
+    <text x="85" y="20" fill="white" font-family="Arial" font-size="12">🔒</text>
+
+    <!-- Royal Purple -->
+    <rect x="115" y="0" width="105" height="90" rx="12" fill="url(#purpleGradient)"/>
+    <text x="167.5" y="50" fill="white" font-family="Arial" font-size="12" text-anchor="middle">皇家紫</text>
+    <text x="200" y="20" fill="white" font-family="Arial" font-size="12">🔒</text>
+
+    <!-- Ocean Blue -->
+    <rect x="230" y="0" width="105" height="90" rx="12" fill="url(#oceanGradient)"/>
+    <text x="282.5" y="50" fill="white" font-family="Arial" font-size="12" text-anchor="middle">海洋蓝</text>
+    <text x="315" y="20" fill="white" font-family="Arial" font-size="12">🔒</text>
+  </g>
+
+  <g transform="translate(20, 515)">
+    <!-- Forest Green -->
+    <rect x="0" y="0" width="105" height="90" rx="12" fill="#228B22"/>
+    <text x="52.5" y="50" fill="white" font-family="Arial" font-size="12" text-anchor="middle">森林绿</text>
+    <text x="85" y="20" fill="white" font-family="Arial" font-size="12">🔒</text>
+
+    <!-- China Red -->
+    <rect x="115" y="0" width="105" height="90" rx="12" fill="url(#redGradient)"/>
+    <text x="167.5" y="50" fill="white" font-family="Arial" font-size="12" text-anchor="middle">中国红</text>
+    <text x="200" y="20" fill="white" font-family="Arial" font-size="12">🔒</text>
+
+    <!-- Galaxy Purple -->
+    <rect x="230" y="0" width="105" height="90" rx="12" fill="#1a1a2e"/>
+    <text x="282.5" y="50" fill="#9D50BB" font-family="Arial" font-size="12" text-anchor="middle">星空紫</text>
+    <text x="315" y="20" fill="white" font-family="Arial" font-size="12">🔒</text>
+  </g>
+
+  <!-- Dark Mode Toggle -->
+  <rect x="20" y="625" width="335" height="60" rx="12" fill="white"/>
+  <text x="50" y="660" fill="#333" font-family="Arial" font-size="24">🌙</text>
+  <text x="85" y="660" fill="#333" font-family="Arial" font-size="14">深色模式</text>
+  <rect x="280" y="643" width="50" height="28" rx="14" fill="#E0E0E0"/>
+  <circle cx="295" cy="657" r="12" fill="white"/>
+
+  <!-- Unlock Button -->
+  <rect x="20" y="705" width="335" height="50" rx="25" fill="url(#headerGradient)"/>
+  <text x="187.5" y="737" fill="white" font-family="Arial" font-size="16" text-anchor="middle">👑 解锁全部主题</text>
+
+  <!-- Preview hint -->
+  <text x="187.5" y="780" fill="#999" font-family="Arial" font-size="12" text-anchor="middle">点击主题可预览效果</text>
+</svg>

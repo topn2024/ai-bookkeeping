@@ -1,4 +1,5 @@
 import 'transaction_split.dart';
+import 'transaction_location.dart';
 
 enum TransactionType {
   expense,
@@ -63,6 +64,15 @@ class Transaction {
   final String? importBatchId;        // 导入批次ID(用于批量回滚)
   final String? rawMerchant;          // 原始商户名(用于AI分类学习)
 
+  // === 2.0新增：小金库关联 ===
+  final String? vaultId;              // 关联的小金库ID（零基预算系统）
+
+  // === 2.0新增：位置信息 ===
+  final TransactionLocation? location; // 交易发生位置信息
+
+  // === 2.0新增：钱龄相关 ===
+  final int? moneyAge;                // 该笔消费的钱龄（天数，仅支出有值）
+
   Transaction({
     required this.id,
     required this.type,
@@ -93,6 +103,9 @@ class Transaction {
     this.externalSource,
     this.importBatchId,
     this.rawMerchant,
+    this.vaultId,
+    this.location,
+    this.moneyAge,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
@@ -135,6 +148,9 @@ class Transaction {
     ExternalSource? externalSource,
     String? importBatchId,
     String? rawMerchant,
+    String? vaultId,
+    TransactionLocation? location,
+    int? moneyAge,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -166,6 +182,9 @@ class Transaction {
       externalSource: externalSource ?? this.externalSource,
       importBatchId: importBatchId ?? this.importBatchId,
       rawMerchant: rawMerchant ?? this.rawMerchant,
+      vaultId: vaultId ?? this.vaultId,
+      location: location ?? this.location,
+      moneyAge: moneyAge ?? this.moneyAge,
     );
   }
 
@@ -199,6 +218,13 @@ class Transaction {
       'externalSource': externalSource?.index,
       'importBatchId': importBatchId,
       'rawMerchant': rawMerchant,
+      'vaultId': vaultId,
+      'latitude': location?.latitude,
+      'longitude': location?.longitude,
+      'placeName': location?.placeName,
+      'address': location?.address,
+      'locationType': location?.locationType?.index,
+      'moneyAge': moneyAge,
     };
   }
 
@@ -243,6 +269,19 @@ class Transaction {
           : null,
       importBatchId: map['importBatchId'],
       rawMerchant: map['rawMerchant'],
+      vaultId: map['vaultId'],
+      location: map['latitude'] != null && map['longitude'] != null
+          ? TransactionLocation(
+              latitude: (map['latitude'] as num).toDouble(),
+              longitude: (map['longitude'] as num).toDouble(),
+              placeName: map['placeName'],
+              address: map['address'],
+              locationType: map['locationType'] != null
+                  ? LocationType.values[map['locationType'] as int]
+                  : null,
+            )
+          : null,
+      moneyAge: map['moneyAge'] as int?,
     );
   }
 
@@ -295,4 +334,24 @@ class Transaction {
         return '通用导入';
     }
   }
+
+  // === 2.0新增辅助方法 ===
+
+  /// 是否关联了小金库
+  bool get hasVault => vaultId != null;
+
+  /// 是否有位置信息
+  bool get hasLocation => location != null;
+
+  /// 是否有钱龄信息
+  bool get hasMoneyAge => moneyAge != null;
+
+  /// 是否为支出类型
+  bool get isExpense => type == TransactionType.expense;
+
+  /// 是否为收入类型
+  bool get isIncome => type == TransactionType.income;
+
+  /// 是否为转账类型
+  bool get isTransfer => type == TransactionType.transfer;
 }

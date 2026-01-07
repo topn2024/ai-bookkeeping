@@ -521,5 +521,141 @@
   "materialDesign3": "Material 3",
   "useMaterialDesign3": "Material Design 3スタイルを使用",
 
-  "featureComingSoon": "{feature}機能は近日公開予定"
+  "featureComingSoon": "{feature}機能は近日公開予定",
+
+  "checkUpdateTitle": "アップデートを確認",
+  "currentVersionLabel": "現在のバージョン {version}",
+  "@currentVersionLabel": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "cleanDownloadCache": "ダウンロードキャッシュを削除",
+  "calculating": "計算中...",
+  "cachedSize": "キャッシュ容量 {size}",
+  "@cachedSize": {
+    "placeholders": {
+      "size": {"type": "String"}
+    }
+  },
+  "noCache": "キャッシュなし",
+  "helpAndFeedback": "ヘルプとフィードバック",
+  "helpAndFeedbackDesc": "使い方、よくある質問",
+  "versionNumber": "バージョン",
+  "buildTime": "ビルド日時",
+  "packageName": "パッケージ名",
+  "userAgreement": "利用規約",
+  "logManagement": "ログ管理",
+  "logManagementDesc": "アプリログの表示と削除",
+  "copyrightText": "© {year} AI家計簿\nスマート財務アシスタント",
+  "@copyrightText": {
+    "placeholders": {
+      "year": {"type": "int"}
+    }
+  },
+  "smartFinanceAssistant": "スマート財務アシスタント",
+  "downloadCacheManagement": "ダウンロードキャッシュ管理",
+  "cacheFileList": "キャッシュファイル：",
+  "clearingCache": "削除中...",
+  "clearAllCache": "すべて削除",
+  "confirmClearCache": "すべてのダウンロード済みAPKとキャッシュファイルを削除しますか？",
+  "pauseBudget": "一時停止",
+  "enableBudget": "有効化",
+  "clickToAddBudget": "右上をタップして予算を追加",
+  "confirmDeleteBudgetMsg": "予算「{name}」を削除しますか？",
+  "@confirmDeleteBudgetMsg": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "budgetNameHint": "例：月間総予算",
+  "allCategories": "すべてのカテゴリ",
+  "carryoverToNextPeriod": "残額/超過分を次の期間に繰り越す",
+  "carryoverSurplusOnly": "残額のみ",
+  "carryoverSurplusOnlyDesc": "プラスの残高のみ次の期間に繰り越す",
+  "carryoverAll": "残額と超過分",
+  "carryoverAllDesc": "プラスまたはマイナスの残高を次の期間に繰り越す",
+  "traditionalBudget": "従来型",
+  "traditionalBudgetHint": "固定予算額を設定",
+  "zeroBudget": "ゼロベース",
+  "zeroBudgetHint": "すべてのお金に役割を割り当てる",
+  "moneyAge": "お金の年齢",
+  "moneyAgeDays": "{days}日",
+  "@moneyAgeDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "whatIsMoneyAge": "お金の年齢とは？",
+  "moneyAgeDescription": "お金の年齢はゼロベース予算の重要な指標です。今日使っているお金が何日前に稼いだものかを示します。",
+  "excellent": "優秀",
+  "good": "良好",
+  "fair": "普通",
+  "needsImprovement": "改善が必要",
+  "daysOrMore": "≥ {days}日",
+  "@daysOrMore": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "daysRange": "{min}-{max}日",
+  "@daysRange": {
+    "placeholders": {
+      "min": {"type": "int"},
+      "max": {"type": "int"}
+    }
+  },
+  "lessThanDays": "< {days}日",
+  "@lessThanDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "healthyCashFlow": "資金繰りが非常に健全",
+  "goodCashFlow": "資金繰りが良好",
+  "considerSavingsBuffer": "貯蓄バッファの追加を検討",
+  "spendingRecentIncome": "最近の収入を使っている可能性があります",
+  "improveMoneyAgeTip": "改善方法：支出を抑える、収入を増やす、緊急資金を貯める",
+  "budgetSpent": "使用済み ¥{amount}",
+  "@budgetSpent": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "budgetTotal": "予算 ¥{amount}",
+  "@budgetTotal": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "budgetRemainingAmount": "残り ¥{amount}",
+  "@budgetRemainingAmount": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "budgetOverspentAmount": "超過 ¥{amount}",
+  "@budgetOverspentAmount": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "budgetName": "予算名",
+
+  "smartAdvice": "スマートアドバイス",
+  "todayAdvice": "今日のアドバイス",
+  "manageAdvicePreference": "アドバイス設定を管理",
+  "financialFreedomSimulator": "経済的自由シミュレーター",
+  "yourFinancialFreedomJourney": "あなたの経済的自由への旅",
+  "estimatedTime": "現在の貯蓄ペースで、約 ",
+  "toAchieveFreedom": " で経済的自由を達成",
+  "accelerateTip": "加速のヒント",
+  "adjustParameters": "パラメータを調整して効果を確認",
+  "monthlySavings": "月間貯蓄額",
+  "annualReturn": "年間リターン",
+  "targetPassiveIncome": "目標パッシブ収入",
+  "disclaimer": "参考情報であり、財務アドバイスではありません",
+  "smartRecommendation": "スマート推薦",
+  "discoverNewFeature": "新機能を発見",
+  "laterRemind": "後で"
 }

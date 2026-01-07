@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../models/transaction.dart';
 import '../providers/transaction_provider.dart';
+import 'tag_filter_page.dart';
 
 class TagStatisticsPage extends ConsumerStatefulWidget {
   const TagStatisticsPage({super.key});
@@ -25,6 +26,18 @@ class _TagStatisticsPageState extends ConsumerState<TagStatisticsPage> {
       appBar: AppBar(
         title: const Text('标签统计'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_alt),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const TagFilterPage(),
+                ),
+              );
+            },
+            tooltip: '标签筛选',
+          ),
           IconButton(
             icon: const Icon(Icons.calendar_month),
             onPressed: _selectMonth,

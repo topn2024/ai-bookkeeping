@@ -4,25 +4,30 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
 import '../services/category_localization_service.dart';
 import '../services/account_localization_service.dart';
+import '../services/locale_format_service.dart';
 
 /// 语言设置状态
 class LocaleState {
   final AppLanguage? selectedLanguage; // null表示跟随系统
   final AppLanguage effectiveLanguage; // 实际使用的语言
+  final int _version; // 用于强制刷新UI
 
   const LocaleState({
     this.selectedLanguage,
     required this.effectiveLanguage,
-  });
+    int version = 0,
+  }) : _version = version;
 
   LocaleState copyWith({
     AppLanguage? selectedLanguage,
     AppLanguage? effectiveLanguage,
     bool clearSelection = false,
+    bool forceRefresh = false,
   }) {
     return LocaleState(
       selectedLanguage: clearSelection ? null : (selectedLanguage ?? this.selectedLanguage),
       effectiveLanguage: effectiveLanguage ?? this.effectiveLanguage,
+      version: forceRefresh ? _version + 1 : _version,
     );
   }
 
@@ -34,6 +39,21 @@ class LocaleState {
 
   /// 当前Locale
   Locale get locale => languageInfo.locale;
+
+  /// 版本号（用于触发UI刷新）
+  int get version => _version;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is LocaleState &&
+        other.selectedLanguage == selectedLanguage &&
+        other.effectiveLanguage == effectiveLanguage &&
+        other._version == _version;
+  }
+
+  @override
+  int get hashCode => Object.hash(selectedLanguage, effectiveLanguage, _version);
 }
 
 /// 语言设置Provider
@@ -96,6 +116,8 @@ class LocaleNotifier extends Notifier<LocaleState> {
     final localeCode = _appLanguageToLocaleCode(language);
     CategoryLocalizationService.instance.setLocale(localeCode);
     AccountLocalizationService.instance.setLocale(localeCode);
+    // 同步格式化服务
+    LocaleFormatService.instance.setLanguage(language);
   }
 
   /// 将AppLanguage转换为语言代码
@@ -122,25 +144,44 @@ class LocaleNotifier extends Notifier<LocaleState> {
     }
   }
 
-  /// 设置语言
+  /// 设置语言（无需重启即可生效）
+  ///
+  /// 通过更新状态版本号触发整个应用的UI刷新
   Future<void> setLanguage(AppLanguage language) async {
+    _syncLocalizationServices(language);
     state = LocaleState(
       selectedLanguage: language,
       effectiveLanguage: language,
+      version: state.version + 1, // 强制触发UI刷新
     );
-    _syncLocalizationServices(language);
     await _saveSettings();
   }
 
-  /// 设置跟随系统
+  /// 设置跟随系统（无需重启即可生效）
   Future<void> setFollowSystem() async {
     final systemLanguage = getSystemLanguage();
+    _syncLocalizationServices(systemLanguage);
     state = LocaleState(
       selectedLanguage: null,
       effectiveLanguage: systemLanguage,
+      version: state.version + 1, // 强制触发UI刷新
     );
-    _syncLocalizationServices(systemLanguage);
     await _saveSettings();
+  }
+
+  /// 刷新语言设置（用于系统语言变化时）
+  void refresh() {
+    if (state.followSystem) {
+      final systemLanguage = getSystemLanguage();
+      if (systemLanguage != state.effectiveLanguage) {
+        _syncLocalizationServices(systemLanguage);
+        state = LocaleState(
+          selectedLanguage: null,
+          effectiveLanguage: systemLanguage,
+          version: state.version + 1,
+        );
+      }
+    }
   }
 
   /// 获取本地化字符串

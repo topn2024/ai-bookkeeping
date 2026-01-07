@@ -131,7 +131,10 @@ const menuItems = computed(() => {
       children: [
         { path: '/monitor/health', title: '系统健康', permission: 'monitor:view' },
         { path: '/monitor/resources', title: '系统资源', permission: 'monitor:view' },
+        { path: '/monitor/logs', title: '系统日志', permission: 'monitor:view' },
         { path: '/monitor/alerts', title: '告警管理', permission: 'monitor:alert' },
+        { path: '/monitor/ai-service', title: 'AI服务监控', permission: 'monitor:view' },
+        { path: '/monitor/diagnostics', title: '诊断报告', permission: 'monitor:view' },
       ],
     },
     {
@@ -305,6 +308,7 @@ const handleCommand = async (command: string) => {
 .main-content {
   background: #f0f2f5;
   padding: 20px;
+  overflow-x: hidden; // 防止水平滚动条
   overflow-y: auto;
 }
 

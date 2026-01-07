@@ -100,8 +100,8 @@
           <el-input
             v-model="processSearch"
             placeholder="搜索进程"
-            style="width: 200px;"
             clearable
+            class="process-search"
           >
             <template #prefix>
               <el-icon><Search /></el-icon>
@@ -373,6 +373,13 @@ onUnmounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .process-search {
+    width: 180px;
+    max-width: 100%;
   }
 
   .chart-container {

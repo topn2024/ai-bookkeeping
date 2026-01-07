@@ -225,82 +225,145 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                   ),
                 ),
               ],
+
+              // 操作按钮
+              _buildActionButtons(),
             ],
           ),
         ),
-        actions: _buildActions(),
+        // 清空默认 actions，使用 content 内的自定义按钮
+        actions: const [],
+        actionsPadding: EdgeInsets.zero,
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24)
       ),
     );
   }
 
-  List<Widget> _buildActions() {
-    final actions = <Widget>[];
-
-    // 稍后更新按钮（非强制更新时显示）
-    if (!widget.isForceUpdate && !_downloading) {
-      actions.add(
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('稍后更新'),
-        ),
-      );
-    }
-
-    // 取消下载按钮
+  Widget _buildActionButtons() {
+    // 下载中状态
     if (_downloading) {
-      actions.add(
-        TextButton(
-          onPressed: _cancelDownload,
-          child: const Text('取消下载'),
-        ),
-      );
-      // 后台下载按钮（下载中时显示）
-      actions.add(
-        TextButton(
-          onPressed: _switchToBackground,
-          child: const Text('后台下载'),
-        ),
-      );
-    }
-
-    // 浏览器下载按钮（下载失败时显示）
-    if (_downloadFailed && widget.versionInfo.downloadUrl != null) {
-      actions.add(
-        TextButton(
-          onPressed: _openInBrowser,
-          child: const Text('浏览器下载'),
-        ),
-      );
-    }
-
-    // 立即更新按钮 / 后台下载按钮
-    if (!_downloading) {
-      // 后台下载按钮（非强制更新时显示）
-      if (!widget.isForceUpdate && !_downloadFailed) {
-        actions.add(
-          OutlinedButton(
-            onPressed: _startBackgroundDownload,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: BorderSide(color: AppColors.primary),
+      return Padding(
+        padding: const EdgeInsets.only(top: 20),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _cancelDownload,
+                child: const Text('取消'),
+              ),
             ),
-            child: const Text('后台下载'),
-          ),
-        );
-      }
-      actions.add(
-        ElevatedButton(
-          onPressed: _downloadFailed ? _retryDownload : _startDownload,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-          ),
-          child: Text(_downloadFailed ? '重试下载' : '立即更新'),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _switchToBackground,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('后台下载'),
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return actions;
+    // 下载失败状态
+    if (_downloadFailed) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                if (!widget.isForceUpdate) ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('稍后'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _retryDownload,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('重试'),
+                  ),
+                ),
+              ],
+            ),
+            if (widget.versionInfo.downloadUrl != null) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: _openInBrowser,
+                  child: const Text('使用浏览器下载'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    // 正常状态（未开始下载）
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 主要按钮行：后台下载 + 立即更新
+          Row(
+            children: [
+              if (!widget.isForceUpdate) ...[
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _startBackgroundDownload,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppColors.primary),
+                    ),
+                    child: const Text('后台下载'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _startDownload,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('立即更新'),
+                ),
+              ),
+            ],
+          ),
+          // 稍后更新按钮（非强制更新时显示）
+          if (!widget.isForceUpdate) ...[
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(
+                  '稍后更新',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   void _cancelDownload() {

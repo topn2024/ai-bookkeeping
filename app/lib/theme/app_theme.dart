@@ -16,6 +16,12 @@ class AppColors {
   static const Color expense = Color(0xFFF44336);
   static const Color transfer = Color(0xFFFF9800);
 
+  // Status colors
+  static const Color success = Color(0xFF4CAF50);
+  static const Color warning = Color(0xFFFF9800);
+  static const Color error = Color(0xFFF44336);
+  static const Color info = Color(0xFF2196F3);
+
   // Background colors
   static const Color background = Color(0xFFF5F5F5);
   static const Color surface = Colors.white;

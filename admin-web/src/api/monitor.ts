@@ -100,3 +100,37 @@ export const toggleAlertRule = (ruleId: string, enabled: boolean): Promise<any> 
 export const deleteAlertRule = (ruleId: string): Promise<any> => {
   return del(`/monitoring/alerts/rules/${ruleId}`)
 }
+
+// System logs
+export const getSystemLogs = (params?: {
+  page?: number
+  page_size?: number
+  level?: string
+  keyword?: string
+  source?: string
+  start_time?: string
+  end_time?: string
+}): Promise<any> => {
+  return get('/monitoring/logs', { params })
+}
+
+// AI service monitoring
+export const getAIServiceStatus = (): Promise<any> => {
+  return get('/monitoring/ai-service/status')
+}
+
+export const getAICalls = (params?: {
+  type?: string
+  limit?: number
+}): Promise<any> => {
+  return get('/monitoring/ai-service/calls', { params })
+}
+
+// Diagnostics
+export const getDiagnosticReport = (): Promise<any> => {
+  return get('/monitoring/diagnostics')
+}
+
+export const runDiagnostics = (): Promise<any> => {
+  return post('/monitoring/diagnostics/run')
+}

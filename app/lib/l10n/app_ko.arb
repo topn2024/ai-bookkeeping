@@ -520,5 +520,141 @@
   "materialDesign3": "Material 3",
   "useMaterialDesign3": "Material Design 3 스타일 사용",
 
-  "featureComingSoon": "{feature} 기능이 곧 출시됩니다"
+  "featureComingSoon": "{feature} 기능이 곧 출시됩니다",
+
+  "checkUpdateTitle": "업데이트 확인",
+  "currentVersionLabel": "현재 버전 {version}",
+  "@currentVersionLabel": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "cleanDownloadCache": "다운로드 캐시 삭제",
+  "calculating": "계산 중...",
+  "cachedSize": "캐시 크기 {size}",
+  "@cachedSize": {
+    "placeholders": {
+      "size": {"type": "String"}
+    }
+  },
+  "noCache": "캐시 없음",
+  "helpAndFeedback": "도움말 및 피드백",
+  "helpAndFeedbackDesc": "사용 가이드, 자주 묻는 질문",
+  "versionNumber": "버전",
+  "buildTime": "빌드 시간",
+  "packageName": "패키지 이름",
+  "userAgreement": "사용자 계약",
+  "logManagement": "로그 관리",
+  "logManagementDesc": "앱 로그 보기 및 삭제",
+  "copyrightText": "© {year} AI 가계부\n스마트 재무 도우미",
+  "@copyrightText": {
+    "placeholders": {
+      "year": {"type": "int"}
+    }
+  },
+  "smartFinanceAssistant": "스마트 재무 도우미",
+  "downloadCacheManagement": "다운로드 캐시 관리",
+  "cacheFileList": "캐시 파일:",
+  "clearingCache": "삭제 중...",
+  "clearAllCache": "전체 삭제",
+  "confirmClearCache": "다운로드한 APK 및 캐시 파일을 모두 삭제하시겠습니까?",
+  "pauseBudget": "일시 정지",
+  "enableBudget": "활성화",
+  "clickToAddBudget": "우측 상단을 탭하여 예산 추가",
+  "confirmDeleteBudgetMsg": "예산 「{name}」을(를) 삭제하시겠습니까?",
+  "@confirmDeleteBudgetMsg": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "budgetNameHint": "예: 월별 총 예산",
+  "allCategories": "모든 카테고리",
+  "carryoverToNextPeriod": "잔액/초과분을 다음 기간으로 이월",
+  "carryoverSurplusOnly": "잔액만",
+  "carryoverSurplusOnlyDesc": "양수 잔액만 다음 기간으로 이월",
+  "carryoverAll": "잔액 및 초과",
+  "carryoverAllDesc": "양수 또는 음수 잔액을 다음 기간으로 이월",
+  "traditionalBudget": "전통 방식",
+  "traditionalBudgetHint": "고정 예산 금액 설정",
+  "zeroBudget": "제로 베이스",
+  "zeroBudgetHint": "모든 돈에 역할 부여",
+  "moneyAge": "돈의 나이",
+  "moneyAgeDays": "{days}일",
+  "@moneyAgeDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "whatIsMoneyAge": "돈의 나이란?",
+  "moneyAgeDescription": "돈의 나이는 제로 베이스 예산의 핵심 지표입니다. 오늘 사용하는 돈이 며칠 전에 벌었는지 보여줍니다.",
+  "excellent": "우수",
+  "good": "양호",
+  "fair": "보통",
+  "needsImprovement": "개선 필요",
+  "daysOrMore": "≥ {days}일",
+  "@daysOrMore": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "daysRange": "{min}-{max}일",
+  "@daysRange": {
+    "placeholders": {
+      "min": {"type": "int"},
+      "max": {"type": "int"}
+    }
+  },
+  "lessThanDays": "< {days}일",
+  "@lessThanDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "healthyCashFlow": "매우 건강한 자금 흐름",
+  "goodCashFlow": "양호한 자금 흐름",
+  "considerSavingsBuffer": "저축 버퍼 추가를 고려하세요",
+  "spendingRecentIncome": "최근 수입을 사용 중일 수 있습니다",
+  "improveMoneyAgeTip": "개선 방법: 지출 절제, 수입 증가, 비상 자금 마련",
+  "budgetSpent": "사용 ¥{amount}",
+  "@budgetSpent": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "budgetTotal": "예산 ¥{amount}",
+  "@budgetTotal": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "budgetRemainingAmount": "남은 금액 ¥{amount}",
+  "@budgetRemainingAmount": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "budgetOverspentAmount": "초과 ¥{amount}",
+  "@budgetOverspentAmount": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "budgetName": "예산 이름",
+
+  "smartAdvice": "스마트 조언",
+  "todayAdvice": "오늘의 조언",
+  "manageAdvicePreference": "조언 설정 관리",
+  "financialFreedomSimulator": "재정 자유 시뮬레이터",
+  "yourFinancialFreedomJourney": "당신의 재정 자유 여정",
+  "estimatedTime": "현재 저축 속도로 약 ",
+  "toAchieveFreedom": " 후 재정 자유 달성",
+  "accelerateTip": "가속 팁",
+  "adjustParameters": "파라미터를 조정하여 효과 확인",
+  "monthlySavings": "월 저축액",
+  "annualReturn": "연간 수익률",
+  "targetPassiveIncome": "목표 수동 소득",
+  "disclaimer": "참고용이며 재정 조언이 아닙니다",
+  "smartRecommendation": "스마트 추천",
+  "discoverNewFeature": "새 기능 발견",
+  "laterRemind": "나중에"
 }

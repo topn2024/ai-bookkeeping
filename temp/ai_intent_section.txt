@@ -1,0 +1,42 @@
+  navigateToAI,         // AI导航：打开智能中心、AI设置
+  navigateToBillReminder,// 账单提醒导航：打开账单提醒、信用卡提醒
+  navigateToMonitor,    // 监控导航：打开系统监控、性能监控
+  searchFunction,       // 功能搜索：找功能、哪里可以
+
+  // ==================== AI智能中心相关 ====================
+  // 智能分类
+  openSmartCategory,    // 打开智能分类中心
+  viewCategoryLearning, // 查看分类学习记录
+  trainCategory,        // 重新训练分类模型
+
+  // 趋势预测
+  viewTrendPrediction,  // 查看消费趋势预测
+  predictNextMonth,     // 预测下月消费
+
+  // 异常检测
+  openAnomalySettings,  // 打开异常检测设置
+  viewAnomalyTransactions,// 查看异常交易
+  enableAnomalyDetection, // 开启异常检测
+  disableAnomalyDetection,// 关闭异常检测
+
+  // 自然语言搜索
+  smartSearch,          // 智能搜索：用自然语言搜索
+  searchByDescription,  // 按描述搜索
+
+  // 对话助手
+  openDialogSettings,   // 打开对话助手设置
+  viewDialogHistory,    // 查看对话历史
+
+  // 语音配置
+  openVoiceConfig,      // 打开语音配置中心
+  setWakeWord,          // 设置唤醒词
+  setVoiceLanguage,     // 设置语音语言
+
+  // AI成本监控
+  viewAICost,           // 查看AI成本
+  viewAIUsage,          // 查看AI使用量
+
+  // 学习报告
+  viewLearningReport,   // 查看智能学习报告
+  viewAccuracyTrend,    // 查看准确率趋势
+

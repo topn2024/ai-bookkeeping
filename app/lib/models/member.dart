@@ -136,6 +136,7 @@ class LedgerMember {
   final MemberRole role;
   final DateTime joinedAt;
   final bool isActive;
+  final String? nickname; // 在账本中的昵称
 
   const LedgerMember({
     required this.id,
@@ -147,7 +148,14 @@ class LedgerMember {
     required this.role,
     required this.joinedAt,
     this.isActive = true,
+    this.nickname,
   });
+
+  /// 显示名称（优先使用昵称）
+  String get displayName => nickname ?? userName;
+
+  /// 头像URL
+  String? get avatarUrl => userAvatar;
 
   LedgerMember copyWith({
     String? id,
@@ -159,6 +167,7 @@ class LedgerMember {
     MemberRole? role,
     DateTime? joinedAt,
     bool? isActive,
+    String? nickname,
   }) {
     return LedgerMember(
       id: id ?? this.id,
@@ -170,6 +179,7 @@ class LedgerMember {
       role: role ?? this.role,
       joinedAt: joinedAt ?? this.joinedAt,
       isActive: isActive ?? this.isActive,
+      nickname: nickname ?? this.nickname,
     );
   }
 
@@ -184,6 +194,7 @@ class LedgerMember {
       'role': role.index,
       'joinedAt': joinedAt.millisecondsSinceEpoch,
       'isActive': isActive ? 1 : 0,
+      'nickname': nickname,
     };
   }
 
@@ -198,6 +209,7 @@ class LedgerMember {
       role: MemberRole.values[map['role'] as int],
       joinedAt: DateTime.fromMillisecondsSinceEpoch(map['joinedAt'] as int),
       isActive: (map['isActive'] as int) == 1,
+      nickname: map['nickname'] as String?,
     );
   }
 }

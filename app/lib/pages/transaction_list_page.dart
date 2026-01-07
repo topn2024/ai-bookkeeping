@@ -11,6 +11,9 @@ import '../widgets/source_image_viewer.dart';
 import '../widgets/source_audio_player.dart';
 import '../widgets/swipeable_transaction_item.dart';
 import 'add_transaction_page.dart';
+import 'transaction_detail_page.dart';
+import 'search_result_page.dart';
+import 'advanced_filter_page.dart';
 
 /// 流水查询页面
 /// 支持按日期、类型、分类、金额筛选，支持关键词搜索
@@ -224,11 +227,22 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
               isLabelVisible: _hasActiveFilters,
               child: const Icon(Icons.filter_list),
             ),
-            tooltip: '筛选',
-            onPressed: () {
-              setState(() {
-                _showFilters = !_showFilters;
-              });
+            tooltip: '高级筛选',
+            onPressed: () async {
+              final result = await AdvancedFilterPage.showAsBottomSheet(context);
+              if (result != null) {
+                setState(() {
+                  _dateRange = result.dateRange;
+                  _minAmount = result.minAmount;
+                  _maxAmount = result.maxAmount;
+                  _selectedType = result.transactionType;
+                  if (result.categoryIds != null && result.categoryIds!.isNotEmpty) {
+                    _selectedCategory = result.categoryIds!.first;
+                  } else {
+                    _selectedCategory = null;
+                  }
+                });
+              }
             },
           ),
         ],
@@ -252,6 +266,16 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddTransactionPage()),
+          ).then((_) => ref.read(transactionProvider.notifier).refresh());
+        },
+        backgroundColor: _themeColors.primary,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 
@@ -259,35 +283,37 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       color: Colors.white,
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: '搜索备注或分类...',
-          prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-          suffixIcon: _searchKeyword.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() {
-                      _searchKeyword = '';
-                    });
-                  },
-                )
-              : null,
-          filled: true,
-          fillColor: AppColors.background,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-        onChanged: (value) {
-          setState(() {
-            _searchKeyword = value;
-          });
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SearchResultPage(initialKeyword: _searchKeyword),
+            ),
+          ).then((_) => ref.read(transactionProvider.notifier).refresh());
         },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.search, color: AppColors.textSecondary),
+              const SizedBox(width: 12),
+              Text(
+                _searchKeyword.isEmpty ? '搜索备注或分类...' : _searchKeyword,
+                style: TextStyle(
+                  color: _searchKeyword.isEmpty
+                      ? AppColors.textSecondary
+                      : AppColors.textPrimary,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -623,9 +649,32 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
     );
 
     if (confirmed == true && mounted) {
+      // 删除交易
       ref.read(transactionProvider.notifier).deleteTransaction(transaction.id);
+
+      // 获取交易名称用于撤销提示
+      final category = DefaultCategories.findById(transaction.category);
+      final transactionName = transaction.note ?? category?.localizedName ?? transaction.category;
+
+      // 显示带撤销功能的 SnackBar
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已删除')),
+        SnackBar(
+          content: Text('已删除「$transactionName ¥${transaction.amount.toStringAsFixed(0)}」'),
+          action: SnackBarAction(
+            label: '撤销',
+            textColor: Colors.white,
+            onPressed: () {
+              // 恢复交易
+              ref.read(transactionProvider.notifier).addTransaction(transaction);
+            },
+          ),
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
       );
     }
   }
@@ -859,6 +908,17 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
   }
 
   void _showTransactionDetail(Transaction transaction) {
+    // 导航到详情页面
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TransactionDetailPage(transaction: transaction),
+      ),
+    ).then((_) => ref.read(transactionProvider.notifier).refresh());
+  }
+
+  /// 保留底部弹窗详情供长按使用
+  void _showTransactionQuickActions(Transaction transaction) {
     final category = DefaultCategories.findById(transaction.category);
     final isExpense = transaction.type == TransactionType.expense;
     final isIncome = transaction.type == TransactionType.income;

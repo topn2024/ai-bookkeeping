@@ -56,6 +56,7 @@
   "ok": "好的",
 
   "home": "首页",
+  "trends": "趋势",
   "statistics": "统计",
   "addRecord": "记账",
   "budget": "预算",
@@ -558,11 +559,11 @@
   "traditionalBudget": "传统预算",
   "traditionalBudgetHint": "设定固定预算额度",
   "zeroBudget": "零基预算",
-  "zeroBudgetHint": "YNAB式，为每一分钱分配用途",
+  "zeroBudgetHint": "让每一分钱都有去处",
   "moneyAge": "钱龄",
   "moneyAgeDays": "{days} 天",
   "whatIsMoneyAge": "什么是钱龄？",
-  "moneyAgeDescription": "钱龄（Age of Money）是YNAB预算法的核心指标之一。它表示您当前花费的钱是多少天前赚到的。",
+  "moneyAgeDescription": "钱龄是零基预算的核心指标之一。它表示您当前花费的钱是多少天前赚到的。",
   "excellent": "优秀",
   "good": "良好",
   "fair": "一般",
@@ -579,5 +580,95 @@
   "budgetTotal": "预算 ¥{amount}",
   "budgetRemainingAmount": "剩余 ¥{amount}",
   "budgetOverspentAmount": "超支 ¥{amount}",
-  "budgetName": "预算名称"
+  "budgetName": "预算名称",
+
+  "myAccounts": "我的账户",
+  "liabilities": "负债",
+  "creditLimit": "额度",
+  "repaymentDay": "还款日",
+  "dayUnit": "号",
+  "transactionRecord": "交易记录",
+  "transactionDetail": "交易详情",
+  "merchant": "商户",
+  "moneyAgeInfo": "钱龄信息",
+  "moneyAgeUsedPrefix": "这笔支出使用的是",
+  "moneyAgeUsedSuffix": "的收入",
+  "daysAgo": "{days}天前",
+  "@daysAgo": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "undoDelete": "撤销删除",
+  "undo": "撤销",
+  "deletedTransaction": "已删除「{name} ¥{amount}」",
+  "@deletedTransaction": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "amount": {"type": "String"}
+    }
+  },
+  "linkVault": "关联小金库",
+  "noLink": "不关联",
+  "tags": "标签",
+  "addTag": "添加标签",
+  "saveTransaction": "保存交易",
+  "debtManagement": "债务管理",
+  "totalDebt": "总负债",
+  "dueThisMonth": "本月需还",
+  "debtPaidPercent": "已还{percent}%",
+  "@debtPaidPercent": {
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+  "estimatedPayoffMonths": "预计{months}个月还清",
+  "@estimatedPayoffMonths": {
+    "placeholders": {
+      "months": {"type": "int"}
+    }
+  },
+  "debtDetails": "债务明细",
+  "repaymentDayIn": "还款日{day}号 · {daysLeft}",
+  "@repaymentDayIn": {
+    "placeholders": {
+      "day": {"type": "int"},
+      "daysLeft": {"type": "String"}
+    }
+  },
+  "daysLater": "{days}天后",
+  "@daysLater": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "currentBill": "本期账单",
+  "installmentInProgress": "分期中",
+  "installmentRemaining": "剩余{count}期",
+  "@installmentRemaining": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "remainingPrincipal": "剩余本金",
+  "repaymentSuggestion": "还款建议",
+  "prioritizeHighInterest": "优先还清高利息债务",
+  "consumerLoan": "消费贷款",
+
+  "smartAdvice": "智能建议",
+  "todayAdvice": "今日建议",
+  "manageAdvicePreference": "管理建议偏好",
+  "financialFreedomSimulator": "财务自由模拟器",
+  "yourFinancialFreedomJourney": "你的财务自由之旅",
+  "estimatedTime": "按当前储蓄速度，预计 ",
+  "toAchieveFreedom": " 后达成财务自由",
+  "accelerateTip": "加速建议",
+  "adjustParameters": "调整参数，看看效果",
+  "monthlySavings": "月储蓄额",
+  "annualReturn": "年化收益率",
+  "targetPassiveIncome": "目标被动收入",
+  "disclaimer": "仅供参考，不构成理财建议",
+  "smartRecommendation": "智能推荐",
+  "discoverNewFeature": "发现新功能",
+  "laterRemind": "���后再说"
 }

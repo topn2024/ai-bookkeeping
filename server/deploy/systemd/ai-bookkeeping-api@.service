@@ -1,0 +1,58 @@
+# /etc/systemd/system/ai-bookkeeping-api@.service
+# 模板服务文件，支持多实例部署
+# 使用方式: systemctl start ai-bookkeeping-api@8000
+#          systemctl start ai-bookkeeping-api@8001
+
+[Unit]
+Description=AI Bookkeeping API Server (Port %i)
+Documentation=https://github.com/topn2024/ai-bookkeeping
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=exec
+User=ai-bookkeeping
+Group=ai-bookkeeping
+WorkingDirectory=/home/ai-bookkeeping/app/server
+
+# 环境变量
+EnvironmentFile=/home/ai-bookkeeping/app/server/.env
+
+# 启动命令 - 使用 uvicorn
+ExecStart=/home/ai-bookkeeping/venv/bin/uvicorn \
+    app.main:app \
+    --host 127.0.0.1 \
+    --port %i \
+    --workers 2 \
+    --loop uvloop \
+    --http httptools \
+    --access-log \
+    --log-level info
+
+# 优雅停止 - 等待请求处理完成
+ExecStop=/bin/kill -s TERM $MAINPID
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
+
+# 重启策略
+Restart=always
+RestartSec=5
+
+# 资源限制
+LimitNOFILE=65535
+LimitNPROC=4096
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ai-bookkeeping/app/server/logs
+ReadWritePaths=/tmp
+
+# 健康检查（systemd 253+）
+# ExecStartPost=/usr/bin/curl -sf http://127.0.0.1:%i/health || exit 1
+
+[Install]
+WantedBy=multi-user.target

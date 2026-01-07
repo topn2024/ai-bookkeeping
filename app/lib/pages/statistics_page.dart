@@ -6,6 +6,8 @@ import '../theme/app_theme.dart';
 import '../providers/transaction_provider.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
+import 'category_detail_page.dart';
+import 'period_comparison_page.dart';
 
 enum StatsPeriod { day, week, month, year }
 
@@ -57,6 +59,20 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('统计报表'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.compare_arrows),
+            tooltip: '时间对比',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PeriodComparisonPage(),
+                ),
+              );
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -1095,7 +1111,19 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
                         _touchedIndex = -1;
                       });
                     }
-                  : null,
+                  : () {
+                      // 导航到分类详情页
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CategoryDetailPage(
+                            categoryId: entry.key,
+                            selectedMonth: _currentDate,
+                            isExpense: _tabController.index == 0,
+                          ),
+                        ),
+                      );
+                    },
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(

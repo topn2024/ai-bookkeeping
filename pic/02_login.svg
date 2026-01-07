@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="375" height="812" viewBox="0 0 375 812" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="headerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="375" height="812" rx="40" fill="#F5F7FA"/>
+
+  <!-- Header Background -->
+  <path d="M0,0 L375,0 L375,280 Q187.5,350 0,280 Z" fill="url(#headerGradient)"/>
+
+  <!-- Status Bar -->
+  <text x="30" y="50" fill="white" font-family="Arial" font-size="14" font-weight="500">9:41</text>
+  <text x="320" y="50" fill="white" font-family="Arial" font-size="14">100%</text>
+
+  <!-- Logo -->
+  <circle cx="187.5" cy="150" r="50" fill="white"/>
+  <text x="187.5" y="165" fill="#667eea" font-family="Arial" font-size="36" font-weight="bold" text-anchor="middle">¥</text>
+
+  <!-- Welcome Text -->
+  <text x="187.5" y="240" fill="white" font-family="Arial" font-size="24" font-weight="bold" text-anchor="middle">欢迎回来</text>
+  <text x="187.5" y="270" fill="rgba(255,255,255,0.8)" font-family="Arial" font-size="14" text-anchor="middle">登录以继续使用AI智能记账</text>
+
+  <!-- Login Form Card -->
+  <rect x="24" y="320" width="327" height="300" rx="16" fill="white" filter="url(#shadow)"/>
+
+  <!-- Phone Input -->
+  <text x="44" y="360" fill="#333" font-family="Arial" font-size="14" font-weight="500">手机号</text>
+  <rect x="44" y="375" width="287" height="50" rx="8" fill="#F5F7FA" stroke="#E0E0E0"/>
+  <text x="64" y="407" fill="#999" font-family="Arial" font-size="15">请输入手机号</text>
+
+  <!-- Password Input -->
+  <text x="44" y="455" fill="#333" font-family="Arial" font-size="14" font-weight="500">密码</text>
+  <rect x="44" y="470" width="287" height="50" rx="8" fill="#F5F7FA" stroke="#E0E0E0"/>
+  <text x="64" y="502" fill="#999" font-family="Arial" font-size="15">请输入密码</text>
+  <text x="306" y="502" fill="#667eea" font-family="Arial" font-size="20">👁</text>
+
+  <!-- Forgot Password -->
+  <text x="311" y="545" fill="#667eea" font-family="Arial" font-size="13" text-anchor="end">忘记密码?</text>
+
+  <!-- Login Button -->
+  <rect x="44" y="560" width="287" height="50" rx="25" fill="url(#headerGradient)"/>
+  <text x="187.5" y="592" fill="white" font-family="Arial" font-size="16" font-weight="bold" text-anchor="middle">登 录</text>
+
+  <!-- Divider -->
+  <line x1="44" y1="660" x2="150" y2="660" stroke="#E0E0E0" stroke-width="1"/>
+  <text x="187.5" y="665" fill="#999" font-family="Arial" font-size="12" text-anchor="middle">或</text>
+  <line x1="225" y1="660" x2="331" y2="660" stroke="#E0E0E0" stroke-width="1"/>
+
+  <!-- Social Login -->
+  <g transform="translate(107, 690)">
+    <circle cx="0" cy="0" r="25" fill="#07C160"/>
+    <text x="0" y="6" fill="white" font-family="Arial" font-size="18" text-anchor="middle">微</text>
+  </g>
+  <g transform="translate(187.5, 690)">
+    <circle cx="0" cy="0" r="25" fill="#1296DB"/>
+    <text x="0" y="6" fill="white" font-family="Arial" font-size="18" text-anchor="middle">支</text>
+  </g>
+  <g transform="translate(268, 690)">
+    <circle cx="0" cy="0" r="25" fill="#000"/>
+    <text x="0" y="6" fill="white" font-family="Arial" font-size="16" text-anchor="middle">🍎</text>
+  </g>
+
+  <!-- Register Link -->
+  <text x="140" y="770" fill="#666" font-family="Arial" font-size="14">还没有账号? </text>
+  <text x="235" y="770" fill="#667eea" font-family="Arial" font-size="14" font-weight="500">立即注册</text>
+</svg>

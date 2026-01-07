@@ -11,18 +11,18 @@
     <div class="filter-form">
       <el-form :model="filters" inline>
         <el-form-item label="用户ID">
-          <el-input v-model="filters.user_id" placeholder="用户ID" clearable style="width: 150px;" />
+          <el-input v-model="filters.user_id" placeholder="用户ID" clearable />
         </el-form-item>
         <el-form-item label="类型">
-          <el-select v-model="filters.type" placeholder="全部" clearable style="width: 120px;">
+          <el-select v-model="filters.type" placeholder="全部" clearable>
             <el-option label="收入" value="income" />
             <el-option label="支出" value="expense" />
           </el-select>
         </el-form-item>
-        <el-form-item label="金额范围">
-          <el-input-number v-model="filters.min_amount" :min="0" placeholder="最小" style="width: 120px;" />
-          <span class="mx-10">-</span>
-          <el-input-number v-model="filters.max_amount" :min="0" placeholder="最大" style="width: 120px;" />
+        <el-form-item label="金额范围" class="amount-range">
+          <el-input-number v-model="filters.min_amount" :min="0" placeholder="最小" controls-position="right" />
+          <span class="range-separator">-</span>
+          <el-input-number v-model="filters.max_amount" :min="0" placeholder="最大" controls-position="right" />
         </el-form-item>
         <el-form-item label="日期范围">
           <el-date-picker
@@ -32,7 +32,6 @@
             start-placeholder="开始"
             end-placeholder="结束"
             value-format="YYYY-MM-DD"
-            style="width: 260px;"
           />
         </el-form-item>
         <el-form-item>
@@ -306,8 +305,17 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .transaction-list {
-  .mx-10 {
-    margin: 0 10px;
+  .amount-range {
+    :deep(.el-form-item__content) {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  }
+
+  .range-separator {
+    color: #999;
+    flex-shrink: 0;
   }
 }
 </style>

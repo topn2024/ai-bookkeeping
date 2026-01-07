@@ -1,0 +1,48 @@
+# /etc/systemd/system/ai-bookkeeping-admin.service
+# Admin API 服务
+
+[Unit]
+Description=AI Bookkeeping Admin API Server
+Documentation=https://github.com/topn2024/ai-bookkeeping
+After=network.target postgresql.service redis.service ai-bookkeeping-api@8000.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=exec
+User=ai-bookkeeping
+Group=ai-bookkeeping
+WorkingDirectory=/home/ai-bookkeeping/app/server
+
+# 环境变量
+EnvironmentFile=/home/ai-bookkeeping/app/server/.env
+
+# 启动命令
+ExecStart=/home/ai-bookkeeping/venv/bin/uvicorn \
+    admin.main:app \
+    --host 127.0.0.1 \
+    --port 8002 \
+    --workers 1 \
+    --loop uvloop \
+    --http httptools \
+    --access-log \
+    --log-level info
+
+# 优雅停止
+ExecStop=/bin/kill -s TERM $MAINPID
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
+
+# 重启策略
+Restart=always
+RestartSec=5
+
+# 资源限制
+LimitNOFILE=65535
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

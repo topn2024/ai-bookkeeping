@@ -15,6 +15,8 @@ import '../models/investment_account.dart';
 import '../models/debt.dart';
 import '../models/member.dart';
 import '../models/import_batch.dart';
+import '../models/resource_pool.dart';
+import '../models/budget_vault.dart';
 import 'package:flutter/material.dart';
 import 'database_migration_service.dart';
 import '../core/logger.dart';
@@ -26,7 +28,7 @@ class DatabaseService {
   final Logger _logger = Logger();
 
   // 当前数据库版本
-  static const int currentVersion = 14;
+  static const int currentVersion = 15;
 
   factory DatabaseService() => _instance;
 
@@ -560,6 +562,108 @@ class DatabaseService {
     await db.execute('CREATE INDEX idx_sync_queue_status ON sync_queue(status)');
     await db.execute('CREATE INDEX idx_id_mapping_local ON id_mapping(entityType, localId)');
     await db.execute('CREATE INDEX idx_id_mapping_server ON id_mapping(entityType, serverId)');
+
+    // ==================== 2.0新增表：钱龄系统 ====================
+
+    // Resource pools table - tracks each income as a resource pool for money age calculation
+    await db.execute('''
+      CREATE TABLE resource_pools (
+        id TEXT PRIMARY KEY,
+        incomeTransactionId TEXT NOT NULL,
+        createdAt INTEGER NOT NULL,
+        originalAmount REAL NOT NULL,
+        remainingAmount REAL NOT NULL,
+        ledgerId TEXT,
+        accountId TEXT,
+        updatedAt INTEGER NOT NULL,
+        FOREIGN KEY (incomeTransactionId) REFERENCES transactions (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Resource consumptions table - records how each expense consumes from resource pools
+    await db.execute('''
+      CREATE TABLE resource_consumptions (
+        id TEXT PRIMARY KEY,
+        resourcePoolId TEXT NOT NULL,
+        expenseTransactionId TEXT NOT NULL,
+        amount REAL NOT NULL,
+        moneyAge INTEGER NOT NULL,
+        consumedAt INTEGER NOT NULL,
+        FOREIGN KEY (resourcePoolId) REFERENCES resource_pools (id) ON DELETE CASCADE,
+        FOREIGN KEY (expenseTransactionId) REFERENCES transactions (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Create indexes for resource pools and consumptions
+    await db.execute('CREATE INDEX idx_resource_pools_remaining ON resource_pools(remainingAmount) WHERE remainingAmount > 0');
+    await db.execute('CREATE INDEX idx_resource_pools_created ON resource_pools(createdAt)');
+    await db.execute('CREATE INDEX idx_resource_pools_income ON resource_pools(incomeTransactionId)');
+    await db.execute('CREATE INDEX idx_resource_consumptions_pool ON resource_consumptions(resourcePoolId)');
+    await db.execute('CREATE INDEX idx_resource_consumptions_expense ON resource_consumptions(expenseTransactionId)');
+
+    // ==================== 2.0新增表：小金库/零基预算系统 ====================
+
+    // Budget vaults table - envelope budgeting system
+    await db.execute('''
+      CREATE TABLE budget_vaults (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        iconCode INTEGER NOT NULL,
+        colorValue INTEGER NOT NULL,
+        type INTEGER NOT NULL,
+        targetAmount REAL NOT NULL DEFAULT 0,
+        allocatedAmount REAL NOT NULL DEFAULT 0,
+        spentAmount REAL NOT NULL DEFAULT 0,
+        dueDate INTEGER,
+        isRecurring INTEGER NOT NULL DEFAULT 0,
+        recurrenceJson TEXT,
+        linkedCategoryId TEXT,
+        linkedCategoryIds TEXT,
+        ledgerId TEXT NOT NULL,
+        isEnabled INTEGER NOT NULL DEFAULT 1,
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL,
+        allocationType INTEGER NOT NULL DEFAULT 0,
+        targetAllocation REAL,
+        targetPercentage REAL
+      )
+    ''');
+
+    // Vault allocations table - records income allocations to vaults
+    await db.execute('''
+      CREATE TABLE vault_allocations (
+        id TEXT PRIMARY KEY,
+        vaultId TEXT NOT NULL,
+        incomeTransactionId TEXT,
+        amount REAL NOT NULL,
+        note TEXT,
+        allocatedAt INTEGER NOT NULL,
+        FOREIGN KEY (vaultId) REFERENCES budget_vaults (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Vault transfers table - records transfers between vaults
+    await db.execute('''
+      CREATE TABLE vault_transfers (
+        id TEXT PRIMARY KEY,
+        fromVaultId TEXT NOT NULL,
+        toVaultId TEXT NOT NULL,
+        amount REAL NOT NULL,
+        note TEXT,
+        transferredAt INTEGER NOT NULL,
+        FOREIGN KEY (fromVaultId) REFERENCES budget_vaults (id) ON DELETE CASCADE,
+        FOREIGN KEY (toVaultId) REFERENCES budget_vaults (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Create indexes for budget vaults
+    await db.execute('CREATE INDEX idx_budget_vaults_ledger ON budget_vaults(ledgerId)');
+    await db.execute('CREATE INDEX idx_budget_vaults_type ON budget_vaults(type)');
+    await db.execute('CREATE INDEX idx_vault_allocations_vault ON vault_allocations(vaultId)');
+    await db.execute('CREATE INDEX idx_vault_transfers_from ON vault_transfers(fromVaultId)');
+    await db.execute('CREATE INDEX idx_vault_transfers_to ON vault_transfers(toVaultId)');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -912,6 +1016,112 @@ class DatabaseService {
       await db.execute('CREATE INDEX idx_transactions_import_batch ON transactions(importBatchId)');
       await db.execute('CREATE INDEX idx_transactions_dedup ON transactions(date, amount, type, category)');
       await db.execute('CREATE INDEX idx_import_batches_status ON import_batches(status)');
+    }
+
+    if (oldVersion < 15) {
+      // ==================== 2.0升级：钱龄系统和小金库系统 ====================
+
+      // Add vaultId and moneyAge fields to transactions table
+      await db.execute('ALTER TABLE transactions ADD COLUMN vaultId TEXT');
+      await db.execute('ALTER TABLE transactions ADD COLUMN moneyAge INTEGER');
+      await db.execute('ALTER TABLE transactions ADD COLUMN locationJson TEXT');
+
+      // Create resource pools table for money age calculation
+      await db.execute('''
+        CREATE TABLE resource_pools (
+          id TEXT PRIMARY KEY,
+          incomeTransactionId TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          originalAmount REAL NOT NULL,
+          remainingAmount REAL NOT NULL,
+          ledgerId TEXT,
+          accountId TEXT,
+          updatedAt INTEGER NOT NULL,
+          FOREIGN KEY (incomeTransactionId) REFERENCES transactions (id) ON DELETE CASCADE
+        )
+      ''');
+
+      // Create resource consumptions table
+      await db.execute('''
+        CREATE TABLE resource_consumptions (
+          id TEXT PRIMARY KEY,
+          resourcePoolId TEXT NOT NULL,
+          expenseTransactionId TEXT NOT NULL,
+          amount REAL NOT NULL,
+          moneyAge INTEGER NOT NULL,
+          consumedAt INTEGER NOT NULL,
+          FOREIGN KEY (resourcePoolId) REFERENCES resource_pools (id) ON DELETE CASCADE,
+          FOREIGN KEY (expenseTransactionId) REFERENCES transactions (id) ON DELETE CASCADE
+        )
+      ''');
+
+      // Create budget vaults table (envelope budgeting)
+      await db.execute('''
+        CREATE TABLE budget_vaults (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          iconCode INTEGER NOT NULL,
+          colorValue INTEGER NOT NULL,
+          type INTEGER NOT NULL,
+          targetAmount REAL NOT NULL DEFAULT 0,
+          allocatedAmount REAL NOT NULL DEFAULT 0,
+          spentAmount REAL NOT NULL DEFAULT 0,
+          dueDate INTEGER,
+          isRecurring INTEGER NOT NULL DEFAULT 0,
+          recurrenceJson TEXT,
+          linkedCategoryId TEXT,
+          linkedCategoryIds TEXT,
+          ledgerId TEXT NOT NULL,
+          isEnabled INTEGER NOT NULL DEFAULT 1,
+          sortOrder INTEGER NOT NULL DEFAULT 0,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL,
+          allocationType INTEGER NOT NULL DEFAULT 0,
+          targetAllocation REAL,
+          targetPercentage REAL
+        )
+      ''');
+
+      // Create vault allocations table
+      await db.execute('''
+        CREATE TABLE vault_allocations (
+          id TEXT PRIMARY KEY,
+          vaultId TEXT NOT NULL,
+          incomeTransactionId TEXT,
+          amount REAL NOT NULL,
+          note TEXT,
+          allocatedAt INTEGER NOT NULL,
+          FOREIGN KEY (vaultId) REFERENCES budget_vaults (id) ON DELETE CASCADE
+        )
+      ''');
+
+      // Create vault transfers table
+      await db.execute('''
+        CREATE TABLE vault_transfers (
+          id TEXT PRIMARY KEY,
+          fromVaultId TEXT NOT NULL,
+          toVaultId TEXT NOT NULL,
+          amount REAL NOT NULL,
+          note TEXT,
+          transferredAt INTEGER NOT NULL,
+          FOREIGN KEY (fromVaultId) REFERENCES budget_vaults (id) ON DELETE CASCADE,
+          FOREIGN KEY (toVaultId) REFERENCES budget_vaults (id) ON DELETE CASCADE
+        )
+      ''');
+
+      // Create indexes for 2.0 tables
+      await db.execute('CREATE INDEX idx_resource_pools_remaining ON resource_pools(remainingAmount) WHERE remainingAmount > 0');
+      await db.execute('CREATE INDEX idx_resource_pools_created ON resource_pools(createdAt)');
+      await db.execute('CREATE INDEX idx_resource_pools_income ON resource_pools(incomeTransactionId)');
+      await db.execute('CREATE INDEX idx_resource_consumptions_pool ON resource_consumptions(resourcePoolId)');
+      await db.execute('CREATE INDEX idx_resource_consumptions_expense ON resource_consumptions(expenseTransactionId)');
+      await db.execute('CREATE INDEX idx_budget_vaults_ledger ON budget_vaults(ledgerId)');
+      await db.execute('CREATE INDEX idx_budget_vaults_type ON budget_vaults(type)');
+      await db.execute('CREATE INDEX idx_vault_allocations_vault ON vault_allocations(vaultId)');
+      await db.execute('CREATE INDEX idx_vault_transfers_from ON vault_transfers(fromVaultId)');
+      await db.execute('CREATE INDEX idx_vault_transfers_to ON vault_transfers(toVaultId)');
+      await db.execute('CREATE INDEX idx_transactions_vault ON transactions(vaultId)');
     }
   }
 
@@ -2640,5 +2850,235 @@ class DatabaseService {
     }
 
     await batch.commit(noResult: true);
+  }
+
+  // ==================== 2.0新增：资源池 CRUD ====================
+
+  /// 插入资源池
+  Future<int> insertResourcePool(ResourcePool pool) async {
+    final db = await database;
+    return await db.insert('resource_pools', pool.toMap());
+  }
+
+  /// 更新资源池
+  Future<int> updateResourcePool(ResourcePool pool) async {
+    final db = await database;
+    return await db.update(
+      'resource_pools',
+      pool.toMap(),
+      where: 'id = ?',
+      whereArgs: [pool.id],
+    );
+  }
+
+  /// 删除资源池
+  Future<int> deleteResourcePool(String id) async {
+    final db = await database;
+    return await db.delete('resource_pools', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// 获取所有有剩余金额的资源池（按创建时间排序，FIFO）
+  Future<List<ResourcePool>> getActiveResourcePools() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'resource_pools',
+      where: 'remainingAmount > 0',
+      orderBy: 'createdAt ASC',
+    );
+    return maps.map((map) => ResourcePool.fromMap(map)).toList();
+  }
+
+  /// 获取所有资源池
+  Future<List<ResourcePool>> getAllResourcePools() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'resource_pools',
+      orderBy: 'createdAt DESC',
+    );
+    return maps.map((map) => ResourcePool.fromMap(map)).toList();
+  }
+
+  /// 根据收入交易ID获取资源池
+  Future<ResourcePool?> getResourcePoolByIncomeId(String incomeTransactionId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'resource_pools',
+      where: 'incomeTransactionId = ?',
+      whereArgs: [incomeTransactionId],
+    );
+    if (maps.isEmpty) return null;
+    return ResourcePool.fromMap(maps.first);
+  }
+
+  /// 插入资源消费记录
+  Future<int> insertResourceConsumption(ResourceConsumption consumption) async {
+    final db = await database;
+    return await db.insert('resource_consumptions', consumption.toMap());
+  }
+
+  /// 批量插入资源消费记录
+  Future<void> batchInsertResourceConsumptions(List<ResourceConsumption> consumptions) async {
+    final db = await database;
+    final batch = db.batch();
+    for (final consumption in consumptions) {
+      batch.insert('resource_consumptions', consumption.toMap());
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// 获取交易的资源消费记录
+  Future<List<ResourceConsumption>> getConsumptionsByTransaction(String transactionId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'resource_consumptions',
+      where: 'expenseTransactionId = ?',
+      whereArgs: [transactionId],
+    );
+    return maps.map((map) => ResourceConsumption.fromMap(map)).toList();
+  }
+
+  /// 获取资源池的消费记录
+  Future<List<ResourceConsumption>> getConsumptionsByPool(String poolId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'resource_consumptions',
+      where: 'resourcePoolId = ?',
+      whereArgs: [poolId],
+      orderBy: 'consumedAt ASC',
+    );
+    return maps.map((map) => ResourceConsumption.fromMap(map)).toList();
+  }
+
+  // ==================== 2.0新增：小金库 CRUD ====================
+
+  /// 插入小金库
+  Future<int> insertBudgetVault(BudgetVault vault) async {
+    final db = await database;
+    return await db.insert('budget_vaults', vault.toMap());
+  }
+
+  /// 更新小金库
+  Future<int> updateBudgetVault(BudgetVault vault) async {
+    final db = await database;
+    return await db.update(
+      'budget_vaults',
+      vault.toMap(),
+      where: 'id = ?',
+      whereArgs: [vault.id],
+    );
+  }
+
+  /// 删除小金库
+  Future<int> deleteBudgetVault(String id) async {
+    final db = await database;
+    return await db.delete('budget_vaults', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// 获取账本的所有小金库
+  Future<List<BudgetVault>> getBudgetVaults({String? ledgerId}) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'budget_vaults',
+      where: ledgerId != null ? 'ledgerId = ?' : null,
+      whereArgs: ledgerId != null ? [ledgerId] : null,
+      orderBy: 'sortOrder ASC, createdAt DESC',
+    );
+    return maps.map((map) => BudgetVault.fromMap(map)).toList();
+  }
+
+  /// 获取启用的小金库
+  Future<List<BudgetVault>> getEnabledBudgetVaults({String? ledgerId}) async {
+    final db = await database;
+    String where = 'isEnabled = 1';
+    List<dynamic> whereArgs = [];
+    if (ledgerId != null) {
+      where += ' AND ledgerId = ?';
+      whereArgs.add(ledgerId);
+    }
+    final List<Map<String, dynamic>> maps = await db.query(
+      'budget_vaults',
+      where: where,
+      whereArgs: whereArgs.isEmpty ? null : whereArgs,
+      orderBy: 'sortOrder ASC',
+    );
+    return maps.map((map) => BudgetVault.fromMap(map)).toList();
+  }
+
+  /// 根据ID获取小金库
+  Future<BudgetVault?> getBudgetVaultById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'budget_vaults',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) return null;
+    return BudgetVault.fromMap(maps.first);
+  }
+
+  /// 根据关联分类获取小金库
+  Future<BudgetVault?> getBudgetVaultByCategory(String categoryId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'budget_vaults',
+      where: 'linkedCategoryId = ? OR linkedCategoryIds LIKE ?',
+      whereArgs: [categoryId, '%$categoryId%'],
+    );
+    if (maps.isEmpty) return null;
+    return BudgetVault.fromMap(maps.first);
+  }
+
+  /// 插入小金库分配记录
+  Future<int> insertVaultAllocation(VaultAllocation allocation) async {
+    final db = await database;
+    return await db.insert('vault_allocations', allocation.toMap());
+  }
+
+  /// 获取小金库的分配记录
+  Future<List<VaultAllocation>> getVaultAllocations(String vaultId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'vault_allocations',
+      where: 'vaultId = ?',
+      whereArgs: [vaultId],
+      orderBy: 'allocatedAt DESC',
+    );
+    return maps.map((map) => VaultAllocation.fromMap(map)).toList();
+  }
+
+  /// 插入小金库调拨记录
+  Future<int> insertVaultTransfer(VaultTransfer transfer) async {
+    final db = await database;
+    return await db.insert('vault_transfers', transfer.toMap());
+  }
+
+  /// 获取小金库的调拨记录
+  Future<List<VaultTransfer>> getVaultTransfers(String vaultId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'vault_transfers',
+      where: 'fromVaultId = ? OR toVaultId = ?',
+      whereArgs: [vaultId, vaultId],
+      orderBy: 'transferredAt DESC',
+    );
+    return maps.map((map) => VaultTransfer.fromMap(map)).toList();
+  }
+
+  /// 更新小金库已分配金额
+  Future<void> updateVaultAllocatedAmount(String vaultId, double amount) async {
+    final db = await database;
+    await db.rawUpdate(
+      'UPDATE budget_vaults SET allocatedAmount = allocatedAmount + ?, updatedAt = ? WHERE id = ?',
+      [amount, DateTime.now().millisecondsSinceEpoch, vaultId],
+    );
+  }
+
+  /// 更新小金库已花费金额
+  Future<void> updateVaultSpentAmount(String vaultId, double amount) async {
+    final db = await database;
+    await db.rawUpdate(
+      'UPDATE budget_vaults SET spentAmount = spentAmount + ?, updatedAt = ? WHERE id = ?',
+      [amount, DateTime.now().millisecondsSinceEpoch, vaultId],
+    );
   }
 }
