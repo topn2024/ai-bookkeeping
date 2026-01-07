@@ -171,6 +171,16 @@ class IntentClassifier {
     IntentType.queryMoneyAge: [
       RegExp(r'钱龄|资金年龄|财务健康'),
     ],
+    // 页面导航意图（支持145页语音导航）
+    IntentType.navigate: [
+      RegExp(r'打开|进入|去|跳转到?|切换到?|显示'),
+      RegExp(r'看看|查看|浏览'),
+      RegExp(r'返回|回到'),
+      RegExp(r'在哪|怎么找|怎么打开'),
+      RegExp(r'首页|设置|统计|报表|账户|分类|预算|钱龄|小金库'),
+      RegExp(r'语音|AI|导入|导出|帮助|反馈|安全|隐私'),
+      RegExp(r'家庭|成员|邀请|习惯|冲动|分享|成就'),
+    ],
   };
 
   /// 分类意图
@@ -514,6 +524,7 @@ enum IntentType {
   queryMoneyAge,    // 查询钱龄
   deleteRecord,     // 删除记录
   modifyRecord,     // 修改记录
+  navigate,         // 页面导航（145页语音导航）
   unknown,          // 未知意图
 }
 
@@ -537,6 +548,9 @@ class NLUIntent {
       type == IntentType.queryExpense ||
       type == IntentType.queryBudget ||
       type == IntentType.queryMoneyAge;
+
+  /// 是否为页面导航意图
+  bool get isNavigateIntent => type == IntentType.navigate;
 }
 
 /// 实体类型
