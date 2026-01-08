@@ -49,9 +49,13 @@ class Transaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
 
+    # Family book related fields
+    visibility: Mapped[int] = mapped_column(Integer, default=1)  # 0: private, 1: all_members, 2: admins_only
+
     # Relationships
     user = relationship("User", back_populates="transactions")
     book = relationship("Book", back_populates="transactions")
     account = relationship("Account", foreign_keys=[account_id], back_populates="transactions")
     target_account = relationship("Account", foreign_keys=[target_account_id])
     category = relationship("Category")
+    split_info = relationship("TransactionSplit", back_populates="transaction", uselist=False, cascade="all, delete-orphan")

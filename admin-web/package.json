@@ -3,13 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:check": "vue-tsc --noEmit && vite build",
     "type-check": "vue-tsc --noEmit",
     "preview": "vite preview",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{vue,ts,js,css,scss}\"",
+    "format:check": "prettier --check \"src/**/*.{vue,ts,js,css,scss}\"",
     "test": "vitest",
     "test:coverage": "vitest run --coverage"
   },
@@ -28,13 +35,19 @@
     "vue-router": "^4.2.5"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^20.10.0",
     "@types/nprogress": "^0.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "@vitejs/plugin-vue": "^5.0.0",
     "@vue/test-utils": "^2.4.0",
     "@vue/tsconfig": "^0.5.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-vue": "^9.28.0",
     "jsdom": "^23.0.0",
+    "prettier": "^3.3.0",
     "sass": "^1.69.0",
     "terser": "^5.44.1",
     "typescript": "~5.3.0",

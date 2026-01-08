@@ -8,7 +8,13 @@ from pydantic import BaseModel, Field
 
 
 class TransactionCreate(BaseModel):
-    """Schema for creating a transaction."""
+    """Schema for creating a transaction.
+
+    Visibility levels (for family/shared books):
+        0: private - 仅本人可见
+        1: all_members - 所有成员可见 (默认)
+        2: admins_only - 仅管理员可见
+    """
     book_id: UUID
     account_id: UUID
     target_account_id: Optional[UUID] = None
@@ -24,6 +30,7 @@ class TransactionCreate(BaseModel):
     location: Optional[str] = Field(None, max_length=200)
     is_reimbursable: bool = False
     is_exclude_stats: bool = False
+    visibility: int = Field(default=1, ge=0, le=2)  # 0: private, 1: all_members, 2: admins_only
     source: int = Field(default=0, ge=0, le=3)  # 0: manual, 1: image, 2: voice, 3: email
     ai_confidence: Optional[Decimal] = Field(None, ge=0, le=1)
     # Source file fields for AI recognition
@@ -51,6 +58,7 @@ class TransactionUpdate(BaseModel):
     is_reimbursable: Optional[bool] = None
     is_reimbursed: Optional[bool] = None
     is_exclude_stats: Optional[bool] = None
+    visibility: Optional[int] = Field(None, ge=0, le=2)
 
 
 class TransactionResponse(BaseModel):
@@ -73,6 +81,7 @@ class TransactionResponse(BaseModel):
     is_reimbursable: bool
     is_reimbursed: bool
     is_exclude_stats: bool
+    visibility: int = 1
     source: int
     ai_confidence: Optional[Decimal] = None
     # Source file fields

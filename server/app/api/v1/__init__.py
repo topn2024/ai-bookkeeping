@@ -19,6 +19,12 @@ from app.api.v1.backup import router as backup_router
 from app.api.v1.config import router as config_router
 from app.api.v1.app_upgrade import router as app_upgrade_router
 from app.api.v1.users import router as users_router
+# Family book routers
+from app.api.v1.invitations import router as invitations_router, accept_router as invitations_accept_router
+from app.api.v1.family_budget import router as family_budget_router
+from app.api.v1.splits import router as splits_router
+from app.api.v1.saving_goals import router as saving_goals_router
+from app.api.v1.family_stats import router as family_stats_router
 
 api_router = APIRouter()
 
@@ -40,3 +46,10 @@ api_router.include_router(files_router)
 api_router.include_router(backup_router)
 api_router.include_router(config_router)
 api_router.include_router(app_upgrade_router)
+# Family book routers
+api_router.include_router(invitations_router)
+api_router.include_router(invitations_accept_router)
+api_router.include_router(family_budget_router)
+api_router.include_router(splits_router)
+api_router.include_router(saving_goals_router)
+api_router.include_router(family_stats_router)

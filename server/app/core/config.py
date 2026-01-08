@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = ""  # Required: Set via environment variable
 
+    # Celery
+    CELERY_BROKER_URL: str = ""  # Defaults to REDIS_URL if not set
+    CELERY_RESULT_BACKEND: str = ""  # Defaults to REDIS_URL if not set
+    CELERY_TIMEZONE: str = "Asia/Shanghai"
+
     # JWT
     JWT_SECRET_KEY: str = ""  # Required: Set via environment variable
     JWT_ALGORITHM: str = "HS256"

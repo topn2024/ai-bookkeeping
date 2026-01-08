@@ -1,6 +1,11 @@
 """Database models."""
 from app.models.user import User
-from app.models.book import Book, BookMember
+from app.models.book import (
+    Book, BookMember, BookInvitation,
+    FamilyBudget, MemberBudget,
+    FamilySavingGoal, GoalContribution,
+    TransactionSplit, SplitParticipant
+)
 from app.models.account import Account
 from app.models.category import Category
 from app.models.transaction import Transaction
@@ -16,6 +21,13 @@ __all__ = [
     "User",
     "Book",
     "BookMember",
+    "BookInvitation",
+    "FamilyBudget",
+    "MemberBudget",
+    "FamilySavingGoal",
+    "GoalContribution",
+    "TransactionSplit",
+    "SplitParticipant",
     "Account",
     "Category",
     "Transaction",

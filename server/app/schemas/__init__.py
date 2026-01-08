@@ -60,6 +60,19 @@ from app.schemas.oauth import (
     AppleTokenResponse
 )
 
+# Family book schemas
+from app.schemas.family import (
+    InvitationCreate, InvitationResponse, InvitationAccept, InvitationAcceptResponse,
+    FamilyBudgetCreate, FamilyBudgetUpdate, FamilyBudgetResponse, MemberBudgetResponse,
+    BudgetAlertResponse, MemberBudgetCreate,
+    TransactionSplitCreate, TransactionSplitResponse, SplitParticipantResponse,
+    SplitParticipantCreate, SplitSettleRequest,
+    FamilySavingGoalCreate, FamilySavingGoalUpdate, FamilySavingGoalResponse,
+    GoalContributionCreate, GoalContributionResponse,
+    FamilyDashboardResponse, FamilySummary, MemberContribution, CategoryBreakdown,
+    PendingSplit, FamilyLeaderboardEntry, FamilyLeaderboardResponse
+)
+
 
 __all__ = [
     # User
@@ -94,4 +107,14 @@ __all__ = [
     "GoogleTokenResponse", "GoogleUserInfo",
     "WeChatTokenResponse", "WeChatUserInfo",
     "AppleTokenResponse",
+    # Family book
+    "InvitationCreate", "InvitationResponse", "InvitationAccept", "InvitationAcceptResponse",
+    "FamilyBudgetCreate", "FamilyBudgetUpdate", "FamilyBudgetResponse", "MemberBudgetResponse",
+    "BudgetAlertResponse", "MemberBudgetCreate",
+    "TransactionSplitCreate", "TransactionSplitResponse", "SplitParticipantResponse",
+    "SplitParticipantCreate", "SplitSettleRequest",
+    "FamilySavingGoalCreate", "FamilySavingGoalUpdate", "FamilySavingGoalResponse",
+    "GoalContributionCreate", "GoalContributionResponse",
+    "FamilyDashboardResponse", "FamilySummary", "MemberContribution", "CategoryBreakdown",
+    "PendingSplit", "FamilyLeaderboardEntry", "FamilyLeaderboardResponse",
 ]

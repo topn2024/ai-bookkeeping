@@ -651,7 +651,13 @@
       "Bash(mkdir:*)",
       "Bash(cd:*)",
       "Bash(dart fix:*)",
-      "Bash(rm -f nul)"
+      "Bash(rm -f nul)",
+      "Bash(git -C \"D:\\\\code\\\\ai-bookkeeping\" check-ignore admin-web/package-lock.json)",
+      "Bash(git -C:*)",
+      "Bash(docker compose:*)",
+      "Bash(cmd /c \"where docker\")",
+      "Bash(cmd /c \"echo Docker not found\")",
+      "Bash(\"C:\\\\Program Files\\\\Docker\\\\Docker\\\\resources\\\\bin\\\\docker.exe\" --version)"
     ]
   }
 }

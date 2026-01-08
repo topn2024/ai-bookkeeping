@@ -1,0 +1,22 @@
+{
+  "name": "ai-bookkeeping",
+  "private": true,
+  "description": "AI Bookkeeping - Monorepo root",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0"
+  },
+  "lint-staged": {
+    "admin-web/**/*.{vue,ts,js}": [
+      "npm run lint:fix --prefix admin-web",
+      "npm run format --prefix admin-web"
+    ],
+    "server/**/*.py": [
+      "ruff check --fix",
+      "ruff format"
+    ]
+  }
+}
