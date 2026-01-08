@@ -13,9 +13,9 @@ services:
     container_name: aibook-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ai_bookkeeping
-      POSTGRES_PASSWORD: AiBookkeeping@2024
-      POSTGRES_DB: ai_bookkeeping
+      POSTGRES_USER: ${POSTGRES_USER:-ai_bookkeeping}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_bookkeeping}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
@@ -23,7 +23,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ai_bookkeeping -d ai_bookkeeping"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_bookkeeping} -d ${POSTGRES_DB:-ai_bookkeeping}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -33,13 +33,13 @@ services:
     image: redis:7-alpine
     container_name: aibook-redis
     restart: unless-stopped
-    command: redis-server --requirepass AiBookkeeping@2024 --appendonly yes
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --appendonly yes
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "AiBookkeeping@2024", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,8 +51,8 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: AiBookkeeping@2024
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
     ports:
       - "9000:9000"   # API
       - "9001:9001"   # Console

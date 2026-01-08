@@ -55,9 +55,9 @@ class HttpService {
     if (_configService.isInitialized) {
       return _configService.config.skipCertificateVerification;
     }
-    // 默认跳过验证（开发环境自签名证书）
-    // 生产环境应从服务器配置获取
-    return true;
+    // 生产环境默认启用证书验证（安全优先）
+    // 开发环境如需使用自签名证书，请通过服务器配置下发 skip_certificate_verification: true
+    return false;
   }
 
   void _initDio() {

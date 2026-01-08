@@ -71,5 +71,13 @@ htmlcov/
 *.bak
 *.tmp
 scripts/build.env
-# Claude Code local settings (ignore)
-.claude/settings.local.json
+
+# Security - Additional sensitive files
+server/.env
+server/.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+local.properties
