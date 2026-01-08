@@ -64,3 +64,5 @@ htmlcov/
 *.bak
 *.tmp
 scripts/build.env
+# Claude Code local settings (ignore)
+.claude/settings.local.json
