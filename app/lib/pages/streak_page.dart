@@ -237,7 +237,7 @@ class _StatsSection extends StatelessWidget {
           _StatCard(
             icon: Icons.trending_up,
             label: '本月记账',
-            value: '${currentStreak}天',
+            value: '$currentStreak天',
             color: Colors.green,
           ),
         ],

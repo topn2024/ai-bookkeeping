@@ -97,7 +97,7 @@ class HeatmapConfig {
       maxColor: maxColor,
       showXLabels: true,
       showYLabels: true,
-      xLabels: List.generate(24, (i) => '${i}时'),
+      xLabels: List.generate(24, (i) => '$i时'),
       yLabels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
     );
   }
@@ -355,7 +355,7 @@ class _ConsumptionHeatmapState extends State<ConsumptionHeatmap>
                                           BoxShadow(
                                             color: Theme.of(context)
                                                 .primaryColor
-                                                .withOpacity(0.3),
+                                                .withValues(alpha: 0.3),
                                             blurRadius: 4,
                                             spreadRadius: 1,
                                           ),
@@ -444,7 +444,7 @@ class _ConsumptionHeatmapState extends State<ConsumptionHeatmap>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor.withOpacity(0.1),
+        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

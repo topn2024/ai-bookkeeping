@@ -27,7 +27,7 @@ class _SecurityAuditLogPageState extends ConsumerState<SecurityAuditLogPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.securityLog ?? '安全日志',
+          l10n.securityLog,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,

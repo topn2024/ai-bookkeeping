@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
 
+import '../../services/import/smart_directory_scanner_service.dart';
 import 'smart_format_detection_page.dart';
 
 /// 智能目录发现页面
 /// 原型设计 5.16：智能目录发现
+/// 设计文档第11.1.1节：智能账单发现交互流程
+/// - 扫描微信、支付宝、银行默认导出目录
 /// - 扫描状态显示
 /// - 发现的账单文件列表（可多选）
 /// - 文件来源标识（微信/支付宝/银行）
@@ -20,9 +24,17 @@ class SmartDirectoryDiscoveryPage extends ConsumerStatefulWidget {
 
 class _SmartDirectoryDiscoveryPageState
     extends ConsumerState<SmartDirectoryDiscoveryPage> {
+  final SmartDirectoryScannerService _scannerService =
+      SmartDirectoryScannerService();
+
   bool _isScanning = false;
   List<DiscoveredFile> _discoveredFiles = [];
   Set<String> _selectedFiles = {};
+
+  // 扫描进度
+  String _scanStatus = '';
+  int _scanProgress = 0;
+  int _scanTotal = 0;
 
   @override
   void initState() {
@@ -31,48 +43,67 @@ class _SmartDirectoryDiscoveryPageState
   }
 
   Future<void> _startScan() async {
-    setState(() => _isScanning = true);
-
-    // 模拟扫描过程
-    await Future.delayed(const Duration(seconds: 2));
-
-    // 模拟发现的文件
-    final files = [
-      DiscoveredFile(
-        id: '1',
-        fileName: '微信账单_202412.csv',
-        source: 'wechat',
-        recordCount: 156,
-        dateRange: '12月账单',
-        fileSize: '2.3MB',
-        filePath: '/Download/WeChat/',
-      ),
-      DiscoveredFile(
-        id: '2',
-        fileName: '支付宝账单_2024Q4.csv',
-        source: 'alipay',
-        recordCount: 243,
-        dateRange: '10-12月',
-        fileSize: '4.1MB',
-        filePath: '/Download/Alipay/',
-      ),
-      DiscoveredFile(
-        id: '3',
-        fileName: '招商银行流水.xlsx',
-        source: 'bank',
-        recordCount: 89,
-        dateRange: '11-12月',
-        fileSize: '1.2MB',
-        filePath: '/Download/',
-      ),
-    ];
-
     setState(() {
-      _isScanning = false;
-      _discoveredFiles = files;
-      // 默认选中前两个
-      _selectedFiles = {'1', '2'};
+      _isScanning = true;
+      _scanStatus = '准备扫描...';
+      _scanProgress = 0;
+      _scanTotal = 0;
+      _discoveredFiles = [];
+      _selectedFiles = {};
     });
+
+    try {
+      final files = await _scannerService.scanDefaultDirectories(
+        onProgress: (stage, current, total, path) {
+          setState(() {
+            _scanProgress = current;
+            _scanTotal = total;
+            switch (stage) {
+              case ScanStage.preparing:
+                _scanStatus = '准备扫描目录...';
+                break;
+              case ScanStage.scanning:
+                _scanStatus = '正在扫描: ${path ?? ""}';
+                break;
+              case ScanStage.analyzing:
+                _scanStatus = '正在分析: ${path ?? ""}';
+                break;
+              case ScanStage.completed:
+                _scanStatus = '扫描完成';
+                break;
+            }
+          });
+        },
+      );
+
+      // 转换为UI模型
+      final uiFiles = files.map((f) => DiscoveredFile(
+            id: f.id,
+            fileName: f.fileName,
+            source: f.source,
+            recordCount: f.estimatedRecordCount,
+            dateRange: f.dateRangeDisplay,
+            fileSize: f.fileSizeDisplay,
+            filePath: f.directoryPath,
+            fullPath: f.fullPath,
+            confidence: f.confidence,
+          )).toList();
+
+      setState(() {
+        _isScanning = false;
+        _discoveredFiles = uiFiles;
+        // 默认选中置信度高于0.7的文件
+        _selectedFiles = uiFiles
+            .where((f) => f.confidence >= 0.7)
+            .map((f) => f.id)
+            .toSet();
+      });
+    } catch (e) {
+      setState(() {
+        _isScanning = false;
+        _scanStatus = '扫描出错: $e';
+      });
+    }
   }
 
   @override
@@ -193,15 +224,27 @@ class _SmartDirectoryDiscoveryPageState
         children: [
           CircularProgressIndicator(
             color: theme.colorScheme.primary,
+            value: _scanTotal > 0 ? _scanProgress / _scanTotal : null,
           ),
           const SizedBox(height: 16),
           Text(
-            '正在扫描下载目录...',
+            _scanStatus,
             style: TextStyle(
               fontSize: 14,
               color: theme.colorScheme.onSurfaceVariant,
             ),
+            textAlign: TextAlign.center,
           ),
+          if (_scanTotal > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              '$_scanProgress / $_scanTotal',
+              style: TextStyle(
+                fontSize: 12,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -489,10 +532,34 @@ class _SmartDirectoryDiscoveryPageState
     });
   }
 
-  void _browseDirectory(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('打开文件选择器...')),
-    );
+  void _browseDirectory(BuildContext context) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv', 'xlsx', 'xls'],
+        allowMultiple: true,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        // 直接导入选中的文件
+        final firstFile = result.files.first;
+        if (firstFile.path != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SmartFormatDetectionPage(
+                filePath: firstFile.path!,
+                fileName: firstFile.name,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('选择文件失败: $e')),
+      );
+    }
   }
 
   void _importSelectedFiles(BuildContext context) {
@@ -504,7 +571,7 @@ class _SmartDirectoryDiscoveryPageState
       context,
       MaterialPageRoute(
         builder: (_) => SmartFormatDetectionPage(
-          filePath: selectedFile.filePath + selectedFile.fileName,
+          filePath: selectedFile.fullPath,
           fileName: selectedFile.fileName,
         ),
       ),
@@ -521,6 +588,8 @@ class DiscoveredFile {
   final String dateRange;
   final String fileSize;
   final String filePath;
+  final String fullPath;
+  final double confidence;
 
   DiscoveredFile({
     required this.id,
@@ -530,5 +599,7 @@ class DiscoveredFile {
     required this.dateRange,
     required this.fileSize,
     required this.filePath,
+    this.fullPath = '',
+    this.confidence = 0.5,
   });
 }

@@ -218,7 +218,7 @@ class AccessibleErrorService {
   bool _autoAnnounce = true;
 
   /// 播报延迟（毫秒）
-  int _announceDelay = 100;
+  final int _announceDelay = 100;
 
   /// 获取是否自动播报
   bool get autoAnnounce => _autoAnnounce;
@@ -698,7 +698,7 @@ class AccessibleErrorWidget extends StatelessWidget {
                     Text(
                       error.description!,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: iconColor.withOpacity(0.8),
+                        color: iconColor.withValues(alpha: 0.8),
                       ),
                     ),
                   ],
@@ -717,7 +717,7 @@ class AccessibleErrorWidget extends StatelessWidget {
                                 child: Text(
                                   suggestion,
                                   style: theme.textTheme.bodySmall?.copyWith(
-                                    color: iconColor.withOpacity(0.9),
+                                    color: iconColor.withValues(alpha: 0.9),
                                   ),
                                 ),
                               ),
@@ -793,7 +793,7 @@ class FieldErrorText extends StatelessWidget {
               Text(
                 suggestion!,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.error.withOpacity(0.8),
+                  color: Theme.of(context).colorScheme.error.withValues(alpha: 0.8),
                   fontSize: 11,
                 ),
               ),

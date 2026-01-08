@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
 import 'app_lock_settings_page.dart';
-import 'pin_settings_page.dart';
 import 'privacy_mode_page.dart';
 import 'security_audit_log_page.dart';
 
@@ -37,7 +36,7 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.securitySettings ?? '安全设置',
+          l10n.securitySettings,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -50,7 +49,7 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
           children: [
             _buildSecurityItem(
               icon: Icons.fingerprint,
-              title: l10n?.fingerprintUnlock ?? '指纹解锁',
+              title: l10n.fingerprintUnlock,
               subtitle: '使用指纹快速解锁应用',
               value: _fingerprintUnlock,
               onChanged: (v) => setState(() => _fingerprintUnlock = v),
@@ -58,7 +57,7 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
             const SizedBox(height: 8),
             _buildSecurityItem(
               icon: Icons.face,
-              title: l10n?.faceIdUnlock ?? '面容解锁',
+              title: l10n.faceIdUnlock,
               subtitle: '使用面容ID解锁',
               value: _faceIdUnlock,
               onChanged: (v) => setState(() => _faceIdUnlock = v),
@@ -66,14 +65,14 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
             const SizedBox(height: 8),
             _buildNavigationItem(
               icon: Icons.pin,
-              title: l10n?.appLock ?? '应用锁',
+              title: l10n.appLock,
               subtitle: '设置6位数字密码',
               onTap: () => _navigateToAppLockSettings(),
             ),
             const SizedBox(height: 8),
             _buildSecurityItem(
               icon: Icons.visibility_off,
-              title: l10n?.hideAmount ?? '隐藏金额',
+              title: l10n.hideAmount,
               subtitle: '首页金额显示为***',
               value: _hideAmount,
               onChanged: (v) => setState(() => _hideAmount = v),
@@ -81,7 +80,7 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
             const SizedBox(height: 8),
             _buildSecurityItem(
               icon: Icons.screenshot,
-              title: l10n?.preventScreenshot ?? '禁止截屏',
+              title: l10n.preventScreenshot,
               subtitle: '防止敏感信息泄露',
               value: _preventScreenshot,
               onChanged: (v) => setState(() => _preventScreenshot = v),
@@ -151,7 +150,7 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
         trailing: Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: AppColors.primary,
+          activeTrackColor: AppColors.primary,
         ),
       ),
     );

@@ -916,7 +916,7 @@ class SZh extends S {
   String get debt => '借贷';
 
   @override
-  String get debtManagement => '借贷管理';
+  String get debtManagement => '债务管理';
 
   @override
   String get addDebt => '添加借贷';
@@ -1074,7 +1074,7 @@ class SZh extends S {
   String get monthlyReport => '月度报表';
 
   @override
-  String get weeklyReport => '周报表';
+  String get weeklyReport => '周报';
 
   @override
   String get customReport => '自定义报表';
@@ -1696,6 +1696,1081 @@ class SZh extends S {
 
   @override
   String get budgetName => '预算名称';
+
+  @override
+  String get myAccounts => '我的账户';
+
+  @override
+  String get liabilities => '负债';
+
+  @override
+  String get creditLimit => '额度';
+
+  @override
+  String get repaymentDay => '还款日';
+
+  @override
+  String get dayUnit => '号';
+
+  @override
+  String get transactionRecord => '交易记录';
+
+  @override
+  String get transactionDetail => '交易详情';
+
+  @override
+  String get merchant => '商户';
+
+  @override
+  String get moneyAgeInfo => '钱龄信息';
+
+  @override
+  String get moneyAgeUsedPrefix => '这笔支出使用的是';
+
+  @override
+  String get moneyAgeUsedSuffix => '的收入';
+
+  @override
+  String daysAgo(int days) {
+    return '$days天前';
+  }
+
+  @override
+  String get undoDelete => '撤销删除';
+
+  @override
+  String get undo => '撤销';
+
+  @override
+  String deletedTransaction(String name, String amount) {
+    return '已删除「$name ¥$amount」';
+  }
+
+  @override
+  String get linkVault => '关联小金库';
+
+  @override
+  String get noLink => '不关联';
+
+  @override
+  String get tags => '标签';
+
+  @override
+  String get addTag => '添加标签';
+
+  @override
+  String get saveTransaction => '保存交易';
+
+  @override
+  String get totalDebt => '总负债';
+
+  @override
+  String get dueThisMonth => '本月需还';
+
+  @override
+  String debtPaidPercent(int percent) {
+    return '已还$percent%';
+  }
+
+  @override
+  String estimatedPayoffMonths(int months) {
+    return '预计$months个月还清';
+  }
+
+  @override
+  String get debtDetails => '债务明细';
+
+  @override
+  String repaymentDayIn(int day, String daysLeft) {
+    return '还款日$day号 · $daysLeft';
+  }
+
+  @override
+  String daysLater(int days) {
+    return '$days天后';
+  }
+
+  @override
+  String get currentBill => '本期账单';
+
+  @override
+  String get installmentInProgress => '分期中';
+
+  @override
+  String installmentRemaining(int count) {
+    return '剩余$count期';
+  }
+
+  @override
+  String get remainingPrincipal => '剩余本金';
+
+  @override
+  String get repaymentSuggestion => '还款建议';
+
+  @override
+  String get prioritizeHighInterest => '优先还清高利息债务';
+
+  @override
+  String get consumerLoan => '消费贷款';
+
+  @override
+  String get smartAdvice => '智能建议';
+
+  @override
+  String get todayAdvice => '今日建议';
+
+  @override
+  String get manageAdvicePreference => '管理建议偏好';
+
+  @override
+  String get financialFreedomSimulator => '财务自由模拟器';
+
+  @override
+  String get yourFinancialFreedomJourney => '你的财务自由之旅';
+
+  @override
+  String get estimatedTime => '预计时间';
+
+  @override
+  String get toAchieveFreedom => '达到财务自由';
+
+  @override
+  String get accelerateTip => '加速提示';
+
+  @override
+  String get adjustParameters => '调整参数';
+
+  @override
+  String get monthlySavings => '月度储蓄';
+
+  @override
+  String get annualReturn => '年度回顾';
+
+  @override
+  String get targetPassiveIncome => '目标被动收入';
+
+  @override
+  String get disclaimer => '免责声明';
+
+  @override
+  String get smartRecommendation => '智能推荐';
+
+  @override
+  String get discoverNewFeature => '发现新功能';
+
+  @override
+  String get laterRemind => '稍后提醒';
+
+  @override
+  String get aaSplit => 'AA分账';
+
+  @override
+  String get aaDetected => '检测到AA分账';
+
+  @override
+  String get totalAmount => '总金额';
+
+  @override
+  String get splitPeople => '分账人数';
+
+  @override
+  String get splitMethod => '分摊方式';
+
+  @override
+  String get evenSplit => '平均分摊';
+
+  @override
+  String get proportionalSplit => '按比例分摊';
+
+  @override
+  String get customSplit => '自定义分摊';
+
+  @override
+  String get yourShare => '你的份额';
+
+  @override
+  String get confirmSplit => '确认分账';
+
+  @override
+  String get accessibilitySettings => '无障碍设置';
+
+  @override
+  String get fontSize => '字体大小';
+
+  @override
+  String get highContrast => '高对比度';
+
+  @override
+  String get boldText => '粗体文字';
+
+  @override
+  String get screenReader => '屏幕阅读器';
+
+  @override
+  String get reduceMotion => '减少动效';
+
+  @override
+  String get largeTouch => '大触控区域';
+
+  @override
+  String get aiLanguageSettings => 'AI语言设置';
+
+  @override
+  String get aiReplyLanguage => 'AI回复语言';
+
+  @override
+  String get aiVoice => 'AI语音';
+
+  @override
+  String get maleVoice => '男声';
+
+  @override
+  String get femaleVoice => '女声';
+
+  @override
+  String get familyLeaderboard => '家庭排行榜';
+
+  @override
+  String get weeklyRanking => '本周排名';
+
+  @override
+  String get monthlyRanking => '本月排名';
+
+  @override
+  String get savingsChampion => '储蓄冠军';
+
+  @override
+  String get budgetMaster => '预算达人';
+
+  @override
+  String get familySavingsGoal => '家庭储蓄目标';
+
+  @override
+  String get contributeNow => '立即贡献';
+
+  @override
+  String get goalAmount => '目标金额';
+
+  @override
+  String get currentProgress => '当前进度';
+
+  @override
+  String get daysRemaining => '剩余天数';
+
+  @override
+  String get ledgerSettings => '账本设置';
+
+  @override
+  String get defaultLedger => '默认账本';
+
+  @override
+  String get ledgerName => '账本名称';
+
+  @override
+  String get ledgerIcon => '账本图标';
+
+  @override
+  String get ledgerColor => '账本颜色';
+
+  @override
+  String get archiveLedger => '归档账本';
+
+  @override
+  String get locationServices => '位置服务';
+
+  @override
+  String get enableLocation => '启用位置';
+
+  @override
+  String get locationAccuracy => '定位精度';
+
+  @override
+  String get highAccuracy => '高精度';
+
+  @override
+  String get lowPower => '低功耗';
+
+  @override
+  String get geofenceAlerts => '地理围栏提醒';
+
+  @override
+  String get nearbyMerchants => '附近商家';
+
+  @override
+  String get duplicateTransaction => '复制交易';
+
+  @override
+  String get transactionTime => '交易时间';
+
+  @override
+  String get transactionNote => '交易备注';
+
+  @override
+  String get transactionTags => '交易标签';
+
+  @override
+  String get transactionLocation => '交易位置';
+
+  @override
+  String get transactionAttachments => '交易附件';
+
+  @override
+  String get budgetWarning => '预算预警';
+
+  @override
+  String get moneyAgeTitle => '钱龄分析';
+
+  @override
+  String get moneyAgeDescription2 => '了解你的资金周转效率';
+
+  @override
+  String get averageMoneyAge => '平均钱龄';
+
+  @override
+  String get moneyAgeHealth => '钱龄健康度';
+
+  @override
+  String get poor => '较差';
+
+  @override
+  String get habitTracking => '习惯追踪';
+
+  @override
+  String get dailyStreak => '连续记账';
+
+  @override
+  String get weeklyGoal => '每周目标';
+
+  @override
+  String get monthlyGoal => '每月目标';
+
+  @override
+  String streakDays(int count) {
+    return '$count天';
+  }
+
+  @override
+  String get achievementUnlocked => '成就解锁';
+
+  @override
+  String get viewAchievements => '查看成就';
+
+  @override
+  String get shareAchievement => '分享成就';
+
+  @override
+  String get achievementProgress => '成就进度';
+
+  @override
+  String get listening => '正在聆听...';
+
+  @override
+  String get voiceError => '语音识别失败';
+
+  @override
+  String get speakNow => '请说话';
+
+  @override
+  String get scanBill => '扫描账单';
+
+  @override
+  String get recognizing => '识别中...';
+
+  @override
+  String get recognitionFailed => '识别失败';
+
+  @override
+  String get syncing => '同步中...';
+
+  @override
+  String get syncComplete => '同步完成';
+
+  @override
+  String get syncFailed => '同步失败';
+
+  @override
+  String get lastSynced => '上次同步';
+
+  @override
+  String get syncNow => '立即同步';
+
+  @override
+  String get offlineMode => '离线模式';
+
+  @override
+  String get offlineData => '离线数据';
+
+  @override
+  String get pendingSync => '待同步';
+
+  @override
+  String get offlineChanges => '离线更改';
+
+  @override
+  String get privacySettings => '隐私设置';
+
+  @override
+  String get dataEncryption => '数据加密';
+
+  @override
+  String get biometricLock => '生物识别锁';
+
+  @override
+  String get autoLock => '自动锁定';
+
+  @override
+  String get lockTimeout => '锁定超时';
+
+  @override
+  String get budgetAlerts => '预算提醒';
+
+  @override
+  String get dailyReminder => '每日提醒';
+
+  @override
+  String get exportFormat => '导出格式';
+
+  @override
+  String get csvFormat => 'CSV格式';
+
+  @override
+  String get excelFormat => 'Excel格式';
+
+  @override
+  String get jsonFormat => 'JSON格式';
+
+  @override
+  String get feedbackSubmitted => '反馈已提交';
+
+  @override
+  String get thankYouFeedback => '感谢您的反馈';
+
+  @override
+  String get rateApp => '给应用评分';
+
+  @override
+  String get shareApp => '分享应用';
+
+  @override
+  String get upgradeRequired => '需要升级';
+
+  @override
+  String get loginRequired => '需要登录';
+
+  @override
+  String get loginToUseFeature => '登录后可使用此功能';
+
+  @override
+  String get loginNow => '立即登录';
+
+  @override
+  String get continueAsGuest => '以访客身份继续';
+
+  @override
+  String get connectionFailed => '连接失败';
+
+  @override
+  String get checkNetwork => '请检查网络连接';
+
+  @override
+  String get permissionRequired => '需要权限';
+
+  @override
+  String get locationPermission => '位置权限';
+
+  @override
+  String get storagePermission => '存储权限';
+
+  @override
+  String get deleteWarning => '此操作无法撤销';
+
+  @override
+  String get permanentlyDelete => '永久删除';
+
+  @override
+  String get moveToTrash => '移至回收站';
+
+  @override
+  String get searchPlaceholder => '搜索...';
+
+  @override
+  String get noResults => '无结果';
+
+  @override
+  String get searchHistory => '搜索历史';
+
+  @override
+  String get clearHistory => '清除历史';
+
+  @override
+  String get filterBy => '筛选';
+
+  @override
+  String get sortBy => '排序';
+
+  @override
+  String get dateRange => '日期范围';
+
+  @override
+  String get amountRange => '金额范围';
+
+  @override
+  String get categoryFilter => '分类筛选';
+
+  @override
+  String get ascending => '升序';
+
+  @override
+  String get descending => '降序';
+
+  @override
+  String get byDate => '按日期';
+
+  @override
+  String get byAmount => '按金额';
+
+  @override
+  String get byCategory => '按分类';
+
+  @override
+  String get selectAll => '全选';
+
+  @override
+  String get deselectAll => '取消全选';
+
+  @override
+  String get selected => '已选择';
+
+  @override
+  String get batchDelete => '批量删除';
+
+  @override
+  String get batchEdit => '批量编辑';
+
+  @override
+  String get redo => '重做';
+
+  @override
+  String get actionUndone => '操作已撤销';
+
+  @override
+  String get actionRedone => '操作已重做';
+
+  @override
+  String get loadMore => '加载更多';
+
+  @override
+  String get refreshing => '刷新中...';
+
+  @override
+  String get pullToRefresh => '下拉刷新';
+
+  @override
+  String get releaseToRefresh => '释放刷新';
+
+  @override
+  String get emptyState => '暂无数据';
+
+  @override
+  String get addFirst => '添加第一条记录';
+
+  @override
+  String get welcomeBack => '欢迎回来';
+
+  @override
+  String get goodMorning => '早上好';
+
+  @override
+  String get goodAfternoon => '下午好';
+
+  @override
+  String get goodEvening => '晚上好';
+
+  @override
+  String get frequentCategories => '常用分类';
+
+  @override
+  String get suggestedActions => '建议操作';
+
+  @override
+  String get importData => '导入数据';
+
+  @override
+  String get exportData => '导出数据';
+
+  @override
+  String get autoDetected => '自动识别';
+
+  @override
+  String get myShare => '我的份额';
+
+  @override
+  String get perPerson => '人均';
+
+  @override
+  String get bookkeepingMode => '记账模式';
+
+  @override
+  String get onlyMyShare => '只记我的份额';
+
+  @override
+  String get recordTotal => '记录总额';
+
+  @override
+  String get largeTouchTarget => '大触控区域';
+
+  @override
+  String get admin => '管理员';
+
+  @override
+  String get adminDesc => '管理员权限描述';
+
+  @override
+  String get aiParsing => 'AI解析';
+
+  @override
+  String get aiParsingOfflineDesc => '离线模式下AI解析不可用';
+
+  @override
+  String get analyzing => '分析中...';
+
+  @override
+  String get annualReview => '年度总结';
+
+  @override
+  String get appLock => '应用锁';
+
+  @override
+  String get askAnything => '随便问';
+
+  @override
+  String get autoExtracted => '自动提取';
+
+  @override
+  String get autoSync => '自动同步';
+
+  @override
+  String get autoSyncDesc => '自动同步数据到云端';
+
+  @override
+  String get badgesWall => '徽章墙';
+
+  @override
+  String get basicRecording => '基础记账';
+
+  @override
+  String get biggestGoal => '最大目标';
+
+  @override
+  String get billDueReminder => '账单到期提醒';
+
+  @override
+  String get budgetOverflowAlert => '预算超支提醒';
+
+  @override
+  String get budgetOverspentAlert => '预算已超支';
+
+  @override
+  String get budgetQuery => '预算查询';
+
+  @override
+  String get choosePlan => '选择方案';
+
+  @override
+  String get completeUpgrade => '完成升级';
+
+  @override
+  String get confidenceLevel => '置信度';
+
+  @override
+  String get confirmBookkeeping => '确认记账';
+
+  @override
+  String get continueAsking => '继续提问';
+
+  @override
+  String get continueOffline => '继续离线使用';
+
+  @override
+  String get continuousChat => '连续对话';
+
+  @override
+  String get copyLink => '复制链接';
+
+  @override
+  String get createFamilyLedger => '创建家庭账本';
+
+  @override
+  String get currentPermissions => '当前权限';
+
+  @override
+  String get dangerZone => '危险区域';
+
+  @override
+  String get dataSecurityGuarantee => '数据安全保障';
+
+  @override
+  String get dateFormat => '日期格式';
+
+  @override
+  String get daysRecording => '天记账';
+
+  @override
+  String get defaultVisibility => '默认可见性';
+
+  @override
+  String get deleteLedger => '删除账本';
+
+  @override
+  String get depositNow => '立即存入';
+
+  @override
+  String get detailedStats => '详细统计';
+
+  @override
+  String get discount => '折扣';
+
+  @override
+  String get education => '教育';
+
+  @override
+  String get examples => '示例';
+
+  @override
+  String get faceIdUnlock => '面容解锁';
+
+  @override
+  String get familyContributions => '家庭贡献';
+
+  @override
+  String get familyDinners => '家庭聚餐';
+
+  @override
+  String get faq => '常见问题';
+
+  @override
+  String get feature => '功能';
+
+  @override
+  String get fingerprintUnlock => '指纹解锁';
+
+  @override
+  String get fullMode => '完整模式';
+
+  @override
+  String get generateBirthdayCard => '生成生日贺卡';
+
+  @override
+  String get geofenceReminder => '地理围栏提醒';
+
+  @override
+  String get getSuggestion => '获取建议';
+
+  @override
+  String get growth => '成长';
+
+  @override
+  String get hideAmount => '隐藏金额';
+
+  @override
+  String get hideAmountDesc => '在列表中隐藏金额显示';
+
+  @override
+  String get hobbies => '爱好';
+
+  @override
+  String get homeLayout => '首页布局';
+
+  @override
+  String get inputHint => '输入提示';
+
+  @override
+  String get inputToBookkeep => '输入记账';
+
+  @override
+  String get inviteFamily => '邀请家人';
+
+  @override
+  String get leaderboard => '排行榜';
+
+  @override
+  String get leaveLedger => '离开账本';
+
+  @override
+  String get ledgerType => '账本类型';
+
+  @override
+  String get locationAnalysis => '位置分析';
+
+  @override
+  String get locationAnalysisReport => '位置分析报告';
+
+  @override
+  String get lowConfidenceTitle => '低置信度';
+
+  @override
+  String get member => '成员';
+
+  @override
+  String get memberBenefits => '成员权益';
+
+  @override
+  String get memberContribution => '成员贡献';
+
+  @override
+  String get memberDesc => '成员描述';
+
+  @override
+  String get memberPermissions => '成员权限';
+
+  @override
+  String get memberRecordNotify => '成员记账通知';
+
+  @override
+  String get membershipService => '会员服务';
+
+  @override
+  String get memberVoteStatus => '成员投票状态';
+
+  @override
+  String get moneyAgeQuery => '钱龄查询';
+
+  @override
+  String get monthlySharedExpense => '月度共享支出';
+
+  @override
+  String get naturalLanguageInput => '自然语言输入';
+
+  @override
+  String get networkUnavailable => '网络不可用';
+
+  @override
+  String get noVoiceHistory => '暂无语音历史';
+
+  @override
+  String get numberFormat => '数字格式';
+
+  @override
+  String get offlineModeActive => '离线模式已启用';
+
+  @override
+  String get offlineModeDesc => '离线模式描述';
+
+  @override
+  String get offlineModeFullDesc => '离线模式下，数据将存储在本地，联网后自动同步';
+
+  @override
+  String get offlineVoice => '离线语音';
+
+  @override
+  String get offlineVoiceDesc => '离线语音识别';
+
+  @override
+  String get online => '在线';
+
+  @override
+  String get onlyOwnerCanDelete => '仅所有者可删除';
+
+  @override
+  String get originalText => '原始文本';
+
+  @override
+  String get otherSavingsGoals => '其他储蓄目标';
+
+  @override
+  String get owner => '所有者';
+
+  @override
+  String get ownerDesc => '所有者描述';
+
+  @override
+  String get permissionSettings => '权限设置';
+
+  @override
+  String get preciseLocationService => '精确定位服务';
+
+  @override
+  String get preventScreenshot => '防止截屏';
+
+  @override
+  String get privacyMode => '隐私模式';
+
+  @override
+  String get pushNotification => '推送通知';
+
+  @override
+  String get qrCodeInvite => '二维码邀请';
+
+  @override
+  String get quickBookkeep => '快速记账';
+
+  @override
+  String get quickBookkeeping => '快速记账';
+
+  @override
+  String get quickQuestions => '快速提问';
+
+  @override
+  String get receiptDetail => '收据详情';
+
+  @override
+  String get recentDeposits => '最近存款';
+
+  @override
+  String get recentRecords => '最近记录';
+
+  @override
+  String get recordLeaderboard => '记录排行榜';
+
+  @override
+  String get regionSettings => '区域设置';
+
+  @override
+  String get remind => '提醒';
+
+  @override
+  String get remoteSpendingRecord => '异地消费记录';
+
+  @override
+  String get residentLocations => '常驻位置';
+
+  @override
+  String get retryNetwork => '重试网络';
+
+  @override
+  String get retryOnline => '重新联网';
+
+  @override
+  String get roleRecommendation => '角色推荐';
+
+  @override
+  String get saveChanges => '保存更改';
+
+  @override
+  String get saveImage => '保存图片';
+
+  @override
+  String get savingsGoals => '储蓄目标';
+
+  @override
+  String get savingsLeaderboard => '储蓄排行榜';
+
+  @override
+  String get scanToJoin => '扫码加入';
+
+  @override
+  String get securityLog => '安全日志';
+
+  @override
+  String get selectRole => '选择角色';
+
+  @override
+  String get sendInviteLink => '发送邀请链接';
+
+  @override
+  String get setPin => '设置PIN码';
+
+  @override
+  String get sharedTime => '共享时间';
+
+  @override
+  String get shareLink => '分享链接';
+
+  @override
+  String get shareToFamily => '分享给家人';
+
+  @override
+  String get showQRCode => '显示二维码';
+
+  @override
+  String get simpleMode => '简单模式';
+
+  @override
+  String get smartTextInput => '智能文本输入';
+
+  @override
+  String get startUpgrade => '开始升级';
+
+  @override
+  String get staySimple => '保持简洁';
+
+  @override
+  String get subtotal => '小计';
+
+  @override
+  String get timeFormat => '时间格式';
+
+  @override
+  String get tripsCount => '出行次数';
+
+  @override
+  String get typeOrSpeak => '输入或语音';
+
+  @override
+  String get upgradeDescription => '升级描述';
+
+  @override
+  String get upgradeMode => '升级模式';
+
+  @override
+  String get upgradeNotice => '升级通知';
+
+  @override
+  String get upgradeNoticeDesc => '升级通知描述';
+
+  @override
+  String get upgradeToFullMode => '升级到完整模式';
+
+  @override
+  String get upgradeVote => '升级投票';
+
+  @override
+  String get useOffline => '离线使用';
+
+  @override
+  String get viewer => '查看者';
+
+  @override
+  String get viewerDesc => '查看者描述';
+
+  @override
+  String get viewStats => '查看统计';
+
+  @override
+  String get visibilityDesc => '可见性描述';
+
+  @override
+  String get voiceAssistant => '语音助手';
+
+  @override
+  String get voiceChat => '语音聊天';
+
+  @override
+  String get voiceHistoryHint => '语音历史提示';
+
+  @override
+  String get voiceHistoryTitle => '语音历史';
+
+  @override
+  String get voteComplete => '投票完成';
+
+  @override
+  String get voteRules => '投票规则';
+
+  @override
+  String get waitingForVotes => '等待投票';
+
+  @override
+  String get warmestMoment => '最温暖的时刻';
+
+  @override
+  String get weekStartDay => '每周起始日';
+
+  @override
+  String get yearlyWarmMoments => '年度温暖时刻';
+
+  @override
+  String get youCanAsk => '你可以问';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).

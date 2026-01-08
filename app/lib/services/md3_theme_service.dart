@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -243,7 +242,7 @@ class MD3ThemeService {
         ),
         backgroundColor: colorScheme.surface,
         modalBackgroundColor: colorScheme.surface,
-        dragHandleColor: colorScheme.onSurfaceVariant.withOpacity(0.4),
+        dragHandleColor: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
         dragHandleSize: const Size(32, 4),
         showDragHandle: true,
       ),

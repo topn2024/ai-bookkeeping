@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -117,10 +118,10 @@ class _MoneyAgeTrendChartState extends State<MoneyAgeTrendChart> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: level.color.withOpacity(0.1),
+        color: level.color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: level.color.withOpacity(0.3),
+          color: level.color.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -156,7 +157,7 @@ class _MoneyAgeTrendChartState extends State<MoneyAgeTrendChart> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: level.color.withOpacity(0.2),
+                        color: level.color.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -300,12 +301,12 @@ class _TrendChartPainter extends CustomPainter {
 
   void _drawLevelZones(Canvas canvas, Rect rect, double yMin, double yMax) {
     final levelZones = [
-      (0, 7, Colors.red.withOpacity(0.1)),
-      (7, 14, Colors.orange.withOpacity(0.1)),
-      (14, 30, Colors.yellow.withOpacity(0.1)),
-      (30, 60, Colors.lightGreen.withOpacity(0.1)),
-      (60, 90, Colors.green.withOpacity(0.1)),
-      (90, yMax.toInt() + 10, Colors.teal.withOpacity(0.1)),
+      (0, 7, Colors.red.withValues(alpha: 0.1)),
+      (7, 14, Colors.orange.withValues(alpha: 0.1)),
+      (14, 30, Colors.yellow.withValues(alpha: 0.1)),
+      (30, 60, Colors.lightGreen.withValues(alpha: 0.1)),
+      (60, 90, Colors.green.withValues(alpha: 0.1)),
+      (90, yMax.toInt() + 10, Colors.teal.withValues(alpha: 0.1)),
     ];
 
     for (final zone in levelZones) {
@@ -326,7 +327,7 @@ class _TrendChartPainter extends CustomPainter {
 
   void _drawGrid(Canvas canvas, Rect rect, double yMin, double yMax) {
     final gridPaint = Paint()
-      ..color = Colors.grey.withOpacity(0.2)
+      ..color = Colors.grey.withValues(alpha: 0.2)
       ..strokeWidth = 0.5;
 
     // 水平网格线
@@ -365,7 +366,7 @@ class _TrendChartPainter extends CustomPainter {
       final textSpan = TextSpan(text: '${y.toInt()}', style: textStyle);
       final textPainter = TextPainter(
         text: textSpan,
-        textDirection: TextDirection.ltr,
+        textDirection: ui.TextDirection.ltr,
       )..layout();
 
       textPainter.paint(
@@ -386,7 +387,7 @@ class _TrendChartPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round;
 
     final fillPaint = Paint()
-      ..color = primaryColor.withOpacity(0.15)
+      ..color = primaryColor.withValues(alpha: 0.15)
       ..style = PaintingStyle.fill;
 
     final path = Path();
@@ -444,7 +445,7 @@ class _TrendChartPainter extends CustomPainter {
       Offset(x, rect.top),
       Offset(x, rect.bottom),
       Paint()
-        ..color = primaryColor.withOpacity(0.3)
+        ..color = primaryColor.withValues(alpha: 0.3)
         ..strokeWidth = 1,
     );
 

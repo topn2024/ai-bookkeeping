@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'dart:convert';
 
 /// Model Tests for AI Bookkeeping App
 /// Tests data models serialization, validation, and business logic

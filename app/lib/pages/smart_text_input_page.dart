@@ -55,7 +55,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          l10n?.smartTextInput ?? '智能输入',
+          l10n.smartTextInput,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -66,7 +66,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
             TextButton(
               onPressed: _confirmTransaction,
               child: Text(
-                l10n?.confirm ?? '确认',
+                l10n.confirm,
                 style: TextStyle(
                   color: AppTheme.primaryColor,
                   fontWeight: FontWeight.w600,
@@ -91,7 +91,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
     );
   }
 
-  Widget _buildInputArea(AppLocalizations? l10n) {
+  Widget _buildInputArea(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -118,7 +118,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
               ),
               const SizedBox(width: 8),
               Text(
-                l10n?.naturalLanguageInput ?? '自然语言输入',
+                l10n.naturalLanguageInput,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -137,7 +137,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
               height: 1.5,
             ),
             decoration: InputDecoration(
-              hintText: l10n?.inputHint ?? '输入消费内容，如"午餐35块"',
+              hintText: l10n.inputHint午餐35块"',
               hintStyle: TextStyle(
                 color: AppTheme.textSecondaryColor.withValues(alpha: 0.7),
               ),
@@ -163,7 +163,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    l10n?.analyzing ?? '正在解析...',
+                    l10n.analyzing,
                     style: TextStyle(
                       fontSize: 12,
                       color: AppTheme.textSecondaryColor,
@@ -177,7 +177,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
     );
   }
 
-  Widget _buildParsedResult(AppLocalizations? l10n) {
+  Widget _buildParsedResult(AppLocalizations l10n) {
     final amount = _parsedResult!['amount'] as double?;
     final category = _parsedResult!['category'] as String?;
     final note = _parsedResult!['note'] as String?;
@@ -205,7 +205,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
               ),
               const SizedBox(width: 8),
               Text(
-                l10n?.recognitionResult ?? '识别结果',
+                l10n.recognitionResult,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -235,7 +235,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                l10n?.amount ?? '金额',
+                l10n.amount,
                 style: TextStyle(
                   color: AppTheme.textSecondaryColor,
                 ),
@@ -258,7 +258,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                l10n?.category ?? '分类',
+                l10n.category,
                 style: TextStyle(
                   color: AppTheme.textSecondaryColor,
                 ),
@@ -285,7 +285,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                l10n?.note ?? '备注',
+                l10n.note,
                 style: TextStyle(
                   color: AppTheme.textSecondaryColor,
                 ),
@@ -303,14 +303,14 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
     );
   }
 
-  Widget _buildExamples(AppLocalizations? l10n) {
+  Widget _buildExamples(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.examples ?? '输入示例',
+            l10n.examples,
             style: TextStyle(
               fontSize: 12,
               color: AppTheme.textSecondaryColor,
@@ -358,7 +358,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
     );
   }
 
-  Widget _buildBottomAction(AppLocalizations? l10n) {
+  Widget _buildBottomAction(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -406,8 +406,8 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
                 ),
                 child: Text(
                   _parsedResult != null
-                      ? '${l10n?.confirmBookkeeping ?? "确认记账"} ¥${(_parsedResult!['amount'] as double?)?.toStringAsFixed(2) ?? "0.00"}'
-                      : l10n?.inputToBookkeep ?? '输入内容后记账',
+                      ? '${l10n.confirmBookkeeping} ¥${(_parsedResult!['amount'] as double?)?.toStringAsFixed(2) ?? "0.00"}'
+                      : l10n.inputToBookkeep,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

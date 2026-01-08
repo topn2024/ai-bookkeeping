@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../models/resource_pool.dart';
-import '../services/money_age_trend_service.dart';
 
 /// 钱龄影响因素分析组件
 ///
@@ -127,7 +126,7 @@ class MoneyAgeInfluenceAnalysisCard extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -176,7 +175,7 @@ class MoneyAgeInfluenceAnalysisCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -355,7 +354,7 @@ class MoneyAgeInfluenceChart extends StatelessWidget {
                   Container(
                     height: normalizedHeight.clamp(20.0, height - 40),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.7),
+                      color: color.withValues(alpha: 0.7),
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(4),
                       ),
@@ -485,7 +484,7 @@ class _PieChartPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     // 绘制负向部分（背景）
-    paint.color = negativeColor.withOpacity(0.3);
+    paint.color = negativeColor.withValues(alpha: 0.3);
     canvas.drawCircle(center, radius, paint);
 
     // 绘制正向部分

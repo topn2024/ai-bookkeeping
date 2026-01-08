@@ -46,7 +46,7 @@ class _MemberPermissionPageState extends ConsumerState<MemberPermissionPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.permissionSettings ?? '权限设置',
+          l10n.permissionSettings,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -123,14 +123,14 @@ class _MemberPermissionPageState extends ConsumerState<MemberPermissionPage> {
     );
   }
 
-  Widget _buildRoleSelection(AppLocalizations? l10n) {
+  Widget _buildRoleSelection(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.selectRole ?? '选择角色（简化设计）',
+            l10n.selectRole,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
@@ -144,8 +144,8 @@ class _MemberPermissionPageState extends ConsumerState<MemberPermissionPage> {
             icon: Icons.shield,
             iconColor: const Color(0xFFFFB74D),
             iconBgColor: const Color(0xFFFFF3E0),
-            title: l10n?.owner ?? '所有者',
-            description: l10n?.ownerDesc ?? '全部权限（账本创建者自动获得）',
+            title: l10n.owner,
+            description: l10n.ownerDesc,
             isSelectable: false,
             isSelected: _selectedRole == MemberRole.owner,
           ),
@@ -156,8 +156,8 @@ class _MemberPermissionPageState extends ConsumerState<MemberPermissionPage> {
             icon: Icons.admin_panel_settings,
             iconColor: AppTheme.primaryColor,
             iconBgColor: const Color(0xFFE3F2FD),
-            title: l10n?.admin ?? '管理员',
-            description: l10n?.adminDesc ?? '管理成员、设置预算、查看所有记录',
+            title: l10n.admin,
+            description: l10n.adminDesc,
             isSelectable: widget.currentRole != MemberRole.owner,
             isSelected: _selectedRole == MemberRole.admin,
           ),
@@ -168,8 +168,8 @@ class _MemberPermissionPageState extends ConsumerState<MemberPermissionPage> {
             icon: Icons.person,
             iconColor: AppTheme.primaryColor,
             iconBgColor: const Color(0xFFE3F2FD),
-            title: l10n?.member ?? '成员',
-            description: l10n?.memberDesc ?? '记账、查看、编辑自己的账目',
+            title: l10n.member,
+            description: l10n.memberDesc,
             isSelectable: widget.currentRole != MemberRole.owner,
             isSelected: _selectedRole == MemberRole.editor,
           ),
@@ -180,8 +180,8 @@ class _MemberPermissionPageState extends ConsumerState<MemberPermissionPage> {
             icon: Icons.visibility,
             iconColor: AppTheme.textSecondaryColor,
             iconBgColor: AppTheme.surfaceVariantColor,
-            title: l10n?.viewer ?? '查看者',
-            description: l10n?.viewerDesc ?? '仅查看（适合孩子或临时成员）',
+            title: l10n.viewer,
+            description: l10n.viewerDesc,
             isSelectable: widget.currentRole != MemberRole.owner,
             isSelected: _selectedRole == MemberRole.viewer,
           ),
@@ -283,7 +283,7 @@ class _MemberPermissionPageState extends ConsumerState<MemberPermissionPage> {
     );
   }
 
-  Widget _buildSmartRecommendation(AppLocalizations? l10n) {
+  Widget _buildSmartRecommendation(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(12),
@@ -301,7 +301,7 @@ class _MemberPermissionPageState extends ConsumerState<MemberPermissionPage> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              l10n?.roleRecommendation ?? '根据关系推荐：配偶/父母建议设为「成员」，孩子建议设为「查看者」',
+              l10n.roleRecommendation,
               style: TextStyle(
                 fontSize: 12,
                 color: const Color(0xFF1565C0),
@@ -313,7 +313,7 @@ class _MemberPermissionPageState extends ConsumerState<MemberPermissionPage> {
     );
   }
 
-  Widget _buildPermissionDetails(AppLocalizations? l10n) {
+  Widget _buildPermissionDetails(AppLocalizations l10n) {
     final permissions = _getPermissionsForRole(_selectedRole);
 
     return Container(
@@ -322,7 +322,7 @@ class _MemberPermissionPageState extends ConsumerState<MemberPermissionPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.currentPermissions ?? '当前角色权限',
+            l10n.currentPermissions,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
@@ -415,7 +415,7 @@ class _MemberPermissionPageState extends ConsumerState<MemberPermissionPage> {
     }
   }
 
-  Widget _buildSaveButton(AppLocalizations? l10n) {
+  Widget _buildSaveButton(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       child: SafeArea(
@@ -433,7 +433,7 @@ class _MemberPermissionPageState extends ConsumerState<MemberPermissionPage> {
               disabledBackgroundColor: AppTheme.primaryColor.withValues(alpha: 0.3),
             ),
             child: Text(
-              l10n?.saveChanges ?? '保存更改',
+              l10n.saveChanges,
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
@@ -418,7 +417,7 @@ class NaturalLanguageSearchService {
     }
 
     try {
-      final structuredQuery = await _llmService!.parseSearchQuery(query);
+      final structuredQuery = await _llmService.parseSearchQuery(query);
       if (structuredQuery != null) {
         // 将LLM解析的结果转换为QueryIntent
         final intent = QueryIntent(

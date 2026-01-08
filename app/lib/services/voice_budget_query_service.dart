@@ -483,7 +483,7 @@ class VoiceBudgetQueryService {
       suggestions.add('您的预算执行情况良好，继续保持');
     }
 
-    final spoken = suggestions.join('。') + '。';
+    final spoken = '${suggestions.join('。')}。';
 
     return VoiceBudgetQueryResult(
       intent: VoiceBudgetIntent.getBudgetSuggestion,

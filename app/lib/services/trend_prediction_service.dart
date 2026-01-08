@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
-
 /// 消费趋势预测服务
 ///
 /// 功能：

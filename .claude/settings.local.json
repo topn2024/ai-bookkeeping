@@ -634,7 +634,24 @@
       "Bash(xargs:*)",
       "Bash(powershell -Command \"\\(Get-Content ''D:\\\\code\\\\ai-bookkeeping\\\\docs\\\\design\\\\app_v2_code_design.md'' | Measure-Object -Line\\).Lines\")",
       "Bash(node -e:*)",
-      "Bash(flutter gen-l10n:*)"
+      "Bash(flutter gen-l10n:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: 实现2.0版本数据联动页面及全量功能代码\n\n## 数据联动页面 \\(Section 9\\)\n- 新增 category_detail_page.dart: 分类详情页面，含趋势图表\n- 新增 advanced_filter_page.dart: 高级筛选页面，支持多维度筛选\n- 新增 search_result_page.dart: 搜索结果页面，支持关键词高亮\n- 新增 period_comparison_page.dart: 时间对比页面，月/季/年对比\n- 新增 tag_filter_page.dart: 标签筛选页面，含标签云\n\n## 页面导航集成\n- statistics_page.dart: 添加时间对比入口，分类详情导航\n- transaction_list_page.dart: 添加搜索结果页导航，高级筛选\n- tag_statistics_page.dart: 添加标签筛选入口\n\n## 其他新增功能\n- 新增 200+ 页面、服务、组件实现2.0版本完整功能\n- 新增本地化文件 \\(app_localizations_*.dart\\)\n- 新增 admin-web 监控页面 \\(AIService, Diagnostics, SystemLogs\\)\n- 新增服务器部署脚本和配置\n- 新增 bspatch 增量更新原生代码\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(powershell -Command \"Get-Content ''D:/code/ai-bookkeeping/app/lib/l10n/app_zh.arb'' | Select-Object -Last 5\")",
+      "Bash(powershell -Command \"Get-ChildItem -Path ''D:\\\\code\\\\ai-bookkeeping\\\\app\\\\lib'' -Recurse -Filter ''*.dart'' | ForEach-Object { \\(Get-Content $_FullName -Raw\\) -replace ''l10n\\\\?\\\\.'', ''l10n.'' | Set-Content $_FullName -NoNewline }\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: 实现完整的自学习与协同学习服务模块\n\n新增18个学习服务文件，实现设计文档第17章自学习与协同学习系统：\n\n核心框架:\n- unified_self_learning_service.dart: 统一自学习框架基类\n- cold_start_accelerator.dart: 冷启动加速器\n- learning_adapters.dart: 学习适配器层\n- self_learning_facade.dart: 自学习门面服务\n- self_learning_goal_checker.dart: 学习目标检查器\n\n业务学习模块:\n- habit_learning_service.dart: 习惯学习与协同学习\n- voice_intent_learning_service.dart: 语音意图学习\n- other_intent_learning_service.dart: 歧义意图学习\n- anomaly_learning_service.dart: 异常检测学习\n- personalized_budget_learning_service.dart: 个性化预算学习\n- location_learning_service.dart: 位置智能学习\n- family_consumption_learning_service.dart: 家庭消费学习\n- feedback_learning_service.dart: 用户反馈学习\n- search_learning_service.dart: 搜索行为学习\n- dialogue_learning_service.dart: 对话学习\n- anomaly_pattern_mining_service.dart: 异常模式挖掘\n- enhanced_intent_recognition_service.dart: 增强意图识别\n- budget_collaborative_learning_service.dart: 预算协同学习\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(for page in today_allowance handwriting_recognition multimodal_input voice_edit_record voice_undo recording_time_stats)",
+      "Bash(do echo \"=== $page ===\")",
+      "Bash(git push)",
+      "Bash(echo \"\" echo \"Root level pages:\" ls -1 /d/code/ai-bookkeeping/app/lib/pages/*.dart)",
+      "Bash(echo \"Checking for ANY references in entire codebase to new pages...\" echo \"\" echo \"=== TodayAllowancePage references ===\" grep -r \"TodayAllowancePage\\\\|today_allowance_page\\\\.dart\" /d/code/ai-bookkeeping --include=\"*.dart\" --exclude-dir=\".git\")",
+      "Bash(head -5 echo \"\" echo \"=== Observability pages references ===\" grep -r \"AlertHistoryPage\\\\|AppHealthPage\\\\|DiagnosticReportPage\\\\|PerformanceMonitorPage\\\\|SystemLogPage\" /d/code/ai-bookkeeping --include=\"*.dart\" --exclude-dir=\".git\")",
+      "Bash(head:*)",
+      "Bash(head -5 echo \"\" echo \"=== Voice pages references ===\" grep -r \"VoiceEditRecordPage\\\\|VoiceUndoPage\\\\|RecordingTimeStatsPage\" /d/code/ai-bookkeeping --include=\"*.dart\" --exclude-dir=\".git\")",
+      "Bash(paste:*)",
+      "Bash(mkdir:*)",
+      "Bash(cd:*)",
+      "Bash(dart fix:*)",
+      "Bash(rm -f nul)"
     ]
   }
 }

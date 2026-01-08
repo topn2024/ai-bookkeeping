@@ -22,7 +22,7 @@ class ModeUpgradePage extends ConsumerWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.upgradeMode ?? '升级模式',
+          l10n.upgradeMode,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -55,7 +55,7 @@ class ModeUpgradePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildUpgradeInfoCard(AppLocalizations? l10n) {
+  Widget _buildUpgradeInfoCard(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -87,7 +87,7 @@ class ModeUpgradePage extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            l10n?.upgradeToFullMode ?? '升级到完整模式',
+            l10n.upgradeToFullMode,
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -95,7 +95,7 @@ class ModeUpgradePage extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            l10n?.upgradeDescription ?? '解锁更多高级功能，让家庭记账更加完善',
+            l10n.upgradeDescription,
             style: TextStyle(
               fontSize: 14,
               color: AppTheme.textSecondaryColor,
@@ -107,45 +107,45 @@ class ModeUpgradePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildFeatureComparison(AppLocalizations? l10n) {
+  Widget _buildFeatureComparison(AppLocalizations l10n) {
     final features = [
       {
-        'name': l10n?.budgetManagement ?? '预算管理',
+        'name': l10n.budgetManagement,
         'simple': false,
         'full': true,
       },
       {
-        'name': l10n?.savingsGoals ?? '储蓄目标',
+        'name': l10n.savingsGoals,
         'simple': false,
         'full': true,
       },
       {
-        'name': l10n?.memberPermissions ?? '成员权限',
+        'name': l10n.memberPermissions,
         'simple': false,
         'full': true,
       },
       {
-        'name': l10n?.detailedStats ?? '详细统计',
+        'name': l10n.detailedStats,
         'simple': false,
         'full': true,
       },
       {
-        'name': l10n?.leaderboard ?? '排行榜',
+        'name': l10n.leaderboard,
         'simple': false,
         'full': true,
       },
       {
-        'name': l10n?.annualReview ?? '年度回顾',
+        'name': l10n.annualReview,
         'simple': false,
         'full': true,
       },
       {
-        'name': l10n?.basicRecording ?? '基础记账',
+        'name': l10n.basicRecording,
         'simple': true,
         'full': true,
       },
       {
-        'name': l10n?.memberContribution ?? '成员贡献',
+        'name': l10n.memberContribution,
         'simple': true,
         'full': true,
       },
@@ -177,7 +177,7 @@ class ModeUpgradePage extends ConsumerWidget {
                 Expanded(
                   flex: 2,
                   child: Text(
-                    l10n?.feature ?? '功能',
+                    l10n.feature,
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -187,7 +187,7 @@ class ModeUpgradePage extends ConsumerWidget {
                 ),
                 Expanded(
                   child: Text(
-                    l10n?.simpleMode ?? '简单',
+                    l10n.simpleMode,
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -198,7 +198,7 @@ class ModeUpgradePage extends ConsumerWidget {
                 ),
                 Expanded(
                   child: Text(
-                    l10n?.fullMode ?? '完整',
+                    l10n.fullMode,
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -259,7 +259,7 @@ class ModeUpgradePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildNotice(AppLocalizations? l10n) {
+  Widget _buildNotice(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -281,7 +281,7 @@ class ModeUpgradePage extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  l10n?.upgradeNotice ?? '升级须知',
+                  l10n.upgradeNotice,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -290,8 +290,7 @@ class ModeUpgradePage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  l10n?.upgradeNoticeDesc ??
-                      '• 升级需要所有成员同意\n• 升级后数据会完整保留\n• 升级过程不可逆',
+                  l10n.upgradeNoticeDesc,
                   style: TextStyle(
                     fontSize: 12,
                     color: AppTheme.textSecondaryColor,
@@ -306,7 +305,7 @@ class ModeUpgradePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildBottomButtons(BuildContext context, AppLocalizations? l10n) {
+  Widget _buildBottomButtons(BuildContext context, AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -331,7 +330,7 @@ class ModeUpgradePage extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text(l10n?.staySimple ?? '保持简单模式'),
+                child: Text(l10n.staySimple),
               ),
             ),
             const SizedBox(width: 12),
@@ -348,7 +347,7 @@ class ModeUpgradePage extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text(l10n?.startUpgrade ?? '发起升级投票'),
+                child: Text(l10n.startUpgrade),
               ),
             ),
           ],

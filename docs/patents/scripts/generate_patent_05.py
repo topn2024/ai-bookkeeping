@@ -21,7 +21,7 @@ def create_patent_document():
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_paragraph()
 
-    doc.add_heading('发明名��', level=1)
+    doc.add_heading('发明名称', level=1)
     doc.add_paragraph('四维语音交互的财务管理方法及系统')
 
     doc.add_heading('技术领域', level=1)

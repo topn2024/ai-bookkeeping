@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 
 // ==================== 家庭消费模式数据模型 ====================
@@ -365,9 +364,7 @@ class FamilyConsumptionLearningService {
   }) async {
     // 确保已学习模式
     var pattern = _patterns[ledgerId];
-    if (pattern == null) {
-      pattern = await learnFamilyPatterns(ledgerId);
-    }
+    pattern ??= await learnFamilyPatterns(ledgerId);
 
     final predictedExpense = pattern.predictedMonthlyExpense;
     final totalBudget = predictedExpense * 1.1; // 预留10%弹性

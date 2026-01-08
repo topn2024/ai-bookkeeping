@@ -55,7 +55,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          l10n?.aaSplit ?? 'AA制分摊',
+          l10n.aaSplit,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -88,7 +88,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
   }
 
   /// 构建检测提示
-  Widget _buildDetectionHint(AppLocalizations? l10n) {
+  Widget _buildDetectionHint(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -115,7 +115,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
               ),
               const SizedBox(width: 8),
               Text(
-                l10n?.aaDetected ?? '检测到AA制消费',
+                l10n.aaDetected,
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   color: AppTheme.primaryColor,
@@ -139,7 +139,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
   }
 
   /// 构建分摊信息卡片
-  Widget _buildSplitInfoCard(AppLocalizations? l10n) {
+  Widget _buildSplitInfoCard(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
@@ -169,7 +169,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
             child: Column(
               children: [
                 Text(
-                  l10n?.totalAmount ?? '消费总金额',
+                  l10n.totalAmount,
                   style: TextStyle(
                     fontSize: 14,
                     color: AppTheme.textSecondaryColor,
@@ -202,14 +202,14 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      l10n?.splitPeople ?? '分摊人数',
+                      l10n.splitPeople,
                       style: const TextStyle(
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     if (widget.suggestedPeople != null)
                       Text(
-                        l10n?.autoDetected ?? '自动识别',
+                        l10n.autoDetected,
                         style: TextStyle(
                           fontSize: 13,
                           color: AppTheme.primaryColor,
@@ -258,7 +258,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      l10n?.myShare ?? '我的份额',
+                      l10n.myShare,
                       style: const TextStyle(
                         fontWeight: FontWeight.w500,
                       ),
@@ -285,7 +285,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
                       ),
                     ),
                     Text(
-                      l10n?.perPerson ?? '人均',
+                      l10n.perPerson,
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondaryColor,
@@ -334,7 +334,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
   }
 
   /// 构建分摊模式选择器
-  Widget _buildSplitModeSelector(AppLocalizations? l10n) {
+  Widget _buildSplitModeSelector(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -346,7 +346,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.bookkeepingMode ?? '记账方式',
+            l10n.bookkeepingMode,
             style: TextStyle(
               fontSize: 13,
               color: AppTheme.textSecondaryColor,
@@ -358,7 +358,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
               Expanded(
                 child: _buildModeOption(
                   icon: Icons.person,
-                  label: l10n?.onlyMyShare ?? '仅记我的份额',
+                  label: l10n.onlyMyShare,
                   isSelected: _splitMode == AASplitMode.myShare,
                   onTap: () => setState(() => _splitMode = AASplitMode.myShare),
                 ),
@@ -367,7 +367,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
               Expanded(
                 child: _buildModeOption(
                   icon: Icons.group,
-                  label: l10n?.recordTotal ?? '记录总金额',
+                  label: l10n.recordTotal,
                   isSelected: _splitMode == AASplitMode.totalAmount,
                   onTap: () =>
                       setState(() => _splitMode = AASplitMode.totalAmount),
@@ -434,7 +434,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
   }
 
   /// 构建分类选择器
-  Widget _buildCategorySelector(AppLocalizations? l10n) {
+  Widget _buildCategorySelector(AppLocalizations l10n) {
     final categories = [
       {'icon': '🍜', 'name': '餐饮'},
       {'icon': '🎬', 'name': '娱乐'},
@@ -450,7 +450,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.category ?? '分类',
+            l10n.category,
             style: TextStyle(
               fontSize: 13,
               color: AppTheme.textSecondaryColor,
@@ -513,7 +513,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
   }
 
   /// 构建底部操作
-  Widget _buildBottomAction(AppLocalizations? l10n) {
+  Widget _buildBottomAction(AppLocalizations l10n) {
     final amount = _splitMode == AASplitMode.myShare
         ? _myShare
         : widget.totalAmount;
@@ -536,7 +536,7 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
             onPressed: _confirmSplit,
             icon: const Icon(Icons.check),
             label: Text(
-              '${l10n?.confirmSplit ?? "确认分摊"} ¥${amount.toStringAsFixed(2)}',
+              '${l10n.confirmSplit} ¥${amount.toStringAsFixed(2)}',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,

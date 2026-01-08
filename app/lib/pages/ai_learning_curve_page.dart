@@ -28,7 +28,7 @@ class _AILearningCurvePageState extends ConsumerState<AILearningCurvePage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.aiLearningCurve ?? 'AI学习成长',
+          l10n.aiLearningCurve,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,

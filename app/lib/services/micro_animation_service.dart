@@ -612,7 +612,7 @@ class _RipplePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = color.withOpacity((1 - progress) * 0.3)
+      ..color = color.withValues(alpha: (1 - progress) * 0.3)
       ..style = PaintingStyle.fill;
 
     canvas.drawCircle(center, maxRadius * progress, paint);

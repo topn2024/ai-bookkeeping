@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
 /// 语义化标签类型

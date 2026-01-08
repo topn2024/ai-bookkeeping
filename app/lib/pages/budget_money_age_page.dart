@@ -221,7 +221,7 @@ class _ImpactItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
           ),
         ],
@@ -235,7 +235,7 @@ class _ImpactItem extends StatelessWidget {
                 height: 44,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [iconColor, iconColor.withOpacity(0.7)],
+                    colors: [iconColor, iconColor.withValues(alpha: 0.7)],
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -320,7 +320,7 @@ class _ImpactBadge extends StatelessWidget {
     } else {
       bgColor = Colors.grey[200]!;
       textColor = Colors.grey[600]!;
-      text = '${impact}天';
+      text = '$impact天';
     }
 
     return Container(
@@ -404,7 +404,7 @@ class _BottomActionBar extends StatelessWidget {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),

@@ -363,7 +363,7 @@ class BreakRecoveryAssistant {
     } else if (daysSinceLastActivity == 1) {
       return '昨天忘记记账了，今天一起补上吧！';
     } else if (daysSinceLastActivity <= 3) {
-      return '已经${daysSinceLastActivity}天没记账了，快来看看有什么消费需要记录';
+      return '已经$daysSinceLastActivity天没记账了，快来看看有什么消费需要记录';
     } else if (daysSinceLastActivity <= 7) {
       return '好久不见！这周的消费还记得吗？让我们一起回顾一下';
     } else {
@@ -378,11 +378,11 @@ class BreakRecoveryAssistant {
       case BreakType.firstTime:
         return '欢迎使用智能记账！让我们开始你的财务管理之旅。';
       case BreakType.short:
-        return '欢迎回来！上次记账是${days}天前，让我们继续保持好习惯。';
+        return '欢迎回来！上次记账是$days天前，让我们继续保持好习惯。';
       case BreakType.medium:
-        return '好久不见！已经${days}天了，不过没关系，我们一起把遗漏的补上。';
+        return '好久不见！已经$days天了，不过没关系，我们一起把遗漏的补上。';
       case BreakType.long:
-        return '很高兴再次见到你！虽然过去了${days}天，但重新开始永远不晚。让我帮你快速恢复状态。';
+        return '很高兴再次见到你！虽然过去了$days天，但重新开始永远不晚。让我帮你快速恢复状态。';
     }
   }
 

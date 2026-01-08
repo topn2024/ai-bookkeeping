@@ -140,7 +140,7 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              l10n?.simpleMode ?? '简单模式',
+              l10n.simpleMode,
               style: const TextStyle(
                 fontSize: 11,
                 color: Color(0xFF2E7D32),
@@ -169,7 +169,7 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
     );
   }
 
-  Widget _buildTotalExpenseCard(double total, double diff, AppLocalizations? l10n) {
+  Widget _buildTotalExpenseCard(double total, double diff, AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(24),
@@ -184,7 +184,7 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
       child: Column(
         children: [
           Text(
-            l10n?.monthlySharedExpense ?? '本月共同支出',
+            l10n.monthlySharedExpense,
             style: const TextStyle(
               fontSize: 13,
               color: Color(0xFFE65100),
@@ -214,14 +214,14 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
     );
   }
 
-  Widget _buildMemberContributions(AppLocalizations? l10n) {
+  Widget _buildMemberContributions(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.memberContribution ?? '成员贡献',
+            l10n.memberContribution,
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -365,7 +365,7 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
     );
   }
 
-  Widget _buildRecentTransactions(AppLocalizations? l10n) {
+  Widget _buildRecentTransactions(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -375,7 +375,7 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                l10n?.recentRecords ?? '最近记录',
+                l10n.recentRecords,
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -384,7 +384,7 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
               TextButton(
                 onPressed: () {},
                 child: Text(
-                  l10n?.viewAll ?? '查看全部',
+                  l10n.viewAll,
                   style: TextStyle(
                     fontSize: 12,
                     color: AppTheme.primaryColor,
@@ -486,7 +486,7 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
     );
   }
 
-  Widget _buildUpgradeHint(AppLocalizations? l10n) {
+  Widget _buildUpgradeHint(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       child: Material(
@@ -506,7 +506,7 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
                 Icon(Icons.upgrade, size: 18, color: AppTheme.primaryColor),
                 const SizedBox(width: 8),
                 Text(
-                  l10n?.upgradeToFullMode ?? '升级到完整模式，解锁更多功能',
+                  l10n.upgradeToFullMode,
                   style: TextStyle(
                     fontSize: 13,
                     color: AppTheme.primaryColor,
@@ -528,7 +528,7 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
     return '${time.month}/${time.day} ${time.hour}:${time.minute.toString().padLeft(2, '0')}';
   }
 
-  void _showUpgradeDialog(AppLocalizations? l10n) {
+  void _showUpgradeDialog(AppLocalizations l10n) {
     Navigator.pushNamed(context, '/mode-upgrade');
   }
 }

@@ -32,15 +32,15 @@ class _DeduplicationPageState extends ConsumerState<DeduplicationPage> {
   bool _isProcessing = true;
 
   // 模拟去重检测结果
-  int _totalRecords = 156;
-  int _newRecords = 142;
-  int _suspectedDuplicates = 8;
-  int _confirmedDuplicates = 6;
+  final int _totalRecords = 156;
+  final int _newRecords = 142;
+  final int _suspectedDuplicates = 8;
+  final int _confirmedDuplicates = 6;
 
   // 三层去重结果
-  int _exactMatches = 6;
-  int _featureMatches = 5;
-  int _semanticMatches = 3;
+  final int _exactMatches = 6;
+  final int _featureMatches = 5;
+  final int _semanticMatches = 3;
 
   // 疑似重复记录
   final List<SuspectedDuplicate> _suspectedList = [
@@ -466,7 +466,7 @@ class _DeduplicationPageState extends ConsumerState<DeduplicationPage> {
             onPressed: _goToPreview,
             icon: const Icon(Icons.arrow_forward),
             label: Text(
-              '处理疑似重复（${_suspectedDuplicates}条）',
+              '处理疑似重复（$_suspectedDuplicates条）',
               style: const TextStyle(fontSize: 16),
             ),
             style: ElevatedButton.styleFrom(

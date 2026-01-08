@@ -208,7 +208,7 @@ class _StatusSection extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [item.iconColor, item.iconColor.withOpacity(0.7)],
+                colors: [item.iconColor, item.iconColor.withValues(alpha: 0.7)],
               ),
               borderRadius: BorderRadius.circular(10),
             ),

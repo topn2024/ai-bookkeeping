@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 /// 审计问题严重级别
 enum AuditSeverity {
@@ -229,7 +228,7 @@ class AuditReport {
     if (passed) {
       return '审计通过，得分$score分';
     }
-    return '发现${totalIssues}个问题（严重$criticalCount，错误$errorCount，警告$warningCount），得分$score分';
+    return '发现$totalIssues个问题（严重$criticalCount，错误$errorCount，警告$warningCount），得分$score分';
   }
 }
 
@@ -758,7 +757,7 @@ class AuditReportWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: count > 0 ? color.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+        color: count > 0 ? color.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: count > 0 ? color : Colors.grey,

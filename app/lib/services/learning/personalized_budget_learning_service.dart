@@ -352,9 +352,9 @@ class PersonalizedBudgetLearningService {
     if (seasonalAdj != null && (seasonalAdj - 1.0).abs() > 0.05) {
       personalizedAmount *= seasonalAdj;
       if (seasonalAdj > 1.0) {
-        reasons.add('根据您${currentMonth}月的消费习惯上调');
+        reasons.add('根据您$currentMonth月的消费习惯上调');
       } else {
-        reasons.add('根据您${currentMonth}月的消费习惯下调');
+        reasons.add('根据您$currentMonth月的消费习惯下调');
       }
     }
 

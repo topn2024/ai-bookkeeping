@@ -32,7 +32,7 @@ class _AppLockSettingsPageState extends ConsumerState<AppLockSettingsPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.appLockSettings ?? '应用锁设置',
+          l10n.appLockSettings,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -109,7 +109,7 @@ class _AppLockSettingsPageState extends ConsumerState<AppLockSettingsPage> {
           Switch(
             value: _appLockEnabled,
             onChanged: (v) => setState(() => _appLockEnabled = v),
-            activeColor: AppColors.primary,
+            activeTrackColor: AppColors.primary,
           ),
         ],
       ),

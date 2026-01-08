@@ -2,6 +2,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/theme_provider.dart';
 
+/// 反重力设计体系颜色 (Antigravity Design System Colors)
+///
+/// 矢车菊蓝主色系 - 清新优雅，传达轻盈、浪漫、温暖的感觉
+/// 设计规范参考：20.2.6 反重力设计体系
+class AntigravityColors {
+  AntigravityColors._();
+
+  // === 矢车菊蓝主色系 ===
+  static const Color primary = Color(0xFF6495ED);           // 矢车菊蓝 - 主色
+  static const Color primaryDark = Color(0xFF4169E1);       // 皇家蓝 - 深色
+  static const Color primaryLight = Color(0xFF87CEFA);      // 浅天蓝 - 浅色
+  static const Color primaryContainer = Color(0xFFEBF3FF);  // 蓝色容器背景
+
+  // === 辅助色 - 薰衣草紫点缀 ===
+  static const Color secondary = Color(0xFF7B8AB8);         // 灰蓝紫
+  static const Color secondaryContainer = Color(0xFFE8ECF8);
+  static const Color tertiary = Color(0xFF9370DB);          // 中紫色点缀
+
+  // === 表面色 ===
+  static const Color surface = Color(0xFFF8FAFF);           // 主背景 - 带蓝调的白
+  static const Color surfaceVariant = Color(0xFFEDF2FA);    // 卡片背景
+  static const Color surfaceElevated = Color(0xFFFFFFFF);   // 提升卡片
+
+  // === 钱龄专用色 ===
+  static const Color moneyAgeExcellent = Color(0xFF66BB6A); // 优秀-绿
+  static const Color moneyAgeGood = Color(0xFF64B5F6);      // 良好-蓝
+  static const Color moneyAgeFair = Color(0xFFFFB74D);      // 一般-橙
+  static const Color moneyAgePoor = Color(0xFFE57373);      // 较差-红
+
+  // === 玻璃态效果色 ===
+  static Color glassBackground = Colors.white.withValues(alpha: 0.72);
+  static Color glassBackgroundStrong = Colors.white.withValues(alpha: 0.88);
+  static Color glassBorder = Colors.white.withValues(alpha: 0.3);
+}
+
 class AppColors {
   // Primary colors (default blue theme)
   static const Color primary = Color(0xFF2196F3);
@@ -110,8 +145,108 @@ extension ThemeColorsExtension on WidgetRef {
 }
 
 class AppTheme {
-  static ThemeData get lightTheme => createLightTheme(AppColors.primary);
-  static ThemeData get darkTheme => createDarkTheme(AppColors.primary);
+  AppTheme._();
+
+  // === 静态颜色访问器 (矢车菊蓝主题) ===
+
+  /// 主色 - 矢车菊蓝
+  static Color get primaryColor => AntigravityColors.primary;
+
+  /// 主色深 - 皇家蓝
+  static Color get primaryDarkColor => AntigravityColors.primaryDark;
+
+  /// 主色浅 - 浅天蓝
+  static Color get primaryLightColor => AntigravityColors.primaryLight;
+
+  /// 表面色 / 背景色
+  static Color get surfaceColor => AntigravityColors.surface;
+
+  /// 表面变体色 / 卡片背景
+  static Color get surfaceVariantColor => AntigravityColors.surfaceVariant;
+
+  /// 卡片背景色
+  static Color get cardColor => AntigravityColors.surfaceElevated;
+
+  /// 主要文本颜色
+  static Color get textPrimaryColor => AppColors.textPrimary;
+
+  /// 次要文本颜色
+  static Color get textSecondaryColor => AppColors.textSecondary;
+
+  /// 提示文本颜色
+  static Color get textHintColor => AppColors.textHint;
+
+  /// 分割线颜色
+  static Color get dividerColor => AppColors.divider;
+
+  /// 边框颜色
+  static Color get borderColor => AppColors.border;
+
+  /// 成功色 - 绿色
+  static Color get successColor => AppColors.success;
+
+  /// 警告色 - 橙色
+  static Color get warningColor => AppColors.warning;
+
+  /// 错误色 - 红色
+  static Color get errorColor => AppColors.error;
+
+  /// 信息色 - 蓝色
+  static Color get infoColor => AppColors.info;
+
+  /// 收入色 - 绿色
+  static Color get incomeColor => AppColors.income;
+
+  /// 支出色 - 红色
+  static Color get expenseColor => AppColors.expense;
+
+  /// 转账色 - 橙色
+  static Color get transferColor => AppColors.transfer;
+
+  /// 背景色
+  static Color get backgroundColor => AppColors.background;
+
+  /// 次要色
+  static Color get secondaryColor => AntigravityColors.secondary;
+
+  /// 第三色
+  static Color get tertiaryColor => AntigravityColors.tertiary;
+
+  /// 白色
+  static Color get whiteColor => Colors.white;
+
+  /// 禁用色
+  static Color get disabledColor => const Color(0xFFBDBDBD);
+
+  /// 阴影色
+  static Color get shadowColor => Colors.black.withValues(alpha: 0.1);
+
+  // === 钱龄专用色 ===
+
+  /// 钱龄优秀 - 绿色
+  static Color get moneyAgeExcellentColor => AntigravityColors.moneyAgeExcellent;
+
+  /// 钱龄良好 - 蓝色
+  static Color get moneyAgeGoodColor => AntigravityColors.moneyAgeGood;
+
+  /// 钱龄一般 - 橙色
+  static Color get moneyAgeFairColor => AntigravityColors.moneyAgeFair;
+
+  /// 钱龄较差 - 红色
+  static Color get moneyAgePoorColor => AntigravityColors.moneyAgePoor;
+
+  // === 玻璃态效果色 ===
+
+  /// 玻璃背景色
+  static Color get glassBackgroundColor => AntigravityColors.glassBackground;
+
+  /// 玻璃边框色
+  static Color get glassBorderColor => AntigravityColors.glassBorder;
+
+  // === 主题数据 ===
+
+  static ThemeData get lightTheme => createLightTheme(AntigravityColors.primary);
+  static ThemeData get darkTheme => createDarkTheme(AntigravityColors.primary);
 
   static ThemeData createLightTheme(Color primaryColor) {
     return ThemeData(

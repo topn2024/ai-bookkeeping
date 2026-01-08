@@ -1,0 +1,2859 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI智能记账 2.0 - 高保真原型</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6750A4;
+            --primary-container: #EADDFF;
+            --on-primary: #FFFFFF;
+            --on-primary-container: #21005D;
+            --secondary: #625B71;
+            --secondary-container: #E8DEF8;
+            --tertiary: #7D5260;
+            --surface: #FFFBFE;
+            --surface-variant: #E7E0EC;
+            --on-surface: #1C1B1F;
+            --on-surface-variant: #49454F;
+            --outline: #79747E;
+            --outline-variant: #CAC4D0;
+            --error: #B3261E;
+            --success: #2E7D32;
+            --warning: #F9A825;
+            --info: #1976D2;
+
+            /* Money Age Colors */
+            --money-age-excellent: #2E7D32;
+            --money-age-good: #1976D2;
+            --money-age-fair: #F57C00;
+            --money-age-poor: #D32F2F;
+
+            /* Spacing */
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+            --spacing-xl: 32px;
+
+            /* Border Radius */
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 28px;
+
+            /* Shadows */
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 8px rgba(0,0,0,0.12);
+            --shadow-lg: 0 8px 16px rgba(0,0,0,0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #F5F5F5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+        }
+
+        /* Phone Frame */
+        .phone-container {
+            display: flex;
+            gap: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .phone-frame {
+            width: 375px;
+            height: 812px;
+            background: var(--surface);
+            border-radius: 40px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+            overflow: hidden;
+            position: relative;
+            border: 12px solid #1a1a1a;
+        }
+
+        .phone-frame::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 30px;
+            background: #1a1a1a;
+            border-radius: 0 0 20px 20px;
+            z-index: 100;
+        }
+
+        .screen {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: var(--surface);
+            padding-top: 44px;
+            padding-bottom: 80px;
+        }
+
+        .screen::-webkit-scrollbar {
+            width: 0;
+        }
+
+        .page-title {
+            text-align: center;
+            font-size: 14px;
+            color: var(--on-surface-variant);
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 44px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 var(--spacing-lg);
+            padding-top: 8px;
+            background: transparent;
+            z-index: 50;
+        }
+
+        .status-bar .time {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .status-bar .icons {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .status-bar .icons .material-icons {
+            font-size: 16px;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: var(--surface);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border-top: 1px solid var(--outline-variant);
+            padding-bottom: 20px;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-item .material-icons {
+            font-size: 24px;
+            color: var(--on-surface-variant);
+        }
+
+        .nav-item span {
+            font-size: 12px;
+            color: var(--on-surface-variant);
+        }
+
+        .nav-item.active .material-icons,
+        .nav-item.active span {
+            color: var(--primary);
+        }
+
+        .nav-item.active .material-icons {
+            background: var(--primary-container);
+            padding: 4px 16px;
+            border-radius: 16px;
+        }
+
+        /* FAB - 支持单手操作的增强FAB */
+        .fab {
+            position: absolute;
+            bottom: 90px;
+            right: 16px;
+            width: 56px;
+            height: 56px;
+            background: var(--primary);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-lg);
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.2s ease;
+        }
+
+        .fab:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 24px rgba(103, 80, 164, 0.4);
+        }
+
+        .fab:active {
+            transform: scale(0.95);
+        }
+
+        .fab .material-icons {
+            color: var(--on-primary);
+            font-size: 24px;
+        }
+
+        /* FAB长按提示 */
+        .fab-hint {
+            position: absolute;
+            bottom: 155px;
+            right: 16px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 11;
+            animation: fadeInUp 0.3s ease;
+        }
+
+        .fab-hint::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            right: 20px;
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid rgba(0,0,0,0.8);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 左手模式FAB */
+        .fab.left-handed {
+            right: auto;
+            left: 16px;
+        }
+
+        /* 拇指热区可视化（开发调试用） */
+        .thumb-zone-overlay {
+            position: absolute;
+            left: 0;
+            right: 0;
+            pointer-events: none;
+            z-index: 5;
+            opacity: 0.15;
+        }
+
+        .thumb-zone-easy {
+            background: linear-gradient(to top, rgba(76, 175, 80, 0.8) 0%, rgba(76, 175, 80, 0) 100%);
+            bottom: 0;
+            height: 40%;
+        }
+
+        .thumb-zone-natural {
+            background: linear-gradient(to bottom, rgba(255, 193, 7, 0) 0%, rgba(255, 193, 7, 0.5) 50%, rgba(255, 193, 7, 0) 100%);
+            bottom: 25%;
+            height: 35%;
+        }
+
+        .thumb-zone-hard {
+            background: linear-gradient(to bottom, rgba(244, 67, 54, 0.8) 0%, rgba(244, 67, 54, 0) 100%);
+            top: 0;
+            height: 25%;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-md);
+            margin: var(--spacing-sm) var(--spacing-md);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .card-elevated {
+            box-shadow: var(--shadow-md);
+        }
+
+        /* Companion Card - 伙伴化问候卡片 */
+        .companion-card {
+            background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
+            margin: var(--spacing-sm) var(--spacing-md);
+            padding: 12px 16px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+            animation: slideInDown 0.3s ease;
+        }
+
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .companion-avatar {
+            width: 36px;
+            height: 36px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .companion-message {
+            flex: 1;
+            color: white;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .companion-close {
+            color: rgba(255,255,255,0.7);
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .companion-close:hover {
+            color: white;
+        }
+
+        /* Companion Achievement Card */
+        .companion-achievement {
+            background: linear-gradient(135deg, #FF9800 0%, #FFB74D 100%);
+        }
+
+        /* Companion Support Card */
+        .companion-support {
+            background: linear-gradient(135deg, #9C27B0 0%, #BA68C8 100%);
+        }
+
+        /* ============================================
+           HOME PAGE - 首页仪表盘
+           ============================================ */
+
+        .home-header {
+            background: linear-gradient(135deg, var(--primary) 0%, #8B5CF6 100%);
+            padding: var(--spacing-lg);
+            padding-top: var(--spacing-xl);
+            color: white;
+            border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+        }
+
+        .greeting {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 4px;
+        }
+
+        .user-name {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .balance-section {
+            text-align: center;
+            padding: var(--spacing-md) 0;
+        }
+
+        .balance-label {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+
+        .balance-amount {
+            font-size: 36px;
+            font-weight: 700;
+            margin: var(--spacing-sm) 0;
+        }
+
+        .balance-trend {
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .balance-trend.up {
+            color: #A5D6A7;
+        }
+
+        .balance-trend.down {
+            color: #EF9A9A;
+        }
+
+        /* Money Age Card */
+        .money-age-card {
+            background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+            border: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .money-age-card::before {
+            content: '';
+            position: absolute;
+            right: -20px;
+            top: -20px;
+            width: 100px;
+            height: 100px;
+            background: rgba(46, 125, 50, 0.1);
+            border-radius: 50%;
+        }
+
+        .money-age-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .money-age-title {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .money-age-title .material-icons {
+            color: var(--money-age-excellent);
+        }
+
+        .money-age-title span {
+            font-weight: 500;
+            color: var(--on-surface);
+        }
+
+        .money-age-badge {
+            background: var(--money-age-excellent);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .money-age-value {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            margin: var(--spacing-sm) 0;
+        }
+
+        .money-age-number {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--money-age-excellent);
+        }
+
+        .money-age-unit {
+            font-size: 18px;
+            color: var(--on-surface-variant);
+        }
+
+        .money-age-desc {
+            font-size: 13px;
+            color: var(--on-surface-variant);
+        }
+
+        .money-age-trend {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: var(--spacing-sm);
+            font-size: 13px;
+            color: var(--money-age-excellent);
+        }
+
+        /* Quick Stats */
+        .quick-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-sm);
+            margin: var(--spacing-md);
+        }
+
+        .stat-card {
+            background: var(--surface);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--on-surface-variant);
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--on-surface);
+        }
+
+        .stat-value.income {
+            color: var(--success);
+        }
+
+        .stat-value.expense {
+            color: var(--error);
+        }
+
+        /* Budget Overview */
+        .budget-overview {
+            margin: var(--spacing-md);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--on-surface);
+        }
+
+        .see-all {
+            font-size: 14px;
+            color: var(--primary);
+            cursor: pointer;
+        }
+
+        .budget-item {
+            background: var(--surface);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-sm);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .budget-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .budget-category {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .category-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .category-icon .material-icons {
+            font-size: 20px;
+            color: white;
+        }
+
+        .budget-name {
+            font-weight: 500;
+        }
+
+        .budget-amount {
+            font-size: 14px;
+            color: var(--on-surface-variant);
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--surface-variant);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        .budget-footer {
+            display: flex;
+            justify-content: space-between;
+            margin-top: var(--spacing-sm);
+            font-size: 12px;
+            color: var(--on-surface-variant);
+        }
+
+        /* Recent Transactions */
+        .recent-transactions {
+            margin: var(--spacing-md);
+        }
+
+        .transaction-item {
+            display: flex;
+            align-items: center;
+            padding: var(--spacing-md) 0;
+            border-bottom: 1px solid var(--outline-variant);
+        }
+
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
+
+        .transaction-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: var(--spacing-md);
+        }
+
+        .transaction-icon .material-icons {
+            font-size: 22px;
+            color: white;
+        }
+
+        .transaction-info {
+            flex: 1;
+        }
+
+        .transaction-title {
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .transaction-meta {
+            font-size: 12px;
+            color: var(--on-surface-variant);
+        }
+
+        .transaction-amount {
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .transaction-amount.expense {
+            color: var(--error);
+        }
+
+        .transaction-amount.income {
+            color: var(--success);
+        }
+
+        /* ============================================
+           ADD TRANSACTION PAGE - 记账页面
+           ============================================ */
+
+        .add-transaction-header {
+            padding: var(--spacing-md);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .back-btn {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .page-header-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .transaction-type-tabs {
+            display: flex;
+            margin: var(--spacing-md);
+            background: var(--surface-variant);
+            border-radius: var(--radius-xl);
+            padding: 4px;
+        }
+
+        .type-tab {
+            flex: 1;
+            padding: var(--spacing-sm) var(--spacing-md);
+            text-align: center;
+            border-radius: var(--radius-xl);
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .type-tab.active {
+            background: var(--surface);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .type-tab.expense.active {
+            color: var(--error);
+        }
+
+        .type-tab.income.active {
+            color: var(--success);
+        }
+
+        .amount-input-section {
+            padding: var(--spacing-xl);
+            text-align: center;
+        }
+
+        .currency-symbol {
+            font-size: 32px;
+            color: var(--on-surface-variant);
+            margin-right: 8px;
+        }
+
+        .amount-display {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--on-surface);
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--spacing-md);
+            padding: var(--spacing-md);
+        }
+
+        .category-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--spacing-xs);
+            cursor: pointer;
+            padding: var(--spacing-sm);
+            border-radius: var(--radius-md);
+            transition: all 0.2s;
+        }
+
+        .category-item:hover {
+            background: var(--surface-variant);
+        }
+
+        .category-item.selected {
+            background: var(--primary-container);
+        }
+
+        .category-item .category-icon {
+            width: 48px;
+            height: 48px;
+        }
+
+        .category-item .category-name {
+            font-size: 12px;
+            color: var(--on-surface-variant);
+        }
+
+        .category-item.selected .category-name {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .input-field {
+            margin: var(--spacing-md);
+        }
+
+        .input-field label {
+            display: block;
+            font-size: 12px;
+            color: var(--on-surface-variant);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .input-field input {
+            width: 100%;
+            padding: var(--spacing-md);
+            border: 1px solid var(--outline-variant);
+            border-radius: var(--radius-md);
+            font-size: 16px;
+            background: var(--surface);
+        }
+
+        .input-field input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .number-pad {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--outline-variant);
+            margin-top: auto;
+        }
+
+        .number-key {
+            background: var(--surface);
+            padding: var(--spacing-lg);
+            text-align: center;
+            font-size: 24px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .number-key:active {
+            background: var(--surface-variant);
+        }
+
+        .number-key.action {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Quick Entry Tags */
+        .quick-entry-tags {
+            display: flex;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-md);
+            overflow-x: auto;
+        }
+
+        .quick-tag {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--surface-variant);
+            border-radius: var(--radius-xl);
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .quick-tag .material-icons {
+            font-size: 18px;
+            color: var(--primary);
+        }
+
+        /* ============================================
+           BUDGET MANAGEMENT PAGE - 预算管理
+           ============================================ */
+
+        .budget-header {
+            background: linear-gradient(135deg, var(--primary) 0%, #8B5CF6 100%);
+            padding: var(--spacing-lg);
+            padding-top: var(--spacing-xl);
+            color: white;
+            border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+        }
+
+        .budget-summary {
+            text-align: center;
+            padding: var(--spacing-md) 0;
+        }
+
+        .budget-total-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .budget-total-amount {
+            font-size: 32px;
+            font-weight: 700;
+            margin: var(--spacing-sm) 0;
+        }
+
+        .budget-remaining {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+
+        .vault-section {
+            margin: var(--spacing-md);
+        }
+
+        .vault-card {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-sm);
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .vault-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .vault-icon .material-icons {
+            font-size: 24px;
+            color: white;
+        }
+
+        .vault-info {
+            flex: 1;
+        }
+
+        .vault-name {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .vault-balance {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .vault-allocated {
+            font-size: 12px;
+            color: var(--on-surface-variant);
+        }
+
+        .vault-actions {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+
+        .vault-action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 18px;
+            background: var(--surface-variant);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .vault-action-btn .material-icons {
+            font-size: 20px;
+            color: var(--on-surface-variant);
+        }
+
+        /* Money Age Detail in Budget */
+        .money-age-detail-card {
+            margin: var(--spacing-md);
+            background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+            padding: var(--spacing-lg);
+            border-radius: var(--radius-lg);
+        }
+
+        .money-age-chart {
+            height: 100px;
+            background: rgba(255,255,255,0.5);
+            border-radius: var(--radius-md);
+            margin: var(--spacing-md) 0;
+            display: flex;
+            align-items: flex-end;
+            padding: var(--spacing-sm);
+            gap: 4px;
+        }
+
+        .chart-bar {
+            flex: 1;
+            background: var(--money-age-excellent);
+            border-radius: 4px 4px 0 0;
+            opacity: 0.7;
+        }
+
+        .chart-bar:last-child {
+            opacity: 1;
+        }
+
+        /* ============================================
+           STATISTICS PAGE - 统计分析
+           ============================================ */
+
+        .stats-header {
+            padding: var(--spacing-md);
+        }
+
+        .period-selector {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .period-btn {
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-xl);
+            background: var(--surface-variant);
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .period-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* ============================================
+           SETTINGS PAGE - 设置页面
+           ============================================ */
+
+        .settings-header {
+            padding: var(--spacing-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            padding: var(--spacing-lg);
+            margin: var(--spacing-md);
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .user-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 32px;
+            background: linear-gradient(135deg, var(--primary) 0%, #8B5CF6 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .user-avatar .material-icons {
+            font-size: 32px;
+            color: white;
+        }
+
+        .user-info h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .user-info p {
+            font-size: 14px;
+            color: var(--on-surface-variant);
+        }
+
+        .settings-section {
+            margin: var(--spacing-md);
+        }
+
+        .settings-section-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--on-surface-variant);
+            padding: var(--spacing-sm) var(--spacing-md);
+        }
+
+        .settings-group {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .settings-item {
+            display: flex;
+            align-items: center;
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--outline-variant);
+            cursor: pointer;
+        }
+
+        .settings-item:last-child {
+            border-bottom: none;
+        }
+
+        .settings-item:hover {
+            background: var(--surface-variant);
+        }
+
+        .settings-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: var(--spacing-md);
+        }
+
+        .settings-icon .material-icons {
+            font-size: 22px;
+        }
+
+        .settings-content {
+            flex: 1;
+        }
+
+        .settings-label {
+            font-weight: 500;
+        }
+
+        .settings-value {
+            font-size: 13px;
+            color: var(--on-surface-variant);
+        }
+
+        .settings-arrow {
+            color: var(--on-surface-variant);
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            width: 48px;
+            height: 28px;
+            background: var(--outline);
+            border-radius: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .toggle-switch.active {
+            background: var(--primary);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 12px;
+            transition: transform 0.2s;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(20px);
+        }
+
+        /* ============================================
+           VOICE RECOGNITION - 语音识别页面
+           ============================================ */
+
+        .voice-page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-xl);
+            min-height: 600px;
+        }
+
+        .voice-status {
+            font-size: 18px;
+            color: var(--on-surface-variant);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .voice-wave-container {
+            width: 200px;
+            height: 200px;
+            position: relative;
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .voice-circle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: var(--primary-container);
+            animation: pulse 2s infinite;
+        }
+
+        .voice-circle:nth-child(1) {
+            width: 200px;
+            height: 200px;
+            opacity: 0.3;
+        }
+
+        .voice-circle:nth-child(2) {
+            width: 160px;
+            height: 160px;
+            opacity: 0.5;
+            animation-delay: 0.3s;
+        }
+
+        .voice-circle:nth-child(3) {
+            width: 120px;
+            height: 120px;
+            opacity: 0.7;
+            animation-delay: 0.6s;
+        }
+
+        .voice-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: var(--primary);
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .voice-btn .material-icons {
+            font-size: 36px;
+            color: white;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.1);
+            }
+        }
+
+        .voice-result {
+            background: var(--surface);
+            padding: var(--spacing-lg);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 300px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .voice-text {
+            font-size: 16px;
+            color: var(--on-surface);
+            margin-bottom: var(--spacing-md);
+            text-align: center;
+        }
+
+        .voice-parsed {
+            background: var(--surface-variant);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+        }
+
+        .parsed-item {
+            display: flex;
+            justify-content: space-between;
+            padding: var(--spacing-xs) 0;
+        }
+
+        .parsed-label {
+            color: var(--on-surface-variant);
+            font-size: 14px;
+        }
+
+        .parsed-value {
+            font-weight: 500;
+        }
+
+        /* ============================================
+           TRANSACTION LIST - 交易列表
+           ============================================ */
+
+        .transaction-list-header {
+            padding: var(--spacing-md);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .search-bar {
+            display: flex;
+            align-items: center;
+            background: var(--surface-variant);
+            border-radius: var(--radius-xl);
+            padding: var(--spacing-sm) var(--spacing-md);
+            margin: 0 var(--spacing-md) var(--spacing-md);
+        }
+
+        .search-bar .material-icons {
+            color: var(--on-surface-variant);
+            margin-right: var(--spacing-sm);
+        }
+
+        .search-bar input {
+            border: none;
+            background: transparent;
+            flex: 1;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .date-group {
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--surface-variant);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--on-surface-variant);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .transactions-list {
+            background: var(--surface);
+        }
+
+        /* Chips */
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+            padding: var(--spacing-xs) var(--spacing-md);
+            background: var(--surface-variant);
+            border-radius: var(--radius-xl);
+            font-size: 13px;
+        }
+
+        .chip.selected {
+            background: var(--primary-container);
+            color: var(--on-primary-container);
+        }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+
+        @media (max-width: 800px) {
+            .phone-container {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-container">
+        <!-- ==========================================
+             PAGE 1: HOME - 首页仪表盘
+             ========================================== -->
+        <div>
+            <div class="page-title">首页 - 仪表盘</div>
+            <div class="phone-frame">
+                <div class="status-bar">
+                    <span class="time">9:41</span>
+                    <div class="icons">
+                        <span class="material-icons">signal_cellular_alt</span>
+                        <span class="material-icons">wifi</span>
+                        <span class="material-icons">battery_full</span>
+                    </div>
+                </div>
+
+                <div class="screen">
+                    <!-- Companion Greeting Card -->
+                    <div class="companion-card">
+                        <div class="companion-avatar">😊</div>
+                        <div class="companion-message">
+                            <span>早上好，张三！新的一天，继续加油 ☀️</span>
+                        </div>
+                        <span class="material-icons companion-close">close</span>
+                    </div>
+
+                    <!-- Header with Balance -->
+                    <div class="home-header">
+                        <div class="greeting">早上好</div>
+                        <div class="user-name">张三</div>
+                        <div class="balance-section">
+                            <div class="balance-label">本月结余</div>
+                            <div class="balance-amount">¥ 12,580.50</div>
+                            <div class="balance-trend up">
+                                <span class="material-icons">trending_up</span>
+                                比上月增加 ¥2,340
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Money Age Card -->
+                    <div class="card money-age-card">
+                        <div class="money-age-header">
+                            <div class="money-age-title">
+                                <span class="material-icons">access_time</span>
+                                <span>钱龄</span>
+                            </div>
+                            <div class="money-age-badge">优秀</div>
+                        </div>
+                        <div class="money-age-value">
+                            <span class="money-age-number">28</span>
+                            <span class="money-age-unit">天</span>
+                        </div>
+                        <div class="money-age-desc">您花费的钱平均是28天前赚的</div>
+                        <div class="money-age-trend">
+                            <span class="material-icons">trending_up</span>
+                            比上月提高 3 天
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="quick-stats">
+                        <div class="stat-card">
+                            <div class="stat-label">本月收入</div>
+                            <div class="stat-value income">¥ 25,000.00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">本月支出</div>
+                            <div class="stat-value expense">¥ 12,419.50</div>
+                        </div>
+                    </div>
+
+                    <!-- Budget Overview -->
+                    <div class="budget-overview">
+                        <div class="section-header">
+                            <span class="section-title">预算执行</span>
+                            <span class="see-all">查看全部</span>
+                        </div>
+
+                        <div class="budget-item">
+                            <div class="budget-item-header">
+                                <div class="budget-category">
+                                    <div class="category-icon" style="background: #EF5350;">
+                                        <span class="material-icons">restaurant</span>
+                                    </div>
+                                    <div>
+                                        <div class="budget-name">餐饮</div>
+                                        <div class="budget-amount">¥1,850 / ¥3,000</div>
+                                    </div>
+                                </div>
+                                <span style="color: var(--success);">62%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 62%; background: var(--success);"></div>
+                            </div>
+                            <div class="budget-footer">
+                                <span>剩余 ¥1,150</span>
+                                <span>还有 12 天</span>
+                            </div>
+                        </div>
+
+                        <div class="budget-item">
+                            <div class="budget-item-header">
+                                <div class="budget-category">
+                                    <div class="category-icon" style="background: #42A5F5;">
+                                        <span class="material-icons">directions_car</span>
+                                    </div>
+                                    <div>
+                                        <div class="budget-name">交通</div>
+                                        <div class="budget-amount">¥720 / ¥800</div>
+                                    </div>
+                                </div>
+                                <span style="color: var(--warning);">90%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 90%; background: var(--warning);"></div>
+                            </div>
+                            <div class="budget-footer">
+                                <span>剩余 ¥80</span>
+                                <span>还有 12 天</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Transactions -->
+                    <div class="recent-transactions">
+                        <div class="section-header">
+                            <span class="section-title">最近交易</span>
+                            <span class="see-all">全部</span>
+                        </div>
+
+                        <div class="transaction-item">
+                            <div class="transaction-icon" style="background: #EF5350;">
+                                <span class="material-icons">restaurant</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-title">午餐 - 沙县小吃</div>
+                                <div class="transaction-meta">今天 12:30 · 餐饮</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥28.00</div>
+                        </div>
+
+                        <div class="transaction-item">
+                            <div class="transaction-icon" style="background: #42A5F5;">
+                                <span class="material-icons">directions_subway</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-title">地铁充值</div>
+                                <div class="transaction-meta">今天 08:15 · 交通</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥100.00</div>
+                        </div>
+
+                        <div class="transaction-item">
+                            <div class="transaction-icon" style="background: #66BB6A;">
+                                <span class="material-icons">account_balance</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-title">工资到账</div>
+                                <div class="transaction-meta">昨天 10:00 · 工资</div>
+                            </div>
+                            <div class="transaction-amount income">+¥15,000.00</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAB with Long-press Hint -->
+                <div class="fab-hint">长按：语音记账</div>
+                <div class="fab" id="homeFab" title="点击添加 / 长按语音记账">
+                    <span class="material-icons">add</span>
+                </div>
+
+                <!-- Bottom Navigation - 位于拇指黄金区 -->
+                <div class="bottom-nav">
+                    <div class="nav-item active">
+                        <span class="material-icons">home</span>
+                        <span>首页</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">account_balance_wallet</span>
+                        <span>预算</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">insights</span>
+                        <span>洞察</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">settings</span>
+                        <span>设置</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PAGE 2: ADD TRANSACTION - 记账页面
+             ========================================== -->
+        <div>
+            <div class="page-title">记账 - 添加交易</div>
+            <div class="phone-frame">
+                <div class="status-bar">
+                    <span class="time">9:41</span>
+                    <div class="icons">
+                        <span class="material-icons">signal_cellular_alt</span>
+                        <span class="material-icons">wifi</span>
+                        <span class="material-icons">battery_full</span>
+                    </div>
+                </div>
+
+                <div class="screen" style="padding-bottom: 0;">
+                    <div class="add-transaction-header">
+                        <div class="back-btn">
+                            <span class="material-icons">arrow_back</span>
+                        </div>
+                        <div class="page-header-title">记一笔</div>
+                    </div>
+
+                    <!-- Transaction Type Tabs -->
+                    <div class="transaction-type-tabs">
+                        <div class="type-tab expense active">支出</div>
+                        <div class="type-tab income">收入</div>
+                        <div class="type-tab">转账</div>
+                    </div>
+
+                    <!-- Quick Entry Tags -->
+                    <div class="quick-entry-tags">
+                        <div class="quick-tag">
+                            <span class="material-icons">mic</span>
+                            语音记账
+                        </div>
+                        <div class="quick-tag">
+                            <span class="material-icons">photo_camera</span>
+                            拍照记账
+                        </div>
+                        <div class="quick-tag">
+                            <span class="material-icons">receipt</span>
+                            扫描小票
+                        </div>
+                    </div>
+
+                    <!-- Amount Input -->
+                    <div class="amount-input-section">
+                        <span class="currency-symbol">¥</span>
+                        <span class="amount-display">88.50</span>
+                    </div>
+
+                    <!-- Category Grid -->
+                    <div class="category-grid">
+                        <div class="category-item selected">
+                            <div class="category-icon" style="background: #EF5350;">
+                                <span class="material-icons">restaurant</span>
+                            </div>
+                            <span class="category-name">餐饮</span>
+                        </div>
+                        <div class="category-item">
+                            <div class="category-icon" style="background: #42A5F5;">
+                                <span class="material-icons">directions_car</span>
+                            </div>
+                            <span class="category-name">交通</span>
+                        </div>
+                        <div class="category-item">
+                            <div class="category-icon" style="background: #66BB6A;">
+                                <span class="material-icons">shopping_bag</span>
+                            </div>
+                            <span class="category-name">购物</span>
+                        </div>
+                        <div class="category-item">
+                            <div class="category-icon" style="background: #FFA726;">
+                                <span class="material-icons">local_cafe</span>
+                            </div>
+                            <span class="category-name">饮品</span>
+                        </div>
+                        <div class="category-item">
+                            <div class="category-icon" style="background: #AB47BC;">
+                                <span class="material-icons">movie</span>
+                            </div>
+                            <span class="category-name">娱乐</span>
+                        </div>
+                        <div class="category-item">
+                            <div class="category-icon" style="background: #26A69A;">
+                                <span class="material-icons">fitness_center</span>
+                            </div>
+                            <span class="category-name">运动</span>
+                        </div>
+                        <div class="category-item">
+                            <div class="category-icon" style="background: #5C6BC0;">
+                                <span class="material-icons">school</span>
+                            </div>
+                            <span class="category-name">学习</span>
+                        </div>
+                        <div class="category-item">
+                            <div class="category-icon" style="background: #78909C;">
+                                <span class="material-icons">more_horiz</span>
+                            </div>
+                            <span class="category-name">更多</span>
+                        </div>
+                    </div>
+
+                    <!-- Input Fields -->
+                    <div class="input-field">
+                        <label>备注</label>
+                        <input type="text" placeholder="午餐">
+                    </div>
+
+                    <!-- Number Pad -->
+                    <div class="number-pad">
+                        <div class="number-key">1</div>
+                        <div class="number-key">2</div>
+                        <div class="number-key">3</div>
+                        <div class="number-key">
+                            <span class="material-icons">calendar_today</span>
+                        </div>
+                        <div class="number-key">4</div>
+                        <div class="number-key">5</div>
+                        <div class="number-key">6</div>
+                        <div class="number-key">+</div>
+                        <div class="number-key">7</div>
+                        <div class="number-key">8</div>
+                        <div class="number-key">9</div>
+                        <div class="number-key">-</div>
+                        <div class="number-key">.</div>
+                        <div class="number-key">0</div>
+                        <div class="number-key">
+                            <span class="material-icons">backspace</span>
+                        </div>
+                        <div class="number-key action">完成</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PAGE 3: BUDGET MANAGEMENT - 预算管理
+             ========================================== -->
+        <div>
+            <div class="page-title">预算管理 - 小金库</div>
+            <div class="phone-frame">
+                <div class="status-bar">
+                    <span class="time">9:41</span>
+                    <div class="icons">
+                        <span class="material-icons">signal_cellular_alt</span>
+                        <span class="material-icons">wifi</span>
+                        <span class="material-icons">battery_full</span>
+                    </div>
+                </div>
+
+                <div class="screen">
+                    <!-- Budget Header -->
+                    <div class="budget-header">
+                        <div class="budget-summary">
+                            <div class="budget-total-label">本月预算</div>
+                            <div class="budget-total-amount">¥ 15,000</div>
+                            <div class="budget-remaining">已用 ¥8,420 · 剩余 ¥6,580</div>
+                        </div>
+
+                        <!-- Simple Progress -->
+                        <div style="padding: 0 20px;">
+                            <div class="progress-bar" style="height: 12px; background: rgba(255,255,255,0.3);">
+                                <div class="progress-fill" style="width: 56%; background: white;"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; opacity: 0.8;">
+                                <span>56% 已使用</span>
+                                <span>还有 12 天</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Money Age Detail Card -->
+                    <div class="money-age-detail-card">
+                        <div class="money-age-header">
+                            <div class="money-age-title">
+                                <span class="material-icons">access_time</span>
+                                <span>钱龄趋势</span>
+                            </div>
+                            <div class="money-age-badge">优秀</div>
+                        </div>
+                        <div class="money-age-chart">
+                            <div class="chart-bar" style="height: 40%;"></div>
+                            <div class="chart-bar" style="height: 50%;"></div>
+                            <div class="chart-bar" style="height: 45%;"></div>
+                            <div class="chart-bar" style="height: 60%;"></div>
+                            <div class="chart-bar" style="height: 55%;"></div>
+                            <div class="chart-bar" style="height: 70%;"></div>
+                            <div class="chart-bar" style="height: 80%;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div class="money-age-value" style="margin: 0;">
+                                    <span class="money-age-number" style="font-size: 36px;">28</span>
+                                    <span class="money-age-unit">天</span>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 13px; color: var(--money-age-excellent);">
+                                    <span class="material-icons" style="font-size: 16px; vertical-align: middle;">trending_up</span>
+                                    +3天
+                                </div>
+                                <div style="font-size: 12px; color: var(--on-surface-variant);">较上月</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vault Section -->
+                    <div class="vault-section">
+                        <div class="section-header">
+                            <span class="section-title">小金库</span>
+                            <span class="see-all" style="display: flex; align-items: center; gap: 4px;">
+                                <span class="material-icons" style="font-size: 18px;">add</span>
+                                新建
+                            </span>
+                        </div>
+
+                        <div class="vault-card">
+                            <div class="vault-icon" style="background: #EF5350;">
+                                <span class="material-icons">restaurant</span>
+                            </div>
+                            <div class="vault-info">
+                                <div class="vault-name">餐饮基金</div>
+                                <div class="vault-balance" style="color: var(--success);">¥1,150</div>
+                                <div class="vault-allocated">预算 ¥3,000 · 已用 62%</div>
+                            </div>
+                            <div class="vault-actions">
+                                <div class="vault-action-btn">
+                                    <span class="material-icons">remove</span>
+                                </div>
+                                <div class="vault-action-btn">
+                                    <span class="material-icons">add</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="vault-card">
+                            <div class="vault-icon" style="background: #42A5F5;">
+                                <span class="material-icons">directions_car</span>
+                            </div>
+                            <div class="vault-info">
+                                <div class="vault-name">交通出行</div>
+                                <div class="vault-balance" style="color: var(--warning);">¥80</div>
+                                <div class="vault-allocated">预算 ¥800 · 已用 90%</div>
+                            </div>
+                            <div class="vault-actions">
+                                <div class="vault-action-btn">
+                                    <span class="material-icons">remove</span>
+                                </div>
+                                <div class="vault-action-btn">
+                                    <span class="material-icons">add</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="vault-card">
+                            <div class="vault-icon" style="background: #66BB6A;">
+                                <span class="material-icons">savings</span>
+                            </div>
+                            <div class="vault-info">
+                                <div class="vault-name">应急储蓄</div>
+                                <div class="vault-balance">¥5,000</div>
+                                <div class="vault-allocated">预算 ¥5,000 · 未动用</div>
+                            </div>
+                            <div class="vault-actions">
+                                <div class="vault-action-btn">
+                                    <span class="material-icons">remove</span>
+                                </div>
+                                <div class="vault-action-btn">
+                                    <span class="material-icons">add</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="vault-card">
+                            <div class="vault-icon" style="background: #AB47BC;">
+                                <span class="material-icons">celebration</span>
+                            </div>
+                            <div class="vault-info">
+                                <div class="vault-name">娱乐休闲</div>
+                                <div class="vault-balance" style="color: var(--success);">¥350</div>
+                                <div class="vault-allocated">预算 ¥500 · 已用 30%</div>
+                            </div>
+                            <div class="vault-actions">
+                                <div class="vault-action-btn">
+                                    <span class="material-icons">remove</span>
+                                </div>
+                                <div class="vault-action-btn">
+                                    <span class="material-icons">add</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Navigation -->
+                <div class="bottom-nav">
+                    <div class="nav-item">
+                        <span class="material-icons">home</span>
+                        <span>首页</span>
+                    </div>
+                    <div class="nav-item active">
+                        <span class="material-icons">account_balance_wallet</span>
+                        <span>预算</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">insights</span>
+                        <span>洞察</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">settings</span>
+                        <span>设置</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PAGE 4: INSIGHTS - 财务洞察
+             ========================================== -->
+        <div>
+            <div class="page-title">财务洞察</div>
+            <div class="phone-frame">
+                <div class="status-bar">
+                    <span class="time">9:41</span>
+                    <div class="icons">
+                        <span class="material-icons">signal_cellular_alt</span>
+                        <span class="material-icons">wifi</span>
+                        <span class="material-icons">battery_full</span>
+                    </div>
+                </div>
+
+                <div class="screen">
+                    <!-- Header -->
+                    <div class="stats-header">
+                        <div class="page-header-title" style="margin-bottom: var(--spacing-md);">财务洞察</div>
+                        <div class="period-selector">
+                            <div class="period-btn">周</div>
+                            <div class="period-btn active">月</div>
+                            <div class="period-btn">年</div>
+                        </div>
+                    </div>
+
+                    <!-- Financial Health Score Card -->
+                    <div style="margin: var(--spacing-md); padding: var(--spacing-lg); background: linear-gradient(135deg, var(--primary) 0%, #8B5CF6 100%); border-radius: var(--radius-lg); color: white;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
+                            <div>
+                                <div style="font-size: 13px; opacity: 0.9;">本月财务健康度</div>
+                                <div style="font-size: 36px; font-weight: 700;">86<span style="font-size: 18px; font-weight: 400;">分</span></div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="display: flex; align-items: center; gap: 4px; font-size: 13px;">
+                                    <span class="material-icons" style="font-size: 16px;">trending_up</span>
+                                    +8分
+                                </div>
+                                <div style="font-size: 12px; opacity: 0.8;">较上月</div>
+                            </div>
+                        </div>
+                        <!-- Health Indicators -->
+                        <div style="display: flex; gap: var(--spacing-sm);">
+                            <div style="flex: 1; background: rgba(255,255,255,0.2); border-radius: var(--radius-sm); padding: var(--spacing-sm); text-align: center;">
+                                <div style="font-size: 11px; opacity: 0.85;">钱龄</div>
+                                <div style="font-size: 16px; font-weight: 600;">28天</div>
+                            </div>
+                            <div style="flex: 1; background: rgba(255,255,255,0.2); border-radius: var(--radius-sm); padding: var(--spacing-sm); text-align: center;">
+                                <div style="font-size: 11px; opacity: 0.85;">预算达成</div>
+                                <div style="font-size: 16px; font-weight: 600;">92%</div>
+                            </div>
+                            <div style="flex: 1; background: rgba(255,255,255,0.2); border-radius: var(--radius-sm); padding: var(--spacing-sm); text-align: center;">
+                                <div style="font-size: 11px; opacity: 0.85;">储蓄率</div>
+                                <div style="font-size: 16px; font-weight: 600;">50%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Insights Card -->
+                    <div style="margin: var(--spacing-md); padding: var(--spacing-md); background: linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%); border-radius: var(--radius-lg);">
+                        <div style="display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm);">
+                            <span class="material-icons" style="color: #F57C00; font-size: 20px;">auto_awesome</span>
+                            <span style="font-weight: 500; color: var(--on-surface);">AI 智能洞察</span>
+                            <span style="margin-left: auto; font-size: 12px; color: var(--on-surface-variant);">今日更新</span>
+                        </div>
+                        <div style="font-size: 14px; color: var(--on-surface); line-height: 1.5;">
+                            您的钱龄从上月的25天提升到28天，说明消费习惯更健康了！建议继续保持，目标是达到30天以上。
+                        </div>
+                        <div style="display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-md);">
+                            <div style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; padding: var(--spacing-sm); background: rgba(255,255,255,0.7); border-radius: var(--radius-sm); font-size: 13px; cursor: pointer;">
+                                <span class="material-icons" style="font-size: 16px; color: var(--success);">thumb_up</span>
+                                有帮助
+                            </div>
+                            <div style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; padding: var(--spacing-sm); background: rgba(255,255,255,0.7); border-radius: var(--radius-sm); font-size: 13px; cursor: pointer;">
+                                <span class="material-icons" style="font-size: 16px; color: var(--primary);">arrow_forward</span>
+                                查看详情
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Money Age Trend -->
+                    <div style="margin: var(--spacing-md); padding: var(--spacing-md); background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); border-radius: var(--radius-lg);">
+                        <div class="section-header" style="margin-bottom: var(--spacing-sm);">
+                            <div style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                                <span class="material-icons" style="color: var(--money-age-excellent);">access_time</span>
+                                <span class="section-title">钱龄趋势</span>
+                            </div>
+                            <span class="see-all">详情</span>
+                        </div>
+                        <!-- Money Age Chart -->
+                        <div style="height: 100px; display: flex; align-items: flex-end; gap: 8px; padding: var(--spacing-sm) 0;">
+                            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                <div style="width: 100%; height: 50px; background: var(--money-age-fair); border-radius: 4px 4px 0 0; opacity: 0.7;"></div>
+                                <span style="font-size: 10px; color: var(--on-surface-variant);">7月</span>
+                            </div>
+                            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                <div style="width: 100%; height: 55px; background: var(--money-age-fair); border-radius: 4px 4px 0 0; opacity: 0.7;"></div>
+                                <span style="font-size: 10px; color: var(--on-surface-variant);">8月</span>
+                            </div>
+                            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                <div style="width: 100%; height: 60px; background: var(--money-age-good); border-radius: 4px 4px 0 0; opacity: 0.7;"></div>
+                                <span style="font-size: 10px; color: var(--on-surface-variant);">9月</span>
+                            </div>
+                            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                <div style="width: 100%; height: 70px; background: var(--money-age-good); border-radius: 4px 4px 0 0; opacity: 0.7;"></div>
+                                <span style="font-size: 10px; color: var(--on-surface-variant);">10月</span>
+                            </div>
+                            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                <div style="width: 100%; height: 75px; background: var(--money-age-good); border-radius: 4px 4px 0 0; opacity: 0.7;"></div>
+                                <span style="font-size: 10px; color: var(--on-surface-variant);">11月</span>
+                            </div>
+                            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                <div style="width: 100%; height: 85px; background: var(--money-age-excellent); border-radius: 4px 4px 0 0;"></div>
+                                <span style="font-size: 10px; font-weight: 500; color: var(--money-age-excellent);">12月</span>
+                            </div>
+                        </div>
+                        <!-- Legend -->
+                        <div style="display: flex; justify-content: center; gap: var(--spacing-md); font-size: 11px; margin-top: var(--spacing-sm);">
+                            <span style="display: flex; align-items: center; gap: 4px;">
+                                <span style="width: 10px; height: 10px; background: var(--money-age-excellent); border-radius: 2px;"></span>
+                                优秀(≥30天)
+                            </span>
+                            <span style="display: flex; align-items: center; gap: 4px;">
+                                <span style="width: 10px; height: 10px; background: var(--money-age-good); border-radius: 2px;"></span>
+                                良好(14-29天)
+                            </span>
+                            <span style="display: flex; align-items: center; gap: 4px;">
+                                <span style="width: 10px; height: 10px; background: var(--money-age-fair); border-radius: 2px;"></span>
+                                一般(&lt;14天)
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Budget Execution -->
+                    <div style="margin: var(--spacing-md); padding: var(--spacing-md); background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);">
+                        <div class="section-header" style="margin-bottom: var(--spacing-md);">
+                            <div style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                                <span class="material-icons" style="color: var(--primary);">account_balance_wallet</span>
+                                <span class="section-title">预算执行</span>
+                            </div>
+                            <span class="see-all">全部</span>
+                        </div>
+                        <!-- Budget Items -->
+                        <div style="display: flex; flex-direction: column; gap: var(--spacing-md);">
+                            <div style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                                <div style="width: 36px; height: 36px; background: #EF5350; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                    <span class="material-icons" style="color: white; font-size: 18px;">restaurant</span>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                        <span style="font-size: 13px;">餐饮</span>
+                                        <span style="font-size: 12px; color: var(--success);">剩余 ¥1,150</span>
+                                    </div>
+                                    <div class="progress-bar" style="height: 6px;">
+                                        <div class="progress-fill" style="width: 62%; background: var(--success);"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                                <div style="width: 36px; height: 36px; background: #42A5F5; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                    <span class="material-icons" style="color: white; font-size: 18px;">directions_car</span>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                        <span style="font-size: 13px;">交通</span>
+                                        <span style="font-size: 12px; color: var(--warning);">剩余 ¥80</span>
+                                    </div>
+                                    <div class="progress-bar" style="height: 6px;">
+                                        <div class="progress-fill" style="width: 90%; background: var(--warning);"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                                <div style="width: 36px; height: 36px; background: #66BB6A; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                    <span class="material-icons" style="color: white; font-size: 18px;">savings</span>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                        <span style="font-size: 13px;">储蓄</span>
+                                        <span style="font-size: 12px; color: var(--success);">已完成</span>
+                                    </div>
+                                    <div class="progress-bar" style="height: 6px;">
+                                        <div class="progress-fill" style="width: 100%; background: var(--success);"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats Grid -->
+                    <div style="margin: var(--spacing-md); display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm);">
+                        <div style="background: var(--surface); padding: var(--spacing-md); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                            <div style="display: flex; align-items: center; gap: var(--spacing-xs); margin-bottom: 4px;">
+                                <span class="material-icons" style="font-size: 16px; color: var(--success);">trending_up</span>
+                                <span style="font-size: 12px; color: var(--on-surface-variant);">本月收入</span>
+                            </div>
+                            <div style="font-size: 20px; font-weight: 600; color: var(--success);">¥25,000</div>
+                        </div>
+                        <div style="background: var(--surface); padding: var(--spacing-md); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                            <div style="display: flex; align-items: center; gap: var(--spacing-xs); margin-bottom: 4px;">
+                                <span class="material-icons" style="font-size: 16px; color: var(--error);">trending_down</span>
+                                <span style="font-size: 12px; color: var(--on-surface-variant);">本月支出</span>
+                            </div>
+                            <div style="font-size: 20px; font-weight: 600; color: var(--error);">¥12,420</div>
+                        </div>
+                        <div style="background: var(--surface); padding: var(--spacing-md); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                            <div style="display: flex; align-items: center; gap: var(--spacing-xs); margin-bottom: 4px;">
+                                <span class="material-icons" style="font-size: 16px; color: var(--primary);">savings</span>
+                                <span style="font-size: 12px; color: var(--on-surface-variant);">本月结余</span>
+                            </div>
+                            <div style="font-size: 20px; font-weight: 600;">¥12,580</div>
+                        </div>
+                        <div style="background: var(--surface); padding: var(--spacing-md); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                            <div style="display: flex; align-items: center; gap: var(--spacing-xs); margin-bottom: 4px;">
+                                <span class="material-icons" style="font-size: 16px; color: var(--info);">receipt_long</span>
+                                <span style="font-size: 12px; color: var(--on-surface-variant);">交易笔数</span>
+                            </div>
+                            <div style="font-size: 20px; font-weight: 600;">68笔</div>
+                        </div>
+                    </div>
+
+                    <!-- More Insights Button -->
+                    <div style="margin: var(--spacing-md); padding: var(--spacing-md); background: var(--surface-variant); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; gap: var(--spacing-sm); cursor: pointer;">
+                        <span class="material-icons" style="color: var(--primary);">analytics</span>
+                        <span style="color: var(--primary); font-weight: 500;">查看完整财务报告</span>
+                        <span class="material-icons" style="color: var(--primary);">chevron_right</span>
+                    </div>
+
+                    <div style="height: 20px;"></div>
+                </div>
+
+                <!-- Bottom Navigation -->
+                <div class="bottom-nav">
+                    <div class="nav-item">
+                        <span class="material-icons">home</span>
+                        <span>首页</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">account_balance_wallet</span>
+                        <span>预算</span>
+                    </div>
+                    <div class="nav-item active">
+                        <span class="material-icons">insights</span>
+                        <span>洞察</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">settings</span>
+                        <span>设置</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PAGE 5: SETTINGS - 设置页面
+             ========================================== -->
+        <div>
+            <div class="page-title">设置</div>
+            <div class="phone-frame">
+                <div class="status-bar">
+                    <span class="time">9:41</span>
+                    <div class="icons">
+                        <span class="material-icons">signal_cellular_alt</span>
+                        <span class="material-icons">wifi</span>
+                        <span class="material-icons">battery_full</span>
+                    </div>
+                </div>
+
+                <div class="screen">
+                    <div class="settings-header">
+                        <div class="page-header-title">设置</div>
+                    </div>
+
+                    <!-- User Profile -->
+                    <div class="user-profile">
+                        <div class="user-avatar">
+                            <span class="material-icons">person</span>
+                        </div>
+                        <div class="user-info">
+                            <h3>张三</h3>
+                            <p>zhangsan@email.com</p>
+                        </div>
+                        <span class="material-icons settings-arrow">chevron_right</span>
+                    </div>
+
+                    <!-- General Settings -->
+                    <div class="settings-section">
+                        <div class="settings-section-title">通用</div>
+                        <div class="settings-group">
+                            <div class="settings-item">
+                                <div class="settings-icon" style="background: var(--primary-container);">
+                                    <span class="material-icons" style="color: var(--primary);">account_balance_wallet</span>
+                                </div>
+                                <div class="settings-content">
+                                    <div class="settings-label">默认账户</div>
+                                    <div class="settings-value">微信钱包</div>
+                                </div>
+                                <span class="material-icons settings-arrow">chevron_right</span>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-icon" style="background: #E3F2FD;">
+                                    <span class="material-icons" style="color: #1976D2;">currency_yuan</span>
+                                </div>
+                                <div class="settings-content">
+                                    <div class="settings-label">默认货币</div>
+                                    <div class="settings-value">人民币 (CNY)</div>
+                                </div>
+                                <span class="material-icons settings-arrow">chevron_right</span>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-icon" style="background: #FFF3E0;">
+                                    <span class="material-icons" style="color: #F57C00;">calendar_month</span>
+                                </div>
+                                <div class="settings-content">
+                                    <div class="settings-label">记账周期起始日</div>
+                                    <div class="settings-value">每月1日</div>
+                                </div>
+                                <span class="material-icons settings-arrow">chevron_right</span>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-icon" style="background: #E8F5E9;">
+                                    <span class="material-icons" style="color: #4CAF50;">pan_tool</span>
+                                </div>
+                                <div class="settings-content">
+                                    <div class="settings-label">惯用手</div>
+                                    <div class="settings-value">右手模式</div>
+                                </div>
+                                <span class="material-icons settings-arrow">chevron_right</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Smart Features -->
+                    <div class="settings-section">
+                        <div class="settings-section-title">智能功能</div>
+                        <div class="settings-group">
+                            <div class="settings-item">
+                                <div class="settings-icon" style="background: #E1F5FE;">
+                                    <span class="material-icons" style="color: #03A9F4;">auto_awesome</span>
+                                </div>
+                                <div class="settings-content">
+                                    <div class="settings-label">智能分类</div>
+                                    <div class="settings-value">自动识别交易类型</div>
+                                </div>
+                                <div class="toggle-switch active"></div>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-icon" style="background: #FCE4EC;">
+                                    <span class="material-icons" style="color: #E91E63;">location_on</span>
+                                </div>
+                                <div class="settings-content">
+                                    <div class="settings-label">位置智能</div>
+                                    <div class="settings-value">根据位置推荐分类</div>
+                                </div>
+                                <div class="toggle-switch active"></div>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-icon" style="background: #FFF8E1;">
+                                    <span class="material-icons" style="color: #FFC107;">notifications</span>
+                                </div>
+                                <div class="settings-content">
+                                    <div class="settings-label">记账提醒</div>
+                                    <div class="settings-value">每日 20:00</div>
+                                </div>
+                                <span class="material-icons settings-arrow">chevron_right</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data & Security -->
+                    <div class="settings-section">
+                        <div class="settings-section-title">数据与安全</div>
+                        <div class="settings-group">
+                            <div class="settings-item">
+                                <div class="settings-icon" style="background: #E8EAF6;">
+                                    <span class="material-icons" style="color: #3F51B5;">cloud_sync</span>
+                                </div>
+                                <div class="settings-content">
+                                    <div class="settings-label">数据同步</div>
+                                    <div class="settings-value">已同步 · 2分钟前</div>
+                                </div>
+                                <span class="material-icons settings-arrow">chevron_right</span>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-icon" style="background: #EFEBE9;">
+                                    <span class="material-icons" style="color: #795548;">backup</span>
+                                </div>
+                                <div class="settings-content">
+                                    <div class="settings-label">备份与恢复</div>
+                                </div>
+                                <span class="material-icons settings-arrow">chevron_right</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- About -->
+                    <div class="settings-section">
+                        <div class="settings-section-title">关于</div>
+                        <div class="settings-group">
+                            <div class="settings-item">
+                                <div class="settings-icon" style="background: var(--surface-variant);">
+                                    <span class="material-icons" style="color: var(--on-surface-variant);">info</span>
+                                </div>
+                                <div class="settings-content">
+                                    <div class="settings-label">版本</div>
+                                    <div class="settings-value">2.0.0</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="height: 20px;"></div>
+                </div>
+
+                <!-- Bottom Navigation -->
+                <div class="bottom-nav">
+                    <div class="nav-item">
+                        <span class="material-icons">home</span>
+                        <span>首页</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">account_balance_wallet</span>
+                        <span>预算</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">insights</span>
+                        <span>洞察</span>
+                    </div>
+                    <div class="nav-item active">
+                        <span class="material-icons">settings</span>
+                        <span>设置</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PAGE 6: VOICE RECOGNITION - 语音识别
+             ========================================== -->
+        <div>
+            <div class="page-title">语音记账</div>
+            <div class="phone-frame">
+                <div class="status-bar">
+                    <span class="time">9:41</span>
+                    <div class="icons">
+                        <span class="material-icons">signal_cellular_alt</span>
+                        <span class="material-icons">wifi</span>
+                        <span class="material-icons">battery_full</span>
+                    </div>
+                </div>
+
+                <div class="screen">
+                    <div class="add-transaction-header">
+                        <div class="back-btn">
+                            <span class="material-icons">close</span>
+                        </div>
+                        <div class="page-header-title">语音记账</div>
+                    </div>
+
+                    <div class="voice-page">
+                        <div class="voice-status">正在聆听...</div>
+
+                        <div class="voice-wave-container">
+                            <div class="voice-circle"></div>
+                            <div class="voice-circle"></div>
+                            <div class="voice-circle"></div>
+                            <div class="voice-btn">
+                                <span class="material-icons">mic</span>
+                            </div>
+                        </div>
+
+                        <div class="voice-result">
+                            <div class="voice-text">"午餐吃了28块钱"</div>
+                            <div class="voice-parsed">
+                                <div class="parsed-item">
+                                    <span class="parsed-label">金额</span>
+                                    <span class="parsed-value" style="color: var(--error);">¥28.00</span>
+                                </div>
+                                <div class="parsed-item">
+                                    <span class="parsed-label">分类</span>
+                                    <span class="parsed-value">餐饮</span>
+                                </div>
+                                <div class="parsed-item">
+                                    <span class="parsed-label">备注</span>
+                                    <span class="parsed-value">午餐</span>
+                                </div>
+                                <div class="parsed-item">
+                                    <span class="parsed-label">类型</span>
+                                    <span class="parsed-value">支出</span>
+                                </div>
+                            </div>
+                            <div style="margin-top: var(--spacing-md); display: flex; gap: var(--spacing-sm);">
+                                <button style="flex: 1; padding: var(--spacing-md); border: 1px solid var(--outline); background: transparent; border-radius: var(--radius-md); font-size: 14px; cursor: pointer;">
+                                    重新录入
+                                </button>
+                                <button style="flex: 1; padding: var(--spacing-md); border: none; background: var(--primary); color: white; border-radius: var(--radius-md); font-size: 14px; cursor: pointer;">
+                                    确认保存
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PAGE 7: TRANSACTION LIST - 交易列表
+             ========================================== -->
+        <div>
+            <div class="page-title">交易列表</div>
+            <div class="phone-frame">
+                <div class="status-bar">
+                    <span class="time">9:41</span>
+                    <div class="icons">
+                        <span class="material-icons">signal_cellular_alt</span>
+                        <span class="material-icons">wifi</span>
+                        <span class="material-icons">battery_full</span>
+                    </div>
+                </div>
+
+                <div class="screen" style="padding-top: 50px;">
+                    <div class="transaction-list-header">
+                        <div class="page-header-title">全部账单</div>
+                        <span class="material-icons">filter_list</span>
+                    </div>
+
+                    <div class="search-bar">
+                        <span class="material-icons">search</span>
+                        <input type="text" placeholder="搜索交易记录">
+                    </div>
+
+                    <!-- Period Filter -->
+                    <div style="padding: 0 var(--spacing-md) var(--spacing-md); display: flex; gap: var(--spacing-sm); overflow-x: auto;">
+                        <div class="chip selected">全部</div>
+                        <div class="chip">今天</div>
+                        <div class="chip">本周</div>
+                        <div class="chip">本月</div>
+                        <div class="chip">支出</div>
+                        <div class="chip">收入</div>
+                    </div>
+
+                    <!-- Transaction Groups -->
+                    <div class="date-group">
+                        <span>今天 · 12月25日</span>
+                        <span>支出 ¥128.00</span>
+                    </div>
+                    <div class="transactions-list">
+                        <div class="transaction-item" style="padding: var(--spacing-md);">
+                            <div class="transaction-icon" style="background: #EF5350;">
+                                <span class="material-icons">restaurant</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-title">午餐 - 沙县小吃</div>
+                                <div class="transaction-meta">12:30 · 餐饮 · 微信</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥28.00</div>
+                        </div>
+                        <div class="transaction-item" style="padding: var(--spacing-md);">
+                            <div class="transaction-icon" style="background: #42A5F5;">
+                                <span class="material-icons">directions_subway</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-title">地铁充值</div>
+                                <div class="transaction-meta">08:15 · 交通 · 支付宝</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥100.00</div>
+                        </div>
+                    </div>
+
+                    <div class="date-group">
+                        <span>昨天 · 12月24日</span>
+                        <span>收入 ¥15,000 · 支出 ¥256.50</span>
+                    </div>
+                    <div class="transactions-list">
+                        <div class="transaction-item" style="padding: var(--spacing-md);">
+                            <div class="transaction-icon" style="background: #66BB6A;">
+                                <span class="material-icons">account_balance</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-title">工资到账</div>
+                                <div class="transaction-meta">10:00 · 工资 · 银行卡</div>
+                            </div>
+                            <div class="transaction-amount income">+¥15,000.00</div>
+                        </div>
+                        <div class="transaction-item" style="padding: var(--spacing-md);">
+                            <div class="transaction-icon" style="background: #AB47BC;">
+                                <span class="material-icons">movie</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-title">电影票 x2</div>
+                                <div class="transaction-meta">19:30 · 娱乐 · 微信</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥98.00</div>
+                        </div>
+                        <div class="transaction-item" style="padding: var(--spacing-md);">
+                            <div class="transaction-icon" style="background: #EF5350;">
+                                <span class="material-icons">restaurant</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-title">晚餐 - 火锅</div>
+                                <div class="transaction-meta">18:00 · 餐饮 · 支付宝</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥158.50</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAB -->
+                <div class="fab">
+                    <span class="material-icons">add</span>
+                </div>
+
+                <!-- Bottom Navigation -->
+                <div class="bottom-nav">
+                    <div class="nav-item">
+                        <span class="material-icons">home</span>
+                        <span>首页</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">account_balance_wallet</span>
+                        <span>预算</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">insights</span>
+                        <span>洞察</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">settings</span>
+                        <span>设置</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PAGE 8: ONE-HANDED OPERATION DEMO - 单手操作演示
+             ========================================== -->
+        <div>
+            <div class="page-title">单手操作设计</div>
+            <div class="phone-frame">
+                <div class="status-bar">
+                    <span class="time">9:41</span>
+                    <div class="icons">
+                        <span class="material-icons">signal_cellular_alt</span>
+                        <span class="material-icons">wifi</span>
+                        <span class="material-icons">battery_full</span>
+                    </div>
+                </div>
+
+                <!-- Thumb Zone Visualization -->
+                <div class="thumb-zone-overlay thumb-zone-hard" style="position: absolute; top: 44px;"></div>
+                <div class="thumb-zone-overlay thumb-zone-natural" style="position: absolute;"></div>
+                <div class="thumb-zone-overlay thumb-zone-easy" style="position: absolute;"></div>
+
+                <div class="screen" style="background: transparent;">
+                    <!-- Zone Labels -->
+                    <div style="position: absolute; top: 80px; left: 50%; transform: translateX(-50%); text-align: center;">
+                        <div style="background: rgba(244, 67, 54, 0.9); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 500;">
+                            <span class="material-icons" style="font-size: 14px; vertical-align: middle;">warning</span>
+                            困难区域 (25%)
+                        </div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">需伸展拇指 / 建议放置非关键信息</div>
+                    </div>
+
+                    <div style="position: absolute; top: 280px; left: 50%; transform: translateX(-50%); text-align: center;">
+                        <div style="background: rgba(255, 193, 7, 0.9); color: #333; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 500;">
+                            <span class="material-icons" style="font-size: 14px; vertical-align: middle;">touch_app</span>
+                            舒适区域 (35%)
+                        </div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">自然触及 / 次要交互元素</div>
+                    </div>
+
+                    <div style="position: absolute; bottom: 200px; left: 50%; transform: translateX(-50%); text-align: center;">
+                        <div style="background: rgba(76, 175, 80, 0.9); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 500;">
+                            <span class="material-icons" style="font-size: 14px; vertical-align: middle;">thumb_up</span>
+                            黄金区域 (40%)
+                        </div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">拇指最易触及 / 核心操作必须在此区域</div>
+                    </div>
+
+                    <!-- Core Operation Examples -->
+                    <div style="position: absolute; bottom: 110px; left: 16px; right: 16px;">
+                        <div style="background: white; border-radius: 12px; padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #333;">核心操作位置检查 ✓</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                <div style="background: #E8F5E9; color: #2E7D32; padding: 4px 10px; border-radius: 12px; font-size: 11px;">FAB记账按钮</div>
+                                <div style="background: #E8F5E9; color: #2E7D32; padding: 4px 10px; border-radius: 12px; font-size: 11px;">底部导航</div>
+                                <div style="background: #E8F5E9; color: #2E7D32; padding: 4px 10px; border-radius: 12px; font-size: 11px;">确认/取消按钮</div>
+                                <div style="background: #E8F5E9; color: #2E7D32; padding: 4px 10px; border-radius: 12px; font-size: 11px;">语音录入</div>
+                                <div style="background: #FFF3E0; color: #F57C00; padding: 4px 10px; border-radius: 12px; font-size: 11px;">分类选择</div>
+                                <div style="background: #FFF3E0; color: #F57C00; padding: 4px 10px; border-radius: 12px; font-size: 11px;">金额键盘</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAB in Golden Zone -->
+                <div class="fab" style="bottom: 90px;">
+                    <span class="material-icons">add</span>
+                </div>
+
+                <!-- Bottom Navigation in Golden Zone -->
+                <div class="bottom-nav">
+                    <div class="nav-item">
+                        <span class="material-icons">home</span>
+                        <span>首页</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">account_balance_wallet</span>
+                        <span>预算</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">insights</span>
+                        <span>洞察</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">settings</span>
+                        <span>设置</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PAGE 9: LEFT-HANDED MODE DEMO - 左手模式演示
+             ========================================== -->
+        <div>
+            <div class="page-title">左手模式</div>
+            <div class="phone-frame">
+                <div class="status-bar">
+                    <span class="time">9:41</span>
+                    <div class="icons">
+                        <span class="material-icons">signal_cellular_alt</span>
+                        <span class="material-icons">wifi</span>
+                        <span class="material-icons">battery_full</span>
+                    </div>
+                </div>
+
+                <div class="screen">
+                    <div class="home-header" style="border-radius: 0 0 28px 28px;">
+                        <div class="greeting">左手模式已启用</div>
+                        <div class="user-name">所有操作适配左手习惯</div>
+                        <div class="balance-section">
+                            <div class="balance-label">本月可用余额</div>
+                            <div class="balance-amount">¥12,580.00</div>
+                        </div>
+                    </div>
+
+                    <!-- Left-hand optimized layout indicators -->
+                    <div style="padding: var(--spacing-md);">
+                        <div style="background: #E3F2FD; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <span class="material-icons" style="color: #1976D2;">pan_tool</span>
+                                <span style="font-weight: 600; color: #1976D2;">左手模式特点</span>
+                            </div>
+                            <ul style="font-size: 13px; color: #333; padding-left: 24px; margin: 0;">
+                                <li style="margin-bottom: 4px;">FAB按钮移至左下角</li>
+                                <li style="margin-bottom: 4px;">滑动操作方向适配</li>
+                                <li style="margin-bottom: 4px;">弹窗按钮顺序调整</li>
+                                <li>手势识别区域优化</li>
+                            </ul>
+                        </div>
+
+                        <div style="background: white; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="font-size: 14px; font-weight: 500; margin-bottom: 12px;">切换惯用手</div>
+                            <div style="display: flex; gap: 8px;">
+                                <div style="flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; text-align: center; cursor: pointer;">
+                                    <span class="material-icons" style="display: block; font-size: 28px; color: #666;">pan_tool</span>
+                                    <span style="font-size: 12px; color: #666;">右手模式</span>
+                                </div>
+                                <div style="flex: 1; padding: 12px; border: 2px solid var(--primary); border-radius: 8px; text-align: center; background: var(--primary-container); cursor: pointer;">
+                                    <span class="material-icons" style="display: block; font-size: 28px; color: var(--primary); transform: scaleX(-1);">pan_tool</span>
+                                    <span style="font-size: 12px; color: var(--primary); font-weight: 500;">左手模式</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAB on LEFT side for left-handed users -->
+                <div class="fab left-handed">
+                    <span class="material-icons">add</span>
+                </div>
+
+                <!-- Bottom Navigation -->
+                <div class="bottom-nav">
+                    <div class="nav-item active">
+                        <span class="material-icons">home</span>
+                        <span>首页</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">account_balance_wallet</span>
+                        <span>预算</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">insights</span>
+                        <span>洞察</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">settings</span>
+                        <span>设置</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PAGE 10: COMPANION INTERACTIONS - 伙伴化交互演示
+             ========================================== -->
+        <div>
+            <div class="page-title">伙伴化交互</div>
+            <div class="phone-frame">
+                <div class="status-bar">
+                    <span class="time">9:41</span>
+                    <div class="icons">
+                        <span class="material-icons">signal_cellular_alt</span>
+                        <span class="material-icons">wifi</span>
+                        <span class="material-icons">battery_full</span>
+                    </div>
+                </div>
+
+                <div class="screen" style="padding: 50px 0 80px;">
+                    <div style="padding: 0 16px;">
+                        <h3 style="font-size: 16px; margin-bottom: 16px; color: #333;">场景化情感交互示例</h3>
+
+                        <!-- Morning Greeting -->
+                        <div class="companion-card" style="margin: 0 0 12px 0;">
+                            <div class="companion-avatar">😊</div>
+                            <div class="companion-message">
+                                <div style="font-size: 11px; opacity: 0.85; margin-bottom: 2px;">早安问候</div>
+                                <span>早上好！新的一天，记得照顾好自己 ☀️</span>
+                            </div>
+                        </div>
+
+                        <!-- Achievement Celebration -->
+                        <div class="companion-card companion-achievement" style="margin: 0 0 12px 0;">
+                            <div class="companion-avatar">🎉</div>
+                            <div class="companion-message">
+                                <div style="font-size: 11px; opacity: 0.85; margin-bottom: 2px;">成就庆祝</div>
+                                <span>太棒了！连续记账7天，坚持就是胜利 💪</span>
+                            </div>
+                        </div>
+
+                        <!-- Budget Warning -->
+                        <div class="companion-card" style="margin: 0 0 12px 0; background: linear-gradient(135deg, #2196F3 0%, #64B5F6 100%);">
+                            <div class="companion-avatar">🤗</div>
+                            <div class="companion-message">
+                                <div style="font-size: 11px; opacity: 0.85; margin-bottom: 2px;">预算提醒</div>
+                                <span>餐饮预算快用完了，要不要一起看看？</span>
+                            </div>
+                        </div>
+
+                        <!-- Overspend Comfort -->
+                        <div class="companion-card companion-support" style="margin: 0 0 12px 0;">
+                            <div class="companion-avatar">💜</div>
+                            <div class="companion-message">
+                                <div style="font-size: 11px; opacity: 0.85; margin-bottom: 2px;">超支安慰</div>
+                                <span>没关系，生活总有意外，我们下个月再努力</span>
+                            </div>
+                        </div>
+
+                        <!-- Welcome Back -->
+                        <div class="companion-card" style="margin: 0 0 12px 0; background: linear-gradient(135deg, #607D8B 0%, #90A4AE 100%);">
+                            <div class="companion-avatar">😌</div>
+                            <div class="companion-message">
+                                <div style="font-size: 11px; opacity: 0.85; margin-bottom: 2px;">回归欢迎</div>
+                                <span>好久不见，一切还好吗？随时欢迎回来记录</span>
+                            </div>
+                        </div>
+
+                        <!-- Special Date -->
+                        <div class="companion-card" style="margin: 0 0 12px 0; background: linear-gradient(135deg, #E91E63 0%, #F48FB1 100%);">
+                            <div class="companion-avatar">🎂</div>
+                            <div class="companion-message">
+                                <div style="font-size: 11px; opacity: 0.85; margin-bottom: 2px;">生日祝福</div>
+                                <span>生日快乐！愿你所有的愿望都能实现 🎁</span>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 20px; padding: 16px; background: #F5F5F5; border-radius: 12px;">
+                            <div style="font-size: 13px; font-weight: 500; margin-bottom: 8px; color: #333;">设计原则</div>
+                            <ul style="font-size: 12px; color: #666; padding-left: 16px; margin: 0;">
+                                <li style="margin-bottom: 4px;">语气温暖友善，像朋友聊天</li>
+                                <li style="margin-bottom: 4px;">正面场景庆祝，负面场景支持</li>
+                                <li style="margin-bottom: 4px;">绝不指责、绝不比较、绝不贩卖焦虑</li>
+                                <li>文案由AI动态生成，避免重复</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Navigation -->
+                <div class="bottom-nav">
+                    <div class="nav-item">
+                        <span class="material-icons">home</span>
+                        <span>首页</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">account_balance_wallet</span>
+                        <span>预算</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">insights</span>
+                        <span>洞察</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="material-icons">settings</span>
+                        <span>设置</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Toggle switch interaction
+        document.querySelectorAll('.toggle-switch').forEach(toggle => {
+            toggle.addEventListener('click', function() {
+                this.classList.toggle('active');
+            });
+        });
+
+        // Category selection
+        document.querySelectorAll('.category-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.category-item').forEach(i => i.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+
+        // Chip selection
+        document.querySelectorAll('.chip').forEach(chip => {
+            chip.addEventListener('click', function() {
+                document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+
+        // Period button selection
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Type tab selection
+        document.querySelectorAll('.type-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.type-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
@@ -364,8 +363,7 @@ class FeedbackLearningService {
   }
 
   String _generateId() {
-    return DateTime.now().millisecondsSinceEpoch.toString() +
-        '_${DateTime.now().microsecond}';
+    return '${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecond}';
   }
 }
 

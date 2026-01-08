@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
 /// 月度计划状态
 enum MonthlyPlanStatus {
@@ -194,11 +193,11 @@ class MonthlyPlanningCard extends StatelessWidget {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.1),
+          color: theme.colorScheme.outline.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -232,12 +231,12 @@ class MonthlyPlanningCard extends StatelessWidget {
 
           // 计划项列表
           if (showPlanItems && data.planItems.isNotEmpty) ...[
-            Divider(height: 1, color: theme.colorScheme.outline.withOpacity(0.1)),
+            Divider(height: 1, color: theme.colorScheme.outline.withValues(alpha: 0.1)),
             _buildPlanItems(theme),
           ],
 
           // 底部操作
-          Divider(height: 1, color: theme.colorScheme.outline.withOpacity(0.1)),
+          Divider(height: 1, color: theme.colorScheme.outline.withValues(alpha: 0.1)),
           _buildFooter(theme),
         ],
       ),
@@ -308,7 +307,7 @@ class MonthlyPlanningCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -326,7 +325,7 @@ class MonthlyPlanningCard extends StatelessWidget {
           Container(
             height: 40,
             width: 1,
-            color: theme.colorScheme.outline.withOpacity(0.1),
+            color: theme.colorScheme.outline.withValues(alpha: 0.1),
           ),
           // 总预算
           Expanded(
@@ -341,7 +340,7 @@ class MonthlyPlanningCard extends StatelessWidget {
           Container(
             height: 40,
             width: 1,
-            color: theme.colorScheme.outline.withOpacity(0.1),
+            color: theme.colorScheme.outline.withValues(alpha: 0.1),
           ),
           // 剩余可花
           Expanded(
@@ -470,13 +469,13 @@ class MonthlyPlanningCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isAchieved
-            ? Colors.green.withOpacity(0.1)
-            : theme.colorScheme.primaryContainer.withOpacity(0.3),
+            ? Colors.green.withValues(alpha: 0.1)
+            : theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isAchieved
-              ? Colors.green.withOpacity(0.3)
-              : theme.colorScheme.primary.withOpacity(0.2),
+              ? Colors.green.withValues(alpha: 0.3)
+              : theme.colorScheme.primary.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
@@ -705,10 +704,10 @@ class MonthlyPlanCreator extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.2),
+          color: theme.colorScheme.outline.withValues(alpha: 0.2),
           style: BorderStyle.solid,
         ),
       ),

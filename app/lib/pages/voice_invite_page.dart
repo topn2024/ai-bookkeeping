@@ -18,7 +18,7 @@ class VoiceInvitePage extends ConsumerStatefulWidget {
 }
 
 class _VoiceInvitePageState extends ConsumerState<VoiceInvitePage> {
-  int _currentStep = 2; // 当前在第2步（邀请家人）
+  final int _currentStep = 2; // 当前在第2步（邀请家人）
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +34,7 @@ class _VoiceInvitePageState extends ConsumerState<VoiceInvitePage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.createFamilyLedger ?? '创建家庭账本',
+          l10n.createFamilyLedger,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -133,14 +133,14 @@ class _VoiceInvitePageState extends ConsumerState<VoiceInvitePage> {
     );
   }
 
-  Widget _buildInviteMethods(AppLocalizations? l10n) {
+  Widget _buildInviteMethods(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.inviteFamily ?? '邀请家人一起记账',
+            l10n.inviteFamily,
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -272,7 +272,7 @@ class _VoiceInvitePageState extends ConsumerState<VoiceInvitePage> {
     );
   }
 
-  Widget _buildShareLinkCard(AppLocalizations? l10n) {
+  Widget _buildShareLinkCard(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -303,14 +303,14 @@ class _VoiceInvitePageState extends ConsumerState<VoiceInvitePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  l10n?.shareLink ?? '分享链接',
+                  l10n.shareLink,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
-                  l10n?.sendInviteLink ?? '发送邀请链接给家人',
+                  l10n.sendInviteLink,
                   style: TextStyle(
                     fontSize: 12,
                     color: AppTheme.textSecondaryColor,
@@ -329,14 +329,14 @@ class _VoiceInvitePageState extends ConsumerState<VoiceInvitePage> {
                 borderRadius: BorderRadius.circular(20),
               ),
             ),
-            child: Text(l10n?.copyLink ?? '复制链接', style: const TextStyle(fontSize: 12)),
+            child: Text(l10n.copyLink, style: const TextStyle(fontSize: 12)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQRCodeCard(AppLocalizations? l10n) {
+  Widget _buildQRCodeCard(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -367,14 +367,14 @@ class _VoiceInvitePageState extends ConsumerState<VoiceInvitePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  l10n?.qrCodeInvite ?? '二维码邀请',
+                  l10n.qrCodeInvite,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
-                  l10n?.scanToJoin ?? '让家人扫码加入',
+                  l10n.scanToJoin,
                   style: TextStyle(
                     fontSize: 12,
                     color: AppTheme.textSecondaryColor,
@@ -391,7 +391,7 @@ class _VoiceInvitePageState extends ConsumerState<VoiceInvitePage> {
                 borderRadius: BorderRadius.circular(20),
               ),
             ),
-            child: Text(l10n?.showQRCode ?? '显示二维码', style: const TextStyle(fontSize: 12)),
+            child: Text(l10n.showQRCode, style: const TextStyle(fontSize: 12)),
           ),
         ],
       ),

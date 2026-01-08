@@ -656,5 +656,189 @@
   "disclaimer": "참고용이며 재정 조언이 아닙니다",
   "smartRecommendation": "스마트 추천",
   "discoverNewFeature": "새 기능 발견",
-  "laterRemind": "나중에"
+  "laterRemind": "나중에",
+
+  "aaSplit": "더치페이",
+  "aaDetected": "더치페이 감지됨",
+  "totalAmount": "총 금액",
+  "splitPeople": "인원 수",
+  "splitMethod": "분할 방법",
+  "evenSplit": "균등 분할",
+  "proportionalSplit": "비율 분할",
+  "customSplit": "사용자 정의 분할",
+  "yourShare": "내 부담금",
+  "confirmSplit": "분할 확인",
+
+  "accessibilitySettings": "접근성 설정",
+  "fontSize": "글꼴 크기",
+  "highContrast": "고대비",
+  "boldText": "굵은 텍스트",
+  "screenReader": "화면 리더 지원",
+  "reduceMotion": "모션 줄이기",
+  "largeTouch": "큰 터치 영역",
+
+  "aiLanguageSettings": "AI 언어 설정",
+  "aiReplyLanguage": "AI 응답 언어",
+  "aiVoice": "AI 음성",
+  "maleVoice": "남성 음성",
+  "femaleVoice": "여성 음성",
+
+  "familyLeaderboard": "가족 순위",
+  "weeklyRanking": "주간 순위",
+  "monthlyRanking": "월간 순위",
+  "savingsChampion": "저축 챔피언",
+  "budgetMaster": "예산 마스터",
+
+  "familySavingsGoal": "가족 저축 목표",
+  "contributeNow": "지금 기여하기",
+  "goalAmount": "목표 금액",
+  "currentProgress": "현재 진행률",
+  "daysRemaining": "남은 일수",
+
+  "ledgerSettings": "장부 설정",
+  "defaultLedger": "기본 장부",
+  "ledgerName": "장부 이름",
+  "ledgerIcon": "장부 아이콘",
+  "ledgerColor": "장부 색상",
+  "archiveLedger": "장부 보관",
+
+  "locationServices": "위치 서비스",
+  "enableLocation": "위치 활성화",
+  "locationAccuracy": "위치 정확도",
+  "highAccuracy": "높은 정확도",
+  "lowPower": "저전력",
+  "geofenceAlerts": "지오펜스 알림",
+  "nearbyMerchants": "근처 가맹점",
+
+  "duplicateTransaction": "거래 복제",
+  "transactionTime": "거래 시간",
+  "transactionNote": "거래 메모",
+  "transactionTags": "거래 태그",
+  "transactionLocation": "거래 위치",
+  "transactionAttachments": "거래 첨부 파일",
+
+  "budgetWarning": "예산 경고",
+
+  "moneyAgeTitle": "자금 연령 분석",
+  "moneyAgeDescription2": "현금 흐름 효율성 이해하기",
+  "averageMoneyAge": "평균 자금 연령",
+  "moneyAgeHealth": "자금 연령 건강도",
+  "poor": "나쁨",
+
+  "habitTracking": "습관 추적",
+  "dailyStreak": "연속 기록",
+  "weeklyGoal": "주간 목표",
+  "monthlyGoal": "월간 목표",
+  "streakDays": "{count}일",
+  "@streakDays": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "achievementUnlocked": "업적 해제",
+  "viewAchievements": "업적 보기",
+  "shareAchievement": "업적 공유",
+  "achievementProgress": "업적 진행률",
+
+  "listening": "듣는 중...",
+  "voiceError": "음성 인식 실패",
+  "speakNow": "말씀하세요",
+
+  "scanBill": "영수증 스캔",
+  "recognizing": "인식 중...",
+  "recognitionFailed": "인식 실패",
+
+  "syncing": "동기화 중...",
+  "syncComplete": "동기화 완료",
+  "syncFailed": "동기화 실패",
+  "lastSynced": "마지막 동기화",
+  "syncNow": "지금 동기화",
+
+  "offlineMode": "오프라인 모드",
+  "offlineData": "오프라인 데이터",
+  "pendingSync": "동기화 대기 중",
+  "offlineChanges": "오프라인 변경사항",
+
+  "privacySettings": "개인정보 설정",
+  "dataEncryption": "데이터 암호화",
+  "biometricLock": "생체 인식 잠금",
+  "autoLock": "자동 잠금",
+  "lockTimeout": "잠금 시간 초과",
+
+  "budgetAlerts": "예산 알림",
+  "dailyReminder": "일일 알림",
+
+  "exportFormat": "내보내기 형식",
+  "csvFormat": "CSV 형식",
+  "excelFormat": "Excel 형식",
+  "jsonFormat": "JSON 형식",
+
+  "feedbackSubmitted": "피드백 제출됨",
+  "thankYouFeedback": "피드백 감사합니다",
+  "rateApp": "앱 평가하기",
+  "shareApp": "앱 공유하기",
+
+  "upgradeRequired": "업그레이드 필요",
+  "loginRequired": "로그인 필요",
+  "loginToUseFeature": "이 기능을 사용하려면 로그인하세요",
+  "loginNow": "지금 로그인",
+  "continueAsGuest": "게스트로 계속",
+
+  "connectionFailed": "연결 실패",
+  "checkNetwork": "네트워크 연결을 확인하세요",
+
+  "permissionRequired": "권한 필요",
+  "locationPermission": "위치 권한",
+  "storagePermission": "저장소 권한",
+
+  "deleteWarning": "이 작업은 취소할 수 없습니다",
+  "permanentlyDelete": "영구 삭제",
+  "moveToTrash": "휴지통으로 이동",
+
+  "searchPlaceholder": "검색...",
+  "noResults": "결과 없음",
+  "searchHistory": "검색 기록",
+  "clearHistory": "기록 지우기",
+
+  "filterBy": "필터",
+  "sortBy": "정렬",
+  "dateRange": "날짜 범위",
+  "amountRange": "금액 범위",
+  "categoryFilter": "카테고리 필터",
+
+  "ascending": "오름차순",
+  "descending": "내림차순",
+  "byDate": "날짜순",
+  "byAmount": "금액순",
+  "byCategory": "카테고리순",
+
+  "selectAll": "전체 선택",
+  "deselectAll": "선택 해제",
+  "selected": "선택됨",
+  "batchDelete": "일괄 삭제",
+  "batchEdit": "일괄 편집",
+
+  "redo": "다시 실행",
+  "actionUndone": "작업 취소됨",
+  "actionRedone": "작업 다시 실행됨",
+
+  "loadMore": "더 보기",
+  "refreshing": "새로고침 중...",
+  "pullToRefresh": "당겨서 새로고침",
+  "releaseToRefresh": "놓아서 새로고침",
+
+  "emptyState": "데이터 없음",
+  "addFirst": "첫 번째 기록 추가",
+
+  "welcomeBack": "다시 오신 것을 환영합니다",
+  "goodMorning": "좋은 아침입니다",
+  "goodAfternoon": "좋은 오후입니다",
+  "goodEvening": "좋은 저녁입니다",
+
+  "frequentCategories": "자주 사용하는 카테고리",
+  "suggestedActions": "추천 작업",
+
+  "importData": "데이터 가져오기",
+  "exportData": "데이터 내보내기"
 }

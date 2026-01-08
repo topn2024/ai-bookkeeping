@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
-import '../l10n/app_localizations.dart';
 
 /// 翻译质量检查服务
 ///
@@ -87,7 +86,7 @@ class TranslationQualityService {
 
         // 检查空值
         int emptyCount = 0;
-        for (final entry in (content as Map<String, dynamic>).entries) {
+        for (final entry in (content).entries) {
           if (!entry.key.startsWith('@') &&
               !entry.key.startsWith('@@') &&
               entry.value is String &&
@@ -218,7 +217,7 @@ class TranslationQualityService {
       }
 
       // 检查带占位符的键是否有对应的元数据
-      for (final entry in (content as Map<String, dynamic>).entries) {
+      for (final entry in (content).entries) {
         if (entry.key.startsWith('@') || entry.key.startsWith('@@')) {
           continue;
         }

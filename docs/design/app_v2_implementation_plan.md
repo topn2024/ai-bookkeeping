@@ -1210,7 +1210,7 @@ metadata:
 - [x] 实现多模态输入统一处理（语音/图片/文本）*(services/multimodal_input_service.dart)*
 - [x] 优化语音识别准确率与响应速度（BookkeepingASROptimizer）
 - [x] 实现图像OCR票据识别增强 *(services/multimodal_input_service.dart - OCRService)*
-- [x] 实现 VoiceNavigationService 语音页面导航服务（145页/16模块）*(services/voice_navigation_service.dart)*
+- [x] 实现 VoiceNavigationService 语音页面导航服务（237页/20模块）*(services/voice_navigation_service.dart)*
 
 **智能化技术方案**
 - [x] 端侧AI模型评估与选型（LocalWhisperService + LocalMLService）

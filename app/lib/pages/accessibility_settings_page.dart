@@ -36,7 +36,7 @@ class _AccessibilitySettingsPageState
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.accessibilitySettings ?? '辅助功能',
+          l10n.accessibilitySettings,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -103,7 +103,7 @@ class _AccessibilitySettingsPageState
     );
   }
 
-  Widget _buildFontSizeSection(AppLocalizations? l10n) {
+  Widget _buildFontSizeSection(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -125,7 +125,7 @@ class _AccessibilitySettingsPageState
               Icon(Icons.text_fields, color: AppTheme.primaryColor),
               const SizedBox(width: 12),
               Text(
-                l10n?.fontSize ?? '字体大小',
+                l10n.fontSize,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -170,7 +170,7 @@ class _AccessibilitySettingsPageState
     );
   }
 
-  Widget _buildVisualSection(AppLocalizations? l10n) {
+  Widget _buildVisualSection(AppLocalizations l10n) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -187,7 +187,7 @@ class _AccessibilitySettingsPageState
         children: [
           _buildSwitchTile(
             icon: Icons.contrast,
-            title: l10n?.highContrast ?? '高对比度',
+            title: l10n.highContrast,
             subtitle: '增强文字与背景的对比',
             value: _highContrast,
             onChanged: (v) => setState(() => _highContrast = v),
@@ -195,7 +195,7 @@ class _AccessibilitySettingsPageState
           Divider(height: 1, color: AppTheme.dividerColor),
           _buildSwitchTile(
             icon: Icons.format_bold,
-            title: l10n?.boldText ?? '粗体文字',
+            title: l10n.boldText,
             subtitle: '使用粗体显示所有文字',
             value: _boldText,
             onChanged: (v) => setState(() => _boldText = v),
@@ -203,7 +203,7 @@ class _AccessibilitySettingsPageState
           Divider(height: 1, color: AppTheme.dividerColor),
           _buildSwitchTile(
             icon: Icons.animation,
-            title: l10n?.reduceMotion ?? '减少动效',
+            title: l10n.reduceMotion,
             subtitle: '减少界面动画效果',
             value: _reduceMotion,
             onChanged: (v) => setState(() => _reduceMotion = v),
@@ -213,7 +213,7 @@ class _AccessibilitySettingsPageState
     );
   }
 
-  Widget _buildInteractionSection(AppLocalizations? l10n) {
+  Widget _buildInteractionSection(AppLocalizations l10n) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -230,7 +230,7 @@ class _AccessibilitySettingsPageState
         children: [
           _buildSwitchTile(
             icon: Icons.record_voice_over,
-            title: l10n?.screenReader ?? '屏幕朗读',
+            title: l10n.screenReader,
             subtitle: '自动朗读屏幕内容',
             value: _screenReader,
             onChanged: (v) => setState(() => _screenReader = v),
@@ -238,7 +238,7 @@ class _AccessibilitySettingsPageState
           Divider(height: 1, color: AppTheme.dividerColor),
           _buildSwitchTile(
             icon: Icons.touch_app,
-            title: l10n?.largeTouchTarget ?? '大触控区域',
+            title: l10n.largeTouchTarget,
             subtitle: '增大按钮和可点击区域',
             value: _largeTouch,
             onChanged: (v) => setState(() => _largeTouch = v),
@@ -275,7 +275,7 @@ class _AccessibilitySettingsPageState
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: AppTheme.primaryColor,
+        activeTrackColor: AppTheme.primaryColor,
       ),
     );
   }

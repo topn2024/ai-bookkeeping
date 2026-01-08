@@ -678,7 +678,7 @@ class SettingsPage extends ConsumerWidget {
           ),
           trailing: Switch(
             value: isEnabled,
-            activeColor: AppColors.primary,
+            activeTrackColor: AppColors.primary,
             onChanged: (value) async {
               final newSettings = settings.copyWith(syncPrivateData: value);
               await autoSync.updateSettings(newSettings);

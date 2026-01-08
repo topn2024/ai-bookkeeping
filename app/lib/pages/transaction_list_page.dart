@@ -46,7 +46,7 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
   final TextEditingController _searchController = TextEditingController();
 
   // 是否显示筛选面板
-  bool _showFilters = false;
+  final bool _showFilters = false;
 
   @override
   void dispose() {
@@ -708,7 +708,7 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
     return Container(
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Icon(icon, size: 12, color: color),
@@ -1101,7 +1101,7 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

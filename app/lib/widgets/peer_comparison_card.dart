@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
 /// 同类用户对比数据
 class PeerComparisonData {
@@ -171,11 +170,11 @@ class PeerComparisonCard extends StatelessWidget {
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: theme.colorScheme.outline.withOpacity(0.1),
+            color: theme.colorScheme.outline.withValues(alpha: 0.1),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -253,8 +252,8 @@ class PeerComparisonCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             color: data.isBetterThanAverage
-                ? Colors.green.withOpacity(0.1)
-                : Colors.orange.withOpacity(0.1),
+                ? Colors.green.withValues(alpha: 0.1)
+                : Colors.orange.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -364,7 +363,7 @@ class PeerComparisonCard extends StatelessWidget {
                     _formatValue(data.peerAverage),
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   Padding(
@@ -372,7 +371,7 @@ class PeerComparisonCard extends StatelessWidget {
                     child: Text(
                       data.type.unit,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
@@ -392,7 +391,7 @@ class PeerComparisonCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -410,8 +409,8 @@ class PeerComparisonCard extends StatelessWidget {
                   child: CircularProgressIndicator(
                     value: 1,
                     strokeWidth: 6,
-                    backgroundColor: color.withOpacity(0.2),
-                    valueColor: AlwaysStoppedAnimation(color.withOpacity(0.2)),
+                    backgroundColor: color.withValues(alpha: 0.2),
+                    valueColor: AlwaysStoppedAnimation(color.withValues(alpha: 0.2)),
                   ),
                 ),
                 // 进度圆环
@@ -453,7 +452,7 @@ class PeerComparisonCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '你超越了${rank}%的同类用户',
+                  '你超越了$rank%的同类用户',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.outline,
                   ),
@@ -488,7 +487,7 @@ class PeerComparisonCard extends StatelessWidget {
         Container(
           height: 30,
           width: 1,
-          color: theme.colorScheme.outline.withOpacity(0.1),
+          color: theme.colorScheme.outline.withValues(alpha: 0.1),
         ),
         // 差异
         Expanded(
@@ -701,9 +700,9 @@ class PeerComparisonOverview extends StatelessWidget {
                     ),
                   ),
                 ),
-                // 平均线标记
-                Positioned(
-                  left: 0.5 * (MediaQuery.of(theme as BuildContext? ?? WidgetsBinding.instance.rootElement!.owner!.debugCreator as BuildContext).size.width - 100) * 3 / 5 - 1,
+                // 平均线标记 (50%位置)
+                Align(
+                  alignment: const Alignment(0, 0), // 50%位置对应alignment.x = 0
                   child: Container(
                     width: 2,
                     height: 8,

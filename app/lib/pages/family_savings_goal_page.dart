@@ -189,7 +189,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.familySavingsGoal ?? '家庭储蓄目标',
+          l10n.familySavingsGoal,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -335,14 +335,14 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
     );
   }
 
-  Widget _buildContributionsSection(FamilySavingsGoal goal, AppLocalizations? l10n) {
+  Widget _buildContributionsSection(FamilySavingsGoal goal, AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.memberContribution ?? '成员贡献进度',
+            l10n.memberContribution,
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -455,7 +455,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
     );
   }
 
-  Widget _buildOtherGoalsSection(AppLocalizations? l10n) {
+  Widget _buildOtherGoalsSection(AppLocalizations l10n) {
     final otherGoals = _goals.where((g) => !g.isMain).toList();
     if (otherGoals.isEmpty) return const SizedBox.shrink();
 
@@ -465,7 +465,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.otherSavingsGoals ?? '其他储蓄目标',
+            l10n.otherSavingsGoals,
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -553,14 +553,14 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
     );
   }
 
-  Widget _buildRecordsSection(AppLocalizations? l10n) {
+  Widget _buildRecordsSection(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.recentDeposits ?? '最近存入记录',
+            l10n.recentDeposits,
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -653,7 +653,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
     );
   }
 
-  Widget _buildDepositButton(AppLocalizations? l10n) {
+  Widget _buildDepositButton(AppLocalizations l10n) {
     return Positioned(
       bottom: 20,
       left: 16,
@@ -662,7 +662,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
         child: ElevatedButton.icon(
           onPressed: _showDepositDialog,
           icon: const Icon(Icons.savings, size: 20),
-          label: Text(l10n?.depositNow ?? '立即存入'),
+          label: Text(l10n.depositNow),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.primaryColor,
             foregroundColor: Colors.white,
@@ -777,7 +777,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
                 labelText: '选择目标',
                 border: OutlineInputBorder(),
               ),
-              value: _goals.first.name,
+              initialValue: _goals.first.name,
               items: _goals
                   .map((g) => DropdownMenuItem(
                         value: g.name,

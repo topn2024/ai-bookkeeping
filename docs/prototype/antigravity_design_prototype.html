@@ -1,0 +1,2191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>反重力设计体系 (Antigravity Design System) - 交互原型</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <style>
+        /* ============================================
+           反重力设计系统 CSS 变量
+           ============================================ */
+        :root {
+            /* 矢车菊蓝主色系 */
+            --primary: #6495ED;
+            --primary-dark: #4169E1;
+            --primary-light: #87CEFA;
+            --primary-container: #EBF3FF;
+            --on-primary: #FFFFFF;
+
+            /* 表面色 */
+            --surface: #F8FAFF;
+            --surface-variant: #EDF2FA;
+            --surface-elevated: #FFFFFF;
+            --on-surface: #1E2A3B;
+            --on-surface-variant: #5A6B7D;
+
+            /* 功能色 */
+            --expense: #E57373;
+            --income: #66BB6A;
+            --warning: #FFB74D;
+
+            /* ====== 反重力阴影系统 (L0-L5) ====== */
+            --shadow-L0: none;
+            --shadow-L1: 0 1px 3px rgba(100,149,237,0.08), 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-L2: 0 2px 6px rgba(100,149,237,0.12), 0 2px 4px rgba(0,0,0,0.06);
+            --shadow-L3: 0 4px 12px rgba(100,149,237,0.16), 0 4px 8px rgba(0,0,0,0.08);
+            --shadow-L4: 0 8px 24px rgba(100,149,237,0.20), 0 6px 12px rgba(0,0,0,0.10);
+            --shadow-L5: 0 16px 48px rgba(100,149,237,0.24), 0 12px 24px rgba(0,0,0,0.12);
+
+            /* 玻璃态效果 */
+            --glass-bg: rgba(255, 255, 255, 0.75);
+            --glass-border: rgba(255, 255, 255, 0.3);
+            --glass-blur: 20px;
+
+            /* 弹性缓动曲线 */
+            --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --ease-elastic-out: cubic-bezier(0.68, -0.6, 0.32, 1.6);
+            --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+            /* 拇指热区高度 */
+            --zone-hot: 45%;    /* 底部热区 */
+            --zone-warm: 35%;   /* 中部温区 */
+            --zone-cold: 20%;   /* 顶部冷区 */
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #5A85DD 0%, #6495ED 50%, #7BA3F0 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* 页面头部 */
+        .prototype-header {
+            text-align: center;
+            color: white;
+            padding: 20px 0 30px;
+        }
+        .prototype-header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .prototype-header p { opacity: 0.9; font-size: 14px; }
+
+        /* 导航标签 */
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+            position: sticky;
+            top: 0;
+            background: linear-gradient(135deg, #5A85DD 0%, #6495ED 100%);
+            padding: 15px 0;
+            z-index: 1000;
+        }
+        .nav-tab {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s var(--ease-out-back);
+            border: none;
+        }
+        .nav-tab:hover, .nav-tab.active {
+            background: white;
+            color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        /* 章节 */
+        .section {
+            margin-bottom: 60px;
+            display: none;
+        }
+        .section.active { display: block; }
+        .section-title {
+            color: white;
+            font-size: 22px;
+            margin-bottom: 16px;
+            padding-left: 12px;
+            border-left: 4px solid white;
+        }
+        .section-desc {
+            color: rgba(255,255,255,0.85);
+            margin-bottom: 24px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* 手机框架网格 */
+        .phone-grid {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .phone-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .phone-label {
+            color: white;
+            font-size: 13px;
+            margin-bottom: 10px;
+            padding: 6px 16px;
+            background: rgba(0,0,0,0.25);
+            border-radius: 20px;
+        }
+
+        /* 手机框架 */
+        .phone-frame {
+            width: 375px;
+            height: 750px;
+            background: var(--surface);
+            border-radius: 40px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+            overflow: hidden;
+            position: relative;
+            border: 12px solid #1a1a1a;
+        }
+
+        /* 状态栏 */
+        .status-bar {
+            height: 44px;
+            background: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* 内容区 */
+        .content {
+            height: calc(100% - 44px - 80px);
+            overflow-y: auto;
+            background: var(--surface);
+        }
+
+        /* ============================================
+           反重力布局组件
+           ============================================ */
+
+        /* 底部导航栏 - 反重力核心 */
+        .bottom-nav {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: var(--surface-elevated);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border-top: 1px solid rgba(100,149,237,0.1);
+            padding-bottom: 16px;
+            box-shadow: 0 -4px 20px rgba(100,149,237,0.08);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: transform 0.3s var(--ease-out-back);
+        }
+        .nav-item:active {
+            transform: scale(0.9);
+        }
+        .nav-item .material-icons {
+            font-size: 24px;
+            color: var(--on-surface-variant);
+            transition: all 0.3s var(--ease-out-back);
+        }
+        .nav-item span {
+            font-size: 11px;
+            color: var(--on-surface-variant);
+            transition: color 0.3s;
+        }
+        .nav-item.active .material-icons {
+            color: var(--primary);
+            background: var(--primary-container);
+            padding: 4px 16px;
+            border-radius: 16px;
+        }
+        .nav-item.active span { color: var(--primary); }
+
+        /* FAB 悬浮按钮 - 标准位置 */
+        .fab {
+            position: absolute;
+            bottom: 96px;
+            right: 16px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-L4);
+            z-index: 10;
+            cursor: pointer;
+            transition: all 0.3s var(--ease-out-back);
+        }
+        .fab:hover {
+            transform: scale(1.05) translateY(-2px);
+            box-shadow: var(--shadow-L5);
+        }
+        .fab:active {
+            transform: scale(0.95);
+        }
+        .fab .material-icons {
+            color: white;
+            font-size: 24px;
+            transition: transform 0.3s var(--ease-out-back);
+        }
+
+        /* FAB 展开菜单 */
+        .fab-expanded {
+            position: absolute;
+            bottom: 96px;
+            right: 16px;
+            z-index: 20;
+        }
+        .fab-main {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-L4);
+            cursor: pointer;
+        }
+        .fab-main .material-icons {
+            color: white;
+            font-size: 24px;
+            transition: transform 0.3s var(--ease-out-back);
+        }
+        .fab-expanded.open .fab-main .material-icons {
+            transform: rotate(45deg);
+        }
+        .fab-menu {
+            position: absolute;
+            bottom: 70px;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s var(--ease-out-back);
+        }
+        .fab-expanded.open .fab-menu {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .fab-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: flex-end;
+            opacity: 0;
+            transform: translateY(20px) scale(0.8);
+            transition: all 0.3s var(--ease-elastic-out);
+        }
+        .fab-expanded.open .fab-menu-item:nth-child(1) {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            transition-delay: 0.1s;
+        }
+        .fab-expanded.open .fab-menu-item:nth-child(2) {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            transition-delay: 0.15s;
+        }
+        .fab-expanded.open .fab-menu-item:nth-child(3) {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            transition-delay: 0.2s;
+        }
+        .fab-menu-label {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            box-shadow: var(--shadow-L2);
+            white-space: nowrap;
+        }
+        .fab-mini {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-L3);
+            cursor: pointer;
+        }
+        .fab-mini .material-icons {
+            font-size: 20px;
+            color: var(--primary);
+        }
+
+        /* FAB 嵌入导航栏中央 */
+        .bottom-nav-with-fab {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: var(--surface-elevated);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border-top: 1px solid rgba(100,149,237,0.1);
+            padding-bottom: 16px;
+            box-shadow: 0 -4px 20px rgba(100,149,237,0.08);
+        }
+        .fab-center {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-L4);
+            margin-top: -28px;
+            cursor: pointer;
+            transition: all 0.3s var(--ease-out-back);
+        }
+        .fab-center:hover {
+            transform: scale(1.1);
+        }
+        .fab-center .material-icons {
+            color: white;
+            font-size: 28px;
+        }
+
+        /* ============================================
+           底部弹窗系统 (Bottom Sheet)
+           ============================================ */
+
+        /* 遮罩层 */
+        .sheet-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.4);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 50;
+        }
+        .sheet-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Mini Sheet (25%) */
+        .sheet-mini {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 25%;
+            background: white;
+            border-radius: 24px 24px 0 0;
+            transform: translateY(100%);
+            transition: transform 0.4s var(--ease-out-back);
+            z-index: 60;
+            box-shadow: var(--shadow-L5);
+        }
+        .sheet-mini.visible {
+            transform: translateY(0);
+        }
+
+        /* Half Sheet (50%) */
+        .sheet-half {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 55%;
+            background: white;
+            border-radius: 24px 24px 0 0;
+            transform: translateY(100%);
+            transition: transform 0.4s var(--ease-out-back);
+            z-index: 60;
+            box-shadow: var(--shadow-L5);
+        }
+        .sheet-half.visible {
+            transform: translateY(0);
+        }
+
+        /* Full Sheet (90%) */
+        .sheet-full {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 92%;
+            background: white;
+            border-radius: 24px 24px 0 0;
+            transform: translateY(100%);
+            transition: transform 0.4s var(--ease-out-back);
+            z-index: 60;
+            box-shadow: var(--shadow-L5);
+        }
+        .sheet-full.visible {
+            transform: translateY(0);
+        }
+
+        /* 拖动条 */
+        .sheet-handle {
+            width: 40px;
+            height: 4px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 2px;
+            margin: 12px auto;
+        }
+
+        .sheet-content {
+            padding: 0 20px 20px;
+            overflow-y: auto;
+            height: calc(100% - 28px);
+        }
+
+        .sheet-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* ============================================
+           反重力视觉效果
+           ============================================ */
+
+        /* 悬浮卡片 L1-L5 */
+        .floating-card {
+            background: white;
+            border-radius: 16px;
+            margin: 12px 16px;
+            padding: 16px;
+            transition: all 0.3s var(--ease-out-back);
+        }
+        .floating-card-L1 { box-shadow: var(--shadow-L1); }
+        .floating-card-L2 { box-shadow: var(--shadow-L2); }
+        .floating-card-L3 {
+            box-shadow: var(--shadow-L3);
+            transform: translateY(-2px);
+        }
+        .floating-card-L4 {
+            box-shadow: var(--shadow-L4);
+            transform: translateY(-4px);
+        }
+        .floating-card-L5 {
+            box-shadow: var(--shadow-L5);
+            transform: translateY(-6px);
+        }
+        .floating-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-L4);
+        }
+
+        /* 玻璃态卡片 */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 20px;
+            margin: 12px 16px;
+        }
+
+        /* 层叠卡片组 */
+        .stacked-cards {
+            position: relative;
+            height: 180px;
+            margin: 20px 16px;
+        }
+        .stacked-card {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 140px;
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            transition: all 0.4s var(--ease-out-back);
+            cursor: pointer;
+        }
+        .stacked-card:nth-child(1) {
+            top: 0;
+            z-index: 3;
+            box-shadow: var(--shadow-L4);
+        }
+        .stacked-card:nth-child(2) {
+            top: 16px;
+            left: 8px;
+            right: 8px;
+            z-index: 2;
+            box-shadow: var(--shadow-L3);
+            opacity: 0.9;
+        }
+        .stacked-card:nth-child(3) {
+            top: 32px;
+            left: 16px;
+            right: 16px;
+            z-index: 1;
+            box-shadow: var(--shadow-L2);
+            opacity: 0.7;
+        }
+        .stacked-card:hover {
+            transform: translateY(-8px);
+        }
+
+        /* 浮岛式布局 */
+        .floating-island {
+            background: white;
+            border-radius: 20px;
+            padding: 16px;
+            box-shadow: var(--shadow-L3);
+            margin-bottom: 16px;
+        }
+
+        /* ============================================
+           反重力动效
+           ============================================ */
+
+        /* 悬浮呼吸动画 */
+        @keyframes float-breathe {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+        .float-animation {
+            animation: float-breathe 3s ease-in-out infinite;
+        }
+
+        /* 向上飘升动画 */
+        @keyframes rise-up {
+            0% {
+                opacity: 0;
+                transform: translateY(30px) scale(0.9);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .rise-animation {
+            animation: rise-up 0.5s var(--ease-out-back) forwards;
+        }
+
+        /* 金额上飘动画 */
+        @keyframes amount-float-up {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            50% {
+                opacity: 0.8;
+                transform: translateY(-40px) scale(0.8);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-80px) scale(0.6);
+            }
+        }
+        .amount-float {
+            animation: amount-float-up 0.8s var(--ease-out-back) forwards;
+        }
+
+        /* 气泡上升效果 */
+        @keyframes bubble-rise {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-100px) scale(0.5);
+            }
+        }
+        .bubble {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: var(--primary-light);
+            border-radius: 50%;
+            opacity: 0.6;
+            animation: bubble-rise 3s ease-out infinite;
+        }
+
+        /* 弹性按钮点击 */
+        @keyframes button-bounce {
+            0% { transform: scale(1); }
+            30% { transform: scale(0.95); }
+            50% { transform: scale(1.05); }
+            70% { transform: scale(0.98); }
+            100% { transform: scale(1); }
+        }
+        .bounce-click {
+            animation: button-bounce 0.4s var(--ease-out-back);
+        }
+
+        /* 列表项升入动画 */
+        .list-item-rise {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        .list-item-rise.visible {
+            animation: rise-up 0.4s var(--ease-out-back) forwards;
+        }
+        .list-item-rise:nth-child(1) { animation-delay: 0.05s; }
+        .list-item-rise:nth-child(2) { animation-delay: 0.1s; }
+        .list-item-rise:nth-child(3) { animation-delay: 0.15s; }
+        .list-item-rise:nth-child(4) { animation-delay: 0.2s; }
+
+        /* Toast从底部升起 */
+        @keyframes toast-rise {
+            0% {
+                opacity: 0;
+                transform: translateY(100%) scale(0.9);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .toast-bottom {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--on-surface);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 24px;
+            font-size: 14px;
+            box-shadow: var(--shadow-L4);
+            animation: toast-rise 0.4s var(--ease-out-back);
+            z-index: 100;
+        }
+
+        /* ============================================
+           拇指热区可视化
+           ============================================ */
+        .thumb-zone-overlay {
+            position: absolute;
+            top: 44px;
+            left: 0;
+            right: 0;
+            bottom: 80px;
+            pointer-events: none;
+            z-index: 5;
+        }
+        .zone-cold {
+            height: 20%;
+            background: rgba(229, 115, 115, 0.15);
+            border-bottom: 2px dashed rgba(229, 115, 115, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #E57373;
+        }
+        .zone-warm {
+            height: 35%;
+            background: rgba(255, 183, 77, 0.1);
+            border-bottom: 2px dashed rgba(255, 183, 77, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #FFB74D;
+        }
+        .zone-hot {
+            height: 45%;
+            background: rgba(102, 187, 106, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #66BB6A;
+        }
+
+        /* ============================================
+           交易列表项
+           ============================================ */
+        .transaction-item {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            background: white;
+            margin: 8px 16px;
+            border-radius: 16px;
+            box-shadow: var(--shadow-L2);
+            transition: all 0.3s var(--ease-out-back);
+        }
+        .transaction-item:hover {
+            transform: translateX(4px);
+            box-shadow: var(--shadow-L3);
+        }
+        .transaction-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+        }
+        .transaction-icon.expense { background: rgba(229, 115, 115, 0.15); }
+        .transaction-icon.income { background: rgba(102, 187, 106, 0.15); }
+        .transaction-icon .material-icons.expense { color: var(--expense); }
+        .transaction-icon .material-icons.income { color: var(--income); }
+        .transaction-info { flex: 1; }
+        .transaction-category { font-weight: 500; color: var(--on-surface); }
+        .transaction-note { font-size: 12px; color: var(--on-surface-variant); margin-top: 2px; }
+        .transaction-amount { font-weight: 600; font-size: 16px; }
+        .transaction-amount.expense { color: var(--expense); }
+        .transaction-amount.income { color: var(--income); }
+
+        /* ============================================
+           分类选择网格
+           ============================================ */
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            padding: 8px;
+        }
+        .category-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 8px;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s var(--ease-out-back);
+        }
+        .category-item:hover {
+            background: var(--primary-container);
+            transform: translateY(-4px);
+        }
+        .category-item.selected {
+            background: var(--primary);
+            color: white;
+        }
+        .category-item .material-icons {
+            font-size: 28px;
+            margin-bottom: 8px;
+            color: var(--primary);
+        }
+        .category-item.selected .material-icons {
+            color: white;
+        }
+        .category-item span {
+            font-size: 12px;
+        }
+
+        /* ============================================
+           记账成功动效演示
+           ============================================ */
+        .success-demo {
+            position: relative;
+            height: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .success-amount {
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .success-bubbles {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .success-bubbles .bubble:nth-child(1) { left: 20%; animation-delay: 0s; }
+        .success-bubbles .bubble:nth-child(2) { left: 40%; animation-delay: 0.3s; }
+        .success-bubbles .bubble:nth-child(3) { left: 60%; animation-delay: 0.6s; }
+        .success-bubbles .bubble:nth-child(4) { left: 80%; animation-delay: 0.9s; }
+        .success-bubbles .bubble:nth-child(5) { left: 30%; animation-delay: 1.2s; }
+
+        /* 确认按钮固定底部 */
+        .sticky-bottom-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 16px;
+            background: white;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+        }
+        .sticky-button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: var(--shadow-L3);
+            transition: all 0.3s var(--ease-out-back);
+        }
+        .sticky-button:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-L4);
+        }
+        .sticky-button:active {
+            transform: scale(0.98);
+        }
+
+        /* 头部渐变 */
+        .header-gradient {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            padding: 20px 16px;
+            color: white;
+            border-radius: 0 0 24px 24px;
+        }
+
+        /* 钱龄仪表盘玻璃态 */
+        .money-age-glass {
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 24px;
+            padding: 24px;
+            margin: -40px 16px 16px;
+            position: relative;
+            z-index: 2;
+            box-shadow: var(--shadow-L4);
+        }
+        .money-age-value {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--primary);
+            text-align: center;
+        }
+        .money-age-label {
+            text-align: center;
+            color: var(--on-surface-variant);
+            margin-top: 4px;
+        }
+        .money-age-badge {
+            display: inline-block;
+            background: #66BB6A;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        /* 演示说明 */
+        .demo-hint {
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin: 16px;
+            color: rgba(255,255,255,0.9);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .demo-hint .material-icons {
+            font-size: 18px;
+        }
+
+        /* 比较演示 */
+        .compare-wrapper {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .compare-item {
+            background: rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 16px;
+            flex: 1;
+            min-width: 280px;
+            max-width: 380px;
+        }
+        .compare-title {
+            color: white;
+            font-size: 14px;
+            margin-bottom: 12px;
+            opacity: 0.9;
+        }
+        .compare-content {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 16px;
+            min-height: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="prototype-header">
+        <h1>
+            <span class="material-icons" style="font-size:32px">rocket_launch</span>
+            反重力设计体系
+        </h1>
+        <p>Antigravity Design System - 打破传统布局约束，提升单手操作体验</p>
+    </div>
+
+    <div class="nav-tabs">
+        <button class="nav-tab active" onclick="showSection('layout')">布局反重力</button>
+        <button class="nav-tab" onclick="showSection('visual')">视觉反重力</button>
+        <button class="nav-tab" onclick="showSection('motion')">动效反重力</button>
+        <button class="nav-tab" onclick="showSection('sheets')">底部弹窗</button>
+        <button class="nav-tab" onclick="showSection('zones')">拇指热区</button>
+        <button class="nav-tab" onclick="showSection('complete')">完整示例</button>
+    </div>
+
+    <!-- 布局反重力 -->
+    <div class="section active" id="layout">
+        <h2 class="section-title">布局反重力 (Layout Antigravity)</h2>
+        <p class="section-desc">
+            核心操作下沉至拇指热区，使用底部导航和FAB按钮，让单手操作更轻松。
+        </p>
+
+        <div class="phone-grid">
+            <!-- FAB 标准位置 -->
+            <div class="phone-wrapper">
+                <div class="phone-label">FAB 标准位置</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="padding:16px">
+                        <div class="header-gradient" style="margin:-16px -16px 16px;padding:24px 16px">
+                            <div style="font-size:14px;opacity:0.9">本月支出</div>
+                            <div style="font-size:32px;font-weight:700;margin-top:4px">¥ 3,580.00</div>
+                        </div>
+
+                        <div style="font-weight:600;margin:16px 0 12px;color:var(--on-surface)">今日账单</div>
+                        <div class="transaction-item">
+                            <div class="transaction-icon expense">
+                                <span class="material-icons expense">restaurant</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-category">餐饮</div>
+                                <div class="transaction-note">午餐</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥35.00</div>
+                        </div>
+                        <div class="transaction-item">
+                            <div class="transaction-icon expense">
+                                <span class="material-icons expense">directions_subway</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-category">交通</div>
+                                <div class="transaction-note">地铁</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥8.00</div>
+                        </div>
+                    </div>
+
+                    <div class="fab" onclick="this.classList.toggle('bounce-click')">
+                        <span class="material-icons">add</span>
+                    </div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FAB 展开菜单 -->
+            <div class="phone-wrapper">
+                <div class="phone-label">FAB 展开菜单</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="padding:16px;background:rgba(0,0,0,0.4)">
+                        <!-- 内容模糊 -->
+                    </div>
+
+                    <div class="fab-expanded open">
+                        <div class="fab-menu">
+                            <div class="fab-menu-item">
+                                <span class="fab-menu-label">扫描票据</span>
+                                <div class="fab-mini"><span class="material-icons">photo_camera</span></div>
+                            </div>
+                            <div class="fab-menu-item">
+                                <span class="fab-menu-label">语音记账</span>
+                                <div class="fab-mini"><span class="material-icons">mic</span></div>
+                            </div>
+                            <div class="fab-menu-item">
+                                <span class="fab-menu-label">手动记账</span>
+                                <div class="fab-mini"><span class="material-icons">edit</span></div>
+                            </div>
+                        </div>
+                        <div class="fab-main">
+                            <span class="material-icons">close</span>
+                        </div>
+                    </div>
+
+                    <div class="bottom-nav" style="opacity:0.5">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FAB 嵌入导航 -->
+            <div class="phone-wrapper">
+                <div class="phone-label">FAB 嵌入导航栏中央</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="padding:16px">
+                        <div class="header-gradient" style="margin:-16px -16px 16px;padding:24px 16px">
+                            <div style="font-size:14px;opacity:0.9">本月支出</div>
+                            <div style="font-size:32px;font-weight:700;margin-top:4px">¥ 3,580.00</div>
+                        </div>
+
+                        <div style="font-weight:600;margin:16px 0 12px;color:var(--on-surface)">今日账单</div>
+                        <div class="transaction-item">
+                            <div class="transaction-icon expense">
+                                <span class="material-icons expense">restaurant</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-category">餐饮</div>
+                                <div class="transaction-note">午餐</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥35.00</div>
+                        </div>
+                    </div>
+
+                    <div class="bottom-nav-with-fab">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="fab-center">
+                            <span class="material-icons">add</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-hint">
+            <span class="material-icons">lightbulb</span>
+            点击 FAB 按钮体验弹性动画效果
+        </div>
+    </div>
+
+    <!-- 视觉反重力 -->
+    <div class="section" id="visual">
+        <h2 class="section-title">视觉反重力 (Visual Antigravity)</h2>
+        <p class="section-desc">
+            通过悬浮阴影、玻璃态效果、层叠卡片，创造轻盈脱俗的界面感受。
+        </p>
+
+        <div class="phone-grid">
+            <!-- 阴影层级演示 -->
+            <div class="phone-wrapper">
+                <div class="phone-label">悬浮阴影层级 (L1-L5)</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="padding-top:16px">
+                        <div class="floating-card floating-card-L1">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <span style="font-weight:500">L1 - 分割线卡片</span>
+                                <span style="color:var(--on-surface-variant);font-size:12px">elevation: 1-2dp</span>
+                            </div>
+                        </div>
+                        <div class="floating-card floating-card-L2">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <span style="font-weight:500">L2 - 普通卡片</span>
+                                <span style="color:var(--on-surface-variant);font-size:12px">elevation: 3-4dp</span>
+                            </div>
+                        </div>
+                        <div class="floating-card floating-card-L3">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <span style="font-weight:500">L3 - 悬浮卡片</span>
+                                <span style="color:var(--on-surface-variant);font-size:12px">elevation: 6-8dp</span>
+                            </div>
+                        </div>
+                        <div class="floating-card floating-card-L4">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <span style="font-weight:500">L4 - 弹窗级别</span>
+                                <span style="color:var(--on-surface-variant);font-size:12px">elevation: 12-16dp</span>
+                            </div>
+                        </div>
+                        <div class="floating-card floating-card-L5">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <span style="font-weight:500">L5 - 全屏覆盖</span>
+                                <span style="color:var(--on-surface-variant);font-size:12px">elevation: 24dp+</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 玻璃态效果 -->
+            <div class="phone-wrapper">
+                <div class="phone-label">玻璃态效果 (Glassmorphism)</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="background:linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)">
+                        <div style="padding:80px 16px 16px">
+                            <div class="money-age-glass float-animation">
+                                <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px">
+                                    <span class="material-icons" style="color:var(--income);font-size:28px">trending_up</span>
+                                    <span style="font-weight:600;font-size:16px">钱龄健康度</span>
+                                </div>
+                                <div class="money-age-value">42天</div>
+                                <div class="money-age-label">
+                                    较上月提升 5天
+                                    <span class="money-age-badge">良好</span>
+                                </div>
+                            </div>
+
+                            <div class="glass-card" style="margin-top:16px">
+                                <div style="font-weight:600;margin-bottom:12px">本月消费分布</div>
+                                <div style="display:flex;gap:8px">
+                                    <div style="flex:1;background:var(--primary);height:8px;border-radius:4px;opacity:0.8"></div>
+                                    <div style="flex:0.6;background:var(--warning);height:8px;border-radius:4px;opacity:0.8"></div>
+                                    <div style="flex:0.3;background:var(--income);height:8px;border-radius:4px;opacity:0.8"></div>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--on-surface-variant)">
+                                    <span>餐饮 40%</span>
+                                    <span>交通 25%</span>
+                                    <span>购物 15%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 层叠卡片 -->
+            <div class="phone-wrapper">
+                <div class="phone-label">层叠卡片组</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="padding:16px">
+                        <div style="font-weight:600;margin-bottom:12px;color:var(--on-surface)">我的小金库</div>
+
+                        <div class="stacked-cards">
+                            <div class="stacked-card" style="background:linear-gradient(135deg, #66BB6A 0%, #4CAF50 100%);color:white">
+                                <div style="font-size:14px;opacity:0.9">应急金</div>
+                                <div style="font-size:28px;font-weight:700;margin:8px 0">¥ 5,000</div>
+                                <div style="display:flex;align-items:center;gap:8px">
+                                    <div style="flex:1;background:rgba(255,255,255,0.3);height:6px;border-radius:3px">
+                                        <div style="width:60%;background:white;height:100%;border-radius:3px"></div>
+                                    </div>
+                                    <span style="font-size:12px">60%</span>
+                                </div>
+                            </div>
+                            <div class="stacked-card" style="background:linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);color:white">
+                                <div style="font-size:14px;opacity:0.9">日常消费</div>
+                                <div style="font-size:28px;font-weight:700;margin:8px 0">¥ 2,340</div>
+                            </div>
+                            <div class="stacked-card" style="background:linear-gradient(135deg, #FFB74D 0%, #FF9800 100%);color:white">
+                                <div style="font-size:14px;opacity:0.9">储蓄目标</div>
+                                <div style="font-size:28px;font-weight:700;margin:8px 0">¥ 10,000</div>
+                            </div>
+                        </div>
+
+                        <div style="font-weight:600;margin:24px 0 12px;color:var(--on-surface)">浮岛式布局</div>
+                        <div style="display:flex;gap:12px;padding:0 0 20px">
+                            <div class="floating-island" style="flex:1">
+                                <div style="font-size:12px;color:var(--on-surface-variant)">今日支出</div>
+                                <div style="font-size:20px;font-weight:600;color:var(--expense)">¥128</div>
+                            </div>
+                            <div class="floating-island" style="flex:1">
+                                <div style="font-size:12px;color:var(--on-surface-variant)">本周剩余</div>
+                                <div style="font-size:20px;font-weight:600;color:var(--income)">¥542</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-hint">
+            <span class="material-icons">lightbulb</span>
+            悬停卡片查看悬浮效果，层叠卡片可点击切换
+        </div>
+    </div>
+
+    <!-- 动效反重力 -->
+    <div class="section" id="motion">
+        <h2 class="section-title">动效反重力 (Motion Antigravity)</h2>
+        <p class="section-desc">
+            向上飘升的动画方向，弹性回弹的缓动曲线，创造违反重力直觉的惊喜微交互。
+        </p>
+
+        <div class="phone-grid">
+            <!-- 列表升入动画 -->
+            <div class="phone-wrapper">
+                <div class="phone-label">列表升入动画</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="padding:16px" id="listDemo">
+                        <div style="font-weight:600;margin-bottom:16px;color:var(--on-surface)">今日账单</div>
+                        <div class="transaction-item list-item-rise visible" style="animation-delay:0.05s">
+                            <div class="transaction-icon expense">
+                                <span class="material-icons expense">restaurant</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-category">餐饮</div>
+                                <div class="transaction-note">午餐 - 公司食堂</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥35.00</div>
+                        </div>
+                        <div class="transaction-item list-item-rise visible" style="animation-delay:0.1s">
+                            <div class="transaction-icon expense">
+                                <span class="material-icons expense">directions_subway</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-category">交通</div>
+                                <div class="transaction-note">地铁</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥8.00</div>
+                        </div>
+                        <div class="transaction-item list-item-rise visible" style="animation-delay:0.15s">
+                            <div class="transaction-icon expense">
+                                <span class="material-icons expense">local_cafe</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-category">餐饮</div>
+                                <div class="transaction-note">下午茶</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥28.00</div>
+                        </div>
+                        <div class="transaction-item list-item-rise visible" style="animation-delay:0.2s">
+                            <div class="transaction-icon income">
+                                <span class="material-icons income">account_balance</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-category">收入</div>
+                                <div class="transaction-note">工资到账</div>
+                            </div>
+                            <div class="transaction-amount income">+¥8,500.00</div>
+                        </div>
+
+                        <button onclick="replayListAnimation()" style="margin-top:20px;padding:12px 24px;background:var(--primary);color:white;border:none;border-radius:12px;cursor:pointer;font-size:14px;width:100%">
+                            <span class="material-icons" style="font-size:18px;vertical-align:middle;margin-right:4px">replay</span>
+                            重播动画
+                        </button>
+                    </div>
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 记账成功动效 -->
+            <div class="phone-wrapper">
+                <div class="phone-label">记账成功 - 金额上飘</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="display:flex;flex-direction:column;justify-content:center;align-items:center;background:linear-gradient(180deg, var(--surface) 0%, var(--primary-container) 100%)">
+                        <div class="success-demo" id="successDemo">
+                            <div class="success-bubbles">
+                                <div class="bubble"></div>
+                                <div class="bubble"></div>
+                                <div class="bubble"></div>
+                                <div class="bubble"></div>
+                                <div class="bubble"></div>
+                            </div>
+                            <div style="width:80px;height:80px;background:linear-gradient(135deg,#66BB6A,#4CAF50);border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:var(--shadow-L4)">
+                                <span class="material-icons" style="color:white;font-size:40px">check</span>
+                            </div>
+                            <div class="success-amount" id="floatAmount">¥ 35.00</div>
+                            <div style="color:var(--on-surface-variant);margin-top:8px">记账成功</div>
+                        </div>
+
+                        <button onclick="replaySuccessAnimation()" style="margin-top:30px;padding:12px 24px;background:var(--primary);color:white;border:none;border-radius:12px;cursor:pointer;font-size:14px">
+                            <span class="material-icons" style="font-size:18px;vertical-align:middle;margin-right:4px">replay</span>
+                            重播动画
+                        </button>
+                    </div>
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toast 从底部升起 -->
+            <div class="phone-wrapper">
+                <div class="phone-label">Toast 从底部升起</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="padding:16px">
+                        <div style="font-weight:600;margin-bottom:16px;color:var(--on-surface)">今日账单</div>
+                        <div class="transaction-item">
+                            <div class="transaction-icon expense">
+                                <span class="material-icons expense">restaurant</span>
+                            </div>
+                            <div class="transaction-info">
+                                <div class="transaction-category">餐饮</div>
+                                <div class="transaction-note">午餐</div>
+                            </div>
+                            <div class="transaction-amount expense">-¥35.00</div>
+                        </div>
+
+                        <button onclick="showToast()" style="margin-top:20px;padding:12px 24px;background:var(--primary);color:white;border:none;border-radius:12px;cursor:pointer;font-size:14px;width:100%">
+                            显示 Toast
+                        </button>
+                    </div>
+
+                    <div class="toast-bottom" id="toastDemo" style="display:none">
+                        <span class="material-icons" style="font-size:18px;vertical-align:middle;margin-right:8px">check_circle</span>
+                        已删除一笔记录
+                    </div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部弹窗系统 -->
+    <div class="section" id="sheets">
+        <h2 class="section-title">底部弹窗系统 (Bottom Sheets)</h2>
+        <p class="section-desc">
+            三级底部弹窗系统：Mini (25%)、Half (50%)、Full (90%)，支持拖拽调节高度。
+        </p>
+
+        <div class="phone-grid">
+            <!-- Mini Sheet -->
+            <div class="phone-wrapper">
+                <div class="phone-label">Mini Sheet (25%)</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="filter:blur(2px);opacity:0.6"></div>
+
+                    <div class="sheet-overlay visible"></div>
+                    <div class="sheet-mini visible">
+                        <div class="sheet-handle"></div>
+                        <div class="sheet-content">
+                            <div style="display:flex;gap:12px;justify-content:center">
+                                <button style="flex:1;padding:12px;background:var(--primary-container);color:var(--primary);border:none;border-radius:12px;font-size:14px;cursor:pointer">今天</button>
+                                <button style="flex:1;padding:12px;background:var(--surface-variant);color:var(--on-surface);border:none;border-radius:12px;font-size:14px;cursor:pointer">昨天</button>
+                                <button style="flex:1;padding:12px;background:var(--surface-variant);color:var(--on-surface);border:none;border-radius:12px;font-size:14px;cursor:pointer">选择日期</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bottom-nav" style="filter:blur(2px);opacity:0.5">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Half Sheet -->
+            <div class="phone-wrapper">
+                <div class="phone-label">Half Sheet (50%) - 分类选择</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="filter:blur(2px);opacity:0.6"></div>
+
+                    <div class="sheet-overlay visible"></div>
+                    <div class="sheet-half visible">
+                        <div class="sheet-handle"></div>
+                        <div class="sheet-content">
+                            <div class="sheet-title">
+                                <span>选择分类</span>
+                                <span class="material-icons" style="color:var(--on-surface-variant);cursor:pointer">close</span>
+                            </div>
+                            <div class="category-grid">
+                                <div class="category-item selected">
+                                    <span class="material-icons">restaurant</span>
+                                    <span>餐饮</span>
+                                </div>
+                                <div class="category-item">
+                                    <span class="material-icons">directions_subway</span>
+                                    <span>交通</span>
+                                </div>
+                                <div class="category-item">
+                                    <span class="material-icons">shopping_bag</span>
+                                    <span>购物</span>
+                                </div>
+                                <div class="category-item">
+                                    <span class="material-icons">sports_esports</span>
+                                    <span>娱乐</span>
+                                </div>
+                                <div class="category-item">
+                                    <span class="material-icons">phone_android</span>
+                                    <span>通讯</span>
+                                </div>
+                                <div class="category-item">
+                                    <span class="material-icons">home</span>
+                                    <span>居住</span>
+                                </div>
+                                <div class="category-item">
+                                    <span class="material-icons">checkroom</span>
+                                    <span>服饰</span>
+                                </div>
+                                <div class="category-item">
+                                    <span class="material-icons">local_hospital</span>
+                                    <span>医疗</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bottom-nav" style="filter:blur(2px);opacity:0.5">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full Sheet -->
+            <div class="phone-wrapper">
+                <div class="phone-label">Full Sheet (90%) - 高级筛选</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="filter:blur(2px);opacity:0.3"></div>
+
+                    <div class="sheet-overlay visible"></div>
+                    <div class="sheet-full visible">
+                        <div class="sheet-handle"></div>
+                        <div class="sheet-content">
+                            <div class="sheet-title">
+                                <div style="display:flex;align-items:center;gap:12px">
+                                    <span class="material-icons" style="color:var(--on-surface-variant);cursor:pointer">arrow_back</span>
+                                    <span>高级筛选</span>
+                                </div>
+                                <span style="color:var(--primary);cursor:pointer;font-size:14px">重置</span>
+                            </div>
+
+                            <div style="margin-bottom:20px">
+                                <div style="font-weight:500;margin-bottom:12px">时间范围</div>
+                                <div style="display:flex;gap:8px">
+                                    <button style="flex:1;padding:10px;background:var(--primary-container);color:var(--primary);border:none;border-radius:8px;font-size:13px">本月</button>
+                                    <button style="flex:1;padding:10px;background:var(--surface-variant);color:var(--on-surface);border:none;border-radius:8px;font-size:13px">上月</button>
+                                    <button style="flex:1;padding:10px;background:var(--surface-variant);color:var(--on-surface);border:none;border-radius:8px;font-size:13px">自定义</button>
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom:20px">
+                                <div style="font-weight:500;margin-bottom:12px">金额范围</div>
+                                <div style="display:flex;gap:12px;align-items:center">
+                                    <input type="text" placeholder="最低" style="flex:1;padding:12px;border:1px solid var(--outline-variant);border-radius:8px;font-size:14px">
+                                    <span>-</span>
+                                    <input type="text" placeholder="最高" style="flex:1;padding:12px;border:1px solid var(--outline-variant);border-radius:8px;font-size:14px">
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom:20px">
+                                <div style="font-weight:500;margin-bottom:12px">交易类型</div>
+                                <div style="display:flex;gap:8px">
+                                    <button style="flex:1;padding:10px;background:var(--primary-container);color:var(--primary);border:none;border-radius:8px;font-size:13px">全部</button>
+                                    <button style="flex:1;padding:10px;background:var(--surface-variant);color:var(--on-surface);border:none;border-radius:8px;font-size:13px">支出</button>
+                                    <button style="flex:1;padding:10px;background:var(--surface-variant);color:var(--on-surface);border:none;border-radius:8px;font-size:13px">收入</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sticky-bottom-bar">
+                            <button class="sticky-button">确认筛选 (共 128 条记录)</button>
+                        </div>
+                    </div>
+
+                    <div class="bottom-nav" style="filter:blur(2px);opacity:0.3">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 拇指热区 -->
+    <div class="section" id="zones">
+        <h2 class="section-title">拇指热区可视化 (Thumb Zones)</h2>
+        <p class="section-desc">
+            根据单手操作人体工学，将屏幕分为冷区(20%)、温区(35%)、热区(45%)，核心操作集中在底部热区。
+        </p>
+
+        <div class="compare-wrapper">
+            <div class="compare-item">
+                <div class="compare-title">❌ 传统布局（重力模式）</div>
+                <div class="compare-content">
+                    <div style="color:var(--expense);font-size:13px;margin-bottom:8px">重要操作在顶部，难以单手触及</div>
+                    <div style="background:rgba(229,115,115,0.2);padding:12px;border-radius:8px;margin-bottom:8px;text-align:center;font-size:13px">
+                        ⬆️ 保存按钮在这里
+                    </div>
+                    <div style="background:var(--surface-variant);height:60px;border-radius:8px;margin-bottom:8px"></div>
+                    <div style="background:var(--surface-variant);height:40px;border-radius:8px"></div>
+                </div>
+            </div>
+            <div class="compare-item">
+                <div class="compare-title">✅ 反重力布局（轻盈模式）</div>
+                <div class="compare-content">
+                    <div style="color:var(--income);font-size:13px;margin-bottom:8px">核心操作下沉至拇指热区</div>
+                    <div style="background:var(--surface-variant);height:40px;border-radius:8px;margin-bottom:8px"></div>
+                    <div style="background:var(--surface-variant);height:60px;border-radius:8px;margin-bottom:8px"></div>
+                    <div style="background:rgba(102,187,106,0.2);padding:12px;border-radius:8px;text-align:center;font-size:13px">
+                        ⬇️ 保存按钮在这里 ✅
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="phone-grid">
+            <div class="phone-wrapper">
+                <div class="phone-label">拇指热区分布</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="position:relative">
+                        <div class="thumb-zone-overlay">
+                            <div class="zone-cold">
+                                <div>
+                                    <span class="material-icons" style="font-size:18px">do_not_touch</span>
+                                    <div>冷区 20% - 难触及</div>
+                                    <div style="font-size:11px">状态栏、品牌标识、设置</div>
+                                </div>
+                            </div>
+                            <div class="zone-warm">
+                                <div>
+                                    <span class="material-icons" style="font-size:18px">touch_app</span>
+                                    <div>温区 35% - 可触及</div>
+                                    <div style="font-size:11px">筛选、搜索、二级操作</div>
+                                </div>
+                            </div>
+                            <div class="zone-hot">
+                                <div>
+                                    <span class="material-icons" style="font-size:18px">thumb_up</span>
+                                    <div>热区 45% - 易触及</div>
+                                    <div style="font-size:11px">主导航、记账、确认</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 完整示例 -->
+    <div class="section" id="complete">
+        <h2 class="section-title">完整示例 - 反重力记账流程</h2>
+        <p class="section-desc">
+            将所有反重力设计元素整合到实际记账流程中，展示完整的用户体验。
+        </p>
+
+        <div class="phone-grid">
+            <!-- 首页 -->
+            <div class="phone-wrapper">
+                <div class="phone-label">1. 首页 - 悬浮卡片 + FAB</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content">
+                        <div class="header-gradient" style="padding-bottom:60px">
+                            <div style="font-size:14px;opacity:0.9">我的钱龄</div>
+                            <div style="font-size:42px;font-weight:700;margin-top:4px">42 天</div>
+                            <div style="display:inline-block;background:rgba(255,255,255,0.25);padding:4px 12px;border-radius:12px;font-size:12px;margin-top:8px">
+                                良好 · 较上月 +5天
+                            </div>
+                        </div>
+
+                        <div class="money-age-glass" style="margin-top:-50px">
+                            <div style="display:flex;justify-content:space-around;text-align:center">
+                                <div>
+                                    <div style="font-size:12px;color:var(--on-surface-variant)">本月支出</div>
+                                    <div style="font-size:20px;font-weight:600;color:var(--expense)">¥3,580</div>
+                                </div>
+                                <div style="width:1px;background:var(--outline-variant)"></div>
+                                <div>
+                                    <div style="font-size:12px;color:var(--on-surface-variant)">本月收入</div>
+                                    <div style="font-size:20px;font-weight:600;color:var(--income)">¥8,500</div>
+                                </div>
+                                <div style="width:1px;background:var(--outline-variant)"></div>
+                                <div>
+                                    <div style="font-size:12px;color:var(--on-surface-variant)">结余</div>
+                                    <div style="font-size:20px;font-weight:600;color:var(--primary)">¥4,920</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="padding:0 16px">
+                            <div style="font-weight:600;margin:16px 0 12px;color:var(--on-surface)">今日账单</div>
+                            <div class="transaction-item" style="margin:0 0 8px">
+                                <div class="transaction-icon expense">
+                                    <span class="material-icons expense">restaurant</span>
+                                </div>
+                                <div class="transaction-info">
+                                    <div class="transaction-category">餐饮</div>
+                                    <div class="transaction-note">午餐</div>
+                                </div>
+                                <div class="transaction-amount expense">-¥35.00</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="fab float-animation">
+                        <span class="material-icons">add</span>
+                    </div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 记账表单 -->
+            <div class="phone-wrapper">
+                <div class="phone-label">2. 记账 - 底部确认按钮</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="padding:16px;padding-bottom:100px">
+                        <div style="display:flex;align-items:center;margin-bottom:20px">
+                            <span class="material-icons" style="color:var(--on-surface-variant);margin-right:12px">arrow_back</span>
+                            <span style="font-size:18px;font-weight:600">记一笔</span>
+                        </div>
+
+                        <div style="text-align:center;margin:30px 0">
+                            <div style="font-size:48px;font-weight:700;color:var(--on-surface)">¥ 35.00</div>
+                        </div>
+
+                        <div class="floating-card floating-card-L2" style="margin:0 0 12px">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div style="display:flex;align-items:center;gap:12px">
+                                    <div style="width:40px;height:40px;background:rgba(229,115,115,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center">
+                                        <span class="material-icons" style="color:var(--expense)">restaurant</span>
+                                    </div>
+                                    <span style="font-weight:500">餐饮</span>
+                                </div>
+                                <span class="material-icons" style="color:var(--on-surface-variant)">chevron_right</span>
+                            </div>
+                        </div>
+
+                        <div class="floating-card floating-card-L2" style="margin:0 0 12px">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div style="display:flex;align-items:center;gap:12px">
+                                    <span class="material-icons" style="color:var(--on-surface-variant)">edit_note</span>
+                                    <span style="color:var(--on-surface-variant)">添加备注</span>
+                                </div>
+                                <span class="material-icons" style="color:var(--on-surface-variant)">chevron_right</span>
+                            </div>
+                        </div>
+
+                        <div class="floating-card floating-card-L2" style="margin:0">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div style="display:flex;align-items:center;gap:12px">
+                                    <span class="material-icons" style="color:var(--on-surface-variant)">today</span>
+                                    <span>今天 14:30</span>
+                                </div>
+                                <span class="material-icons" style="color:var(--on-surface-variant)">chevron_right</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sticky-bottom-bar" style="bottom:80px">
+                        <button class="sticky-button">
+                            <span class="material-icons" style="font-size:20px">check</span>
+                            保存
+                        </button>
+                    </div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 成功反馈 -->
+            <div class="phone-wrapper">
+                <div class="phone-label">3. 成功 - 上飘动效</div>
+                <div class="phone-frame">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div style="display:flex;gap:4px">
+                            <span class="material-icons" style="font-size:16px">signal_cellular_4_bar</span>
+                            <span class="material-icons" style="font-size:16px">battery_full</span>
+                        </div>
+                    </div>
+                    <div class="content" style="display:flex;flex-direction:column;justify-content:center;align-items:center;background:linear-gradient(180deg, var(--surface) 0%, var(--primary-container) 100%)">
+                        <div class="success-demo">
+                            <div class="success-bubbles">
+                                <div class="bubble"></div>
+                                <div class="bubble"></div>
+                                <div class="bubble"></div>
+                                <div class="bubble"></div>
+                                <div class="bubble"></div>
+                            </div>
+                            <div style="width:100px;height:100px;background:linear-gradient(135deg,#66BB6A,#4CAF50);border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:var(--shadow-L5)">
+                                <span class="material-icons" style="color:white;font-size:48px">check</span>
+                            </div>
+                            <div style="font-size:24px;font-weight:600;color:var(--on-surface)">记账成功</div>
+                            <div class="success-amount rise-animation" style="margin-top:12px">-¥ 35.00</div>
+                            <div style="color:var(--on-surface-variant);margin-top:8px;font-size:14px">餐饮 · 今天 14:30</div>
+                        </div>
+                    </div>
+
+                    <div class="toast-bottom">
+                        <span class="material-icons" style="font-size:18px;vertical-align:middle;margin-right:8px">account_balance_wallet</span>
+                        本月预算剩余 ¥1,420
+                    </div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <span class="material-icons">home</span>
+                            <span>首页</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">bar_chart</span>
+                            <span>统计</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">account_balance_wallet</span>
+                            <span>预算</span>
+                        </div>
+                        <div class="nav-item">
+                            <span class="material-icons">person</span>
+                            <span>我的</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 切换章节
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // 重播列表动画
+        function replayListAnimation() {
+            const items = document.querySelectorAll('#listDemo .list-item-rise');
+            items.forEach(item => {
+                item.classList.remove('visible');
+            });
+            setTimeout(() => {
+                items.forEach(item => {
+                    item.classList.add('visible');
+                });
+            }, 100);
+        }
+
+        // 重播成功动画
+        function replaySuccessAnimation() {
+            const amount = document.getElementById('floatAmount');
+            amount.classList.remove('amount-float');
+            amount.style.opacity = '1';
+            amount.style.transform = 'none';
+            setTimeout(() => {
+                amount.classList.add('amount-float');
+            }, 100);
+        }
+
+        // 显示Toast
+        function showToast() {
+            const toast = document.getElementById('toastDemo');
+            toast.style.display = 'block';
+            toast.style.animation = 'none';
+            setTimeout(() => {
+                toast.style.animation = 'toast-rise 0.4s var(--ease-out-back)';
+            }, 10);
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        // FAB 展开切换
+        document.querySelectorAll('.fab-expanded').forEach(fab => {
+            fab.querySelector('.fab-main').addEventListener('click', () => {
+                fab.classList.toggle('open');
+            });
+        });
+
+        // 分类选择
+        document.querySelectorAll('.category-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.category-item').forEach(i => i.classList.remove('selected'));
+                item.classList.add('selected');
+            });
+        });
+
+        // 层叠卡片交互
+        document.querySelectorAll('.stacked-card').forEach((card, index) => {
+            card.addEventListener('click', () => {
+                const cards = card.parentElement.querySelectorAll('.stacked-card');
+                cards.forEach((c, i) => {
+                    c.style.zIndex = i === index ? 3 : 3 - Math.abs(i - index);
+                    c.style.top = `${Math.abs(i - index) * 16}px`;
+                    c.style.left = `${Math.abs(i - index) * 8}px`;
+                    c.style.right = `${Math.abs(i - index) * 8}px`;
+                    c.style.opacity = i === index ? 1 : 1 - Math.abs(i - index) * 0.15;
+                });
+            });
+        });
+    </script>
+</body>
+</html>

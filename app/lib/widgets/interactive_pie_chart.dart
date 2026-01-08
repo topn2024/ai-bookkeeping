@@ -574,7 +574,7 @@ class _PieChartPainter extends CustomPainter {
 
       // 绘制扇区
       final paint = Paint()
-        ..color = isSelected ? section.color : section.color.withOpacity(0.85)
+        ..color = isSelected ? section.color : section.color.withValues(alpha: 0.85)
         ..style = PaintingStyle.fill;
 
       // 计算扇区路径

@@ -108,14 +108,14 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              l10n?.voiceChat ?? '语音记账',
+              l10n.voiceChat,
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
             ),
             Text(
-              l10n?.continuousChat ?? '连续对话模式',
+              l10n.continuousChat,
               style: TextStyle(
                 fontSize: 12,
                 color: AppTheme.textSecondaryColor,
@@ -324,7 +324,7 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
   }
 
   /// 构建快捷问题
-  Widget _buildQuickQuestions(AppLocalizations? l10n) {
+  Widget _buildQuickQuestions(AppLocalizations l10n) {
     final questions = [
       '今天花了多少钱？',
       '本月餐饮支出',
@@ -337,7 +337,7 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.quickQuestions ?? '快捷问题',
+            l10n.quickQuestions,
             style: TextStyle(
               fontSize: 12,
               color: AppTheme.textSecondaryColor,
@@ -384,7 +384,7 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
   }
 
   /// 构建输入区域
-  Widget _buildInputArea(AppLocalizations? l10n) {
+  Widget _buildInputArea(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -408,7 +408,7 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
                 child: TextField(
                   controller: _textController,
                   decoration: InputDecoration(
-                    hintText: l10n?.typeOrSpeak ?? '输入或语音记账...',
+                    hintText: l10n.typeOrSpeak,
                     hintStyle: TextStyle(
                       color: AppTheme.textSecondaryColor,
                     ),

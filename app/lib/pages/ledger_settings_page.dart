@@ -52,7 +52,7 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.ledgerSettings ?? '账本设置',
+          l10n.ledgerSettings,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -77,7 +77,7 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
     );
   }
 
-  Widget _buildLedgerInfoSection(Ledger ledger, AppLocalizations? l10n) {
+  Widget _buildLedgerInfoSection(Ledger ledger, AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -94,7 +94,7 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
       child: Column(
         children: [
           _buildSettingItem(
-            title: l10n?.ledgerName ?? '账本名称',
+            title: l10n.ledgerName,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -113,7 +113,7 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
           ),
           _buildDivider(),
           _buildSettingItem(
-            title: l10n?.ledgerIcon ?? '账本图标',
+            title: l10n.ledgerIcon,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -126,7 +126,7 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
           ),
           _buildDivider(),
           _buildSettingItem(
-            title: l10n?.ledgerType ?? '账本类型',
+            title: l10n.ledgerType,
             trailing: Text(
               '家庭账本',
               style: TextStyle(
@@ -140,14 +140,14 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
     );
   }
 
-  Widget _buildPrivacySection(AppLocalizations? l10n) {
+  Widget _buildPrivacySection(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            l10n?.privacySettings ?? '隐私设置',
+            l10n.privacySettings,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
@@ -172,8 +172,8 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
           child: Column(
             children: [
               _buildSettingItem(
-                title: l10n?.defaultVisibility ?? '默认记录可见性',
-                subtitle: l10n?.visibilityDesc ?? '新记录默认对谁可见',
+                title: l10n.defaultVisibility,
+                subtitle: l10n.visibilityDesc,
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -191,8 +191,8 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
               ),
               _buildDivider(),
               _buildSwitchItem(
-                title: l10n?.hideAmount ?? '隐藏金额',
-                subtitle: l10n?.hideAmountDesc ?? '普通成员看不到具体金额',
+                title: l10n.hideAmount,
+                subtitle: l10n.hideAmountDesc,
                 value: _hideAmount,
                 onChanged: (value) {
                   setState(() => _hideAmount = value);
@@ -205,14 +205,14 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
     );
   }
 
-  Widget _buildNotificationSection(AppLocalizations? l10n) {
+  Widget _buildNotificationSection(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 16, top: 24, bottom: 12),
           child: Text(
-            l10n?.notificationSettings ?? '通知设置',
+            l10n.notificationSettings,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
@@ -236,7 +236,7 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
           child: Column(
             children: [
               _buildSwitchItem(
-                title: l10n?.memberRecordNotify ?? '成员记账通知',
+                title: l10n.memberRecordNotify,
                 value: _memberRecordNotify,
                 onChanged: (value) {
                   setState(() => _memberRecordNotify = value);
@@ -244,7 +244,7 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
               ),
               _buildDivider(),
               _buildSwitchItem(
-                title: l10n?.budgetOverflowAlert ?? '预算超支提醒',
+                title: l10n.budgetOverflowAlert,
                 value: _budgetOverflowAlert,
                 onChanged: (value) {
                   setState(() => _budgetOverflowAlert = value);
@@ -257,14 +257,14 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
     );
   }
 
-  Widget _buildDangerSection(Ledger ledger, AppLocalizations? l10n) {
+  Widget _buildDangerSection(Ledger ledger, AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 16, top: 24, bottom: 12),
           child: Text(
-            l10n?.dangerZone ?? '危险操作',
+            l10n.dangerZone,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
@@ -288,15 +288,15 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
           child: Column(
             children: [
               _buildSettingItem(
-                title: l10n?.leaveLedger ?? '退出账本',
+                title: l10n.leaveLedger,
                 titleColor: AppTheme.errorColor,
                 trailing: Icon(Icons.chevron_right, size: 18, color: AppTheme.textSecondaryColor),
                 onTap: () => _showLeaveConfirmDialog(ledger),
               ),
               _buildDivider(),
               _buildSettingItem(
-                title: l10n?.deleteLedger ?? '删除账本',
-                subtitle: l10n?.onlyOwnerCanDelete ?? '仅所有者可操作',
+                title: l10n.deleteLedger,
+                subtitle: l10n.onlyOwnerCanDelete,
                 titleColor: AppTheme.errorColor,
                 trailing: Icon(Icons.chevron_right, size: 18, color: AppTheme.textSecondaryColor),
                 onTap: () => _showDeleteConfirmDialog(ledger),
@@ -393,7 +393,7 @@ class _LedgerSettingsPageState extends ConsumerState<LedgerSettingsPage> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppTheme.primaryColor,
+            activeTrackColor: AppTheme.primaryColor,
           ),
         ],
       ),

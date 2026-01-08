@@ -63,7 +63,7 @@ class MoneyAgeStageProgressCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.1),
+                      color: Colors.amber.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -117,7 +117,7 @@ class MoneyAgeStageProgressCard extends StatelessWidget {
           width: 56,
           height: 56,
           decoration: BoxDecoration(
-            color: stage.color.withOpacity(0.15),
+            color: stage.color.withValues(alpha: 0.15),
             shape: BoxShape.circle,
             border: Border.all(
               color: stage.color,
@@ -286,7 +286,7 @@ class MoneyAgeStageProgressCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.amber.withOpacity(0.1),
+            color: Colors.amber.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Row(
@@ -360,7 +360,7 @@ class MoneyAgeStageDetailsSheet extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
+                    color: Colors.amber.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
@@ -425,7 +425,7 @@ class MoneyAgeStageDetailsSheet extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isCurrent
-            ? stage.color.withOpacity(0.1)
+            ? stage.color.withValues(alpha: 0.1)
             : isAchieved
                 ? Colors.grey.shade100
                 : Colors.white,
@@ -450,7 +450,7 @@ class MoneyAgeStageDetailsSheet extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   color: isAchieved
-                      ? stage.color.withOpacity(0.2)
+                      ? stage.color.withValues(alpha: 0.2)
                       : Colors.grey.shade200,
                   shape: BoxShape.circle,
                 ),
@@ -503,7 +503,7 @@ class MoneyAgeStageDetailsSheet extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
+                              color: Colors.green.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Row(
@@ -542,7 +542,7 @@ class MoneyAgeStageDetailsSheet extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: isAchieved
-                      ? Colors.amber.withOpacity(0.15)
+                      ? Colors.amber.withValues(alpha: 0.15)
                       : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -658,10 +658,10 @@ class MoneyAgeStageProgressCompact extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: stage.color.withOpacity(0.1),
+          color: stage.color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: stage.color.withOpacity(0.3),
+            color: stage.color.withValues(alpha: 0.3),
           ),
         ),
         child: Row(

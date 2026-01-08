@@ -168,9 +168,9 @@ class SearchLearningData extends LearningData {
   final bool taskCompleted;
 
   SearchLearningData({
-    required String id,
-    required DateTime timestamp,
-    required String userId,
+    required super.id,
+    required super.timestamp,
+    required super.userId,
     required this.query,
     this.predictedIntent,
     this.actualIntent,
@@ -179,9 +179,6 @@ class SearchLearningData extends LearningData {
     this.clickPosition,
     this.taskCompleted = false,
   }) : super(
-          id: id,
-          timestamp: timestamp,
-          userId: userId,
           features: {'query': query},
           label: actualIntent ?? predictedIntent,
           source: actualIntent != null
@@ -240,24 +237,20 @@ class SearchRule extends LearnedRule {
   final List<String> keywords;
 
   SearchRule({
-    required String ruleId,
+    required super.ruleId,
     required this.queryPattern,
     required this.intentType,
-    required double confidence,
-    required RuleSource source,
+    required super.confidence,
+    required super.source,
     this.parameterMappings = const {},
     this.keywords = const [],
     DateTime? createdAt,
-    int hitCount = 0,
+    super.hitCount,
   }) : super(
-          ruleId: ruleId,
           moduleId: 'search_learning',
           priority: source == RuleSource.userLearned ? 100 : 50,
-          confidence: confidence,
           createdAt: createdAt ?? DateTime.now(),
           lastUsedAt: DateTime.now(),
-          hitCount: hitCount,
-          source: source,
         );
 
   @override
@@ -352,7 +345,7 @@ class SearchLearningService
   static const double _minConfidenceThreshold = 0.6;
 
   // 状态
-  bool _isEnabled = true;
+  final bool _isEnabled = true;
   DateTime? _lastTrainingTime;
   LearningStage _stage = LearningStage.coldStart;
 

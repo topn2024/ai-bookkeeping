@@ -38,7 +38,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  Widget _buildAppBar(AppLocalizations? l10n) {
+  Widget _buildAppBar(AppLocalizations l10n) {
     return SliverAppBar(
       backgroundColor: const Color(0xFF6495ED),
       expandedHeight: 120,
@@ -49,7 +49,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       ),
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
-          l10n?.membershipService ?? '会员服务',
+          l10n.membershipService,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 18,
@@ -69,7 +69,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  Widget _buildCurrentPlanCard(AppLocalizations? l10n) {
+  Widget _buildCurrentPlanCard(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -143,7 +143,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  Widget _buildBenefitsSection(AppLocalizations? l10n) {
+  Widget _buildBenefitsSection(AppLocalizations l10n) {
     final benefits = [
       {'icon': Icons.cloud_sync, 'title': '云端同步', 'desc': '数据多端实时同步'},
       {'icon': Icons.auto_awesome, 'title': 'AI智能分析', 'desc': '深度财务洞察'},
@@ -159,7 +159,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            l10n?.memberBenefits ?? '会员权益',
+            l10n.memberBenefits,
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -235,7 +235,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  Widget _buildPlansSection(AppLocalizations? l10n) {
+  Widget _buildPlansSection(AppLocalizations l10n) {
     final plans = [
       {
         'name': '月度会员',
@@ -266,7 +266,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
           child: Text(
-            l10n?.choosePlan ?? '选择套餐',
+            l10n.choosePlan,
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -401,7 +401,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  Widget _buildFaqSection(AppLocalizations? l10n) {
+  Widget _buildFaqSection(AppLocalizations l10n) {
     final faqs = [
       {'q': '如何取消订阅？', 'a': '在个人中心 > 会员服务中可随时取消'},
       {'q': '订阅会自动续费吗？', 'a': '是的，您可以在到期前随时取消'},
@@ -414,7 +414,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: Text(
-            l10n?.faq ?? '常见问题',
+            l10n.faq,
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,

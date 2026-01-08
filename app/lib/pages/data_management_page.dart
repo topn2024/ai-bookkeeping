@@ -29,7 +29,7 @@ class _DataManagementPageState extends ConsumerState<DataManagementPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.dataManagement ?? '数据管理',
+          l10n.dataManagement,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,

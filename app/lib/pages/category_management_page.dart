@@ -458,7 +458,7 @@ class _CategoryEditPageState extends ConsumerState<_CategoryEditPage> {
                           ? Border.all(color: Colors.black, width: 3)
                           : null,
                       boxShadow: isSelected
-                          ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 8)]
+                          ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 8)]
                           : null,
                     ),
                     child: isSelected
@@ -490,7 +490,7 @@ class _CategoryEditPageState extends ConsumerState<_CategoryEditPage> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? _selectedColor.withOpacity(0.2)
+                          ? _selectedColor.withValues(alpha: 0.2)
                           : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
                       border: isSelected

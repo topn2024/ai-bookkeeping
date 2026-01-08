@@ -157,7 +157,7 @@ class _LowConfidenceDialogState extends State<LowConfidenceDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          l10n?.lowConfidenceTitle ?? '识别结果需要确认',
+                          l10n.lowConfidenceTitle,
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             color: AppTheme.warningColor,
@@ -165,7 +165,7 @@ class _LowConfidenceDialogState extends State<LowConfidenceDialog> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${l10n?.confidenceLevel ?? "置信度"}: $confidencePercent%',
+                          '${l10n.confidenceLevel}: $confidencePercent%',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppTheme.textSecondaryColor,
@@ -182,7 +182,7 @@ class _LowConfidenceDialogState extends State<LowConfidenceDialog> {
             // 原始识别文本
             if (widget.result.rawText != null) ...[
               Text(
-                l10n?.originalText ?? '原始语音',
+                l10n.originalText,
                 style: TextStyle(
                   fontSize: 12,
                   color: AppTheme.textSecondaryColor,
@@ -208,7 +208,7 @@ class _LowConfidenceDialogState extends State<LowConfidenceDialog> {
 
             // 金额输入
             Text(
-              l10n?.amount ?? '金额',
+              l10n.amount,
               style: TextStyle(
                 fontSize: 12,
                 color: AppTheme.textSecondaryColor,
@@ -244,7 +244,7 @@ class _LowConfidenceDialogState extends State<LowConfidenceDialog> {
 
             // 分类选择
             Text(
-              l10n?.category ?? '分类',
+              l10n.category,
               style: TextStyle(
                 fontSize: 12,
                 color: AppTheme.textSecondaryColor,
@@ -291,7 +291,7 @@ class _LowConfidenceDialogState extends State<LowConfidenceDialog> {
 
             // 备注输入
             Text(
-              l10n?.note ?? '备注',
+              l10n.note,
               style: TextStyle(
                 fontSize: 12,
                 color: AppTheme.textSecondaryColor,
@@ -307,7 +307,7 @@ class _LowConfidenceDialogState extends State<LowConfidenceDialog> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                hintText: l10n?.addNote ?? '添加备注...',
+                hintText: l10n.addNote,
               ),
             ),
             const SizedBox(height: 24),
@@ -323,7 +323,7 @@ class _LowConfidenceDialogState extends State<LowConfidenceDialog> {
                       widget.onRetry?.call();
                     },
                     icon: const Icon(Icons.mic),
-                    label: Text(l10n?.retry ?? '重录'),
+                    label: Text(l10n.retry),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, 48),
                       shape: RoundedRectangleBorder(
@@ -339,7 +339,7 @@ class _LowConfidenceDialogState extends State<LowConfidenceDialog> {
                   child: ElevatedButton.icon(
                     onPressed: _confirmResult,
                     icon: const Icon(Icons.check),
-                    label: Text(l10n?.confirm ?? '确认'),
+                    label: Text(l10n.confirm),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryColor,
                       foregroundColor: Colors.white,

@@ -10,6 +10,14 @@ import 'help_page.dart';
 import 'financial_freedom_simulator_page.dart';
 import 'actionable_advice_page.dart';
 import 'smart_feature_recommendation_page.dart';
+import 'user_profile_visualization_page.dart';
+import 'goal_achievement_dashboard_page.dart';
+import 'growth/nps_survey_page.dart';
+import 'growth/achievement_share_page.dart';
+import 'growth/invite_friend_page.dart';
+import 'growth/viral_campaign_page.dart';
+import 'growth/negative_experience_recovery_page.dart';
+import 'growth/detractor_care_page.dart';
 
 /// 个人中心页面
 /// 原型设计 1.05：个人中心 Profile
@@ -40,6 +48,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               _buildAchievementCards(context, theme),
               _buildAccountManagementGroup(context, theme),
               _buildFinancialToolsGroup(context, theme),
+              _buildGrowthGroup(context, theme),
               _buildDataManagementGroup(context, theme),
               _buildSystemSettingsGroup(context, theme),
               const SizedBox(height: 100), // 底部导航栏留白
@@ -55,7 +64,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   Widget _buildUserHeader(BuildContext context, ThemeData theme) {
     return InkWell(
       onTap: () {
-        // 跳转到个人资料编辑页面
+        // 跳转到用户画像页面
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const UserProfileVisualizationPage()),
+        );
       },
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -235,6 +248,24 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       title: '财务工具',
       items: [
         _SettingsItem(
+          icon: Icons.flag,
+          title: '目标达成',
+          subtitle: '追踪你的财务目标',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const GoalAchievementDashboardPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.person_search,
+          title: '我的画像',
+          subtitle: '了解你的消费性格',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const UserProfileVisualizationPage()),
+          ),
+        ),
+        _SettingsItem(
           icon: Icons.beach_access,
           title: '财务自由模拟器',
           subtitle: '规划你的财务自由之路',
@@ -259,6 +290,72 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const SmartFeatureRecommendationPage()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 增长与分享分组
+  /// 原型设计 14：增长与裂变模块
+  Widget _buildGrowthGroup(BuildContext context, ThemeData theme) {
+    return _buildSettingsGroup(
+      context,
+      theme,
+      title: '增长与分享',
+      items: [
+        _SettingsItem(
+          icon: Icons.thumb_up,
+          title: '满意度调查',
+          subtitle: '给我们反馈',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const NpsSurveyPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.share,
+          title: '分享成就',
+          subtitle: '炫耀你的理财成果',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AchievementSharePage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.person_add,
+          title: '邀请好友',
+          subtitle: '邀请奖励等你拿',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const InviteFriendPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.campaign,
+          title: '活动中心',
+          subtitle: '参与活动赢奖励',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ViralCampaignPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.healing,
+          title: '体验恢复',
+          subtitle: '遇到问题？我们来帮你',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const NegativeExperienceRecoveryPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.feedback,
+          title: '深度反馈',
+          subtitle: '告诉我们如何改进',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DetractorCarePage()),
           ),
         ),
       ],

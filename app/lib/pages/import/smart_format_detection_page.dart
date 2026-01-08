@@ -122,7 +122,7 @@ class _SmartFormatDetectionPageState extends ConsumerState<SmartFormatDetectionP
       // Step 4: 解析器匹配
       setState(() {
         _steps[3].status = StepStatus.completed;
-        _steps[3].description = _needsFieldMapping ? '需要手动配置字段映射' : '使用${_detectedSource}解析器';
+        _steps[3].description = _needsFieldMapping ? '需要手动配置字段映射' : '使用$_detectedSource解析器';
       });
 
       // 生成预览数据（模拟）

@@ -108,7 +108,7 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          l10n?.voiceHistoryTitle ?? '对话记录',
+          l10n.voiceHistoryTitle,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -170,7 +170,7 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
   }
 
   /// 构建空状态
-  Widget _buildEmptyState(AppLocalizations? l10n) {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -182,7 +182,7 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
           ),
           const SizedBox(height: 16),
           Text(
-            l10n?.noVoiceHistory ?? '暂无对话记录',
+            l10n.noVoiceHistory,
             style: TextStyle(
               fontSize: 16,
               color: AppTheme.textSecondaryColor,
@@ -190,7 +190,7 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            l10n?.voiceHistoryHint ?? '使用语音或图片记账后，记录会显示在这里',
+            l10n.voiceHistoryHint,
             style: TextStyle(
               fontSize: 14,
               color: AppTheme.textSecondaryColor.withValues(alpha: 0.7),
@@ -205,7 +205,7 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
   Widget _buildDateSection(
     String dateLabel,
     List<VoiceRecord> records,
-    AppLocalizations? l10n,
+    AppLocalizations l10n,
   ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -229,7 +229,7 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
   }
 
   /// 构建记录卡片
-  Widget _buildRecordCard(VoiceRecord record, AppLocalizations? l10n) {
+  Widget _buildRecordCard(VoiceRecord record, AppLocalizations l10n) {
     final isVoice = record.type == VoiceRecordType.voice;
     final isImage = record.type == VoiceRecordType.image;
 
@@ -324,7 +324,7 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
   }
 
   /// 构建悬浮语音按钮
-  Widget _buildVoiceFab(AppLocalizations? l10n) {
+  Widget _buildVoiceFab(AppLocalizations l10n) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -364,7 +364,7 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          l10n?.quickBookkeeping ?? '快速记账',
+          l10n.quickBookkeeping,
           style: TextStyle(
             fontSize: 12,
             color: AppTheme.textSecondaryColor,

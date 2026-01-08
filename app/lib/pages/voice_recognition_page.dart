@@ -811,7 +811,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: primaryColor.withOpacity(0.4),
+                      color: primaryColor.withValues(alpha: 0.4),
                       blurRadius: 40,
                       spreadRadius: 0,
                       offset: const Offset(0, 10),
@@ -891,7 +891,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [expenseColor, expenseColor.withOpacity(0.7)],
+                    colors: [expenseColor, expenseColor.withValues(alpha: 0.7)],
                   ),
                 ),
               );
@@ -912,11 +912,11 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [expenseColor, expenseColor.withOpacity(0.8)],
+                colors: [expenseColor, expenseColor.withValues(alpha: 0.8)],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: expenseColor.withOpacity(0.4),
+                  color: expenseColor.withValues(alpha: 0.4),
                   blurRadius: 40,
                   spreadRadius: 0,
                   offset: const Offset(0, 10),
@@ -1004,12 +1004,12 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
             child: Container(
               decoration: BoxDecoration(
                 color: isDark
-                    ? Colors.white.withOpacity(0.95)
+                    ? Colors.white.withValues(alpha: 0.95)
                     : Colors.white,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -1036,7 +1036,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: themeColors.income.withOpacity(0.15),
+                          color: themeColors.income.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -1108,7 +1108,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
                           width: 32,
                           height: 32,
                           decoration: BoxDecoration(
-                            color: themeColors.primary.withOpacity(0.15),
+                            color: themeColors.primary.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Center(
@@ -1216,7 +1216,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
-                                  color: themeColors.primary.withOpacity(0.3),
+                                  color: themeColors.primary.withValues(alpha: 0.3),
                                   blurRadius: 15,
                                   offset: const Offset(0, 4),
                                 ),
@@ -1311,12 +1311,12 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
                 end: Alignment.bottomRight,
                 colors: [
                   themeColors.income,
-                  themeColors.income.withOpacity(0.7),
+                  themeColors.income.withValues(alpha: 0.7),
                 ],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: themeColors.income.withOpacity(0.3),
+                  color: themeColors.income.withValues(alpha: 0.3),
                   blurRadius: 30,
                   offset: const Offset(0, 10),
                 ),
@@ -1372,8 +1372,8 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
             height: 56,
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withOpacity(0.2)
-                  : Colors.black.withOpacity(0.1),
+                  ? Colors.white.withValues(alpha: 0.2)
+                  : Colors.black.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(28),
             ),
             child: Center(
@@ -1440,8 +1440,8 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withOpacity(0.1)
-            : Colors.black.withOpacity(0.05),
+            ? Colors.white.withValues(alpha: 0.1)
+            : Colors.black.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
@@ -1709,7 +1709,7 @@ class _EditTransactionPanelState extends State<_EditTransactionPanel> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? widget.themeColors.primary.withOpacity(0.15)
+                                ? widget.themeColors.primary.withValues(alpha: 0.15)
                                 : const Color(0xFFF8F8F8),
                             borderRadius: BorderRadius.circular(12),
                             border: isSelected
@@ -1823,7 +1823,7 @@ class _EditTransactionPanelState extends State<_EditTransactionPanel> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: widget.themeColors.primary.withOpacity(0.3),
+                      color: widget.themeColors.primary.withValues(alpha: 0.3),
                       blurRadius: 15,
                       offset: const Offset(0, 4),
                     ),
@@ -1862,7 +1862,7 @@ class _EditTransactionPanelState extends State<_EditTransactionPanel> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.15) : const Color(0xFFF5F5F5),
+          color: isSelected ? color.withValues(alpha: 0.15) : const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? color : const Color(0xFFE0E0E0),

@@ -38,7 +38,7 @@ class _HomeLayoutPageState extends ConsumerState<HomeLayoutPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.homeLayout ?? '首页布局',
+          l10n.homeLayout,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -48,7 +48,7 @@ class _HomeLayoutPageState extends ConsumerState<HomeLayoutPage> {
           TextButton(
             onPressed: _resetToDefault,
             child: Text(
-              l10n?.reset ?? '重置',
+              l10n.reset,
               style: TextStyle(color: AppTheme.primaryColor),
             ),
           ),
@@ -154,7 +154,7 @@ class _HomeLayoutPageState extends ConsumerState<HomeLayoutPage> {
             Switch(
               value: module.enabled,
               onChanged: (v) => setState(() => module.enabled = v),
-              activeColor: AppTheme.primaryColor,
+              activeTrackColor: AppTheme.primaryColor,
             ),
             const SizedBox(width: 8),
             ReorderableDragStartListener(

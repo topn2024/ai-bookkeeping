@@ -1,8 +1,4 @@
-import 'dart:convert';
-import 'dart:math' as math;
-
 import 'package:collection/collection.dart';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 import 'learning_adapters.dart';
@@ -159,7 +155,7 @@ class ExpressionHabits {
   ExpressionHabits merge(ExpressionHabits other) {
     return ExpressionHabits(
       synonymMappings: {...synonymMappings, ...other.synonymMappings},
-      frequentPhrases: [...frequentPhrases, ...other.frequentPhrases].toSet().toList(),
+      frequentPhrases: <dynamic>{...frequentPhrases, ...other.frequentPhrases}.toList(),
       averageInputLength: (averageInputLength + other.averageInputLength) / 2,
     );
   }

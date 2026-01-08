@@ -127,7 +127,7 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          l10n?.receiptDetail ?? '小票明细',
+          l10n.receiptDetail,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -278,7 +278,7 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
   }
 
   /// 构建商品列表
-  Widget _buildItemsList(AppLocalizations? l10n) {
+  Widget _buildItemsList(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -297,7 +297,7 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
                   ),
                 ),
                 Text(
-                  l10n?.autoExtracted ?? '自动提取',
+                  l10n.autoExtracted,
                   style: TextStyle(
                     fontSize: 13,
                     color: AppTheme.primaryColor,
@@ -379,7 +379,7 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
   }
 
   /// 构建合计区域
-  Widget _buildTotalSection(AppLocalizations? l10n) {
+  Widget _buildTotalSection(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -398,7 +398,7 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  l10n?.subtotal ?? '商品合计',
+                  l10n.subtotal,
                   style: TextStyle(
                     color: AppTheme.textSecondaryColor,
                   ),
@@ -414,7 +414,7 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  l10n?.discount ?? '优惠折扣',
+                  l10n.discount,
                   style: TextStyle(
                     color: AppTheme.textSecondaryColor,
                   ),
@@ -457,7 +457,7 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
               child: ElevatedButton.icon(
                 onPressed: _confirmBookkeeping,
                 icon: const Icon(Icons.check),
-                label: Text(l10n?.confirmBookkeeping ?? '确认记账'),
+                label: Text(l10n.confirmBookkeeping),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primaryColor,
                   foregroundColor: Colors.white,

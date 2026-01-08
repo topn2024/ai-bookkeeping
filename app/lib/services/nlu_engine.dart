@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
-
 /// 自然语言理解引擎
 /// 解析用户输入，提取记账意图和实体
 class NLUEngine {
@@ -649,4 +647,628 @@ enum TransactionType {
   expense,
   income,
   transfer,
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NLU 增强功能
+// ═══════════════════════════════════════════════════════════════
+
+/// 多轮对话状态
+enum DialogueState {
+  /// 初始状态
+  initial,
+
+  /// 等待金额
+  waitingForAmount,
+
+  /// 等待分类
+  waitingForCategory,
+
+  /// 等待确认
+  waitingForConfirmation,
+
+  /// 对话完成
+  completed,
+
+  /// 对话取消
+  cancelled,
+}
+
+/// 槽位填充状态
+class SlotFillingState {
+  /// 对话状态
+  final DialogueState state;
+
+  /// 已填充的槽位
+  final Map<String, dynamic> filledSlots;
+
+  /// 缺失的槽位
+  final List<String> missingSlots;
+
+  /// 当前询问的槽位
+  final String? currentSlot;
+
+  /// 置信度
+  final double confidence;
+
+  /// 原始意图
+  final IntentType? intent;
+
+  const SlotFillingState({
+    required this.state,
+    this.filledSlots = const {},
+    this.missingSlots = const [],
+    this.currentSlot,
+    this.confidence = 0.0,
+    this.intent,
+  });
+
+  /// 是否需要用户补充信息
+  bool get needsMoreInfo =>
+      state == DialogueState.waitingForAmount ||
+      state == DialogueState.waitingForCategory;
+
+  /// 是否已完成
+  bool get isComplete => state == DialogueState.completed;
+
+  /// 是否已取消
+  bool get isCancelled => state == DialogueState.cancelled;
+
+  SlotFillingState copyWith({
+    DialogueState? state,
+    Map<String, dynamic>? filledSlots,
+    List<String>? missingSlots,
+    String? currentSlot,
+    double? confidence,
+    IntentType? intent,
+  }) {
+    return SlotFillingState(
+      state: state ?? this.state,
+      filledSlots: filledSlots ?? this.filledSlots,
+      missingSlots: missingSlots ?? this.missingSlots,
+      currentSlot: currentSlot ?? this.currentSlot,
+      confidence: confidence ?? this.confidence,
+      intent: intent ?? this.intent,
+    );
+  }
+}
+
+/// 多轮对话管理器
+class DialogueManager {
+  SlotFillingState _currentState = const SlotFillingState(
+    state: DialogueState.initial,
+  );
+
+  final NLUEngine _nluEngine;
+
+  DialogueManager({NLUEngine? nluEngine})
+      : _nluEngine = nluEngine ?? NLUEngine();
+
+  /// 获取当前对话状态
+  SlotFillingState get currentState => _currentState;
+
+  /// 处理用户输入
+  Future<DialogueResponse> processInput(String input) async {
+    // 检查是否是取消指令
+    if (_isCancel(input)) {
+      _currentState = const SlotFillingState(
+        state: DialogueState.cancelled,
+      );
+      return DialogueResponse(
+        text: '好的，已取消',
+        state: _currentState,
+        action: DialogueAction.cancelled,
+      );
+    }
+
+    // 检查是否是确认指令
+    if (_currentState.state == DialogueState.waitingForConfirmation) {
+      if (_isConfirm(input)) {
+        _currentState = _currentState.copyWith(
+          state: DialogueState.completed,
+        );
+        return DialogueResponse(
+          text: '已确认记录',
+          state: _currentState,
+          action: DialogueAction.confirmed,
+          transaction: _buildTransaction(),
+        );
+      } else {
+        _currentState = const SlotFillingState(
+          state: DialogueState.cancelled,
+        );
+        return DialogueResponse(
+          text: '好的，已取消',
+          state: _currentState,
+          action: DialogueAction.cancelled,
+        );
+      }
+    }
+
+    // 解析用户输入
+    final result = await _nluEngine.parse(input);
+
+    // 根据当前状态处理
+    if (_currentState.state == DialogueState.initial) {
+      return _handleInitialInput(result);
+    } else if (_currentState.needsMoreInfo) {
+      return _handleSlotFilling(input, result);
+    }
+
+    return DialogueResponse(
+      text: '抱歉，我没有理解您的意思',
+      state: _currentState,
+      action: DialogueAction.needClarification,
+    );
+  }
+
+  /// 处理初始输入
+  DialogueResponse _handleInitialInput(NLUResult result) {
+    if (!result.intent.isRecordIntent) {
+      // 非记账意图
+      return DialogueResponse(
+        text: _getIntentResponse(result.intent.type),
+        state: _currentState,
+        action: DialogueAction.otherIntent,
+        nluResult: result,
+      );
+    }
+
+    // 记账意图，检查必要槽位
+    final filledSlots = <String, dynamic>{};
+    final missingSlots = <String>[];
+
+    // 检查金额
+    if (result.primaryTransaction?.amount != null) {
+      filledSlots['amount'] = result.primaryTransaction!.amount;
+    } else {
+      missingSlots.add('amount');
+    }
+
+    // 检查分类
+    if (result.primaryTransaction?.category != null) {
+      filledSlots['category'] = result.primaryTransaction!.category;
+    } else {
+      missingSlots.add('category');
+    }
+
+    // 检查日期（可选，默认今天）
+    filledSlots['date'] = result.primaryTransaction?.date ?? DateTime.now();
+
+    // 检查描述（可选）
+    if (result.primaryTransaction?.description != null) {
+      filledSlots['description'] = result.primaryTransaction!.description;
+    }
+
+    // 检查商家（可选）
+    if (result.primaryTransaction?.merchant != null) {
+      filledSlots['merchant'] = result.primaryTransaction!.merchant;
+    }
+
+    // 类型
+    filledSlots['type'] = result.primaryTransaction?.type ?? TransactionType.expense;
+
+    if (missingSlots.isEmpty) {
+      // 所有必要槽位已填充，请求确认
+      _currentState = SlotFillingState(
+        state: DialogueState.waitingForConfirmation,
+        filledSlots: filledSlots,
+        missingSlots: [],
+        confidence: result.confidence,
+        intent: result.intent.type,
+      );
+      return DialogueResponse(
+        text: _generateConfirmationPrompt(filledSlots),
+        state: _currentState,
+        action: DialogueAction.needConfirmation,
+      );
+    } else {
+      // 需要补充信息
+      final nextSlot = missingSlots.first;
+      _currentState = SlotFillingState(
+        state: _getStateForSlot(nextSlot),
+        filledSlots: filledSlots,
+        missingSlots: missingSlots,
+        currentSlot: nextSlot,
+        confidence: result.confidence,
+        intent: result.intent.type,
+      );
+      return DialogueResponse(
+        text: _getSlotPrompt(nextSlot),
+        state: _currentState,
+        action: DialogueAction.needMoreInfo,
+      );
+    }
+  }
+
+  /// 处理槽位填充
+  DialogueResponse _handleSlotFilling(String input, NLUResult result) {
+    final currentSlot = _currentState.currentSlot;
+    final filledSlots = Map<String, dynamic>.from(_currentState.filledSlots);
+    final missingSlots = List<String>.from(_currentState.missingSlots);
+
+    // 尝试从输入中提取槽位值
+    dynamic slotValue;
+    if (currentSlot == 'amount') {
+      final amount = AmountParser().parse(input);
+      slotValue = amount?.value;
+    } else if (currentSlot == 'category') {
+      final categories = result.entities
+          .where((e) => e.type == EntityType.category)
+          .map((e) => e.value)
+          .toList();
+      slotValue = categories.isNotEmpty ? categories.first : input;
+    }
+
+    if (slotValue != null) {
+      filledSlots[currentSlot!] = slotValue;
+      missingSlots.remove(currentSlot);
+    } else {
+      // 无法提取，使用原始输入
+      if (currentSlot == 'category') {
+        filledSlots[currentSlot!] = input;
+        missingSlots.remove(currentSlot);
+      } else {
+        return DialogueResponse(
+          text: '抱歉，我没有理解。${_getSlotPrompt(currentSlot!)}',
+          state: _currentState,
+          action: DialogueAction.needMoreInfo,
+        );
+      }
+    }
+
+    if (missingSlots.isEmpty) {
+      // 所有槽位已填充，请求确认
+      _currentState = SlotFillingState(
+        state: DialogueState.waitingForConfirmation,
+        filledSlots: filledSlots,
+        missingSlots: [],
+        confidence: _currentState.confidence,
+        intent: _currentState.intent,
+      );
+      return DialogueResponse(
+        text: _generateConfirmationPrompt(filledSlots),
+        state: _currentState,
+        action: DialogueAction.needConfirmation,
+      );
+    } else {
+      // 继续询问下一个槽位
+      final nextSlot = missingSlots.first;
+      _currentState = SlotFillingState(
+        state: _getStateForSlot(nextSlot),
+        filledSlots: filledSlots,
+        missingSlots: missingSlots,
+        currentSlot: nextSlot,
+        confidence: _currentState.confidence,
+        intent: _currentState.intent,
+      );
+      return DialogueResponse(
+        text: _getSlotPrompt(nextSlot),
+        state: _currentState,
+        action: DialogueAction.needMoreInfo,
+      );
+    }
+  }
+
+  /// 重置对话
+  void reset() {
+    _currentState = const SlotFillingState(
+      state: DialogueState.initial,
+    );
+  }
+
+  /// 构建交易
+  ParsedTransaction? _buildTransaction() {
+    final slots = _currentState.filledSlots;
+    if (slots['amount'] == null) return null;
+
+    return ParsedTransaction(
+      type: slots['type'] as TransactionType? ?? TransactionType.expense,
+      amount: slots['amount'] as double,
+      category: slots['category'] as String?,
+      merchant: slots['merchant'] as String?,
+      description: slots['description'] as String?,
+      date: slots['date'] as DateTime? ?? DateTime.now(),
+      confidence: _currentState.confidence,
+    );
+  }
+
+  bool _isConfirm(String input) {
+    final lower = input.toLowerCase();
+    return RegExp(r'^(是|对|确认|好的?|可以|没问题|ok|yes)$').hasMatch(lower);
+  }
+
+  bool _isCancel(String input) {
+    final lower = input.toLowerCase();
+    return RegExp(r'^(取消|算了|不要|不用了?|no)$').hasMatch(lower);
+  }
+
+  DialogueState _getStateForSlot(String slot) {
+    switch (slot) {
+      case 'amount':
+        return DialogueState.waitingForAmount;
+      case 'category':
+        return DialogueState.waitingForCategory;
+      default:
+        return DialogueState.initial;
+    }
+  }
+
+  String _getSlotPrompt(String slot) {
+    switch (slot) {
+      case 'amount':
+        return '请告诉我金额是多少？';
+      case 'category':
+        return '请选择消费分类，比如餐饮、交通、购物等';
+      default:
+        return '请提供更多信息';
+    }
+  }
+
+  String _generateConfirmationPrompt(Map<String, dynamic> slots) {
+    final type = slots['type'] == TransactionType.income ? '收入' : '支出';
+    final amount = slots['amount'] as double;
+    final category = slots['category'] as String? ?? '未分类';
+    final date = slots['date'] as DateTime;
+    final dateStr = date.day == DateTime.now().day ? '今天' : '${date.month}月${date.day}日';
+
+    return '确认记录$dateStr$category$type${amount.toStringAsFixed(2)}元，请说"确认"或"取消"';
+  }
+
+  String _getIntentResponse(IntentType type) {
+    switch (type) {
+      case IntentType.queryBalance:
+        return '您想查询余额，让我来帮您查看';
+      case IntentType.queryExpense:
+        return '您想查询消费，让我来帮您统计';
+      case IntentType.queryBudget:
+        return '您想查看预算情况';
+      case IntentType.setBudget:
+        return '您想设置预算';
+      case IntentType.navigate:
+        return '您想打开某个页面';
+      default:
+        return '我来帮您处理';
+    }
+  }
+}
+
+/// 对话动作
+enum DialogueAction {
+  /// 需要更多信息
+  needMoreInfo,
+
+  /// 需要确认
+  needConfirmation,
+
+  /// 已确认
+  confirmed,
+
+  /// 已取消
+  cancelled,
+
+  /// 需要澄清
+  needClarification,
+
+  /// 其他意图
+  otherIntent,
+}
+
+/// 对话响应
+class DialogueResponse {
+  /// 响应文本
+  final String text;
+
+  /// 对话状态
+  final SlotFillingState state;
+
+  /// 对话动作
+  final DialogueAction action;
+
+  /// 解析后的交易（如果已完成）
+  final ParsedTransaction? transaction;
+
+  /// NLU 结果（如果有）
+  final NLUResult? nluResult;
+
+  const DialogueResponse({
+    required this.text,
+    required this.state,
+    required this.action,
+    this.transaction,
+    this.nluResult,
+  });
+}
+
+/// 增强实体提取器
+///
+/// 支持更多实体类型和更精确的提取
+class EnhancedEntityExtractor extends EntityExtractor {
+  /// 数量词映射
+  static const Map<String, int> _quantityWords = {
+    '一': 1, '二': 2, '两': 2, '三': 3, '四': 4, '五': 5,
+    '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+    '几': 3, // 默认值
+  };
+
+  /// 货币单位
+  static const Map<String, double> _currencyUnits = {
+    '元': 1,
+    '块': 1,
+    '毛': 0.1,
+    '角': 0.1,
+    '分': 0.01,
+    '万': 10000,
+    '千': 1000,
+    '百': 100,
+  };
+
+  /// 提取所有实体（增强版）
+  @override
+  Future<List<NLUEntity>> extract(String text) async {
+    final entities = await super.extract(text);
+
+    // 提取更多实体类型
+    entities.addAll(_extractQuantities(text));
+    entities.addAll(_extractPaymentMethods(text));
+    entities.addAll(_extractLocations(text));
+
+    return _deduplicateEntities(entities);
+  }
+
+  /// 提取数量
+  List<NLUEntity> _extractQuantities(String text) {
+    final entities = <NLUEntity>[];
+
+    // 匹配 "N个/份/杯" 等
+    final pattern = RegExp(r'([一二两三四五六七八九十几\d]+)(个|份|杯|瓶|包|盒|件)');
+    for (final match in pattern.allMatches(text)) {
+      final quantityStr = match.group(1)!;
+      int? quantity;
+
+      if (_quantityWords.containsKey(quantityStr)) {
+        quantity = _quantityWords[quantityStr];
+      } else {
+        quantity = int.tryParse(quantityStr);
+      }
+
+      if (quantity != null) {
+        entities.add(NLUEntity(
+          type: EntityType.description,
+          value: '${quantity}${match.group(2)}',
+          confidence: 0.85,
+          startIndex: match.start,
+          endIndex: match.end,
+        ));
+      }
+    }
+
+    return entities;
+  }
+
+  /// 提取支付方式
+  List<NLUEntity> _extractPaymentMethods(String text) {
+    final entities = <NLUEntity>[];
+
+    const paymentMethods = [
+      '微信', '支付宝', '现金', '银行卡', '信用卡', '花呗', '京东白条',
+      'Apple Pay', 'WeChat Pay', 'Alipay',
+    ];
+
+    for (final method in paymentMethods) {
+      if (text.contains(method)) {
+        entities.add(NLUEntity(
+          type: EntityType.account,
+          value: method,
+          confidence: 0.9,
+          startIndex: text.indexOf(method),
+          endIndex: text.indexOf(method) + method.length,
+        ));
+      }
+    }
+
+    return entities;
+  }
+
+  /// 提取地点
+  List<NLUEntity> _extractLocations(String text) {
+    final entities = <NLUEntity>[];
+
+    // 匹配 "在XX" 模式
+    final pattern = RegExp(r'在([^，。、\s]{2,10})');
+    for (final match in pattern.allMatches(text)) {
+      final location = match.group(1)!;
+      // 过滤掉动词
+      if (!RegExp(r'^(买|吃|消费|花|付|给|用)').hasMatch(location)) {
+        entities.add(NLUEntity(
+          type: EntityType.merchant,
+          value: location,
+          confidence: 0.75,
+          startIndex: match.start,
+          endIndex: match.end,
+        ));
+      }
+    }
+
+    return entities;
+  }
+}
+
+/// NLU 结果构建器
+///
+/// 方便构建 NLU 结果用于测试
+class NLUResultBuilder {
+  IntentType _intentType = IntentType.unknown;
+  double _confidence = 0.5;
+  final List<NLUEntity> _entities = [];
+  double? _amount;
+  DateTime? _date;
+  String _rawText = '';
+
+  NLUResultBuilder intent(IntentType type, {double confidence = 0.8}) {
+    _intentType = type;
+    _confidence = confidence;
+    return this;
+  }
+
+  NLUResultBuilder addEntity(EntityType type, String value, {double confidence = 0.8}) {
+    _entities.add(NLUEntity(
+      type: type,
+      value: value,
+      confidence: confidence,
+      startIndex: 0,
+      endIndex: value.length,
+    ));
+    return this;
+  }
+
+  NLUResultBuilder amount(double value) {
+    _amount = value;
+    return this;
+  }
+
+  NLUResultBuilder date(DateTime value) {
+    _date = value;
+    return this;
+  }
+
+  NLUResultBuilder rawText(String text) {
+    _rawText = text;
+    return this;
+  }
+
+  NLUResult build() {
+    final transactions = <ParsedTransaction>[];
+
+    if (_intentType == IntentType.recordExpense ||
+        _intentType == IntentType.recordIncome) {
+      if (_amount != null) {
+        transactions.add(ParsedTransaction(
+          type: _intentType == IntentType.recordIncome
+              ? TransactionType.income
+              : TransactionType.expense,
+          amount: _amount!,
+          category: _entities
+              .where((e) => e.type == EntityType.category)
+              .map((e) => e.value)
+              .firstOrNull,
+          merchant: _entities
+              .where((e) => e.type == EntityType.merchant)
+              .map((e) => e.value)
+              .firstOrNull,
+          date: _date ?? DateTime.now(),
+          confidence: _confidence,
+        ));
+      }
+    }
+
+    return NLUResult(
+      intent: NLUIntent(type: _intentType, confidence: _confidence),
+      entities: _entities,
+      transactions: transactions,
+      confidence: _confidence,
+      rawText: _rawText,
+      normalizedText: _rawText.toLowerCase(),
+    );
+  }
 }

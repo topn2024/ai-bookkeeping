@@ -74,7 +74,7 @@ class _BatchAITrainingPageState extends ConsumerState<BatchAITrainingPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.batchTrainAI ?? '快速训练AI',
+          l10n.batchTrainAI,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,

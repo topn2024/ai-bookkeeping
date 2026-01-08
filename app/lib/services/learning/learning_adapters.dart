@@ -18,18 +18,15 @@ class CategoryLearningData extends LearningData {
   final String? description;
 
   CategoryLearningData({
-    required String id,
-    required DateTime timestamp,
-    required String userId,
+    required super.id,
+    required super.timestamp,
+    required super.userId,
     required this.merchantName,
     required this.amount,
     this.originalCategory,
     required this.userCorrectedCategory,
     this.description,
   }) : super(
-          id: id,
-          timestamp: timestamp,
-          userId: userId,
           features: {
             'merchant': merchantName,
             'amount': amount,
@@ -90,24 +87,20 @@ class CategoryRule extends LearnedRule {
   final String? amountRange;
 
   CategoryRule({
-    required String ruleId,
+    required super.ruleId,
     required this.merchantPattern,
     required this.categoryId,
-    required double confidence,
-    required RuleSource source,
+    required super.confidence,
+    required super.source,
     this.amountRange,
     DateTime? createdAt,
     DateTime? lastUsedAt,
-    int hitCount = 0,
+    super.hitCount,
   }) : super(
-          ruleId: ruleId,
           moduleId: 'smart_category',
           priority: source == RuleSource.userLearned ? 100 : 50,
-          confidence: confidence,
           createdAt: createdAt ?? DateTime.now(),
           lastUsedAt: lastUsedAt ?? DateTime.now(),
-          hitCount: hitCount,
-          source: source,
         );
 
   @override
@@ -187,7 +180,7 @@ class CategoryLearningAdapter
   static const double _minConfidenceThreshold = 0.6;
 
   // 状态
-  bool _isEnabled = true;
+  final bool _isEnabled = true;
   DateTime? _lastTrainingTime;
   LearningStage _stage = LearningStage.coldStart;
 
@@ -476,7 +469,6 @@ class _PredictionRecord {
     required this.input,
     this.result,
     required this.matched,
-    this.wasCorrect,
   });
 }
 
@@ -490,17 +482,14 @@ class AnomalyLearningData extends LearningData {
   final String? userFeedback;
 
   AnomalyLearningData({
-    required String id,
-    required DateTime timestamp,
-    required String userId,
+    required super.id,
+    required super.timestamp,
+    required super.userId,
     required this.amount,
     required this.category,
     required this.wasActualAnomaly,
     this.userFeedback,
   }) : super(
-          id: id,
-          timestamp: timestamp,
-          userId: userId,
           features: {
             'amount': amount,
             'category': category,
@@ -538,20 +527,17 @@ class AnomalyRule extends LearnedRule {
   final double multiplier;
 
   AnomalyRule({
-    required String ruleId,
+    required super.ruleId,
     required this.category,
     required this.threshold,
     required this.multiplier,
-    required double confidence,
-    required RuleSource source,
+    required super.confidence,
+    required super.source,
   }) : super(
-          ruleId: ruleId,
           moduleId: 'anomaly_detection',
           priority: 50,
-          confidence: confidence,
           createdAt: DateTime.now(),
           lastUsedAt: DateTime.now(),
-          source: source,
         );
 
   @override
@@ -787,17 +773,14 @@ class IntentLearningData extends LearningData {
   final double originalConfidence;
 
   IntentLearningData({
-    required String id,
-    required DateTime timestamp,
-    required String userId,
+    required super.id,
+    required super.timestamp,
+    required super.userId,
     required this.utterance,
     required this.recognizedIntent,
     this.userCorrectedIntent,
     required this.originalConfidence,
   }) : super(
-          id: id,
-          timestamp: timestamp,
-          userId: userId,
           features: {'utterance': utterance},
           label: userCorrectedIntent ?? recognizedIntent,
           source: userCorrectedIntent != null
@@ -835,20 +818,17 @@ class IntentRule extends LearnedRule {
   final List<String> keywords;
 
   IntentRule({
-    required String ruleId,
+    required super.ruleId,
     required this.pattern,
     required this.intentId,
     required this.keywords,
-    required double confidence,
-    required RuleSource source,
+    required super.confidence,
+    required super.source,
   }) : super(
-          ruleId: ruleId,
           moduleId: 'intent_recognition',
           priority: source == RuleSource.userLearned ? 100 : 50,
-          confidence: confidence,
           createdAt: DateTime.now(),
           lastUsedAt: DateTime.now(),
-          source: source,
         );
 
   @override

@@ -33,7 +33,7 @@ class _PrivacyModePageState extends ConsumerState<PrivacyModePage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.privacyMode ?? '隐私模式',
+          l10n.privacyMode,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -112,7 +112,7 @@ class _PrivacyModePageState extends ConsumerState<PrivacyModePage> {
           Switch(
             value: _privacyModeEnabled,
             onChanged: (v) => setState(() => _privacyModeEnabled = v),
-            activeColor: Colors.white,
+            thumbColor: WidgetStateProperty.all(Colors.white),
             activeTrackColor: Colors.white.withValues(alpha: 0.3),
           ),
         ],
@@ -271,7 +271,7 @@ class _PrivacyModePageState extends ConsumerState<PrivacyModePage> {
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: AppColors.primary,
+        activeTrackColor: AppColors.primary,
       ),
     );
   }

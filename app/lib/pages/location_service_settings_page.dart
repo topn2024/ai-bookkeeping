@@ -25,7 +25,7 @@ class _LocationServiceSettingsPageState
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -34,7 +34,7 @@ class _LocationServiceSettingsPageState
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.locationServices ?? '位置服务',
+          l10n.locationServices,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -53,7 +53,7 @@ class _LocationServiceSettingsPageState
     );
   }
 
-  Widget _buildLocationToggleCard(AppLocalizations? l10n) {
+  Widget _buildLocationToggleCard(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -77,18 +77,18 @@ class _LocationServiceSettingsPageState
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.location_on,
-                  color: AppTheme.primaryColor,
+                  color: AppColors.primary,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  l10n?.preciseLocationService ?? '精确位置服务',
+                  l10n.preciseLocationService,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -98,7 +98,7 @@ class _LocationServiceSettingsPageState
               Switch(
                 value: _preciseLocation,
                 onChanged: (v) => setState(() => _preciseLocation = v),
-                activeColor: AppTheme.primaryColor,
+                activeTrackColor: AppColors.primary,
               ),
             ],
           ),
@@ -107,7 +107,7 @@ class _LocationServiceSettingsPageState
             '开启后可获得：',
             style: TextStyle(
               fontSize: 12,
-              color: AppTheme.textSecondaryColor,
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
@@ -128,14 +128,14 @@ class _LocationServiceSettingsPageState
           Icon(
             Icons.check_circle,
             size: 16,
-            color: AppTheme.successColor,
+            color: AppColors.success,
           ),
           const SizedBox(width: 8),
           Text(
             text,
             style: TextStyle(
               fontSize: 12,
-              color: AppTheme.textSecondaryColor,
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -143,26 +143,26 @@ class _LocationServiceSettingsPageState
     );
   }
 
-  Widget _buildLocationOptions(AppLocalizations? l10n) {
+  Widget _buildLocationOptions(AppLocalizations l10n) {
     final options = [
       {
         'icon': Icons.home,
-        'title': l10n?.residentLocations ?? '常驻地点设置',
+        'title': l10n.residentLocations,
         'subtitle': '家庭、公司位置',
       },
       {
         'icon': Icons.fence,
-        'title': l10n?.geofenceReminder ?? '地理围栏提醒',
+        'title': l10n.geofenceReminder,
         'subtitle': '进入商圈自动提醒预算',
       },
       {
         'icon': Icons.map,
-        'title': l10n?.locationAnalysisReport ?? '位置分析报告',
+        'title': l10n.locationAnalysisReport,
         'subtitle': '查看消费地图与统计',
       },
       {
         'icon': Icons.flight,
-        'title': l10n?.remoteSpendingRecord ?? '异地消费记录',
+        'title': l10n.remoteSpendingRecord,
         'subtitle': '旅行/出差消费自动分离',
       },
     ];
@@ -194,7 +194,7 @@ class _LocationServiceSettingsPageState
                 border: !isLast
                     ? Border(
                         bottom: BorderSide(
-                          color: AppTheme.dividerColor,
+                          color: AppColors.divider,
                           width: 0.5,
                         ),
                       )
@@ -204,7 +204,7 @@ class _LocationServiceSettingsPageState
                 children: [
                   Icon(
                     option['icon'] as IconData,
-                    color: AppTheme.primaryColor,
+                    color: AppColors.primary,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -222,7 +222,7 @@ class _LocationServiceSettingsPageState
                           option['subtitle'] as String,
                           style: TextStyle(
                             fontSize: 13,
-                            color: AppTheme.textSecondaryColor,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -230,7 +230,7 @@ class _LocationServiceSettingsPageState
                   ),
                   Icon(
                     Icons.chevron_right,
-                    color: AppTheme.textSecondaryColor,
+                    color: AppColors.textSecondary,
                   ),
                 ],
               ),
@@ -241,12 +241,12 @@ class _LocationServiceSettingsPageState
     );
   }
 
-  Widget _buildSecurityNotice(AppLocalizations? l10n) {
+  Widget _buildSecurityNotice(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceVariantColor,
+        color: AppColors.background,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -257,11 +257,11 @@ class _LocationServiceSettingsPageState
               Icon(
                 Icons.verified_user,
                 size: 18,
-                color: AppTheme.primaryColor,
+                color: AppColors.primary,
               ),
               const SizedBox(width: 8),
               Text(
-                l10n?.dataSecurityGuarantee ?? '数据安全保障',
+                l10n.dataSecurityGuarantee,
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -274,7 +274,7 @@ class _LocationServiceSettingsPageState
             '✓ 位置数据本地加密存储\n✓ 不上传原始坐标到云端\n✓ 30天自动清理历史轨迹',
             style: TextStyle(
               fontSize: 11,
-              color: AppTheme.textSecondaryColor,
+              color: AppColors.textSecondary,
               height: 1.5,
             ),
           ),
@@ -295,8 +295,8 @@ class _LocationServiceSettingsPageState
                 child: ElevatedButton(
                   onPressed: _showClearDataDialog,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.errorColor.withValues(alpha: 0.1),
-                    foregroundColor: AppTheme.errorColor,
+                    backgroundColor: AppColors.error.withValues(alpha: 0.1),
+                    foregroundColor: AppColors.error,
                     minimumSize: const Size(0, 36),
                     elevation: 0,
                   ),
@@ -355,12 +355,12 @@ class _LocationServiceSettingsPageState
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: const Text('位置数据已清除'),
-                  backgroundColor: AppTheme.successColor,
+                  backgroundColor: AppColors.success,
                 ),
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
+              backgroundColor: AppColors.error,
             ),
             child: const Text('确认清除'),
           ),

@@ -27,7 +27,7 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.locationAnalysis ?? '位置分析',
+          l10n.locationAnalysis,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,

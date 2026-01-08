@@ -1,7 +1,6 @@
 import '../l10n/app_localizations.dart';
 import 'locale_format_service.dart';
 import 'category_localization_service.dart';
-import 'account_localization_service.dart';
 
 /// 国际化目标达成检测服务
 ///
@@ -204,7 +203,7 @@ class I18nGoalDetectionService {
       buffer.writeln('║                                                            ║');
       buffer.writeln('║  $status ${result.goal.name.padRight(12)} ${result.goal.description.padRight(30)} ║');
       buffer.writeln('║     目标值: ${result.goal.targetValue.toString().padRight(5)} 当前值: ${result.currentValue.toString().padRight(5)}                    ║');
-      buffer.writeln('║     ${result.details.length > 50 ? result.details.substring(0, 50) + '...' : result.details.padRight(53)}║');
+      buffer.writeln('║     ${result.details.length > 50 ? '${result.details.substring(0, 50)}...' : result.details.padRight(53)}║');
     }
 
     buffer.writeln('║                                                            ║');

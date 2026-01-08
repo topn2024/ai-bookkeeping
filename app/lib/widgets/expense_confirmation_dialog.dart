@@ -150,7 +150,7 @@ class _ExpenseConfirmationDialogState extends State<ExpenseConfirmationDialog>
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 20,
               offset: const Offset(0, -5),
             ),
@@ -165,7 +165,7 @@ class _ExpenseConfirmationDialogState extends State<ExpenseConfirmationDialog>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: theme.colorScheme.outline.withOpacity(0.3),
+                color: theme.colorScheme.outline.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -211,7 +211,7 @@ class _ExpenseConfirmationDialogState extends State<ExpenseConfirmationDialog>
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -259,7 +259,7 @@ class _ExpenseConfirmationDialogState extends State<ExpenseConfirmationDialog>
           width: 100,
           height: 6,
           decoration: BoxDecoration(
-            color: theme.colorScheme.outline.withOpacity(0.2),
+            color: theme.colorScheme.outline.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(3),
           ),
           child: FractionallySizedBox(
@@ -275,7 +275,7 @@ class _ExpenseConfirmationDialogState extends State<ExpenseConfirmationDialog>
         ),
         const SizedBox(width: 8),
         Text(
-          '${score.toStringAsFixed(0)}',
+          score.toStringAsFixed(0),
           style: theme.textTheme.bodySmall?.copyWith(
             color: color,
             fontWeight: FontWeight.bold,
@@ -290,7 +290,7 @@ class _ExpenseConfirmationDialogState extends State<ExpenseConfirmationDialog>
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -380,10 +380,10 @@ class _ExpenseConfirmationDialogState extends State<ExpenseConfirmationDialog>
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -424,7 +424,7 @@ class _ExpenseConfirmationDialogState extends State<ExpenseConfirmationDialog>
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -477,10 +477,10 @@ class _ExpenseConfirmationDialogState extends State<ExpenseConfirmationDialog>
       margin: const EdgeInsets.all(24),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.1),
+        color: Colors.blue.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.blue.withOpacity(0.3),
+          color: Colors.blue.withValues(alpha: 0.3),
         ),
       ),
       child: Row(

@@ -1,7 +1,6 @@
 import 'dart:math';
 
 import '../models/budget_vault.dart';
-import '../models/transaction.dart';
 
 /// 分配结果状态
 enum AllocationResultStatus {

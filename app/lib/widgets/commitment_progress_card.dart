@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
 /// 承诺状态
 enum CommitmentStatus {
@@ -203,13 +202,13 @@ class CommitmentProgressCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: commitment.isNearDeadline
-                ? Colors.orange.withOpacity(0.5)
-                : theme.colorScheme.outline.withOpacity(0.1),
+                ? Colors.orange.withValues(alpha: 0.5)
+                : theme.colorScheme.outline.withValues(alpha: 0.1),
             width: commitment.isNearDeadline ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -266,7 +265,7 @@ class CommitmentProgressCard extends StatelessWidget {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.1),
+            color: statusColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
@@ -305,7 +304,7 @@ class CommitmentProgressCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.1),
+            color: statusColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -376,7 +375,7 @@ class CommitmentProgressCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      statusColor.withOpacity(0.6),
+                      statusColor.withValues(alpha: 0.6),
                       statusColor,
                     ],
                   ),
@@ -505,8 +504,8 @@ class CommitmentProgressCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: commitment.isNearDeadline
-            ? Colors.orange.withOpacity(0.1)
-            : theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+            ? Colors.orange.withValues(alpha: 0.1)
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -554,10 +553,10 @@ class CommitmentProgressCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.amber.withOpacity(0.1),
+        color: Colors.amber.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.amber.withOpacity(0.3),
+          color: Colors.amber.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -595,7 +594,7 @@ class CommitmentProgressCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: const BorderRadius.vertical(
           bottom: Radius.circular(20),
         ),
@@ -703,7 +702,7 @@ class CommitmentList extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(

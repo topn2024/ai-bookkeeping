@@ -206,8 +206,7 @@ class CollaborativeLearningService {
   }
 
   String _generateId() {
-    return DateTime.now().millisecondsSinceEpoch.toString() +
-        '_${Random().nextInt(10000)}';
+    return '${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(10000)}';
   }
 
   void dispose() {

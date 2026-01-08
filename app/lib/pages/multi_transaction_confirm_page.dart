@@ -299,7 +299,7 @@ class _MultiTransactionConfirmPageState
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: themeColors.primary.withOpacity(0.15),
+                      color: themeColors.primary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
@@ -472,7 +472,7 @@ class _MultiTransactionConfirmPageState
                   ),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? themeColors.primary.withOpacity(0.15)
+                        ? themeColors.primary.withValues(alpha: 0.15)
                         : (isDark ? Colors.white10 : Colors.grey.shade100),
                     borderRadius: BorderRadius.circular(20),
                     border: isSelected
@@ -564,7 +564,7 @@ class _MultiTransactionConfirmPageState
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.15) : Colors.transparent,
+          color: isSelected ? color.withValues(alpha: 0.15) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? color : (isDark ? Colors.white24 : Colors.black12),
@@ -597,7 +597,7 @@ class _MultiTransactionConfirmPageState
         color: isDark ? const Color(0xFF252545) : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),

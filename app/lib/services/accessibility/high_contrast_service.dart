@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 
 /// 高对比度模式类型
 enum HighContrastMode {
@@ -380,9 +379,9 @@ class HighContrastService {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return themeConfig.primaryColor.withOpacity(0.5);
+            return themeConfig.primaryColor.withValues(alpha: 0.5);
           }
-          return themeConfig.disabledColor.withOpacity(0.3);
+          return themeConfig.disabledColor.withValues(alpha: 0.3);
         }),
       ),
       dividerTheme: DividerThemeData(

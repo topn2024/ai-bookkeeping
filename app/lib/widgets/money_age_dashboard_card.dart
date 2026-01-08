@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/resource_pool.dart';
 import '../services/money_age_level_service.dart';
@@ -114,10 +113,10 @@ class MoneyAgeDashboardCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: level.color.withOpacity(0.15),
+        color: level.color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: level.color.withOpacity(0.3),
+          color: level.color.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -358,7 +357,7 @@ class MoneyAgeTrendMiniChart extends StatelessWidget {
         painter: _TrendChartPainter(
           data: data,
           lineColor: Theme.of(context).colorScheme.primary,
-          fillColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          fillColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
         ),
       ),
     );
@@ -473,10 +472,10 @@ class MoneyAgeCompactCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: level.color.withOpacity(0.1),
+          color: level.color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: level.color.withOpacity(0.3),
+            color: level.color.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
@@ -525,7 +524,7 @@ class MoneyAgeIndicator extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: level.color.withOpacity(0.15),
+          color: level.color.withValues(alpha: 0.15),
           shape: BoxShape.circle,
         ),
         child: Center(

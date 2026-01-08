@@ -139,7 +139,7 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.smartAdvice ?? '智能建议',
+          l10n.smartAdvice,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -170,7 +170,7 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
     );
   }
 
-  Widget _buildTodaySummary(AppLocalizations? l10n) {
+  Widget _buildTodaySummary(AppLocalizations l10n) {
     final actionableCount = _adviceList
         .where((a) => a.primaryAction != null)
         .length;
@@ -194,7 +194,7 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
               Icon(Icons.tips_and_updates, color: const Color(0xFF1565C0)),
               const SizedBox(width: 8),
               Text(
-                l10n?.todayAdvice ?? '今日建议',
+                l10n.todayAdvice,
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -205,7 +205,7 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
           ),
           const SizedBox(height: 10),
           Text(
-            '基于你的消费习惯，这里有${actionableCount}条可执行的建议帮助你更好地管理财务',
+            '基于你的消费习惯，这里有$actionableCount条可执行的建议帮助你更好地管理财务',
             style: const TextStyle(
               fontSize: 13,
               color: Color(0xFF1565C0),
@@ -217,7 +217,7 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
     );
   }
 
-  Widget _buildAdviceCard(ActionableAdvice advice, AppLocalizations? l10n) {
+  Widget _buildAdviceCard(ActionableAdvice advice, AppLocalizations l10n) {
     final isAchievement = advice.type == AdviceType.achievement;
 
     return Container(
@@ -383,7 +383,7 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
     );
   }
 
-  Widget _buildSettingsEntry(AppLocalizations? l10n) {
+  Widget _buildSettingsEntry(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -409,7 +409,7 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
               ),
               const SizedBox(width: 8),
               Text(
-                l10n?.manageAdvicePreference ?? '管理建议偏好',
+                l10n.manageAdvicePreference,
                 style: TextStyle(
                   fontSize: 13,
                   color: AppTheme.textSecondaryColor,
@@ -603,7 +603,7 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
           Switch(
             value: value,
             onChanged: (v) {},
-            activeColor: AppTheme.primaryColor,
+            activeTrackColor: AppTheme.primaryColor,
           ),
         ],
       ),

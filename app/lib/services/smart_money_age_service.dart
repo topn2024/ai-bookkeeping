@@ -1,11 +1,8 @@
-import 'dart:math';
-
 import 'package:sqflite/sqflite.dart';
 
 import '../models/resource_pool.dart';
 import '../models/transaction.dart';
 import 'database_service.dart';
-import 'money_age_calculator.dart';
 import 'money_age_level_service.dart';
 import 'money_age_trend_service.dart';
 import '../core/logger.dart';
@@ -534,7 +531,7 @@ class SmartMoneyAgeService {
 
       if (recentlyAchieved) {
         suggestions.add(SmartSuggestion(
-          id: 'milestone_$milestone\_${now.millisecondsSinceEpoch}',
+          id: 'milestone_${milestone}_${now.millisecondsSinceEpoch}',
           type: SmartSuggestionType.celebration,
           priority: SuggestionPriority.low,
           title: '🎉 恭喜达成 $milestone 天钱龄！',

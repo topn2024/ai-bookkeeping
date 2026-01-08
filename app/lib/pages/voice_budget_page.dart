@@ -59,7 +59,7 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
     );
   }
 
-  Widget _buildTopBar(AppLocalizations? l10n) {
+  Widget _buildTopBar(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -70,7 +70,7 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
           ),
           const Spacer(),
           Text(
-            l10n?.budgetQuery ?? '预算查询',
+            l10n.budgetQuery,
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -349,7 +349,7 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
     );
   }
 
-  Widget _buildQuickQuestions(AppLocalizations? l10n) {
+  Widget _buildQuickQuestions(AppLocalizations l10n) {
     final questions = [
       '餐饮还能花多少？',
       '这个月超支了吗？',
@@ -368,7 +368,7 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.youCanAsk ?? '您还可以问：',
+            l10n.youCanAsk,
             style: TextStyle(
               fontSize: 11,
               color: AppTheme.textSecondaryColor,
@@ -407,7 +407,7 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
     );
   }
 
-  Widget _buildInputArea(AppLocalizations? l10n) {
+  Widget _buildInputArea(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
       decoration: const BoxDecoration(
@@ -423,7 +423,7 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Text(
-                l10n?.continueAsking ?? '继续提问...',
+                l10n.continueAsking,
                 style: TextStyle(
                   fontSize: 14,
                   color: AppTheme.textSecondaryColor,

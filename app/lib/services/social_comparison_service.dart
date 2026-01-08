@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'database_service.dart';
 
 /// 用户画像标签

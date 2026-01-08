@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 
 /// 智能默认值类型
 enum SmartDefaultType {

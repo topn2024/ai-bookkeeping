@@ -72,7 +72,7 @@ class OfflineModeHint extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      l10n?.offlineMode ?? '离线模式',
+                      l10n.offlineMode,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: AppTheme.warningColor,
@@ -80,7 +80,7 @@ class OfflineModeHint extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      l10n?.offlineModeDesc ?? '当前网络不可用，可使用离线识别',
+                      l10n.offlineModeDesc,
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondaryColor,
@@ -108,7 +108,7 @@ class OfflineModeHint extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, 40),
                     ),
-                    child: Text(l10n?.retryOnline ?? '重试网络'),
+                    child: Text(l10n.retryOnline),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -120,7 +120,7 @@ class OfflineModeHint extends StatelessWidget {
                       foregroundColor: Colors.white,
                       minimumSize: const Size(0, 40),
                     ),
-                    child: Text(l10n?.useOffline ?? '离线识别'),
+                    child: Text(l10n.useOffline),
                   ),
                 ),
               ],
@@ -185,7 +185,7 @@ class OfflineModeDialog extends StatelessWidget {
 
           // 标题
           Text(
-            l10n?.networkUnavailable ?? '网络连接不可用',
+            l10n.networkUnavailable,
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
@@ -195,8 +195,7 @@ class OfflineModeDialog extends StatelessWidget {
 
           // 描述
           Text(
-            l10n?.offlineModeFullDesc ??
-                '当前无法连接到服务器，您可以使用离线语音识别功能继续记账。离线模式下识别准确率可能略有下降。',
+            l10n.offlineModeFullDesc,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -217,22 +216,22 @@ class OfflineModeDialog extends StatelessWidget {
               children: [
                 _buildFeatureItem(
                   icon: Icons.mic,
-                  title: l10n?.offlineVoice ?? '离线语音识别',
-                  subtitle: l10n?.offlineVoiceDesc ?? '支持中文语音转文字',
+                  title: l10n.offlineVoice,
+                  subtitle: l10n.offlineVoiceDesc,
                   isAvailable: true,
                 ),
                 const SizedBox(height: 12),
                 _buildFeatureItem(
                   icon: Icons.auto_awesome,
-                  title: l10n?.aiParsing ?? 'AI智能解析',
-                  subtitle: l10n?.aiParsingOfflineDesc ?? '联网后自动优化',
+                  title: l10n.aiParsing,
+                  subtitle: l10n.aiParsingOfflineDesc,
                   isAvailable: false,
                 ),
                 const SizedBox(height: 12),
                 _buildFeatureItem(
                   icon: Icons.sync,
-                  title: l10n?.autoSync ?? '自动同步',
-                  subtitle: l10n?.autoSyncDesc ?? '恢复网络后自动上传',
+                  title: l10n.autoSync,
+                  subtitle: l10n.autoSyncDesc,
                   isAvailable: true,
                 ),
               ],
@@ -250,7 +249,7 @@ class OfflineModeDialog extends StatelessWidget {
                     onRetryOnline?.call();
                   },
                   icon: const Icon(Icons.refresh),
-                  label: Text(l10n?.retryNetwork ?? '重试网络'),
+                  label: Text(l10n.retryNetwork),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 48),
                     shape: RoundedRectangleBorder(
@@ -267,7 +266,7 @@ class OfflineModeDialog extends StatelessWidget {
                     onUseOffline?.call();
                   },
                   icon: const Icon(Icons.wifi_off),
-                  label: Text(l10n?.continueOffline ?? '继续离线'),
+                  label: Text(l10n.continueOffline),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryColor,
                     foregroundColor: Colors.white,
@@ -371,7 +370,7 @@ class OfflineModeBanner extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  l10n?.offlineModeActive ?? '离线模式 - 数据将在联网后同步',
+                  l10n.offlineModeActive,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,

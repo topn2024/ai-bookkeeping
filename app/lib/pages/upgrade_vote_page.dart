@@ -82,7 +82,7 @@ class _UpgradeVotePageState extends ConsumerState<UpgradeVotePage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.upgradeVote ?? '升级投票',
+          l10n.upgradeVote,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -116,7 +116,7 @@ class _UpgradeVotePageState extends ConsumerState<UpgradeVotePage> {
     );
   }
 
-  Widget _buildVoteProgressCard(int approved, int total, AppLocalizations? l10n) {
+  Widget _buildVoteProgressCard(int approved, int total, AppLocalizations l10n) {
     final progress = approved / total;
     final allApproved = approved == total;
 
@@ -150,8 +150,8 @@ class _UpgradeVotePageState extends ConsumerState<UpgradeVotePage> {
           const SizedBox(height: 12),
           Text(
             allApproved
-                ? (l10n?.voteComplete ?? '投票通过！')
-                : (l10n?.waitingForVotes ?? '等待成员投票'),
+                ? (l10n.voteComplete)
+                : (l10n.waitingForVotes),
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -190,12 +190,12 @@ class _UpgradeVotePageState extends ConsumerState<UpgradeVotePage> {
     );
   }
 
-  Widget _buildMemberVoteSection(AppLocalizations? l10n) {
+  Widget _buildMemberVoteSection(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          l10n?.memberVoteStatus ?? '成员投票状态',
+          l10n.memberVoteStatus,
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -327,7 +327,7 @@ class _UpgradeVotePageState extends ConsumerState<UpgradeVotePage> {
     );
   }
 
-  Widget _buildVoteInfo(AppLocalizations? l10n) {
+  Widget _buildVoteInfo(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -342,7 +342,7 @@ class _UpgradeVotePageState extends ConsumerState<UpgradeVotePage> {
               Icon(Icons.info_outline, size: 18, color: AppTheme.primaryColor),
               const SizedBox(width: 8),
               Text(
-                l10n?.voteRules ?? '投票规则',
+                l10n.voteRules,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -365,7 +365,7 @@ class _UpgradeVotePageState extends ConsumerState<UpgradeVotePage> {
     );
   }
 
-  Widget _buildBottomAction(AppLocalizations? l10n) {
+  Widget _buildBottomAction(AppLocalizations l10n) {
     final allApproved = _members.every((m) => m.status == VoteStatus.approved);
 
     return Container(
@@ -392,7 +392,7 @@ class _UpgradeVotePageState extends ConsumerState<UpgradeVotePage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text(l10n?.completeUpgrade ?? '完成升级'),
+                child: Text(l10n.completeUpgrade),
               )
             : Row(
                 children: [
@@ -405,7 +405,7 @@ class _UpgradeVotePageState extends ConsumerState<UpgradeVotePage> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: Text(l10n?.cancel ?? '取消投票'),
+                      child: Text(l10n.cancel),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -413,7 +413,7 @@ class _UpgradeVotePageState extends ConsumerState<UpgradeVotePage> {
                     child: ElevatedButton.icon(
                       onPressed: _sendReminder,
                       icon: const Icon(Icons.notifications, size: 18),
-                      label: Text(l10n?.remind ?? '提醒投票'),
+                      label: Text(l10n.remind),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryColor,
                         foregroundColor: Colors.white,

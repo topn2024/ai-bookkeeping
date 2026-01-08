@@ -576,8 +576,8 @@ class BudgetDistributionEngine {
       if (daysRemaining <= _config.deadlineWarningDays) {
         // 即将到期，优先分配
         urgencyFactor = 0.5; // 优先分配50%的剩余资金
-        reason = '目标即将在${daysRemaining}天后到期，加速储蓄';
-        warnings.add('${vault.name}将在${daysRemaining}天后到期');
+        reason = '目标即将在$daysRemaining天后到期，加速储蓄';
+        warnings.add('${vault.name}将在$daysRemaining天后到期');
       } else {
         // 按月均分配
         final monthsRemaining = max(1, daysRemaining ~/ 30);

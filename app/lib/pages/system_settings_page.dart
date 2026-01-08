@@ -20,6 +20,11 @@ import 'ai_learning_curve_page.dart';
 import 'home_layout_page.dart';
 import 'data_management_page.dart';
 import 'app_lock_settings_page.dart';
+import 'observability/app_health_page.dart';
+import 'observability/performance_monitor_page.dart';
+import 'observability/system_log_page.dart';
+import 'observability/alert_history_page.dart';
+import 'observability/diagnostic_report_page.dart';
 
 class SystemSettingsPage extends ConsumerWidget {
   const SystemSettingsPage({super.key});
@@ -237,6 +242,71 @@ class SystemSettingsPage extends ConsumerWidget {
               context,
               ref,
               children: [
+                _buildMenuItem(
+                  icon: Icons.monitor_heart,
+                  iconColor: AppColors.income,
+                  title: '应用健康',
+                  subtitle: '系统状态与诊断',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AppHealthPage()),
+                    );
+                  },
+                ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.speed,
+                  iconColor: const Color(0xFF00BCD4),
+                  title: '性能监控',
+                  subtitle: '帧率、内存、启动时间',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const PerformanceMonitorPage()),
+                    );
+                  },
+                ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.article,
+                  iconColor: const Color(0xFF607D8B),
+                  title: '系统日志',
+                  subtitle: '查看运行日志',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SystemLogPage()),
+                    );
+                  },
+                ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.notifications_active,
+                  iconColor: AppColors.warning,
+                  title: '告警历史',
+                  subtitle: '查看系统告警',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AlertHistoryPage()),
+                    );
+                  },
+                ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.bug_report,
+                  iconColor: AppColors.expense,
+                  title: '诊断报告',
+                  subtitle: '生成完整诊断',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const DiagnosticReportPage()),
+                    );
+                  },
+                ),
+                _buildDivider(),
                 _buildMenuItem(
                   icon: Icons.info_outline,
                   iconColor: AppColors.primary,

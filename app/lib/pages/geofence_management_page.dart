@@ -60,7 +60,7 @@ class _GeofenceManagementPageState extends ConsumerState<GeofenceManagementPage>
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.geofenceReminder ?? '地理围栏提醒',
+          l10n.geofenceReminder,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -129,7 +129,7 @@ class _GeofenceManagementPageState extends ConsumerState<GeofenceManagementPage>
           Switch(
             value: _geofenceEnabled,
             onChanged: (v) => setState(() => _geofenceEnabled = v),
-            activeColor: AppColors.primary,
+            activeTrackColor: AppColors.primary,
           ),
         ],
       ),
@@ -206,7 +206,7 @@ class _GeofenceManagementPageState extends ConsumerState<GeofenceManagementPage>
               Switch(
                 value: fence.enabled,
                 onChanged: (v) => setState(() => fence.enabled = v),
-                activeColor: AppColors.primary,
+                activeTrackColor: AppColors.primary,
               ),
             ],
           ),

@@ -198,7 +198,7 @@ class ImportSuccessPage extends ConsumerWidget {
       '钱龄计算已更新',
       '预��状态已同步',
       if (aiCategorizedCount != null && aiCategorizedCount! > 0)
-        'AI分类已完成（${aiCategorizedCount}条）'
+        'AI分类已完成（$aiCategorizedCount条）'
       else
         'AI分类已完成（38条）',
     ];

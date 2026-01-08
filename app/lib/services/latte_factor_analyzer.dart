@@ -338,11 +338,11 @@ class LatteFactorAnalyzer {
     final potentialSavings = top.savingsIfReduceTo(reducedTimes.toDouble());
 
     if (weeklyTimes <= 2) {
-      return '${top.description}每周约${weeklyTimes}次，'
+      return '${top.description}每周约$weeklyTimes次，'
           '年度累计¥${top.yearlyTotal.toStringAsFixed(0)}';
     }
 
-    return '如果将${top.description}从每周${weeklyTimes}次减少到${reducedTimes}次，'
+    return '如果将${top.description}从每周$weeklyTimes次减少到$reducedTimes次，'
         '每年可以多存 ¥${potentialSavings.toStringAsFixed(0)}';
   }
 }

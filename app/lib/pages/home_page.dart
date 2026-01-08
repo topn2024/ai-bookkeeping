@@ -9,6 +9,8 @@ import '../models/category.dart';
 import '../widgets/budget_alert_widget.dart';
 import 'transaction_list_page.dart';
 import 'add_transaction_page.dart';
+import 'goal_achievement_dashboard_page.dart';
+import 'today_allowance_page.dart';
 
 /// 仪表盘首页
 /// 原型设计 1.01：仪表盘 Dashboard
@@ -42,6 +44,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           children: [
             _buildHeaderGradient(context, theme, balance, colors),
             const BudgetAlertBanner(),
+            _buildTodayAllowanceCard(context, theme, monthlyIncome, monthlyExpense),
             _buildCelebrationCard(context, theme),
             _buildMoneyAgeCard(context, theme),
             _buildQuickStats(context, theme, monthlyIncome, monthlyExpense, colors),
@@ -173,6 +176,93 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
+  /// 今日可支出卡片
+  /// 原型设计 1.06：快速入口到今日可支出页面
+  Widget _buildTodayAllowanceCard(
+    BuildContext context,
+    ThemeData theme,
+    double monthlyIncome,
+    double monthlyExpense,
+  ) {
+    // 计算今日可支出
+    final now = DateTime.now();
+    final lastDay = DateTime(now.year, now.month + 1, 0);
+    final daysRemaining = lastDay.day - now.day + 1;
+    final budgetRemaining = monthlyIncome - monthlyExpense;
+    final dailyAllowance = budgetRemaining > 0 ? budgetRemaining / daysRemaining : 0.0;
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TodayAllowancePage()),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.primary.withValues(alpha: 0.1),
+              AppColors.primary.withValues(alpha: 0.05),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.today,
+                color: AppColors.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '今日可支出',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '¥${dailyAllowance.toStringAsFixed(0)}',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// 成就庆祝卡片
   /// 原型设计：伙伴化设计 - 连续记账达成时显示
   Widget _buildCelebrationCard(BuildContext context, ThemeData theme) {
@@ -210,7 +300,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '太棒了！连续记账${consecutiveDays}天！',
+                  '太棒了！连续记账$consecutiveDays天！',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -241,111 +331,131 @@ class _HomePageState extends ConsumerState<HomePage> {
     const level = '优秀';
     const trendDays = 5;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.access_time,
-                    size: 20,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '钱龄',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
+    return InkWell(
+      onTap: () {
+        // 跳转到目标达成仪表盘
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const GoalAchievementDashboardPage()),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: 20,
+                      color: theme.colorScheme.primary,
                     ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+                    const SizedBox(width: 6),
+                    Text(
+                      '钱龄',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
                 ),
-                child: Text(
-                  level,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        level,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  '$moneyAge',
                   style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 40,
+                    fontWeight: FontWeight.bold,
                     color: AppColors.success,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                '$moneyAge',
-                style: TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.success,
+                const SizedBox(width: 4),
+                Text(
+                  '天',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '天',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '您花的钱平均是$moneyAge天前赚的',
-            style: TextStyle(
-              fontSize: 13,
-              color: theme.colorScheme.onSurfaceVariant,
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(
-                Icons.trending_up,
-                size: 16,
-                color: AppColors.success,
+            const SizedBox(height: 4),
+            Text(
+              '您花的钱平均是$moneyAge天前赚的',
+              style: TextStyle(
+                fontSize: 13,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(width: 4),
-              Text(
-                '较上月提升${trendDays}天',
-                style: TextStyle(
-                  fontSize: 12,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.trending_up,
+                  size: 16,
                   color: AppColors.success,
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 4),
+                Text(
+                  '较上月提升$trendDays天',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.success,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -256,19 +256,19 @@ abstract class DrillDownEvent {
 /// 下钻进入事件
 class DrillDownEnterEvent extends DrillDownEvent {
   final DrillDownNode node;
-  DrillDownEnterEvent(DrillDownPath path, this.node) : super(path);
+  DrillDownEnterEvent(super.path, this.node);
 }
 
 /// 下钻返回事件
 class DrillDownBackEvent extends DrillDownEvent {
   final DrillDownNode? fromNode;
   final DrillDownNode? toNode;
-  DrillDownBackEvent(DrillDownPath path, this.fromNode, this.toNode) : super(path);
+  DrillDownBackEvent(super.path, this.fromNode, this.toNode);
 }
 
 /// 下钻重置事件
 class DrillDownResetEvent extends DrillDownEvent {
-  DrillDownResetEvent(DrillDownPath path) : super(path);
+  DrillDownResetEvent(super.path);
 }
 
 /// 数据下钻导航服务

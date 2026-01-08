@@ -1,11 +1,8 @@
 import 'dart:math';
 
-import 'package:sqflite/sqflite.dart';
-
 import '../models/resource_pool.dart';
 import '../models/transaction.dart';
 import 'database_service.dart';
-import 'money_age_calculator.dart';
 import '../core/logger.dart';
 
 /// 趋势方向
@@ -578,7 +575,7 @@ class MoneyAgeTrendService {
       orElse: () => const SeasonalPattern(month: 0, averageDeviation: 0, typicalReason: ''),
     );
     if (currentPattern.month > 0 && currentPattern.averageDeviation.abs() > 2) {
-      insights.add('${currentMonth}月通常${currentPattern.typicalReason}');
+      insights.add('$currentMonth月通常${currentPattern.typicalReason}');
     }
 
     return MoneyAgeInsightReport(

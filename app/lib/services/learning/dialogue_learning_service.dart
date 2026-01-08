@@ -96,9 +96,9 @@ class DialogueLearningData extends LearningData {
   final bool userAbandoned;
 
   DialogueLearningData({
-    required String id,
-    required DateTime timestamp,
-    required String userId,
+    required super.id,
+    required super.timestamp,
+    required super.userId,
     required this.context,
     required this.predictedIntent,
     this.actualIntent,
@@ -108,9 +108,6 @@ class DialogueLearningData extends LearningData {
     this.isFirstTurn = true,
     this.userAbandoned = false,
   }) : super(
-          id: id,
-          timestamp: timestamp,
-          userId: userId,
           features: {
             'message': context.userMessage,
             'turn': context.turnNumber,
@@ -179,24 +176,20 @@ class DialogueRule extends LearnedRule {
   final int expectedTurns;
 
   DialogueRule({
-    required String ruleId,
+    required super.ruleId,
     required this.greetingPattern,
     required this.intentType,
-    required double confidence,
-    required RuleSource source,
+    required super.confidence,
+    required super.source,
     this.keywords = const [],
     this.expectedTurns = 2,
     DateTime? createdAt,
-    int hitCount = 0,
+    super.hitCount,
   }) : super(
-          ruleId: ruleId,
           moduleId: 'dialogue_learning',
           priority: source == RuleSource.userLearned ? 100 : 50,
-          confidence: confidence,
           createdAt: createdAt ?? DateTime.now(),
           lastUsedAt: DateTime.now(),
-          hitCount: hitCount,
-          source: source,
         );
 
   @override
@@ -302,7 +295,7 @@ class DialogueLearningService
   static const double _minConfidenceThreshold = 0.6;
 
   // 状态
-  bool _isEnabled = true;
+  final bool _isEnabled = true;
   DateTime? _lastTrainingTime;
   LearningStage _stage = LearningStage.coldStart;
 

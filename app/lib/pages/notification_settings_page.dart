@@ -36,7 +36,7 @@ class _NotificationSettingsPageState
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.notificationSettings ?? '通知设置',
+          l10n.notificationSettings,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -49,7 +49,7 @@ class _NotificationSettingsPageState
           children: [
             _buildNotificationItem(
               icon: Icons.notifications,
-              title: l10n?.pushNotification ?? '推送通知',
+              title: l10n.pushNotification,
               subtitle: '接收账单提醒和重要通知',
               value: _pushNotification,
               onChanged: (v) => setState(() => _pushNotification = v),
@@ -57,7 +57,7 @@ class _NotificationSettingsPageState
             const SizedBox(height: 8),
             _buildNotificationItem(
               icon: Icons.access_alarm,
-              title: l10n?.dailyReminder ?? '每日记账提醒',
+              title: l10n.dailyReminder,
               subtitle: '每天 ${_formatTime(_reminderTime)} 提醒记账',
               value: _dailyReminder,
               onChanged: (v) => setState(() => _dailyReminder = v),
@@ -66,7 +66,7 @@ class _NotificationSettingsPageState
             const SizedBox(height: 8),
             _buildNotificationItem(
               icon: Icons.payments,
-              title: l10n?.billDueReminder ?? '账单到期提醒',
+              title: l10n.billDueReminder,
               subtitle: '信用卡、房租等账单提醒',
               value: _billReminder,
               onChanged: (v) => setState(() => _billReminder = v),
@@ -74,7 +74,7 @@ class _NotificationSettingsPageState
             const SizedBox(height: 8),
             _buildNotificationItem(
               icon: Icons.pie_chart,
-              title: l10n?.budgetOverspentAlert ?? '预算超支提醒',
+              title: l10n.budgetOverspentAlert,
               subtitle: '预算使用超过80%时提醒',
               value: _budgetAlert,
               onChanged: (v) => setState(() => _budgetAlert = v),
@@ -82,7 +82,7 @@ class _NotificationSettingsPageState
             const SizedBox(height: 8),
             _buildNotificationItem(
               icon: Icons.summarize,
-              title: l10n?.weeklyReport ?? '周报月报',
+              title: l10n.weeklyReport,
               subtitle: '每周一发送财务周报',
               value: _weeklyReport,
               onChanged: (v) => setState(() => _weeklyReport = v),
@@ -133,7 +133,7 @@ class _NotificationSettingsPageState
         trailing: Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: AppTheme.primaryColor,
+          activeTrackColor: AppTheme.primaryColor,
         ),
         onTap: onTap,
       ),

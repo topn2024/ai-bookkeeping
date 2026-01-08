@@ -69,14 +69,14 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  l10n?.voiceAssistant ?? '智能助手',
+                  l10n.voiceAssistant,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 Text(
-                  l10n?.online ?? '在线',
+                  l10n.online,
                   style: TextStyle(
                     fontSize: 12,
                     color: AppTheme.successColor,
@@ -193,26 +193,26 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
     );
   }
 
-  Widget _buildQuickActions(AppLocalizations? l10n) {
+  Widget _buildQuickActions(AppLocalizations l10n) {
     final actions = [
       {
         'icon': Icons.add_circle_outline,
-        'label': l10n?.quickBookkeep ?? '快速记账',
+        'label': l10n.quickBookkeep,
         'color': AppTheme.primaryColor,
       },
       {
         'icon': Icons.pie_chart_outline,
-        'label': l10n?.viewStats ?? '查看统计',
+        'label': l10n.viewStats,
         'color': AppTheme.successColor,
       },
       {
         'icon': Icons.account_balance_wallet_outlined,
-        'label': l10n?.budgetQuery ?? '预算查询',
+        'label': l10n.budgetQuery,
         'color': AppTheme.warningColor,
       },
       {
         'icon': Icons.lightbulb_outline,
-        'label': l10n?.getSuggestion ?? '获取建议',
+        'label': l10n.getSuggestion,
         'color': AppTheme.infoColor,
       },
     ];
@@ -273,7 +273,7 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
     );
   }
 
-  Widget _buildInputArea(AppLocalizations? l10n) {
+  Widget _buildInputArea(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
@@ -292,7 +292,7 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
                 ),
                 child: TextField(
                   decoration: InputDecoration(
-                    hintText: l10n?.askAnything ?? '问我任何问题...',
+                    hintText: l10n.askAnything,
                     hintStyle: TextStyle(
                       color: AppTheme.textSecondaryColor,
                     ),
@@ -472,6 +472,67 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
                 Navigator.pushNamed(context, '/voice-history');
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.edit_note),
+              title: const Text('编辑记录'),
+              subtitle: const Text('查看语音编辑历史'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const VoiceEditRecordPage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.undo),
+              title: const Text('撤销操作'),
+              subtitle: const Text('语音撤销最近的操作'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const VoiceUndoPage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.timer),
+              title: const Text('记录时间统计'),
+              subtitle: const Text('查看语音记账效率'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const RecordingTimeStatsPage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.gesture),
+              title: const Text('手写输入'),
+              subtitle: const Text('切换到手写记账'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HandwritingRecognitionPage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.input),
+              title: const Text('多模态输入'),
+              subtitle: const Text('语音/手写/拍照/键盘'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MultimodalInputPage()),
+                );
+              },
+            ),
+            const Divider(),
             ListTile(
               leading: const Icon(Icons.delete_outline),
               title: const Text('清空对话'),

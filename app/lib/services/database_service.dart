@@ -126,7 +126,10 @@ class DatabaseService {
         externalId TEXT,
         externalSource INTEGER,
         importBatchId TEXT,
-        rawMerchant TEXT
+        rawMerchant TEXT,
+        vaultId TEXT,
+        moneyAge INTEGER,
+        locationJson TEXT
       )
     ''');
 

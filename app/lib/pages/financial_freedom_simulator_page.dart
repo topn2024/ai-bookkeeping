@@ -60,7 +60,7 @@ class _FinancialFreedomSimulatorPageState
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.financialFreedomSimulator ?? '财务自由模拟器',
+          l10n.financialFreedomSimulator,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -91,7 +91,7 @@ class _FinancialFreedomSimulatorPageState
     );
   }
 
-  Widget _buildProgressVisualization(AppLocalizations? l10n) {
+  Widget _buildProgressVisualization(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -111,7 +111,7 @@ class _FinancialFreedomSimulatorPageState
               const Text('🏝️', style: TextStyle(fontSize: 28)),
               const SizedBox(width: 10),
               Text(
-                l10n?.yourFinancialFreedomJourney ?? '你的财务自由之旅',
+                l10n.yourFinancialFreedomJourney,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -143,7 +143,7 @@ class _FinancialFreedomSimulatorPageState
                       color: Color(0xFF1565C0),
                     ),
                     children: [
-                      TextSpan(text: l10n?.estimatedTime ?? '按当前储蓄速度，预计 '),
+                      TextSpan(text: l10n.estimatedTime),
                       TextSpan(
                         text: '$_yearsToFreedom年',
                         style: const TextStyle(
@@ -151,7 +151,7 @@ class _FinancialFreedomSimulatorPageState
                           fontSize: 16,
                         ),
                       ),
-                      TextSpan(text: l10n?.toAchieveFreedom ?? ' 后达成财务自由'),
+                      TextSpan(text: l10n.toAchieveFreedom),
                     ],
                   ),
                 ),
@@ -286,7 +286,7 @@ class _FinancialFreedomSimulatorPageState
     }).toList();
   }
 
-  Widget _buildOptimizationTip(AppLocalizations? l10n) {
+  Widget _buildOptimizationTip(AppLocalizations l10n) {
     final extraSavings = 500;
     final yearsReduced = 3;
 
@@ -306,7 +306,7 @@ class _FinancialFreedomSimulatorPageState
               Icon(Icons.tips_and_updates, color: const Color(0xFFF57C00), size: 22),
               const SizedBox(width: 10),
               Text(
-                l10n?.accelerateTip ?? '加速建议',
+                l10n.accelerateTip,
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -343,14 +343,14 @@ class _FinancialFreedomSimulatorPageState
     );
   }
 
-  Widget _buildParameterSection(AppLocalizations? l10n) {
+  Widget _buildParameterSection(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.adjustParameters ?? '调整参数，看看效果',
+            l10n.adjustParameters,
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -374,7 +374,7 @@ class _FinancialFreedomSimulatorPageState
               children: [
                 // 月储蓄额
                 _buildSliderParameter(
-                  label: l10n?.monthlySavings ?? '月储蓄额',
+                  label: l10n.monthlySavings,
                   value: _monthlySavings,
                   min: 1000,
                   max: 10000,
@@ -390,7 +390,7 @@ class _FinancialFreedomSimulatorPageState
                 const SizedBox(height: 24),
                 // 年化收益率
                 _buildSliderParameter(
-                  label: l10n?.annualReturn ?? '年化收益率',
+                  label: l10n.annualReturn,
                   value: _annualReturn,
                   min: 2,
                   max: 10,
@@ -406,7 +406,7 @@ class _FinancialFreedomSimulatorPageState
                 const SizedBox(height: 24),
                 // 目标被动收入
                 _buildSliderParameter(
-                  label: l10n?.targetPassiveIncome ?? '目标被动收入',
+                  label: l10n.targetPassiveIncome,
                   value: _targetPassiveIncome,
                   min: 5000,
                   max: 30000,
@@ -504,7 +504,7 @@ class _FinancialFreedomSimulatorPageState
     );
   }
 
-  Widget _buildDisclaimer(AppLocalizations? l10n) {
+  Widget _buildDisclaimer(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -517,7 +517,7 @@ class _FinancialFreedomSimulatorPageState
           ),
           const SizedBox(width: 6),
           Text(
-            l10n?.disclaimer ?? '仅供参考，不构成理财建议',
+            l10n.disclaimer,
             style: TextStyle(
               fontSize: 12,
               color: AppTheme.textSecondaryColor,

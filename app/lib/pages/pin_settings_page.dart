@@ -45,7 +45,7 @@ class _PinSettingsPageState extends ConsumerState<PinSettingsPage> {
                     ),
                     const Spacer(),
                     Text(
-                      l10n?.setPin ?? '设置PIN码',
+                      l10n.setPin,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,

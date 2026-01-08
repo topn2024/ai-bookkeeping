@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'database_service.dart';
 
 /// 得分组成部分
@@ -407,7 +406,7 @@ class FinancialHealthScoreService {
       if (currentStreak < 7) {
         tip = '养成每日记账习惯是财务管理的基础';
       } else if (currentStreak < 30) {
-        tip = '继续保持，连续记账${currentStreak}天';
+        tip = '继续保持，连续记账$currentStreak天';
       }
 
       return (score: totalHabitScore, tip: tip);

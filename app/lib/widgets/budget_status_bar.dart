@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
 import '../models/budget_vault.dart';
 
@@ -128,7 +127,7 @@ class _BudgetStatusBarState extends State<BudgetStatusBar>
                         child: Container(
                           height: 32,
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.3),
+                            color: statusColor.withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
@@ -181,11 +180,11 @@ class _BudgetStatusBarState extends State<BudgetStatusBar>
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: theme.colorScheme.outline.withOpacity(0.1),
+            color: theme.colorScheme.outline.withValues(alpha: 0.1),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -202,7 +201,7 @@ class _BudgetStatusBarState extends State<BudgetStatusBar>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -303,7 +302,7 @@ class _BudgetStatusBarState extends State<BudgetStatusBar>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      statusColor.withOpacity(0.6),
+                      statusColor.withValues(alpha: 0.6),
                       statusColor,
                     ],
                   ),
@@ -323,7 +322,7 @@ class _BudgetStatusBarState extends State<BudgetStatusBar>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.red.withOpacity(0.5),
+                        color: Colors.red.withValues(alpha: 0.5),
                         blurRadius: 4,
                       ),
                     ],
@@ -377,7 +376,7 @@ class _BudgetStatusBarState extends State<BudgetStatusBar>
         Container(
           height: 30,
           width: 1,
-          color: theme.colorScheme.outline.withOpacity(0.1),
+          color: theme.colorScheme.outline.withValues(alpha: 0.1),
         ),
         // 已花
         Expanded(
@@ -392,7 +391,7 @@ class _BudgetStatusBarState extends State<BudgetStatusBar>
         Container(
           height: 30,
           width: 1,
-          color: theme.colorScheme.outline.withOpacity(0.1),
+          color: theme.colorScheme.outline.withValues(alpha: 0.1),
         ),
         // 日均可用
         Expanded(
@@ -584,7 +583,7 @@ class BudgetOverviewBar extends StatelessWidget {
               child: Stack(
                 children: [
                   Container(
-                    color: color.withOpacity(0.2),
+                    color: color.withValues(alpha: 0.2),
                   ),
                   FractionallySizedBox(
                     alignment: Alignment.centerLeft,

@@ -1697,4 +1697,1080 @@ class SKo extends S {
 
   @override
   String get budgetName => '예산 이름';
+
+  @override
+  String get myAccounts => 'My Accounts';
+
+  @override
+  String get liabilities => 'Liabilities';
+
+  @override
+  String get creditLimit => 'Limit';
+
+  @override
+  String get repaymentDay => 'Due';
+
+  @override
+  String get dayUnit => 'th';
+
+  @override
+  String get transactionRecord => 'Transactions';
+
+  @override
+  String get transactionDetail => 'Transaction Details';
+
+  @override
+  String get merchant => 'Merchant';
+
+  @override
+  String get moneyAgeInfo => 'Money Age Info';
+
+  @override
+  String get moneyAgeUsedPrefix => 'This expense used income from';
+
+  @override
+  String get moneyAgeUsedSuffix => '';
+
+  @override
+  String daysAgo(int days) {
+    return '$days days ago';
+  }
+
+  @override
+  String get undoDelete => 'Undo Delete';
+
+  @override
+  String get undo => 'Undo';
+
+  @override
+  String deletedTransaction(String name, String amount) {
+    return 'Deleted \"$name ¥$amount\"';
+  }
+
+  @override
+  String get linkVault => 'Link to Vault';
+
+  @override
+  String get noLink => 'No Link';
+
+  @override
+  String get tags => 'Tags';
+
+  @override
+  String get addTag => 'Add Tag';
+
+  @override
+  String get saveTransaction => 'Save Transaction';
+
+  @override
+  String get totalDebt => 'Total Debt';
+
+  @override
+  String get dueThisMonth => 'Due This Month';
+
+  @override
+  String debtPaidPercent(int percent) {
+    return '$percent% Paid';
+  }
+
+  @override
+  String estimatedPayoffMonths(int months) {
+    return 'Est. $months months to pay off';
+  }
+
+  @override
+  String get debtDetails => 'Debt Details';
+
+  @override
+  String repaymentDayIn(int day, String daysLeft) {
+    return 'Due ${day}th · $daysLeft';
+  }
+
+  @override
+  String daysLater(int days) {
+    return '$days days';
+  }
+
+  @override
+  String get currentBill => 'Current Bill';
+
+  @override
+  String get installmentInProgress => 'In Progress';
+
+  @override
+  String installmentRemaining(int count) {
+    return '$count payments left';
+  }
+
+  @override
+  String get remainingPrincipal => 'Remaining Principal';
+
+  @override
+  String get repaymentSuggestion => 'Repayment Suggestion';
+
+  @override
+  String get prioritizeHighInterest => 'Prioritize high-interest debt';
+
+  @override
+  String get consumerLoan => 'Consumer Loan';
+
+  @override
+  String get smartAdvice => '스마트 조언';
+
+  @override
+  String get todayAdvice => '오늘의 조언';
+
+  @override
+  String get manageAdvicePreference => '조언 설정 관리';
+
+  @override
+  String get financialFreedomSimulator => '재정 자유 시뮬레이터';
+
+  @override
+  String get yourFinancialFreedomJourney => '당신의 재정 자유 여정';
+
+  @override
+  String get estimatedTime => '현재 저축 속도로 약 ';
+
+  @override
+  String get toAchieveFreedom => ' 후 재정 자유 달성';
+
+  @override
+  String get accelerateTip => '가속 팁';
+
+  @override
+  String get adjustParameters => '파라미터를 조정하여 효과 확인';
+
+  @override
+  String get monthlySavings => '월 저축액';
+
+  @override
+  String get annualReturn => '연간 수익률';
+
+  @override
+  String get targetPassiveIncome => '목표 수동 소득';
+
+  @override
+  String get disclaimer => '참고용이며 재정 조언이 아닙니다';
+
+  @override
+  String get smartRecommendation => '스마트 추천';
+
+  @override
+  String get discoverNewFeature => '새 기능 발견';
+
+  @override
+  String get laterRemind => '나중에';
+
+  @override
+  String get aaSplit => '더치페이';
+
+  @override
+  String get aaDetected => '더치페이 감지됨';
+
+  @override
+  String get totalAmount => '총 금액';
+
+  @override
+  String get splitPeople => '인원 수';
+
+  @override
+  String get splitMethod => '분할 방법';
+
+  @override
+  String get evenSplit => '균등 분할';
+
+  @override
+  String get proportionalSplit => '비율 분할';
+
+  @override
+  String get customSplit => '사용자 정의 분할';
+
+  @override
+  String get yourShare => '내 부담금';
+
+  @override
+  String get confirmSplit => '분할 확인';
+
+  @override
+  String get accessibilitySettings => '접근성 설정';
+
+  @override
+  String get fontSize => '글꼴 크기';
+
+  @override
+  String get highContrast => '고대비';
+
+  @override
+  String get boldText => '굵은 텍스트';
+
+  @override
+  String get screenReader => '화면 리더 지원';
+
+  @override
+  String get reduceMotion => '모션 줄이기';
+
+  @override
+  String get largeTouch => '큰 터치 영역';
+
+  @override
+  String get aiLanguageSettings => 'AI 언어 설정';
+
+  @override
+  String get aiReplyLanguage => 'AI 응답 언어';
+
+  @override
+  String get aiVoice => 'AI 음성';
+
+  @override
+  String get maleVoice => '남성 음성';
+
+  @override
+  String get femaleVoice => '여성 음성';
+
+  @override
+  String get familyLeaderboard => '가족 순위';
+
+  @override
+  String get weeklyRanking => '주간 순위';
+
+  @override
+  String get monthlyRanking => '월간 순위';
+
+  @override
+  String get savingsChampion => '저축 챔피언';
+
+  @override
+  String get budgetMaster => '예산 마스터';
+
+  @override
+  String get familySavingsGoal => '가족 저축 목표';
+
+  @override
+  String get contributeNow => '지금 기여하기';
+
+  @override
+  String get goalAmount => '목표 금액';
+
+  @override
+  String get currentProgress => '현재 진행률';
+
+  @override
+  String get daysRemaining => '남은 일수';
+
+  @override
+  String get ledgerSettings => '장부 설정';
+
+  @override
+  String get defaultLedger => '기본 장부';
+
+  @override
+  String get ledgerName => '장부 이름';
+
+  @override
+  String get ledgerIcon => '장부 아이콘';
+
+  @override
+  String get ledgerColor => '장부 색상';
+
+  @override
+  String get archiveLedger => '장부 보관';
+
+  @override
+  String get locationServices => '위치 서비스';
+
+  @override
+  String get enableLocation => '위치 활성화';
+
+  @override
+  String get locationAccuracy => '위치 정확도';
+
+  @override
+  String get highAccuracy => '높은 정확도';
+
+  @override
+  String get lowPower => '저전력';
+
+  @override
+  String get geofenceAlerts => '지오펜스 알림';
+
+  @override
+  String get nearbyMerchants => '근처 가맹점';
+
+  @override
+  String get duplicateTransaction => '거래 복제';
+
+  @override
+  String get transactionTime => '거래 시간';
+
+  @override
+  String get transactionNote => '거래 메모';
+
+  @override
+  String get transactionTags => '거래 태그';
+
+  @override
+  String get transactionLocation => '거래 위치';
+
+  @override
+  String get transactionAttachments => '거래 첨부 파일';
+
+  @override
+  String get budgetWarning => '예산 경고';
+
+  @override
+  String get moneyAgeTitle => '자금 연령 분석';
+
+  @override
+  String get moneyAgeDescription2 => '현금 흐름 효율성 이해하기';
+
+  @override
+  String get averageMoneyAge => '평균 자금 연령';
+
+  @override
+  String get moneyAgeHealth => '자금 연령 건강도';
+
+  @override
+  String get poor => '나쁨';
+
+  @override
+  String get habitTracking => '습관 추적';
+
+  @override
+  String get dailyStreak => '연속 기록';
+
+  @override
+  String get weeklyGoal => '주간 목표';
+
+  @override
+  String get monthlyGoal => '월간 목표';
+
+  @override
+  String streakDays(int count) {
+    return '$count일';
+  }
+
+  @override
+  String get achievementUnlocked => '업적 해제';
+
+  @override
+  String get viewAchievements => '업적 보기';
+
+  @override
+  String get shareAchievement => '업적 공유';
+
+  @override
+  String get achievementProgress => '업적 진행률';
+
+  @override
+  String get listening => '듣는 중...';
+
+  @override
+  String get voiceError => '음성 인식 실패';
+
+  @override
+  String get speakNow => '말씀하세요';
+
+  @override
+  String get scanBill => '영수증 스캔';
+
+  @override
+  String get recognizing => '인식 중...';
+
+  @override
+  String get recognitionFailed => '인식 실패';
+
+  @override
+  String get syncing => '동기화 중...';
+
+  @override
+  String get syncComplete => '동기화 완료';
+
+  @override
+  String get syncFailed => '동기화 실패';
+
+  @override
+  String get lastSynced => '마지막 동기화';
+
+  @override
+  String get syncNow => '지금 동기화';
+
+  @override
+  String get offlineMode => '오프라인 모드';
+
+  @override
+  String get offlineData => '오프라인 데이터';
+
+  @override
+  String get pendingSync => '동기화 대기 중';
+
+  @override
+  String get offlineChanges => '오프라인 변경사항';
+
+  @override
+  String get privacySettings => '개인정보 설정';
+
+  @override
+  String get dataEncryption => '데이터 암호화';
+
+  @override
+  String get biometricLock => '생체 인식 잠금';
+
+  @override
+  String get autoLock => '자동 잠금';
+
+  @override
+  String get lockTimeout => '잠금 시간 초과';
+
+  @override
+  String get budgetAlerts => '예산 알림';
+
+  @override
+  String get dailyReminder => '일일 알림';
+
+  @override
+  String get exportFormat => '내보내기 형식';
+
+  @override
+  String get csvFormat => 'CSV 형식';
+
+  @override
+  String get excelFormat => 'Excel 형식';
+
+  @override
+  String get jsonFormat => 'JSON 형식';
+
+  @override
+  String get feedbackSubmitted => '피드백 제출됨';
+
+  @override
+  String get thankYouFeedback => '피드백 감사합니다';
+
+  @override
+  String get rateApp => '앱 평가하기';
+
+  @override
+  String get shareApp => '앱 공유하기';
+
+  @override
+  String get upgradeRequired => '업그레이드 필요';
+
+  @override
+  String get loginRequired => '로그인 필요';
+
+  @override
+  String get loginToUseFeature => '이 기능을 사용하려면 로그인하세요';
+
+  @override
+  String get loginNow => '지금 로그인';
+
+  @override
+  String get continueAsGuest => '게스트로 계속';
+
+  @override
+  String get connectionFailed => '연결 실패';
+
+  @override
+  String get checkNetwork => '네트워크 연결을 확인하세요';
+
+  @override
+  String get permissionRequired => '권한 필요';
+
+  @override
+  String get locationPermission => '위치 권한';
+
+  @override
+  String get storagePermission => '저장소 권한';
+
+  @override
+  String get deleteWarning => '이 작업은 취소할 수 없습니다';
+
+  @override
+  String get permanentlyDelete => '영구 삭제';
+
+  @override
+  String get moveToTrash => '휴지통으로 이동';
+
+  @override
+  String get searchPlaceholder => '검색...';
+
+  @override
+  String get noResults => '결과 없음';
+
+  @override
+  String get searchHistory => '검색 기록';
+
+  @override
+  String get clearHistory => '기록 지우기';
+
+  @override
+  String get filterBy => '필터';
+
+  @override
+  String get sortBy => '정렬';
+
+  @override
+  String get dateRange => '날짜 범위';
+
+  @override
+  String get amountRange => '금액 범위';
+
+  @override
+  String get categoryFilter => '카테고리 필터';
+
+  @override
+  String get ascending => '오름차순';
+
+  @override
+  String get descending => '내림차순';
+
+  @override
+  String get byDate => '날짜순';
+
+  @override
+  String get byAmount => '금액순';
+
+  @override
+  String get byCategory => '카테고리순';
+
+  @override
+  String get selectAll => '전체 선택';
+
+  @override
+  String get deselectAll => '선택 해제';
+
+  @override
+  String get selected => '선택됨';
+
+  @override
+  String get batchDelete => '일괄 삭제';
+
+  @override
+  String get batchEdit => '일괄 편집';
+
+  @override
+  String get redo => '다시 실행';
+
+  @override
+  String get actionUndone => '작업 취소됨';
+
+  @override
+  String get actionRedone => '작업 다시 실행됨';
+
+  @override
+  String get loadMore => '더 보기';
+
+  @override
+  String get refreshing => '새로고침 중...';
+
+  @override
+  String get pullToRefresh => '당겨서 새로고침';
+
+  @override
+  String get releaseToRefresh => '놓아서 새로고침';
+
+  @override
+  String get emptyState => '데이터 없음';
+
+  @override
+  String get addFirst => '첫 번째 기록 추가';
+
+  @override
+  String get welcomeBack => '다시 오신 것을 환영합니다';
+
+  @override
+  String get goodMorning => '좋은 아침입니다';
+
+  @override
+  String get goodAfternoon => '좋은 오후입니다';
+
+  @override
+  String get goodEvening => '좋은 저녁입니다';
+
+  @override
+  String get frequentCategories => '자주 사용하는 카테고리';
+
+  @override
+  String get suggestedActions => '추천 작업';
+
+  @override
+  String get importData => '데이터 가져오기';
+
+  @override
+  String get exportData => '데이터 내보내기';
+
+  @override
+  String get autoDetected => 'Auto Detected';
+
+  @override
+  String get myShare => 'My Share';
+
+  @override
+  String get perPerson => 'Per Person';
+
+  @override
+  String get bookkeepingMode => 'Bookkeeping Mode';
+
+  @override
+  String get onlyMyShare => 'Only My Share';
+
+  @override
+  String get recordTotal => 'Record Total';
+
+  @override
+  String get largeTouchTarget => 'Large Touch Target';
+
+  @override
+  String get admin => 'Admin';
+
+  @override
+  String get adminDesc => 'Admin permission description';
+
+  @override
+  String get aiParsing => 'AI Parsing';
+
+  @override
+  String get aiParsingOfflineDesc => 'AI parsing unavailable in offline mode';
+
+  @override
+  String get analyzing => 'Analyzing...';
+
+  @override
+  String get annualReview => 'Annual Review';
+
+  @override
+  String get appLock => 'App Lock';
+
+  @override
+  String get askAnything => 'Ask Anything';
+
+  @override
+  String get autoExtracted => 'Auto Extracted';
+
+  @override
+  String get autoSync => 'Auto Sync';
+
+  @override
+  String get autoSyncDesc => 'Automatically sync data to cloud';
+
+  @override
+  String get badgesWall => 'Badges Wall';
+
+  @override
+  String get basicRecording => 'Basic Recording';
+
+  @override
+  String get biggestGoal => 'Biggest Goal';
+
+  @override
+  String get billDueReminder => 'Bill Due Reminder';
+
+  @override
+  String get budgetOverflowAlert => 'Budget Overflow Alert';
+
+  @override
+  String get budgetOverspentAlert => 'Budget Overspent';
+
+  @override
+  String get budgetQuery => 'Budget Query';
+
+  @override
+  String get choosePlan => 'Choose Plan';
+
+  @override
+  String get completeUpgrade => 'Complete Upgrade';
+
+  @override
+  String get confidenceLevel => 'Confidence Level';
+
+  @override
+  String get confirmBookkeeping => 'Confirm Bookkeeping';
+
+  @override
+  String get continueAsking => 'Continue Asking';
+
+  @override
+  String get continueOffline => 'Continue Offline';
+
+  @override
+  String get continuousChat => 'Continuous Chat';
+
+  @override
+  String get copyLink => 'Copy Link';
+
+  @override
+  String get createFamilyLedger => 'Create Family Ledger';
+
+  @override
+  String get currentPermissions => 'Current Permissions';
+
+  @override
+  String get dangerZone => 'Danger Zone';
+
+  @override
+  String get dataSecurityGuarantee => 'Data Security Guarantee';
+
+  @override
+  String get dateFormat => 'Date Format';
+
+  @override
+  String get daysRecording => 'days recording';
+
+  @override
+  String get defaultVisibility => 'Default Visibility';
+
+  @override
+  String get deleteLedger => 'Delete Ledger';
+
+  @override
+  String get depositNow => 'Deposit Now';
+
+  @override
+  String get detailedStats => 'Detailed Stats';
+
+  @override
+  String get discount => 'Discount';
+
+  @override
+  String get education => 'Education';
+
+  @override
+  String get examples => 'Examples';
+
+  @override
+  String get faceIdUnlock => 'Face ID Unlock';
+
+  @override
+  String get familyContributions => 'Family Contributions';
+
+  @override
+  String get familyDinners => 'Family Dinners';
+
+  @override
+  String get faq => 'FAQ';
+
+  @override
+  String get feature => 'Feature';
+
+  @override
+  String get fingerprintUnlock => 'Fingerprint Unlock';
+
+  @override
+  String get fullMode => 'Full Mode';
+
+  @override
+  String get generateBirthdayCard => 'Generate Birthday Card';
+
+  @override
+  String get geofenceReminder => 'Geofence Reminder';
+
+  @override
+  String get getSuggestion => 'Get Suggestion';
+
+  @override
+  String get growth => 'Growth';
+
+  @override
+  String get hideAmount => 'Hide Amount';
+
+  @override
+  String get hideAmountDesc => 'Hide amount display in lists';
+
+  @override
+  String get hobbies => 'Hobbies';
+
+  @override
+  String get homeLayout => 'Home Layout';
+
+  @override
+  String get inputHint => 'Input Hint';
+
+  @override
+  String get inputToBookkeep => 'Input to Bookkeep';
+
+  @override
+  String get inviteFamily => 'Invite Family';
+
+  @override
+  String get leaderboard => 'Leaderboard';
+
+  @override
+  String get leaveLedger => 'Leave Ledger';
+
+  @override
+  String get ledgerType => 'Ledger Type';
+
+  @override
+  String get locationAnalysis => 'Location Analysis';
+
+  @override
+  String get locationAnalysisReport => 'Location Analysis Report';
+
+  @override
+  String get lowConfidenceTitle => 'Low Confidence';
+
+  @override
+  String get member => 'Member';
+
+  @override
+  String get memberBenefits => 'Member Benefits';
+
+  @override
+  String get memberContribution => 'Member Contribution';
+
+  @override
+  String get memberDesc => 'Member description';
+
+  @override
+  String get memberPermissions => 'Member Permissions';
+
+  @override
+  String get memberRecordNotify => 'Member Record Notify';
+
+  @override
+  String get membershipService => 'Membership Service';
+
+  @override
+  String get memberVoteStatus => 'Member Vote Status';
+
+  @override
+  String get moneyAgeQuery => 'Money Age Query';
+
+  @override
+  String get monthlySharedExpense => 'Monthly Shared Expense';
+
+  @override
+  String get naturalLanguageInput => 'Natural Language Input';
+
+  @override
+  String get networkUnavailable => 'Network Unavailable';
+
+  @override
+  String get noVoiceHistory => 'No Voice History';
+
+  @override
+  String get numberFormat => 'Number Format';
+
+  @override
+  String get offlineModeActive => 'Offline Mode Active';
+
+  @override
+  String get offlineModeDesc => 'Offline mode description';
+
+  @override
+  String get offlineModeFullDesc =>
+      'In offline mode, data is stored locally and synced when online';
+
+  @override
+  String get offlineVoice => 'Offline Voice';
+
+  @override
+  String get offlineVoiceDesc => 'Offline voice recognition';
+
+  @override
+  String get online => 'Online';
+
+  @override
+  String get onlyOwnerCanDelete => 'Only Owner Can Delete';
+
+  @override
+  String get originalText => 'Original Text';
+
+  @override
+  String get otherSavingsGoals => 'Other Savings Goals';
+
+  @override
+  String get owner => 'Owner';
+
+  @override
+  String get ownerDesc => 'Owner description';
+
+  @override
+  String get permissionSettings => 'Permission Settings';
+
+  @override
+  String get preciseLocationService => 'Precise Location Service';
+
+  @override
+  String get preventScreenshot => 'Prevent Screenshot';
+
+  @override
+  String get privacyMode => 'Privacy Mode';
+
+  @override
+  String get pushNotification => 'Push Notification';
+
+  @override
+  String get qrCodeInvite => 'QR Code Invite';
+
+  @override
+  String get quickBookkeep => 'Quick Bookkeep';
+
+  @override
+  String get quickBookkeeping => 'Quick Bookkeeping';
+
+  @override
+  String get quickQuestions => 'Quick Questions';
+
+  @override
+  String get receiptDetail => 'Receipt Detail';
+
+  @override
+  String get recentDeposits => 'Recent Deposits';
+
+  @override
+  String get recentRecords => 'Recent Records';
+
+  @override
+  String get recordLeaderboard => 'Record Leaderboard';
+
+  @override
+  String get regionSettings => 'Region Settings';
+
+  @override
+  String get remind => 'Remind';
+
+  @override
+  String get remoteSpendingRecord => 'Remote Spending Record';
+
+  @override
+  String get residentLocations => 'Resident Locations';
+
+  @override
+  String get retryNetwork => 'Retry Network';
+
+  @override
+  String get retryOnline => 'Retry Online';
+
+  @override
+  String get roleRecommendation => 'Role Recommendation';
+
+  @override
+  String get saveChanges => 'Save Changes';
+
+  @override
+  String get saveImage => 'Save Image';
+
+  @override
+  String get savingsGoals => 'Savings Goals';
+
+  @override
+  String get savingsLeaderboard => 'Savings Leaderboard';
+
+  @override
+  String get scanToJoin => 'Scan to Join';
+
+  @override
+  String get securityLog => 'Security Log';
+
+  @override
+  String get selectRole => 'Select Role';
+
+  @override
+  String get sendInviteLink => 'Send Invite Link';
+
+  @override
+  String get setPin => 'Set PIN';
+
+  @override
+  String get sharedTime => 'Shared Time';
+
+  @override
+  String get shareLink => 'Share Link';
+
+  @override
+  String get shareToFamily => 'Share to Family';
+
+  @override
+  String get showQRCode => 'Show QR Code';
+
+  @override
+  String get simpleMode => 'Simple Mode';
+
+  @override
+  String get smartTextInput => 'Smart Text Input';
+
+  @override
+  String get startUpgrade => 'Start Upgrade';
+
+  @override
+  String get staySimple => 'Stay Simple';
+
+  @override
+  String get subtotal => 'Subtotal';
+
+  @override
+  String get timeFormat => 'Time Format';
+
+  @override
+  String get tripsCount => 'Trips Count';
+
+  @override
+  String get typeOrSpeak => 'Type or Speak';
+
+  @override
+  String get upgradeDescription => 'Upgrade Description';
+
+  @override
+  String get upgradeMode => 'Upgrade Mode';
+
+  @override
+  String get upgradeNotice => 'Upgrade Notice';
+
+  @override
+  String get upgradeNoticeDesc => 'Upgrade notice description';
+
+  @override
+  String get upgradeToFullMode => 'Upgrade to Full Mode';
+
+  @override
+  String get upgradeVote => 'Upgrade Vote';
+
+  @override
+  String get useOffline => 'Use Offline';
+
+  @override
+  String get viewer => 'Viewer';
+
+  @override
+  String get viewerDesc => 'Viewer description';
+
+  @override
+  String get viewStats => 'View Stats';
+
+  @override
+  String get visibilityDesc => 'Visibility description';
+
+  @override
+  String get voiceAssistant => 'Voice Assistant';
+
+  @override
+  String get voiceChat => 'Voice Chat';
+
+  @override
+  String get voiceHistoryHint => 'Voice history hint';
+
+  @override
+  String get voiceHistoryTitle => 'Voice History';
+
+  @override
+  String get voteComplete => 'Vote Complete';
+
+  @override
+  String get voteRules => 'Vote Rules';
+
+  @override
+  String get waitingForVotes => 'Waiting for Votes';
+
+  @override
+  String get warmestMoment => 'Warmest Moment';
+
+  @override
+  String get weekStartDay => 'Week Start Day';
+
+  @override
+  String get yearlyWarmMoments => 'Yearly Warm Moments';
+
+  @override
+  String get youCanAsk => 'You Can Ask';
 }

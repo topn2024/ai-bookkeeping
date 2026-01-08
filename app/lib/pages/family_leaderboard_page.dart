@@ -130,7 +130,7 @@ class _FamilyLeaderboardPageState extends ConsumerState<FamilyLeaderboardPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.familyLeaderboard ?? '家庭排行榜',
+          l10n.familyLeaderboard,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -198,7 +198,7 @@ class _FamilyLeaderboardPageState extends ConsumerState<FamilyLeaderboardPage> {
     );
   }
 
-  Widget _buildRecordRanking(AppLocalizations? l10n) {
+  Widget _buildRecordRanking(AppLocalizations l10n) {
     final sortedByRecord = List<MemberRanking>.from(_rankings)
       ..sort((a, b) => b.recordCount.compareTo(a.recordCount));
 
@@ -212,7 +212,7 @@ class _FamilyLeaderboardPageState extends ConsumerState<FamilyLeaderboardPage> {
               const Icon(Icons.edit_note, color: Color(0xFFFFD700), size: 22),
               const SizedBox(width: 8),
               Text(
-                l10n?.recordLeaderboard ?? '记账达人榜',
+                l10n.recordLeaderboard,
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -411,7 +411,7 @@ class _FamilyLeaderboardPageState extends ConsumerState<FamilyLeaderboardPage> {
     );
   }
 
-  Widget _buildSavingsRanking(AppLocalizations? l10n) {
+  Widget _buildSavingsRanking(AppLocalizations l10n) {
     final sortedBySavings = List<MemberRanking>.from(_rankings)
       ..sort((a, b) => b.savingsRate.compareTo(a.savingsRate));
 
@@ -425,7 +425,7 @@ class _FamilyLeaderboardPageState extends ConsumerState<FamilyLeaderboardPage> {
               Icon(Icons.savings, color: AppTheme.successColor, size: 22),
               const SizedBox(width: 8),
               Text(
-                l10n?.savingsLeaderboard ?? '节俭达人榜',
+                l10n.savingsLeaderboard,
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -584,7 +584,7 @@ class _FamilyLeaderboardPageState extends ConsumerState<FamilyLeaderboardPage> {
     );
   }
 
-  Widget _buildBadgesWall(AppLocalizations? l10n) {
+  Widget _buildBadgesWall(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -595,7 +595,7 @@ class _FamilyLeaderboardPageState extends ConsumerState<FamilyLeaderboardPage> {
               const Icon(Icons.military_tech, color: Color(0xFF9C27B0), size: 22),
               const SizedBox(width: 8),
               Text(
-                l10n?.badgesWall ?? '贡献勋章墙',
+                l10n.badgesWall,
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,

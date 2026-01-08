@@ -5,8 +5,6 @@ import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
-import 'learning_adapters.dart';
-
 // ==================== 异常模式类型 ====================
 
 /// 异常模式类型

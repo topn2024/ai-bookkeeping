@@ -112,25 +112,25 @@ class FamilyBirthdayPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildInvestmentStats(AppLocalizations? l10n) {
+  Widget _buildInvestmentStats(AppLocalizations l10n) {
     final investments = [
       {
         'icon': '📚',
-        'label': l10n?.education ?? '教育投入',
+        'label': l10n.education,
         'amount': yearlyInvestments['education'] ?? 12000,
         'color': const Color(0xFFE3F2FD),
         'textColor': const Color(0xFF1565C0),
       },
       {
         'icon': '🎮',
-        'label': l10n?.hobbies ?? '兴趣培养',
+        'label': l10n.hobbies,
         'amount': yearlyInvestments['hobbies'] ?? 3500,
         'color': const Color(0xFFF3E5F5),
         'textColor': const Color(0xFF7B1FA2),
       },
       {
         'icon': '👕',
-        'label': l10n?.growth ?? '成长所需',
+        'label': l10n.growth,
         'amount': yearlyInvestments['growth'] ?? 5200,
         'color': const Color(0xFFE8F5E9),
         'textColor': const Color(0xFF2E7D32),
@@ -233,7 +233,7 @@ class FamilyBirthdayPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildActionButton(AppLocalizations? l10n) {
+  Widget _buildActionButton(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: SizedBox(
@@ -242,7 +242,7 @@ class FamilyBirthdayPage extends ConsumerWidget {
         child: ElevatedButton.icon(
           onPressed: () {},
           icon: const Icon(Icons.card_giftcard, size: 18),
-          label: Text(l10n?.generateBirthdayCard ?? '生成家庭祝福卡片'),
+          label: Text(l10n.generateBirthdayCard),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.primaryColor,
             foregroundColor: Colors.white,

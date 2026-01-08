@@ -202,7 +202,7 @@ class BudgetPlanningCoordinator {
     // 4. 可选：结合位置洞察优化
     LocationBasedBudgetSuggestion? locationInsights;
     if (useLocationInsights && _locationAwareBudget != null) {
-      locationInsights = await _locationAwareBudget!.suggestBudgetAllocation(
+      locationInsights = await _locationAwareBudget.suggestBudgetAllocation(
         monthlyIncome: monthlyIncome,
         historicalTransactions: historicalTransactions,
       );

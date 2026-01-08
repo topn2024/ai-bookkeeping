@@ -518,9 +518,9 @@ class EmergencyExpenseHandler {
     // 生成建议
     String suggestion;
     if (recoveryMonths <= 3) {
-      suggestion = '突发支出金额适中，${recoveryMonths}个月内可以恢复正常';
+      suggestion = '突发支出金额适中，$recoveryMonths个月内可以恢复正常';
     } else if (recoveryMonths <= 6) {
-      suggestion = '建议在${recoveryMonths}个月内逐步恢复，同时考虑增加应急金储备';
+      suggestion = '建议在$recoveryMonths个月内逐步恢复，同时考虑增加应急金储备';
     } else {
       suggestion = '恢复期较长，建议同时开源节流，加快恢复进度';
     }

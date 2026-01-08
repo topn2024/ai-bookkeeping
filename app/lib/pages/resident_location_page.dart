@@ -46,7 +46,7 @@ class _ResidentLocationPageState extends ConsumerState<ResidentLocationPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.residentLocations ?? '常驻地点',
+          l10n.residentLocations,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,

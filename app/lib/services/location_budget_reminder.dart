@@ -317,7 +317,7 @@ class LocationBudgetReminder {
 
     // 发送通知
     if (_notificationService != null) {
-      await _notificationService!.show(
+      await _notificationService.show(
         title: '预算提醒 - ${event.locationType.displayName}',
         body: messages.join('\n'),
         category: _determineNotificationCategory(vaultStatuses),
@@ -344,7 +344,7 @@ class LocationBudgetReminder {
     // 获取位置类型
     LocationType locationType = LocationType.unknown;
     if (_geofenceService != null) {
-      locationType = await _geofenceService!.getLocationType(location);
+      locationType = await _geofenceService.getLocationType(location);
     }
 
     // 获取相关小金库
@@ -427,7 +427,7 @@ class LocationBudgetReminder {
         type: location.type,
       );
 
-      await _geofenceService!.registerGeofence(geofence);
+      await _geofenceService.registerGeofence(geofence);
     }
   }
 

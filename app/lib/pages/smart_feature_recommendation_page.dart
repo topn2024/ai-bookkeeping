@@ -110,7 +110,7 @@ class _SmartFeatureRecommendationPageState
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.smartRecommendation ?? '智能推荐',
+          l10n.smartRecommendation,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -141,7 +141,7 @@ class _SmartFeatureRecommendationPageState
   }
 
   Widget _buildRecommendationCard(
-      FeatureRecommendation recommendation, AppLocalizations? l10n) {
+      FeatureRecommendation recommendation, AppLocalizations l10n) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -201,7 +201,7 @@ class _SmartFeatureRecommendationPageState
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        l10n?.discoverNewFeature ?? '发现新功能',
+                        l10n.discoverNewFeature,
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -344,7 +344,7 @@ class _SmartFeatureRecommendationPageState
                         child: TextButton(
                           onPressed: () => Navigator.pop(context),
                           child: Text(
-                            l10n?.laterRemind ?? '以后再说',
+                            l10n.laterRemind,
                             style: TextStyle(
                               fontSize: 14,
                               color: AppTheme.textSecondaryColor,

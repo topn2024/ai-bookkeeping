@@ -304,8 +304,8 @@ class BudgetHabitIntegration {
       _completedTasks[taskId] = true;
 
       if (_habitService != null) {
-        await _habitService!.completeTask(taskId);
-        await _habitService!.awardPoints(50);
+        await _habitService.completeTask(taskId);
+        await _habitService.awardPoints(50);
       }
       _totalPointsAwarded += 50;
 
@@ -344,7 +344,7 @@ class BudgetHabitIntegration {
     const dailyPoints = 5;
 
     if (_habitService != null) {
-      await _habitService!.awardPoints(dailyPoints);
+      await _habitService.awardPoints(dailyPoints);
     }
     _totalPointsAwarded += dailyPoints;
 

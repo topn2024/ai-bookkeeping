@@ -118,7 +118,7 @@ class _VoiceMoneyAgePageState extends ConsumerState<VoiceMoneyAgePage> {
     );
   }
 
-  Widget _buildTopBar(AppLocalizations? l10n) {
+  Widget _buildTopBar(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -129,7 +129,7 @@ class _VoiceMoneyAgePageState extends ConsumerState<VoiceMoneyAgePage> {
           ),
           const Spacer(),
           Text(
-            l10n?.moneyAgeQuery ?? '钱龄查询',
+            l10n.moneyAgeQuery,
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -387,7 +387,7 @@ class _VoiceMoneyAgePageState extends ConsumerState<VoiceMoneyAgePage> {
   }
 
   /// 构建快捷问题
-  Widget _buildQuickQuestions(AppLocalizations? l10n) {
+  Widget _buildQuickQuestions(AppLocalizations l10n) {
     final questions = [
       '如何提升钱龄？',
       '本月钱龄变化',
@@ -406,7 +406,7 @@ class _VoiceMoneyAgePageState extends ConsumerState<VoiceMoneyAgePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.youCanAsk ?? '您还可以问：',
+            l10n.youCanAsk,
             style: TextStyle(
               fontSize: 11,
               color: AppTheme.textSecondaryColor,
@@ -446,7 +446,7 @@ class _VoiceMoneyAgePageState extends ConsumerState<VoiceMoneyAgePage> {
   }
 
   /// 构建输入区域
-  Widget _buildInputArea(AppLocalizations? l10n) {
+  Widget _buildInputArea(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
       decoration: const BoxDecoration(
@@ -462,7 +462,7 @@ class _VoiceMoneyAgePageState extends ConsumerState<VoiceMoneyAgePage> {
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Text(
-                l10n?.continueAsking ?? '继续提问...',
+                l10n.continueAsking,
                 style: TextStyle(
                   fontSize: 14,
                   color: AppTheme.textSecondaryColor,

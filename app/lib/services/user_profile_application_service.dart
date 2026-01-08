@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
-
 import 'user_profile_service.dart';
 
 /// 用户画像实时应用服务

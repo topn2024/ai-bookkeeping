@@ -475,10 +475,10 @@ class TransactionDetailPage extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(context.l10n.cancel),
               style: TextButton.styleFrom(
                 minimumSize: const Size(0, 48),
               ),
+              child: Text(context.l10n.cancel),
             ),
             ElevatedButton(
               onPressed: () {

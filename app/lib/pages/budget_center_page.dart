@@ -541,7 +541,7 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
                 ),
               ),
               Text(
-                '还剩${daysLeft}天',
+                '还剩$daysLeft天',
                 style: TextStyle(
                   fontSize: 12,
                   color: theme.colorScheme.onSurfaceVariant,

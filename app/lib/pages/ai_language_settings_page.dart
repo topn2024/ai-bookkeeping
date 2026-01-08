@@ -16,7 +16,7 @@ class AILanguageSettingsPage extends ConsumerStatefulWidget {
 class _AILanguageSettingsPageState
     extends ConsumerState<AILanguageSettingsPage> {
   String _aiReplyLanguage = 'follow_app';
-  String _voiceRecognitionLanguage = 'auto';
+  final String _voiceRecognitionLanguage = 'auto';
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +32,7 @@ class _AILanguageSettingsPageState
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.aiLanguageSettings ?? 'AI语言设置',
+          l10n.aiLanguageSettings,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -121,7 +121,7 @@ class _AILanguageSettingsPageState
     );
   }
 
-  Widget _buildAIReplyLanguageSection(AppLocalizations? l10n) {
+  Widget _buildAIReplyLanguageSection(AppLocalizations l10n) {
     final options = [
       {
         'value': 'follow_app',
@@ -155,7 +155,7 @@ class _AILanguageSettingsPageState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.aiReplyLanguage ?? 'AI回复语言',
+            l10n.aiReplyLanguage,
             style: TextStyle(
               fontSize: 13,
               color: AppTheme.textSecondaryColor,
@@ -243,14 +243,14 @@ class _AILanguageSettingsPageState
     );
   }
 
-  Widget _buildVoiceRecognitionSection(AppLocalizations? l10n) {
+  Widget _buildVoiceRecognitionSection(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            l10n?.voiceRecognitionLanguage ?? '语音识别语言',
+            l10n.voiceRecognitionLanguage,
             style: TextStyle(
               fontSize: 13,
               color: AppTheme.textSecondaryColor,
@@ -290,7 +290,7 @@ class _AILanguageSettingsPageState
     );
   }
 
-  Widget _buildExampleSection(AppLocalizations? l10n) {
+  Widget _buildExampleSection(AppLocalizations l10n) {
     final examples = [
       {
         'label': '财务洞察',

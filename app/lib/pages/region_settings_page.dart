@@ -32,7 +32,7 @@ class _RegionSettingsPageState extends ConsumerState<RegionSettingsPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          l10n?.regionSettings ?? '区域设置',
+          l10n.regionSettings,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -44,16 +44,16 @@ class _RegionSettingsPageState extends ConsumerState<RegionSettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionTitle(l10n?.dateFormat ?? '日期格式'),
+            _buildSectionTitle(l10n.dateFormat),
             _buildDateFormatSection(),
             const SizedBox(height: 24),
-            _buildSectionTitle(l10n?.timeFormat ?? '时间格式'),
+            _buildSectionTitle(l10n.timeFormat),
             _buildTimeFormatSection(),
             const SizedBox(height: 24),
-            _buildSectionTitle(l10n?.weekStartDay ?? '每周起始日'),
+            _buildSectionTitle(l10n.weekStartDay),
             _buildWeekStartSection(),
             const SizedBox(height: 24),
-            _buildSectionTitle(l10n?.numberFormat ?? '数字格式'),
+            _buildSectionTitle(l10n.numberFormat),
             _buildNumberFormatSection(),
           ],
         ),

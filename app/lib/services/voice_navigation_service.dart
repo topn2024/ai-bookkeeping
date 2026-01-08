@@ -2,8 +2,30 @@ import 'package:flutter/foundation.dart';
 
 /// 语音页面导航服务
 ///
-/// 支持通过语音指令导航到APP的145个页面
-/// 对应设计文档：第18.0.4节 语音导航页面适配分析
+/// 支持通过语音指令导航到APP的237个页面
+/// 对应设计文档：第18.4节 智能语音导航模块
+///
+/// 页面统计（20个模块，237页）：
+/// - 首页与快速记账: 6页
+/// - 钱龄分析: 11页
+/// - 零基预算: 12页
+/// - 账户管理: 9页
+/// - 智能分类: 7页
+/// - 统计报表: 12页
+/// - 设置中心: 33页
+/// - 语音交互: 21页
+/// - AI智能中心: 10页
+/// - 导入导出: 18页
+/// - 帮助与反馈: 8页
+/// - 安全与隐私: 7页
+/// - 习惯培养: 20页
+/// - 冲动防护: 6页
+/// - 家庭账本: 16页
+/// - 增长与分享: 12页
+/// - 数据联动: 5页
+/// - 异常处理: 10页
+/// - 系统监控: 6页
+/// - 账单提醒: 8页
 ///
 /// 使用示例：
 /// ```dart
@@ -20,7 +42,7 @@ class VoiceNavigationService extends ChangeNotifier {
   /// 最大历史记录数
   static const int maxHistorySize = 20;
 
-  /// 页面路由配置（16个模块，145个页面）
+  /// 页面路由配置（20个模块，237个页面）
   static final Map<String, PageConfig> _pageConfigs = {
     // ═══════════════════════════════════════════════════════════════
     // 模块1：首页与快速记账（6页）
@@ -446,7 +468,7 @@ class VoiceNavigationService extends ChangeNotifier {
     ),
 
     // ═══════════════════════════════════════════════════════════════
-    // 模块7：设置中心（15页）
+    // 模块7：设置中心（33页）
     // ═══════════════════════════════════════════════════════════════
     '/settings': PageConfig(
       route: '/settings',
@@ -553,9 +575,135 @@ class VoiceNavigationService extends ChangeNotifier {
       aliases: ['开发者选项', '开发模式'],
       voiceAdaptation: VoiceAdaptation.low,
     ),
+    '/settings/ai': PageConfig(
+      route: '/settings/ai',
+      name: 'AI设置',
+      module: '设置中心',
+      aliases: ['AI设置', '智能设置', '人工智能设置'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/settings/security': PageConfig(
+      route: '/settings/security',
+      name: '安全设置',
+      module: '设置中心',
+      aliases: ['安全设置', '安全'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/settings/storage': PageConfig(
+      route: '/settings/storage',
+      name: '存储管理',
+      module: '设置中心',
+      aliases: ['存储管理', '存储', '空间管理'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/settings/cache': PageConfig(
+      route: '/settings/cache',
+      name: '缓存清理',
+      module: '设置中心',
+      aliases: ['缓存清理', '清理缓存', '清除缓存'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/settings/export': PageConfig(
+      route: '/settings/export',
+      name: '导出设置',
+      module: '设置中心',
+      aliases: ['导出设置', '数据导出设置'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/settings/import': PageConfig(
+      route: '/settings/import',
+      name: '导入设置',
+      module: '设置中心',
+      aliases: ['导入设置', '数据导入设置'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/settings/family': PageConfig(
+      route: '/settings/family',
+      name: '家庭设置',
+      module: '设置中心',
+      aliases: ['家庭设置', '家庭账本设置'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/settings/budget': PageConfig(
+      route: '/settings/budget',
+      name: '预算设置',
+      module: '设置中心',
+      aliases: ['预算设置', '默认预算'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/settings/category': PageConfig(
+      route: '/settings/category',
+      name: '分类设置',
+      module: '设置中心',
+      aliases: ['分类设置', '类别设置'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/settings/account': PageConfig(
+      route: '/settings/account',
+      name: '账户设置',
+      module: '设置中心',
+      aliases: ['账户设置', '默认账户'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/settings/template': PageConfig(
+      route: '/settings/template',
+      name: '模板设置',
+      module: '设置中心',
+      aliases: ['模板设置', '记账模板'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/settings/shortcut': PageConfig(
+      route: '/settings/shortcut',
+      name: '快捷方式',
+      module: '设置中心',
+      aliases: ['快捷方式', '快捷设置'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/settings/widget': PageConfig(
+      route: '/settings/widget',
+      name: '桌面小组件',
+      module: '设置中心',
+      aliases: ['桌面小组件', '小组件', 'Widget'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/settings/gesture': PageConfig(
+      route: '/settings/gesture',
+      name: '手势设置',
+      module: '设置中心',
+      aliases: ['手势设置', '手势操作'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/settings/display': PageConfig(
+      route: '/settings/display',
+      name: '显示设置',
+      module: '设置中心',
+      aliases: ['显示设置', '屏幕显示'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/settings/font': PageConfig(
+      route: '/settings/font',
+      name: '字体设置',
+      module: '设置中心',
+      aliases: ['字体设置', '字体大小'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/settings/reset': PageConfig(
+      route: '/settings/reset',
+      name: '重置设置',
+      module: '设置中心',
+      aliases: ['重置设置', '恢复默认'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/settings/feedback': PageConfig(
+      route: '/settings/feedback',
+      name: '反馈设置',
+      module: '设置中心',
+      aliases: ['反馈设置', '触觉反馈'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
 
     // ═══════════════════════════════════════════════════════════════
-    // 模块8：语音交互（8页）
+    // 模块8：语音交互（21页）
     // ═══════════════════════════════════════════════════════════════
     '/voice': PageConfig(
       route: '/voice',
@@ -612,6 +760,97 @@ class VoiceNavigationService extends ChangeNotifier {
       module: '语音交互',
       aliases: ['语音播报', '播报设置'],
       voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/voice/continuous': PageConfig(
+      route: '/voice/continuous',
+      name: '连续对话',
+      module: '语音交互',
+      aliases: ['连续对话', '多轮对话'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/voice/ocr-result': PageConfig(
+      route: '/voice/ocr-result',
+      name: 'OCR结果',
+      module: '语音交互',
+      aliases: ['OCR结果', '识别结果'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/voice/split': PageConfig(
+      route: '/voice/split',
+      name: 'AA分摊处理',
+      module: '语音交互',
+      aliases: ['AA分摊', '分摊处理'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/voice/timing': PageConfig(
+      route: '/voice/timing',
+      name: '流程时间',
+      module: '语音交互',
+      aliases: ['流程时间', '识别耗时'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/voice/accuracy': PageConfig(
+      route: '/voice/accuracy',
+      name: '准确率统计',
+      module: '语音交互',
+      aliases: ['准确率', '识别准确率'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/voice/customer-service': PageConfig(
+      route: '/voice/customer-service',
+      name: '语音客服',
+      module: '语音交互',
+      aliases: ['语音客服', '客服'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/voice/batch': PageConfig(
+      route: '/voice/batch',
+      name: '批量确认',
+      module: '语音交互',
+      aliases: ['批量确认', '批量记账'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/voice/context': PageConfig(
+      route: '/voice/context',
+      name: '上下文管理',
+      module: '语音交互',
+      aliases: ['上下文', '对话上下文'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/voice/dialect': PageConfig(
+      route: '/voice/dialect',
+      name: '方言设置',
+      module: '语音交互',
+      aliases: ['方言设置', '方言识别'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/voice/noise': PageConfig(
+      route: '/voice/noise',
+      name: '降噪设置',
+      module: '语音交互',
+      aliases: ['降噪设置', '噪音过滤'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/voice/offline': PageConfig(
+      route: '/voice/offline',
+      name: '离线识别',
+      module: '语音交互',
+      aliases: ['离线识别', '离线语音'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/voice/model': PageConfig(
+      route: '/voice/model',
+      name: '模型管理',
+      module: '语音交互',
+      aliases: ['模型管理', '语音模型'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/voice/permission': PageConfig(
+      route: '/voice/permission',
+      name: '麦克风权限',
+      module: '语音交互',
+      aliases: ['麦克风权限', '录音权限'],
+      voiceAdaptation: VoiceAdaptation.low,
     ),
 
     // ═══════════════════════════════════════════════════════════════
@@ -689,7 +928,7 @@ class VoiceNavigationService extends ChangeNotifier {
     ),
 
     // ═══════════════════════════════════════════════════════════════
-    // 模块10：导入导出（8页）
+    // 模块10：导入导出（18页）
     // ═══════════════════════════════════════════════════════════════
     '/import': PageConfig(
       route: '/import',
@@ -745,6 +984,76 @@ class VoiceNavigationService extends ChangeNotifier {
       name: '导入历史',
       module: '导入导出',
       aliases: ['导入历史', '导入记录'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/import/creditcard': PageConfig(
+      route: '/import/creditcard',
+      name: '信用卡账单',
+      module: '导入导出',
+      aliases: ['信用卡账单', '导入信用卡'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/import/csv': PageConfig(
+      route: '/import/csv',
+      name: 'CSV导入',
+      module: '导入导出',
+      aliases: ['CSV导入', '表格导入'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/import/app': PageConfig(
+      route: '/import/app',
+      name: '其他APP',
+      module: '导入导出',
+      aliases: ['其他APP', '随手记导入', '记账APP导入'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/import/mapping': PageConfig(
+      route: '/import/mapping',
+      name: '字段映射',
+      module: '导入导出',
+      aliases: ['字段映射', '映射设置'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/import/conflict': PageConfig(
+      route: '/import/conflict',
+      name: '冲突处理',
+      module: '导入导出',
+      aliases: ['冲突处理', '导入冲突'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/export/excel': PageConfig(
+      route: '/export/excel',
+      name: 'Excel导出',
+      module: '导入导出',
+      aliases: ['Excel导出', '表格导出'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/export/pdf': PageConfig(
+      route: '/export/pdf',
+      name: 'PDF导出',
+      module: '导入导出',
+      aliases: ['PDF导出', '报告导出'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/export/template': PageConfig(
+      route: '/export/template',
+      name: '导出模板',
+      module: '导入导出',
+      aliases: ['导出模板', '模板选择'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/export/schedule': PageConfig(
+      route: '/export/schedule',
+      name: '定时导出',
+      module: '导入导出',
+      aliases: ['定时导出', '自动导出'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/export/share': PageConfig(
+      route: '/export/share',
+      name: '导出分享',
+      module: '导入导出',
+      aliases: ['导出分享', '分享导出'],
       voiceAdaptation: VoiceAdaptation.medium,
     ),
 
@@ -862,7 +1171,7 @@ class VoiceNavigationService extends ChangeNotifier {
     ),
 
     // ═══════════════════════════════════════════════════════════════
-    // 模块13：习惯培养（10页）
+    // 模块13：习惯培养（20页）
     // ═══════════════════════════════════════════════════════════════
     '/habits': PageConfig(
       route: '/habits',
@@ -933,6 +1242,76 @@ class VoiceNavigationService extends ChangeNotifier {
       module: '习惯培养',
       aliases: ['激励', '奖励', '成就'],
       voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/habits/goals': PageConfig(
+      route: '/habits/goals',
+      name: '财务目标',
+      module: '习惯培养',
+      aliases: ['财务目标', '理财目标', '目标设定'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/habits/savings': PageConfig(
+      route: '/habits/savings',
+      name: '储蓄追踪',
+      module: '习惯培养',
+      aliases: ['储蓄追踪', '存钱进度', '攒钱'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/habits/challenge': PageConfig(
+      route: '/habits/challenge',
+      name: '省钱挑战',
+      module: '习惯培养',
+      aliases: ['省钱挑战', '挑战', '节约挑战'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/habits/reward': PageConfig(
+      route: '/habits/reward',
+      name: '奖励兑换',
+      module: '习惯培养',
+      aliases: ['奖励兑换', '兑换奖励', '积分兑换'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/habits/calendar': PageConfig(
+      route: '/habits/calendar',
+      name: '习惯日历',
+      module: '习惯培养',
+      aliases: ['习惯日历', '打卡日历', '记账日历'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/habits/analysis': PageConfig(
+      route: '/habits/analysis',
+      name: '习惯分析',
+      module: '习惯培养',
+      aliases: ['习惯分析', '行为分析'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/habits/reminder': PageConfig(
+      route: '/habits/reminder',
+      name: '习惯提醒',
+      module: '习惯培养',
+      aliases: ['习惯提醒', '打卡提醒'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/habits/badge': PageConfig(
+      route: '/habits/badge',
+      name: '徽章墙',
+      module: '习惯培养',
+      aliases: ['徽章墙', '我的徽章', '成就墙'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/habits/freedom': PageConfig(
+      route: '/habits/freedom',
+      name: '财务自由',
+      module: '习惯培养',
+      aliases: ['财务自由', '自由进度', '自由计算器'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/habits/settings': PageConfig(
+      route: '/habits/settings',
+      name: '习惯设置',
+      module: '习惯培养',
+      aliases: ['习惯设置'],
+      voiceAdaptation: VoiceAdaptation.low,
     ),
 
     // ═══════════════════════════════════════════════════════════════
@@ -1182,6 +1561,225 @@ class VoiceNavigationService extends ChangeNotifier {
       name: '应用评价',
       module: '增长与分享',
       aliases: ['应用评价', '去评价', '给好评'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // 模块17：数据联动（5页）
+    // ═══════════════════════════════════════════════════════════════
+    '/drill-down': PageConfig(
+      route: '/drill-down',
+      name: '数据下钻',
+      module: '数据联动',
+      aliases: ['数据下钻', '下钻分析', '详细分析'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/drill-down/category': PageConfig(
+      route: '/drill-down/category',
+      name: '分类详情',
+      module: '数据联动',
+      aliases: ['分类详情', '分类明细'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/drill-down/merchant': PageConfig(
+      route: '/drill-down/merchant',
+      name: '商家详情',
+      module: '数据联动',
+      aliases: ['商家详情', '商家明细'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/advanced-search': PageConfig(
+      route: '/advanced-search',
+      name: '高级搜索',
+      module: '数据联动',
+      aliases: ['高级搜索', '筛选', '高级筛选'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/filter': PageConfig(
+      route: '/filter',
+      name: '筛选条件',
+      module: '数据联动',
+      aliases: ['筛选条件', '过滤', '条件筛选'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // 模块18：异常处理（10页）
+    // ═══════════════════════════════════════════════════════════════
+    '/error': PageConfig(
+      route: '/error',
+      name: '错误页面',
+      module: '异常处理',
+      aliases: ['错误', '出错了'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/error/network': PageConfig(
+      route: '/error/network',
+      name: '网络错误',
+      module: '异常处理',
+      aliases: ['网络错误', '没网了', '断网'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/error/sync': PageConfig(
+      route: '/error/sync',
+      name: '同步失败',
+      module: '异常处理',
+      aliases: ['同步失败', '同步出错'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/error/recognition': PageConfig(
+      route: '/error/recognition',
+      name: '识别失败',
+      module: '异常处理',
+      aliases: ['识别失败', '识别出错'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/conflict': PageConfig(
+      route: '/conflict',
+      name: '冲突处理',
+      module: '异常处理',
+      aliases: ['冲突处理', '数据冲突', '解决冲突'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/conflict/list': PageConfig(
+      route: '/conflict/list',
+      name: '冲突列表',
+      module: '异常处理',
+      aliases: ['冲突列表', '所有冲突'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/confirm/delete': PageConfig(
+      route: '/confirm/delete',
+      name: '删除确认',
+      module: '异常处理',
+      aliases: ['删除确认', '确认删除'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/confirm/overwrite': PageConfig(
+      route: '/confirm/overwrite',
+      name: '覆盖确认',
+      module: '异常处理',
+      aliases: ['覆盖确认', '确认覆盖'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/retry': PageConfig(
+      route: '/retry',
+      name: '重试操作',
+      module: '异常处理',
+      aliases: ['重试', '再试一次'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/fallback': PageConfig(
+      route: '/fallback',
+      name: '降级模式',
+      module: '异常处理',
+      aliases: ['降级模式', '离线模式'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // 模块19：系统监控（6页）
+    // ═══════════════════════════════════════════════════════════════
+    '/monitor': PageConfig(
+      route: '/monitor',
+      name: '系统监控',
+      module: '系统监控',
+      aliases: ['系统监控', '监控', '系统状态'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/monitor/health': PageConfig(
+      route: '/monitor/health',
+      name: '健康检查',
+      module: '系统监控',
+      aliases: ['健康检查', '应用健康'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/monitor/performance': PageConfig(
+      route: '/monitor/performance',
+      name: '性能监控',
+      module: '系统监控',
+      aliases: ['性能监控', '性能'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+    '/monitor/storage': PageConfig(
+      route: '/monitor/storage',
+      name: '存储状态',
+      module: '系统监控',
+      aliases: ['存储状态', '存储空间', '缓存'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/monitor/network': PageConfig(
+      route: '/monitor/network',
+      name: '网络状态',
+      module: '系统监控',
+      aliases: ['网络状态', '网络监控'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/monitor/report': PageConfig(
+      route: '/monitor/report',
+      name: '诊断报告',
+      module: '系统监控',
+      aliases: ['诊断报告', '系统诊断'],
+      voiceAdaptation: VoiceAdaptation.low,
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // 模块20：账单提醒（8页）
+    // ═══════════════════════════════════════════════════════════════
+    '/bills': PageConfig(
+      route: '/bills',
+      name: '账单中心',
+      module: '账单提醒',
+      aliases: ['账单', '账单中心', '待付账单'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/bills/upcoming': PageConfig(
+      route: '/bills/upcoming',
+      name: '即将到期',
+      module: '账单提醒',
+      aliases: ['即将到期', '快到期的'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/bills/overdue': PageConfig(
+      route: '/bills/overdue',
+      name: '已逾期',
+      module: '账单提醒',
+      aliases: ['已逾期', '逾期账单', '过期了'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/bills/credit-card': PageConfig(
+      route: '/bills/credit-card',
+      name: '信用卡还款',
+      module: '账单提醒',
+      aliases: ['信用卡还款', '还信用卡', '信用卡账单'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/bills/subscription': PageConfig(
+      route: '/bills/subscription',
+      name: '订阅续费',
+      module: '账单提醒',
+      aliases: ['订阅续费', '订阅提醒'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/bills/calendar': PageConfig(
+      route: '/bills/calendar',
+      name: '账单日历',
+      module: '账单提醒',
+      aliases: ['账单日历', '日历视图'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/bills/create': PageConfig(
+      route: '/bills/create',
+      name: '添加账单',
+      module: '账单提醒',
+      aliases: ['添加账单', '新建账单', '记账单'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/bills/settings': PageConfig(
+      route: '/bills/settings',
+      name: '提醒设置',
+      module: '账单提醒',
+      aliases: ['提醒设置', '账单提醒设置'],
       voiceAdaptation: VoiceAdaptation.medium,
     ),
   };

@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
-import 'package:collection/collection.dart';
+import 'package:collection/collection.dart'; // ignore: depend_on_referenced_packages
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 // ==================== 异常学习数据模型 ====================
@@ -242,6 +244,7 @@ class AnomalyLearningService {
   // 配置
   static const int _minSamplesForLearning = 20;
   static const double _zScoreThreshold = 2.5;
+  // ignore: unused_field
   static const double _confidenceThreshold = 0.7;
 
   String get moduleId => 'anomaly_learning';
@@ -695,4 +698,890 @@ class InMemoryAnomalyDataStore implements AnomalyDataStore {
   }
 
   void clear() => _data.clear();
+}
+
+// ==================== 脱敏数据模型（协同学习） ====================
+
+/// 脱敏后的异常模式
+class SanitizedAnomalyPattern {
+  /// 异常类型
+  final AnomalyType anomalyType;
+
+  /// 金额区间
+  final String amountRange;
+
+  /// 分类（脱敏后）
+  final String categoryGroup;
+
+  /// 时段
+  final int? hour;
+
+  /// 星期几
+  final int? dayOfWeek;
+
+  /// 用户反馈
+  final AnomalyFeedback? feedback;
+
+  /// 异常分数区间
+  final String anomalyScoreRange;
+
+  /// 用户哈希
+  final String userHash;
+
+  /// 时间戳
+  final DateTime timestamp;
+
+  const SanitizedAnomalyPattern({
+    required this.anomalyType,
+    required this.amountRange,
+    required this.categoryGroup,
+    this.hour,
+    this.dayOfWeek,
+    this.feedback,
+    required this.anomalyScoreRange,
+    required this.userHash,
+    required this.timestamp,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'anomaly_type': anomalyType.name,
+        'amount_range': amountRange,
+        'category_group': categoryGroup,
+        'hour': hour,
+        'day_of_week': dayOfWeek,
+        'feedback': feedback?.name,
+        'anomaly_score_range': anomalyScoreRange,
+        'user_hash': userHash,
+        'timestamp': timestamp.toIso8601String(),
+      };
+
+  factory SanitizedAnomalyPattern.fromJson(Map<String, dynamic> json) {
+    return SanitizedAnomalyPattern(
+      anomalyType: AnomalyType.values.firstWhere(
+        (t) => t.name == json['anomaly_type'],
+        orElse: () => AnomalyType.unusualAmount,
+      ),
+      amountRange: json['amount_range'] as String,
+      categoryGroup: json['category_group'] as String,
+      hour: json['hour'] as int?,
+      dayOfWeek: json['day_of_week'] as int?,
+      feedback: json['feedback'] != null
+          ? AnomalyFeedback.values.firstWhere(
+              (f) => f.name == json['feedback'],
+              orElse: () => AnomalyFeedback.dismissed,
+            )
+          : null,
+      anomalyScoreRange: json['anomaly_score_range'] as String,
+      userHash: json['user_hash'] as String,
+      timestamp: DateTime.parse(json['timestamp'] as String),
+    );
+  }
+}
+
+// ==================== 全局异常洞察 ====================
+
+/// 全局异常洞察
+class GlobalAnomalyInsights {
+  /// 各异常类型分布
+  final Map<AnomalyType, double> typeDistribution;
+
+  /// 各金额区间的异常率
+  final Map<String, double> amountRangeAnomalyRate;
+
+  /// 各时段的异常率
+  final Map<int, double> hourlyAnomalyRate;
+
+  /// 各分类组的异常阈值参考
+  final Map<String, CategoryAnomalyThreshold> categoryThresholds;
+
+  /// 全局误报率
+  final double globalFalsePositiveRate;
+
+  /// 热门异常模式
+  final List<PopularAnomalyPattern> popularPatterns;
+
+  /// 新型异常警告
+  final List<EmergingAnomalyAlert> emergingAlerts;
+
+  /// 生成时间
+  final DateTime generatedAt;
+
+  const GlobalAnomalyInsights({
+    required this.typeDistribution,
+    required this.amountRangeAnomalyRate,
+    required this.hourlyAnomalyRate,
+    required this.categoryThresholds,
+    required this.globalFalsePositiveRate,
+    required this.popularPatterns,
+    required this.emergingAlerts,
+    required this.generatedAt,
+  });
+}
+
+/// 分类异常阈值
+class CategoryAnomalyThreshold {
+  final String categoryGroup;
+  final double avgThreshold;
+  final double p90Threshold;
+  final double p99Threshold;
+  final int sampleCount;
+
+  const CategoryAnomalyThreshold({
+    required this.categoryGroup,
+    required this.avgThreshold,
+    required this.p90Threshold,
+    required this.p99Threshold,
+    required this.sampleCount,
+  });
+}
+
+/// 热门异常模式
+class PopularAnomalyPattern {
+  final AnomalyType type;
+  final String description;
+  final double frequency;
+  final double confirmRate;
+
+  const PopularAnomalyPattern({
+    required this.type,
+    required this.description,
+    required this.frequency,
+    required this.confirmRate,
+  });
+}
+
+/// 新型异常警告
+class EmergingAnomalyAlert {
+  final String alertId;
+  final String title;
+  final String description;
+  final AnomalyType relatedType;
+  final double riskLevel;
+  final DateTime detectedAt;
+
+  const EmergingAnomalyAlert({
+    required this.alertId,
+    required this.title,
+    required this.description,
+    required this.relatedType,
+    required this.riskLevel,
+    required this.detectedAt,
+  });
+}
+
+// ==================== 异常协同学习服务 ====================
+
+/// 异常协同学习服务
+class AnomalyCollaborativeLearningService {
+  final GlobalAnomalyInsightsAggregator _aggregator;
+  final AnomalyPatternReporter _reporter;
+  final String _currentUserId;
+
+  // 本地缓存
+  GlobalAnomalyInsights? _insightsCache;
+  DateTime? _lastInsightsUpdate;
+
+  // 配置
+  static const Duration _cacheExpiry = Duration(hours: 12);
+  // ignore: unused_field
+  static const double _privacyEpsilon = 0.1;
+
+  AnomalyCollaborativeLearningService({
+    GlobalAnomalyInsightsAggregator? aggregator,
+    AnomalyPatternReporter? reporter,
+    String? currentUserId,
+  })  : _aggregator = aggregator ?? GlobalAnomalyInsightsAggregator(),
+        _reporter = reporter ?? InMemoryAnomalyPatternReporter(),
+        _currentUserId = currentUserId ?? 'anonymous';
+
+  /// 上报异常模式（隐私保护）
+  Future<void> reportAnomalyPattern(AnomalyLearningData data) async {
+    final pattern = SanitizedAnomalyPattern(
+      anomalyType: data.anomalyType,
+      amountRange: _getAmountRange(data.amount),
+      categoryGroup: _getCategoryGroup(data.category),
+      hour: data.date.hour,
+      dayOfWeek: data.date.weekday,
+      feedback: data.feedback,
+      anomalyScoreRange: _getAnomalyScoreRange(data.amount),
+      userHash: _hashValue(_currentUserId),
+      timestamp: DateTime.now(),
+    );
+
+    await _reporter.report(pattern);
+    debugPrint('Reported anomaly pattern: ${pattern.anomalyType.name}');
+  }
+
+  /// 金额区间化（保护隐私）
+  String _getAmountRange(double amount) {
+    if (amount < 50) return '0-50';
+    if (amount < 100) return '50-100';
+    if (amount < 200) return '100-200';
+    if (amount < 500) return '200-500';
+    if (amount < 1000) return '500-1000';
+    if (amount < 2000) return '1000-2000';
+    if (amount < 5000) return '2000-5000';
+    return '5000+';
+  }
+
+  /// 分类组化（保护隐私）
+  String _getCategoryGroup(String category) {
+    // 将具体分类映射到大类
+    final categoryMapping = {
+      '餐饮': 'daily_expense',
+      '交通': 'daily_expense',
+      '购物': 'shopping',
+      '娱乐': 'entertainment',
+      '医疗': 'healthcare',
+      '教育': 'education',
+      '转账': 'transfer',
+      '理财': 'investment',
+    };
+    return categoryMapping[category] ?? 'other';
+  }
+
+  /// 异常分数区间化
+  String _getAnomalyScoreRange(double amount) {
+    // 简化实现：基于金额估算异常分数区间
+    if (amount < 100) return 'low';
+    if (amount < 500) return 'medium';
+    if (amount < 2000) return 'high';
+    return 'very_high';
+  }
+
+  String _hashValue(String value) {
+    final bytes = utf8.encode(value);
+    final digest = sha256.convert(bytes);
+    return digest.toString().substring(0, 16);
+  }
+
+  /// 获取全局异常洞察
+  Future<GlobalAnomalyInsights> getGlobalInsights({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _insightsCache != null &&
+        _lastInsightsUpdate != null &&
+        DateTime.now().difference(_lastInsightsUpdate!) < _cacheExpiry) {
+      return _insightsCache!;
+    }
+
+    _insightsCache = await _aggregator.aggregate();
+    _lastInsightsUpdate = DateTime.now();
+    return _insightsCache!;
+  }
+
+  /// 获取分类的全局异常阈值
+  Future<CategoryAnomalyThreshold?> getCategoryThreshold(String category) async {
+    final insights = await getGlobalInsights();
+    final categoryGroup = _getCategoryGroup(category);
+    return insights.categoryThresholds[categoryGroup];
+  }
+
+  /// 检查是否为新型异常模式
+  Future<EmergingAnomalyAlert?> checkEmergingAnomaly(AnomalyLearningData data) async {
+    final insights = await getGlobalInsights();
+
+    // 检查是否匹配任何新型异常警告
+    for (final alert in insights.emergingAlerts) {
+      if (alert.relatedType == data.anomalyType && alert.riskLevel > 0.7) {
+        return alert;
+      }
+    }
+
+    return null;
+  }
+
+  /// 获取同类用户的异常率对比
+  Future<AnomalyComparison> compareToPopulation(
+    String categoryGroup,
+    double userAnomalyRate,
+  ) async {
+    final insights = await getGlobalInsights();
+
+    // 计算该分类组的全局平均异常率
+    double globalRate = 0.1; // 默认值
+    final threshold = insights.categoryThresholds[categoryGroup];
+    if (threshold != null) {
+      globalRate = threshold.avgThreshold > 0 ? 0.1 : 0.05;
+    }
+
+    // 计算百分位
+    int percentile;
+    String recommendation;
+
+    if (userAnomalyRate < globalRate * 0.5) {
+      percentile = 90;
+      recommendation = '您的异常率低于90%的用户，消费非常规律';
+    } else if (userAnomalyRate < globalRate) {
+      percentile = 70;
+      recommendation = '您的异常率处于正常水平';
+    } else if (userAnomalyRate < globalRate * 1.5) {
+      percentile = 40;
+      recommendation = '您的异常率略高于平均，建议关注消费规律';
+    } else {
+      percentile = 20;
+      recommendation = '您的异常率较高，建议仔细审查近期消费';
+    }
+
+    return AnomalyComparison(
+      categoryGroup: categoryGroup,
+      userAnomalyRate: userAnomalyRate,
+      globalAnomalyRate: globalRate,
+      percentile: percentile,
+      recommendation: recommendation,
+    );
+  }
+
+  /// 批量上报
+  Future<void> reportBatch(List<AnomalyLearningData> dataList) async {
+    for (final data in dataList) {
+      await reportAnomalyPattern(data);
+    }
+  }
+
+  /// 获取热门异常模式
+  Future<List<PopularAnomalyPattern>> getPopularPatterns() async {
+    final insights = await getGlobalInsights();
+    return insights.popularPatterns;
+  }
+
+  /// 获取新型异常警告
+  Future<List<EmergingAnomalyAlert>> getEmergingAlerts() async {
+    final insights = await getGlobalInsights();
+    return insights.emergingAlerts;
+  }
+}
+
+/// 异常对比结果
+class AnomalyComparison {
+  final String categoryGroup;
+  final double userAnomalyRate;
+  final double globalAnomalyRate;
+  final int percentile;
+  final String recommendation;
+
+  const AnomalyComparison({
+    required this.categoryGroup,
+    required this.userAnomalyRate,
+    required this.globalAnomalyRate,
+    required this.percentile,
+    required this.recommendation,
+  });
+}
+
+// ==================== 模式上报器 ====================
+
+/// 异常模式上报器接口
+abstract class AnomalyPatternReporter {
+  Future<void> report(SanitizedAnomalyPattern pattern);
+  Future<List<SanitizedAnomalyPattern>> getAllPatterns();
+}
+
+/// 内存异常模式上报器
+class InMemoryAnomalyPatternReporter implements AnomalyPatternReporter {
+  final List<SanitizedAnomalyPattern> _patterns = [];
+
+  @override
+  Future<void> report(SanitizedAnomalyPattern pattern) async {
+    _patterns.add(pattern);
+  }
+
+  @override
+  Future<List<SanitizedAnomalyPattern>> getAllPatterns() async {
+    return List.unmodifiable(_patterns);
+  }
+
+  void clear() => _patterns.clear();
+}
+
+// ==================== 全局异常洞察聚合 ====================
+
+/// 全局异常洞察聚合器
+class GlobalAnomalyInsightsAggregator {
+  final AnomalyPatternReporter _db;
+
+  GlobalAnomalyInsightsAggregator({AnomalyPatternReporter? db})
+      : _db = db ?? InMemoryAnomalyPatternReporter();
+
+  Future<GlobalAnomalyInsights> aggregate() async {
+    final patterns = await _db.getAllPatterns();
+
+    return GlobalAnomalyInsights(
+      typeDistribution: _aggregateTypeDistribution(patterns),
+      amountRangeAnomalyRate: _aggregateAmountRangeAnomalyRate(patterns),
+      hourlyAnomalyRate: _aggregateHourlyAnomalyRate(patterns),
+      categoryThresholds: _aggregateCategoryThresholds(patterns),
+      globalFalsePositiveRate: _calculateGlobalFalsePositiveRate(patterns),
+      popularPatterns: _aggregatePopularPatterns(patterns),
+      emergingAlerts: _detectEmergingAlerts(patterns),
+      generatedAt: DateTime.now(),
+    );
+  }
+
+  Map<AnomalyType, double> _aggregateTypeDistribution(
+    List<SanitizedAnomalyPattern> patterns,
+  ) {
+    if (patterns.isEmpty) return _getDefaultTypeDistribution();
+
+    final counts = <AnomalyType, int>{};
+    for (final p in patterns) {
+      counts[p.anomalyType] = (counts[p.anomalyType] ?? 0) + 1;
+    }
+
+    final total = patterns.length;
+    return counts.map((k, v) => MapEntry(k, v / total));
+  }
+
+  Map<AnomalyType, double> _getDefaultTypeDistribution() {
+    return {
+      AnomalyType.unusualAmount: 0.45,
+      AnomalyType.unusualTime: 0.20,
+      AnomalyType.unusualFrequency: 0.15,
+      AnomalyType.unusualCategory: 0.10,
+      AnomalyType.potentialDuplicate: 0.08,
+      AnomalyType.unusualLocation: 0.02,
+    };
+  }
+
+  Map<String, double> _aggregateAmountRangeAnomalyRate(
+    List<SanitizedAnomalyPattern> patterns,
+  ) {
+    if (patterns.isEmpty) {
+      return {
+        '0-50': 0.02,
+        '50-100': 0.03,
+        '100-200': 0.05,
+        '200-500': 0.08,
+        '500-1000': 0.12,
+        '1000-2000': 0.18,
+        '2000-5000': 0.25,
+        '5000+': 0.35,
+      };
+    }
+
+    final rangeCounts = <String, int>{};
+    final rangeConfirmed = <String, int>{};
+
+    for (final p in patterns) {
+      rangeCounts[p.amountRange] = (rangeCounts[p.amountRange] ?? 0) + 1;
+      if (p.feedback == AnomalyFeedback.confirmed) {
+        rangeConfirmed[p.amountRange] = (rangeConfirmed[p.amountRange] ?? 0) + 1;
+      }
+    }
+
+    final result = <String, double>{};
+    for (final entry in rangeCounts.entries) {
+      final confirmed = rangeConfirmed[entry.key] ?? 0;
+      result[entry.key] = confirmed / entry.value;
+    }
+
+    return result;
+  }
+
+  Map<int, double> _aggregateHourlyAnomalyRate(
+    List<SanitizedAnomalyPattern> patterns,
+  ) {
+    if (patterns.isEmpty) {
+      // 默认：深夜和凌晨异常率较高
+      return {
+        0: 0.25, 1: 0.30, 2: 0.35, 3: 0.35, 4: 0.30, 5: 0.20,
+        6: 0.10, 7: 0.05, 8: 0.05, 9: 0.05, 10: 0.05, 11: 0.05,
+        12: 0.08, 13: 0.05, 14: 0.05, 15: 0.05, 16: 0.05, 17: 0.05,
+        18: 0.08, 19: 0.08, 20: 0.10, 21: 0.12, 22: 0.15, 23: 0.20,
+      };
+    }
+
+    final hourCounts = <int, int>{};
+    final hourConfirmed = <int, int>{};
+
+    for (final p in patterns) {
+      if (p.hour != null) {
+        hourCounts[p.hour!] = (hourCounts[p.hour!] ?? 0) + 1;
+        if (p.feedback == AnomalyFeedback.confirmed) {
+          hourConfirmed[p.hour!] = (hourConfirmed[p.hour!] ?? 0) + 1;
+        }
+      }
+    }
+
+    final result = <int, double>{};
+    for (int h = 0; h < 24; h++) {
+      final total = hourCounts[h] ?? 1;
+      final confirmed = hourConfirmed[h] ?? 0;
+      result[h] = confirmed / total;
+    }
+
+    return result;
+  }
+
+  Map<String, CategoryAnomalyThreshold> _aggregateCategoryThresholds(
+    List<SanitizedAnomalyPattern> patterns,
+  ) {
+    final thresholds = <String, CategoryAnomalyThreshold>{};
+
+    final byCategory = groupBy(patterns, (p) => p.categoryGroup);
+
+    for (final entry in byCategory.entries) {
+      if (entry.value.length >= 5) {
+        // 根据金额区间估算阈值
+        final amountEstimates = entry.value.map((p) {
+          switch (p.amountRange) {
+            case '0-50': return 25.0;
+            case '50-100': return 75.0;
+            case '100-200': return 150.0;
+            case '200-500': return 350.0;
+            case '500-1000': return 750.0;
+            case '1000-2000': return 1500.0;
+            case '2000-5000': return 3500.0;
+            default: return 7500.0;
+          }
+        }).toList()..sort();
+
+        final avgThreshold = amountEstimates.reduce((a, b) => a + b) / amountEstimates.length;
+        final p90Index = (amountEstimates.length * 0.9).floor();
+        final p99Index = (amountEstimates.length * 0.99).floor();
+
+        thresholds[entry.key] = CategoryAnomalyThreshold(
+          categoryGroup: entry.key,
+          avgThreshold: avgThreshold,
+          p90Threshold: amountEstimates[p90Index.clamp(0, amountEstimates.length - 1)],
+          p99Threshold: amountEstimates[p99Index.clamp(0, amountEstimates.length - 1)],
+          sampleCount: entry.value.length,
+        );
+      }
+    }
+
+    // 添加默认阈值
+    _addDefaultCategoryThresholds(thresholds);
+
+    return thresholds;
+  }
+
+  void _addDefaultCategoryThresholds(Map<String, CategoryAnomalyThreshold> thresholds) {
+    final defaults = {
+      'daily_expense': const CategoryAnomalyThreshold(
+        categoryGroup: 'daily_expense',
+        avgThreshold: 200,
+        p90Threshold: 500,
+        p99Threshold: 1000,
+        sampleCount: 100,
+      ),
+      'shopping': const CategoryAnomalyThreshold(
+        categoryGroup: 'shopping',
+        avgThreshold: 500,
+        p90Threshold: 2000,
+        p99Threshold: 5000,
+        sampleCount: 100,
+      ),
+      'entertainment': const CategoryAnomalyThreshold(
+        categoryGroup: 'entertainment',
+        avgThreshold: 300,
+        p90Threshold: 1000,
+        p99Threshold: 3000,
+        sampleCount: 100,
+      ),
+      'transfer': const CategoryAnomalyThreshold(
+        categoryGroup: 'transfer',
+        avgThreshold: 1000,
+        p90Threshold: 5000,
+        p99Threshold: 20000,
+        sampleCount: 100,
+      ),
+    };
+
+    for (final entry in defaults.entries) {
+      thresholds.putIfAbsent(entry.key, () => entry.value);
+    }
+  }
+
+  double _calculateGlobalFalsePositiveRate(List<SanitizedAnomalyPattern> patterns) {
+    if (patterns.isEmpty) return 0.15;
+
+    final withFeedback = patterns.where((p) => p.feedback != null).toList();
+    if (withFeedback.isEmpty) return 0.15;
+
+    final dismissed = withFeedback.where((p) => p.feedback == AnomalyFeedback.dismissed).length;
+    return dismissed / withFeedback.length;
+  }
+
+  List<PopularAnomalyPattern> _aggregatePopularPatterns(
+    List<SanitizedAnomalyPattern> patterns,
+  ) {
+    if (patterns.isEmpty) {
+      return [
+        const PopularAnomalyPattern(
+          type: AnomalyType.unusualAmount,
+          description: '大额消费异常',
+          frequency: 0.45,
+          confirmRate: 0.70,
+        ),
+        const PopularAnomalyPattern(
+          type: AnomalyType.unusualTime,
+          description: '深夜消费',
+          frequency: 0.20,
+          confirmRate: 0.50,
+        ),
+        const PopularAnomalyPattern(
+          type: AnomalyType.potentialDuplicate,
+          description: '疑似重复交易',
+          frequency: 0.15,
+          confirmRate: 0.85,
+        ),
+      ];
+    }
+
+    final byType = groupBy(patterns, (p) => p.anomalyType);
+    final total = patterns.length;
+
+    final popularPatterns = byType.entries.map((entry) {
+      final confirmedCount = entry.value
+          .where((p) => p.feedback == AnomalyFeedback.confirmed)
+          .length;
+      final withFeedbackCount = entry.value.where((p) => p.feedback != null).length;
+
+      return PopularAnomalyPattern(
+        type: entry.key,
+        description: _getTypeDescription(entry.key),
+        frequency: entry.value.length / total,
+        confirmRate: withFeedbackCount > 0 ? confirmedCount / withFeedbackCount : 0.5,
+      );
+    }).toList();
+
+    popularPatterns.sort((a, b) => b.frequency.compareTo(a.frequency));
+    return popularPatterns.take(5).toList();
+  }
+
+  String _getTypeDescription(AnomalyType type) {
+    switch (type) {
+      case AnomalyType.unusualAmount:
+        return '大额消费异常';
+      case AnomalyType.unusualTime:
+        return '异常时段消费';
+      case AnomalyType.unusualFrequency:
+        return '异常消费频率';
+      case AnomalyType.unusualLocation:
+        return '异常消费地点';
+      case AnomalyType.unusualCategory:
+        return '异常消费分类';
+      case AnomalyType.potentialDuplicate:
+        return '疑似重复交易';
+      case AnomalyType.combined:
+        return '多因素异常';
+    }
+  }
+
+  List<EmergingAnomalyAlert> _detectEmergingAlerts(
+    List<SanitizedAnomalyPattern> patterns,
+  ) {
+    final alerts = <EmergingAnomalyAlert>[];
+
+    if (patterns.isEmpty) return alerts;
+
+    // 检测最近7天的异常模式变化
+    final recentPatterns = patterns
+        .where((p) => p.timestamp.isAfter(DateTime.now().subtract(const Duration(days: 7))))
+        .toList();
+
+    if (recentPatterns.isEmpty) return alerts;
+
+    // 检测异常激增
+    final recentByType = groupBy(recentPatterns, (p) => p.anomalyType);
+    final olderPatterns = patterns
+        .where((p) => p.timestamp.isBefore(DateTime.now().subtract(const Duration(days: 7))))
+        .toList();
+    final olderByType = groupBy(olderPatterns, (p) => p.anomalyType);
+
+    for (final entry in recentByType.entries) {
+      final recentRate = entry.value.length / math.max(1, recentPatterns.length);
+      final olderCount = olderByType[entry.key]?.length ?? 0;
+      final olderRate = olderCount / math.max(1, olderPatterns.length);
+
+      // 如果某类型异常率增加了50%以上
+      if (olderRate > 0 && recentRate > olderRate * 1.5) {
+        alerts.add(EmergingAnomalyAlert(
+          alertId: 'emerging_${entry.key.name}_${DateTime.now().millisecondsSinceEpoch}',
+          title: '${_getTypeDescription(entry.key)}激增',
+          description: '近7天该类型异常增加${((recentRate / olderRate - 1) * 100).toStringAsFixed(0)}%',
+          relatedType: entry.key,
+          riskLevel: math.min(1.0, (recentRate / olderRate - 1)),
+          detectedAt: DateTime.now(),
+        ));
+      }
+    }
+
+    return alerts;
+  }
+}
+
+// ==================== 异常学习整合服务 ====================
+
+/// 异常学习整合服务（整合本地学习与协同学习）
+class AnomalyLearningIntegrationService {
+  final AnomalyLearningService _localService;
+  final AnomalyCollaborativeLearningService _collaborativeService;
+
+  AnomalyLearningIntegrationService({
+    AnomalyLearningService? localService,
+    AnomalyCollaborativeLearningService? collaborativeService,
+  })  : _localService = localService ?? AnomalyLearningService(),
+        _collaborativeService =
+            collaborativeService ?? AnomalyCollaborativeLearningService();
+
+  /// 检测异常（整合本地与协同学习）
+  Future<EnhancedAnomalyDetectionResult> detectAnomaly({
+    required String transactionId,
+    required double amount,
+    required String category,
+    required DateTime time,
+    String? userId,
+  }) async {
+    // 1. 本地检测
+    final localResult = await _localService.detectAnomaly(
+      transactionId: transactionId,
+      amount: amount,
+      category: category,
+      time: time,
+      userId: userId,
+    );
+
+    // 2. 获取全局阈值参考
+    final globalThreshold = await _collaborativeService.getCategoryThreshold(category);
+
+    // 3. 检查是否为新型异常
+    EmergingAnomalyAlert? emergingAlert;
+    if (localResult.isAnomaly) {
+      emergingAlert = await _collaborativeService.checkEmergingAnomaly(
+        AnomalyLearningData(
+          transactionId: transactionId,
+          amount: amount,
+          category: category,
+          date: time,
+          anomalyType: localResult.anomalyType ?? AnomalyType.unusualAmount,
+        ),
+      );
+    }
+
+    // 4. 调整置信度（结合全局数据）
+    double adjustedConfidence = localResult.confidence;
+    if (globalThreshold != null && amount > globalThreshold.p90Threshold) {
+      adjustedConfidence = math.min(1.0, adjustedConfidence * 1.2);
+    }
+
+    return EnhancedAnomalyDetectionResult(
+      localResult: localResult,
+      globalThreshold: globalThreshold,
+      emergingAlert: emergingAlert,
+      adjustedConfidence: adjustedConfidence,
+      globalContext: await _getGlobalContext(category),
+    );
+  }
+
+  Future<String> _getGlobalContext(String category) async {
+    final insights = await _collaborativeService.getGlobalInsights();
+    final categoryGroup = _getCategoryGroup(category);
+    final threshold = insights.categoryThresholds[categoryGroup];
+
+    if (threshold != null) {
+      return '该分类全局P90阈值: ¥${threshold.p90Threshold.toStringAsFixed(0)}';
+    }
+    return '';
+  }
+
+  String _getCategoryGroup(String category) {
+    final mapping = {
+      '餐饮': 'daily_expense',
+      '交通': 'daily_expense',
+      '购物': 'shopping',
+      '娱乐': 'entertainment',
+      '转账': 'transfer',
+    };
+    return mapping[category] ?? 'other';
+  }
+
+  /// 记录异常数据
+  Future<void> recordAnomaly(AnomalyLearningData data) async {
+    // 本地学习
+    await _localService.learn(data);
+
+    // 上报协同学习
+    await _collaborativeService.reportAnomalyPattern(data);
+  }
+
+  /// 用户反馈
+  Future<void> feedback(AnomalyLearningData data, bool confirmed) async {
+    await _localService.feedback(data, confirmed);
+
+    // 更新后重新上报
+    final updatedData = AnomalyLearningData(
+      transactionId: data.transactionId,
+      amount: data.amount,
+      category: data.category,
+      date: data.date,
+      anomalyType: data.anomalyType,
+      feedback: confirmed ? AnomalyFeedback.confirmed : AnomalyFeedback.dismissed,
+      transactionContext: data.transactionContext,
+    );
+    await _collaborativeService.reportAnomalyPattern(updatedData);
+  }
+
+  /// 获取统计信息
+  Future<AnomalyLearningStats> getStats() async {
+    return _localService.getStats();
+  }
+
+  /// 获取全局洞察
+  Future<GlobalAnomalyInsights> getGlobalInsights() async {
+    return _collaborativeService.getGlobalInsights();
+  }
+
+  /// 获取热门异常模式
+  Future<List<PopularAnomalyPattern>> getPopularPatterns() async {
+    return _collaborativeService.getPopularPatterns();
+  }
+
+  /// 获取新型异常警告
+  Future<List<EmergingAnomalyAlert>> getEmergingAlerts() async {
+    return _collaborativeService.getEmergingAlerts();
+  }
+}
+
+/// 增强的异常检测结果
+class EnhancedAnomalyDetectionResult {
+  final AnomalyDetectionResult localResult;
+  final CategoryAnomalyThreshold? globalThreshold;
+  final EmergingAnomalyAlert? emergingAlert;
+  final double adjustedConfidence;
+  final String globalContext;
+
+  const EnhancedAnomalyDetectionResult({
+    required this.localResult,
+    this.globalThreshold,
+    this.emergingAlert,
+    required this.adjustedConfidence,
+    required this.globalContext,
+  });
+
+  bool get isAnomaly => localResult.isAnomaly;
+  AnomalyType? get anomalyType => localResult.anomalyType;
+  String? get explanation => localResult.explanation;
+
+  /// 是否为新型异常
+  bool get isEmergingAnomaly => emergingAlert != null;
+
+  /// 获取综合说明
+  String getComprehensiveExplanation() {
+    final buffer = StringBuffer();
+
+    if (localResult.explanation != null) {
+      buffer.writeln(localResult.explanation);
+    }
+
+    if (globalContext.isNotEmpty) {
+      buffer.writeln(globalContext);
+    }
+
+    if (emergingAlert != null) {
+      buffer.writeln('⚠️ ${emergingAlert!.title}: ${emergingAlert!.description}');
+    }
+
+    return buffer.toString().trim();
+  }
 }

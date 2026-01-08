@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
 /// 债务健康等级
 enum DebtHealthLevel {
@@ -216,11 +215,11 @@ class DebtHealthCard extends StatelessWidget {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.1),
+          color: theme.colorScheme.outline.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -248,13 +247,13 @@ class DebtHealthCard extends StatelessWidget {
 
           // 债务列表
           if (showDetails && data.debts.isNotEmpty) ...[
-            Divider(height: 1, color: theme.colorScheme.outline.withOpacity(0.1)),
+            Divider(height: 1, color: theme.colorScheme.outline.withValues(alpha: 0.1)),
             _buildDebtList(theme),
           ],
 
           // 底部操作
           if (onViewPlan != null) ...[
-            Divider(height: 1, color: theme.colorScheme.outline.withOpacity(0.1)),
+            Divider(height: 1, color: theme.colorScheme.outline.withValues(alpha: 0.1)),
             _buildFooter(theme),
           ],
         ],
@@ -269,7 +268,7 @@ class DebtHealthCard extends StatelessWidget {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: level.color.withOpacity(0.1),
+            color: level.color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
@@ -335,7 +334,7 @@ class DebtHealthCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: level.color.withOpacity(0.1),
+        color: level.color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -353,9 +352,9 @@ class DebtHealthCard extends StatelessWidget {
                   child: CircularProgressIndicator(
                     value: 1,
                     strokeWidth: 8,
-                    backgroundColor: level.color.withOpacity(0.2),
+                    backgroundColor: level.color.withValues(alpha: 0.2),
                     valueColor:
-                        AlwaysStoppedAnimation(level.color.withOpacity(0.2)),
+                        AlwaysStoppedAnimation(level.color.withValues(alpha: 0.2)),
                   ),
                 ),
                 // 进度环
@@ -436,7 +435,7 @@ class DebtHealthCard extends StatelessWidget {
         Container(
           height: 40,
           width: 1,
-          color: theme.colorScheme.outline.withOpacity(0.1),
+          color: theme.colorScheme.outline.withValues(alpha: 0.1),
         ),
         // 负债收入比
         Expanded(
@@ -451,7 +450,7 @@ class DebtHealthCard extends StatelessWidget {
         Container(
           height: 40,
           width: 1,
-          color: theme.colorScheme.outline.withOpacity(0.1),
+          color: theme.colorScheme.outline.withValues(alpha: 0.1),
         ),
         // 债务笔数
         Expanded(

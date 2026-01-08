@@ -75,7 +75,7 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildMainDataCard(AppLocalizations? l10n) {
+  Widget _buildMainDataCard(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
@@ -108,21 +108,21 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildCoreStats(AppLocalizations? l10n) {
+  Widget _buildCoreStats(AppLocalizations l10n) {
     final stats = [
       {
         'value': reviewData['daysRecording'] ?? 365,
-        'label': l10n?.daysRecording ?? '一起记账天数',
+        'label': l10n.daysRecording,
         'color': AppTheme.primaryColor,
       },
       {
         'value': reviewData['familyDinners'] ?? 156,
-        'label': l10n?.familyDinners ?? '家庭晚餐次数',
+        'label': l10n.familyDinners,
         'color': AppTheme.successColor,
       },
       {
         'value': reviewData['trips'] ?? 23,
-        'label': l10n?.tripsCount ?? '一起出行次数',
+        'label': l10n.tripsCount,
         'color': const Color(0xFFFF9800),
       },
     ];
@@ -154,23 +154,23 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildWarmMoments(AppLocalizations? l10n) {
+  Widget _buildWarmMoments(AppLocalizations l10n) {
     final moments = [
       {
         'emoji': '🏖️',
-        'title': l10n?.warmestMoment ?? '最温馨时刻',
+        'title': l10n.warmestMoment,
         'description': reviewData['warmestMoment'] ?? '暑假全家三亚旅行',
         'color': const Color(0xFFE8F5E9),
       },
       {
         'emoji': '🚗',
-        'title': l10n?.biggestGoal ?? '最大共同目标',
+        'title': l10n.biggestGoal,
         'description': reviewData['biggestGoal'] ?? '一起攒钱买了新车',
         'color': const Color(0xFFFFF3E0),
       },
       {
         'emoji': '🎬',
-        'title': l10n?.sharedTime ?? '共同度过',
+        'title': l10n.sharedTime,
         'description': '${reviewData['movieNights'] ?? 12}个电影之夜',
         'color': const Color(0xFFE3F2FD),
       },
@@ -180,7 +180,7 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          l10n?.yearlyWarmMoments ?? '年度温馨时刻',
+          l10n.yearlyWarmMoments,
           style: TextStyle(
             fontSize: 13,
             color: AppTheme.textSecondaryColor,
@@ -227,7 +227,7 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildMemberContributions(AppLocalizations? l10n) {
+  Widget _buildMemberContributions(AppLocalizations l10n) {
     final members = [
       {
         'emoji': '👨',
@@ -250,7 +250,7 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          l10n?.familyContributions ?? '家庭成员贡献',
+          l10n.familyContributions,
           style: TextStyle(
             fontSize: 13,
             color: AppTheme.textSecondaryColor,
@@ -307,7 +307,7 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildShareButtons(AppLocalizations? l10n) {
+  Widget _buildShareButtons(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -316,7 +316,7 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
             child: OutlinedButton.icon(
               onPressed: () {},
               icon: const Icon(Icons.save_alt, size: 18),
-              label: Text(l10n?.saveImage ?? '保存图片'),
+              label: Text(l10n.saveImage),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(0, 44),
                 shape: RoundedRectangleBorder(
@@ -330,7 +330,7 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
             child: ElevatedButton.icon(
               onPressed: () {},
               icon: const Icon(Icons.share, size: 18),
-              label: Text(l10n?.shareToFamily ?? '分享给家人'),
+              label: Text(l10n.shareToFamily),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
                 foregroundColor: Colors.white,

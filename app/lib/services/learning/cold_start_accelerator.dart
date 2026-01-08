@@ -212,7 +212,7 @@ class ColdStartResult {
       return '已完成初始化，正在学习您的习惯';
     }
 
-    return '已导入$rulesImported条智能规则，预计${warmUpDays}天后达到最佳效果';
+    return '已导入$rulesImported条智能规则，预计$warmUpDays天后达到最佳效果';
   }
 }
 

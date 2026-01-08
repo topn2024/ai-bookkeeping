@@ -427,7 +427,7 @@ class _SubscriptionCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          '${daysAgo}天未使用',
+                          '$daysAgo天未使用',
                           style: const TextStyle(
                             fontSize: 10,
                             color: Color(0xFFEF5350),

@@ -632,7 +632,7 @@ class BudgetSuggestionService {
       }
     }
 
-    return parts.join('，') + '。';
+    return '${parts.join('，')}。';
   }
 
   /// 记录用户对建议的反馈

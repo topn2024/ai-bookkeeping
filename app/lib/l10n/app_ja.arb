@@ -657,5 +657,189 @@
   "disclaimer": "参考情報であり、財務アドバイスではありません",
   "smartRecommendation": "スマート推薦",
   "discoverNewFeature": "新機能を発見",
-  "laterRemind": "後で"
+  "laterRemind": "後で",
+
+  "aaSplit": "割り勘",
+  "aaDetected": "割り勘を検出",
+  "totalAmount": "合計金額",
+  "splitPeople": "人数",
+  "splitMethod": "分割方法",
+  "evenSplit": "均等分割",
+  "proportionalSplit": "比例分割",
+  "customSplit": "カスタム分割",
+  "yourShare": "あなたの負担額",
+  "confirmSplit": "分割を確認",
+
+  "accessibilitySettings": "アクセシビリティ設定",
+  "fontSize": "フォントサイズ",
+  "highContrast": "ハイコントラスト",
+  "boldText": "太字テキスト",
+  "screenReader": "スクリーンリーダー対応",
+  "reduceMotion": "モーションを減らす",
+  "largeTouch": "大きなタッチターゲット",
+
+  "aiLanguageSettings": "AI言語設定",
+  "aiReplyLanguage": "AI応答言語",
+  "aiVoice": "AI音声",
+  "maleVoice": "男性の声",
+  "femaleVoice": "女性の声",
+
+  "familyLeaderboard": "家族ランキング",
+  "weeklyRanking": "週間ランキング",
+  "monthlyRanking": "月間ランキング",
+  "savingsChampion": "貯蓄チャンピオン",
+  "budgetMaster": "予算マスター",
+
+  "familySavingsGoal": "家族貯蓄目標",
+  "contributeNow": "今すぐ貢献",
+  "goalAmount": "目標金額",
+  "currentProgress": "現在の進捗",
+  "daysRemaining": "残り日数",
+
+  "ledgerSettings": "帳簿設定",
+  "defaultLedger": "デフォルト帳簿",
+  "ledgerName": "帳簿名",
+  "ledgerIcon": "帳簿アイコン",
+  "ledgerColor": "帳簿の色",
+  "archiveLedger": "帳簿をアーカイブ",
+
+  "locationServices": "位置情報サービス",
+  "enableLocation": "位置情報を有効にする",
+  "locationAccuracy": "位置精度",
+  "highAccuracy": "高精度",
+  "lowPower": "省電力",
+  "geofenceAlerts": "ジオフェンス通知",
+  "nearbyMerchants": "近くの店舗",
+
+  "duplicateTransaction": "取引を複製",
+  "transactionTime": "取引時間",
+  "transactionNote": "取引メモ",
+  "transactionTags": "取引タグ",
+  "transactionLocation": "取引場所",
+  "transactionAttachments": "取引添付ファイル",
+
+  "budgetWarning": "予算警告",
+
+  "moneyAgeTitle": "マネーエイジ分析",
+  "moneyAgeDescription2": "キャッシュフロー効率を理解する",
+  "averageMoneyAge": "平均マネーエイジ",
+  "moneyAgeHealth": "マネーエイジ健康度",
+  "poor": "不良",
+
+  "habitTracking": "習慣トラッキング",
+  "dailyStreak": "連続記録",
+  "weeklyGoal": "週間目標",
+  "monthlyGoal": "月間目標",
+  "streakDays": "{count}日",
+  "@streakDays": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "achievementUnlocked": "実績解除",
+  "viewAchievements": "実績を見る",
+  "shareAchievement": "実績を共有",
+  "achievementProgress": "実績進捗",
+
+  "listening": "聞いています...",
+  "voiceError": "音声認識に失敗しました",
+  "speakNow": "話してください",
+
+  "scanBill": "請求書をスキャン",
+  "recognizing": "認識中...",
+  "recognitionFailed": "認識に失敗しました",
+
+  "syncing": "同期中...",
+  "syncComplete": "同期完了",
+  "syncFailed": "同期に失敗しました",
+  "lastSynced": "最終同期",
+  "syncNow": "今すぐ同期",
+
+  "offlineMode": "オフラインモード",
+  "offlineData": "オフラインデータ",
+  "pendingSync": "同期待ち",
+  "offlineChanges": "オフライン変更",
+
+  "privacySettings": "プライバシー設定",
+  "dataEncryption": "データ暗号化",
+  "biometricLock": "生体認証ロック",
+  "autoLock": "自動ロック",
+  "lockTimeout": "ロックタイムアウト",
+
+  "budgetAlerts": "予算アラート",
+  "dailyReminder": "毎日のリマインダー",
+
+  "exportFormat": "エクスポート形式",
+  "csvFormat": "CSV形式",
+  "excelFormat": "Excel形式",
+  "jsonFormat": "JSON形式",
+
+  "feedbackSubmitted": "フィードバックを送信しました",
+  "thankYouFeedback": "フィードバックありがとうございます",
+  "rateApp": "アプリを評価",
+  "shareApp": "アプリを共有",
+
+  "upgradeRequired": "アップグレードが必要です",
+  "loginRequired": "ログインが必要です",
+  "loginToUseFeature": "この機能を使用するにはログインしてください",
+  "loginNow": "今すぐログイン",
+  "continueAsGuest": "ゲストとして続ける",
+
+  "connectionFailed": "接続に失敗しました",
+  "checkNetwork": "ネットワーク接続を確認してください",
+
+  "permissionRequired": "権限が必要です",
+  "locationPermission": "位置情報の権限",
+  "storagePermission": "ストレージの権限",
+
+  "deleteWarning": "この操作は取り消せません",
+  "permanentlyDelete": "完全に削除",
+  "moveToTrash": "ゴミ箱に移動",
+
+  "searchPlaceholder": "検索...",
+  "noResults": "結果なし",
+  "searchHistory": "検索履歴",
+  "clearHistory": "履歴をクリア",
+
+  "filterBy": "フィルター",
+  "sortBy": "並べ替え",
+  "dateRange": "日付範囲",
+  "amountRange": "金額範囲",
+  "categoryFilter": "カテゴリフィルター",
+
+  "ascending": "昇順",
+  "descending": "降順",
+  "byDate": "日付順",
+  "byAmount": "金額順",
+  "byCategory": "カテゴリ順",
+
+  "selectAll": "すべて選択",
+  "deselectAll": "選択解除",
+  "selected": "選択済み",
+  "batchDelete": "一括削除",
+  "batchEdit": "一括編集",
+
+  "redo": "やり直し",
+  "actionUndone": "操作を取り消しました",
+  "actionRedone": "操作をやり直しました",
+
+  "loadMore": "もっと読み込む",
+  "refreshing": "更新中...",
+  "pullToRefresh": "引き下げて更新",
+  "releaseToRefresh": "離して更新",
+
+  "emptyState": "データなし",
+  "addFirst": "最初の記録を追加",
+
+  "welcomeBack": "おかえりなさい",
+  "goodMorning": "おはようございます",
+  "goodAfternoon": "こんにちは",
+  "goodEvening": "こんばんは",
+
+  "frequentCategories": "よく使うカテゴリ",
+  "suggestedActions": "おすすめ操作",
+
+  "importData": "データをインポート",
+  "exportData": "データをエクスポート"
 }

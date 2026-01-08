@@ -51643,7 +51643,7 @@ class ReferralRewardService {
     referrerRewards: [
       ReferralReward(
         trigger: 'referee_registered',
-        reward: '7天高级会员体验',
+        reward: '额外50次AI调用额度',
         description: '好友注册成功',
       ),
       ReferralReward(
@@ -51652,9 +51652,9 @@ class ReferralRewardService {
         description: '好友活跃使用7天',
       ),
       ReferralReward(
-        trigger: 'referee_subscribed',
-        reward: '1个月高级会员',
-        description: '好友订阅会员',
+        trigger: 'referee_active_30_days',
+        reward: '额外100次AI调用额度',
+        description: '好友持续活跃30天',
       ),
     ],
 
@@ -51662,7 +51662,7 @@ class ReferralRewardService {
     refereeRewards: [
       ReferralReward(
         trigger: 'registration',
-        reward: '14天高级会员体验',
+        reward: '额外30次AI调用额度',
         description: '新用户注册奖励',
       ),
     ],
@@ -51675,11 +51675,11 @@ class ReferralRewardService {
       ),
       CumulativeReward(
         count: 10,
-        reward: '3个月高级会员',
+        reward: '额外500次AI调用额度',
       ),
       CumulativeReward(
         count: 50,
-        reward: '终身高级会员',
+        reward: '推荐大使徽章+永久额外AI额度',
       ),
     ],
   );

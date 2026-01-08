@@ -246,7 +246,7 @@ class _SourceDataSettingsPageState extends State<SourceDataSettingsPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -321,7 +321,7 @@ class _SourceDataSettingsPageState extends State<SourceDataSettingsPage> {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: isSelected
-                ? Theme.of(context).primaryColor.withOpacity(0.1)
+                ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
                 : AppColors.background,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
