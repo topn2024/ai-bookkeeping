@@ -40,12 +40,19 @@ android/app/release/
 *.apk
 *.aab
 
+# Android signing (security)
+app/android/keystore/
+app/android/key.properties
+
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 .DS_Store
+
+# Claude local settings
+.claude/settings.local.json
 
 # Logs
 logs/
