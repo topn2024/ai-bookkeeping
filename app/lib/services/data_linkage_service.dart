@@ -439,8 +439,93 @@ class DataLinkageService extends ChangeNotifier {
 
   /// 恢复状态
   void restoreState(Map<String, dynamic> state) {
-    // TODO: 实现状态恢复逻辑
-    // 需要根据保存的数据重建下钻路径和筛选条件
+    try {
+      // 1. 恢复下钻路径
+      final drillDownPathData = state['drillDownPath'] as List<dynamic>?;
+      if (drillDownPathData != null && drillDownPathData.isNotEmpty) {
+        // 重置当前路径
+        drillDownService.reset();
+
+        // 重建路径节点
+        for (final nodeData in drillDownPathData) {
+          final nodeMap = nodeData as Map<String, dynamic>;
+          final dimensionName = nodeMap['dimension'] as String;
+          final dimension = DrillDownDimension.values.firstWhere(
+            (d) => d.name == dimensionName,
+            orElse: () => DrillDownDimension.category,
+          );
+
+          final id = nodeMap['id'] as String;
+          final title = nodeMap['title'] as String;
+          final filterValue = nodeMap['filterValue'];
+          final depth = nodeMap['depth'] as int;
+
+          // 根据深度判断是否是第一个节点
+          if (depth == 0) {
+            // 第一个节点使用startDrillDown
+            drillDownService.startDrillDown(
+              dimension: dimension,
+              title: title,
+              metadata: {'id': id, 'filterValue': filterValue},
+            );
+          } else {
+            // 后续节点使用drillDown
+            drillDownService.drillDown(
+              id: id,
+              title: title,
+              filterValue: filterValue,
+            );
+          }
+        }
+      }
+
+      // 2. 恢复筛选条件
+      final filtersData = state['filters'] as List<dynamic>?;
+      if (filtersData != null && filtersData.isNotEmpty) {
+        // 清空当前筛选
+        filterService.clearAll();
+
+        // 重建筛选条件
+        final conditions = <FilterCondition>[];
+        for (final filterData in filtersData) {
+          final filterMap = filterData as Map<String, dynamic>;
+          final typeName = filterMap['type'] as String;
+          final filterType = FilterType.values.firstWhere(
+            (t) => t.name == typeName,
+            orElse: () => FilterType.custom,
+          );
+
+          final condition = FilterCondition(
+            type: filterType,
+            value: filterMap['value'],
+            displayLabel: filterMap['displayLabel'] as String,
+            isActive: filterMap['isActive'] as bool? ?? true,
+          );
+
+          conditions.add(condition);
+        }
+
+        // 批量设置筛选条件
+        filterService.setConditions(conditions);
+      }
+
+      // 3. 恢复页面栈
+      final pageStackData = state['pageStack'] as List<dynamic>?;
+      if (pageStackData != null) {
+        _pageStack.clear();
+        _pageStack.addAll(pageStackData.map((e) => e.toString()));
+      }
+
+      // 4. 发送恢复完成事件
+      _emitEvent(DataLinkageRestoreEvent());
+      notifyListeners();
+    } catch (e) {
+      // 恢复失败时重置状态
+      drillDownService.reset();
+      filterService.clearAll();
+      _pageStack.clear();
+      debugPrint('状态恢复失败: $e');
+    }
   }
 
   // ========== 清理 ==========
@@ -522,3 +607,6 @@ class DataLinkageFilterChangedEvent extends DataLinkageEvent {
 
 /// 清空筛选事件
 class DataLinkageClearFiltersEvent extends DataLinkageEvent {}
+
+/// 状态恢复事件
+class DataLinkageRestoreEvent extends DataLinkageEvent {}

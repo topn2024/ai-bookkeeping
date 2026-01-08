@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -5,6 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:excel/excel.dart' as excel_pkg;
 
 /// 水印配置
 class WatermarkConfig {
@@ -380,9 +385,31 @@ class ChartCaptureService {
   /// 保存到相册
   Future<bool> saveToGallery(String filePath) async {
     try {
-      // TODO: 使用 image_gallery_saver 包保存到相册
-      // 需要添加依赖: image_gallery_saver: ^2.0.3
-      return true;
+      final file = File(filePath);
+      final bytes = await file.readAsBytes();
+
+      final result = await ImageGallerySaver.saveImage(
+        bytes,
+        quality: 100,
+        name: 'chart_${DateTime.now().millisecondsSinceEpoch}',
+      );
+
+      return result != null && result['isSuccess'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 保存图片字节到相册
+  Future<bool> saveImageBytesToGallery(Uint8List bytes, {String? name}) async {
+    try {
+      final result = await ImageGallerySaver.saveImage(
+        bytes,
+        quality: 100,
+        name: name ?? 'chart_${DateTime.now().millisecondsSinceEpoch}',
+      );
+
+      return result != null && result['isSuccess'] == true;
     } catch (e) {
       return false;
     }
@@ -522,6 +549,221 @@ class ChartCaptureService {
       // 忽略清理错误
     }
   }
+
+  /// 导出图表为PDF
+  Future<String> exportToPDF({
+    required GlobalKey chartKey,
+    required String title,
+    Map<String, String>? dataPoints,
+    ChartCaptureOptions? options,
+  }) async {
+    // 先截取图表
+    final chartResult = await captureWidget(
+      key: chartKey,
+      options: options,
+    );
+
+    if (!chartResult.success || chartResult.imageBytes == null) {
+      throw Exception('图表截图失败: ${chartResult.error}');
+    }
+
+    // 创建PDF文档
+    final pdf = pw.Document();
+
+    // 转换为PDF图片格式
+    final image = pw.MemoryImage(chartResult.imageBytes!);
+
+    // 添加页面
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // 标题
+              pw.Text(
+                title,
+                style: pw.TextStyle(
+                  fontSize: 24,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 20),
+
+              // 数据点（如果有）
+              if (dataPoints != null && dataPoints.isNotEmpty) ...[
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey300),
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(5)),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: dataPoints.entries.map((entry) {
+                      return pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                        child: pw.Text(
+                          '${entry.key}: ${entry.value}',
+                          style: const pw.TextStyle(fontSize: 12),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+              ],
+
+              // 图表图片
+              pw.Expanded(
+                child: pw.Center(
+                  child: pw.Image(image, fit: pw.BoxFit.contain),
+                ),
+              ),
+
+              // 页脚
+              pw.SizedBox(height: 10),
+              pw.Text(
+                '生成时间: ${DateTime.now().toString().substring(0, 19)}',
+                style: pw.TextStyle(fontSize: 10, color: PdfColors.grey),
+              ),
+              pw.Text(
+                '由 AI智能记账 生成',
+                style: pw.TextStyle(fontSize: 10, color: PdfColors.grey),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    // 保存PDF文件
+    final directory = await getTemporaryDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final filePath = '${directory.path}/chart_$timestamp.pdf';
+
+    final file = File(filePath);
+    await file.writeAsBytes(await pdf.save());
+
+    return filePath;
+  }
+
+  /// 批量导出为PDF
+  Future<String> exportMultipleToPDF({
+    required List<GlobalKey> chartKeys,
+    required List<String> titles,
+    required String documentTitle,
+    Map<String, String>? summary,
+    ChartCaptureOptions? options,
+  }) async {
+    if (chartKeys.length != titles.length) {
+      throw ArgumentError('chartKeys and titles must have the same length');
+    }
+
+    final pdf = pw.Document();
+
+    // 添加封面
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Center(
+            child: pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              children: [
+                pw.Text(
+                  documentTitle,
+                  style: pw.TextStyle(
+                    fontSize: 32,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+                pw.Text(
+                  DateTime.now().toString().substring(0, 10),
+                  style: const pw.TextStyle(fontSize: 16),
+                ),
+                if (summary != null && summary.isNotEmpty) ...[
+                  pw.SizedBox(height: 40),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(20),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: PdfColors.grey300),
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(5)),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: summary.entries.map((entry) {
+                        return pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 4),
+                          child: pw.Text(
+                            '${entry.key}: ${entry.value}',
+                            style: const pw.TextStyle(fontSize: 14),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    // 为每个图表添加页面
+    for (int i = 0; i < chartKeys.length; i++) {
+      final chartResult = await captureWidget(
+        key: chartKeys[i],
+        options: options,
+      );
+
+      if (chartResult.success && chartResult.imageBytes != null) {
+        final image = pw.MemoryImage(chartResult.imageBytes!);
+
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            build: (pw.Context context) {
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    titles[i],
+                    style: pw.TextStyle(
+                      fontSize: 20,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 20),
+                  pw.Expanded(
+                    child: pw.Center(
+                      child: pw.Image(image, fit: pw.BoxFit.contain),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      }
+
+      // 添加延迟避免性能问题
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+
+    // 保存PDF文件
+    final directory = await getTemporaryDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final filePath = '${directory.path}/charts_$timestamp.pdf';
+
+    final file = File(filePath);
+    await file.writeAsBytes(await pdf.save());
+
+    return filePath;
+  }
 }
 
 /// 图表导出服务
@@ -580,5 +822,216 @@ class ChartExportService {
     );
 
     return filePath;
+  }
+
+  /// 导出为Excel（带格式）
+  Future<String> exportToExcel({
+    required String title,
+    required List<String> headers,
+    required List<List<dynamic>> rows,
+    String? sheetName,
+  }) async {
+    final excel = excel_pkg.Excel.createExcel();
+
+    // 删除默认的Sheet1
+    excel.delete('Sheet1');
+
+    // 创建工作表
+    final sheet = excel[sheetName ?? 'Data'];
+
+    // 设置列宽
+    for (int i = 0; i < headers.length; i++) {
+      sheet.setColumnWidth(i, 15);
+    }
+
+    // 添加标题行（合并单元格）
+    sheet.merge(
+      excel_pkg.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
+      excel_pkg.CellIndex.indexByColumnRow(
+        columnIndex: headers.length - 1,
+        rowIndex: 0,
+      ),
+    );
+
+    final titleCell = sheet.cell(
+      excel_pkg.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
+    );
+    titleCell.value = excel_pkg.TextCellValue(title);
+    titleCell.cellStyle = excel_pkg.CellStyle(
+      bold: true,
+      fontSize: 16,
+      horizontalAlign: excel_pkg.HorizontalAlign.Center,
+      verticalAlign: excel_pkg.VerticalAlign.Center,
+    );
+
+    // 添加表头
+    for (int i = 0; i < headers.length; i++) {
+      final headerCell = sheet.cell(
+        excel_pkg.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 2),
+      );
+      headerCell.value = excel_pkg.TextCellValue(headers[i]);
+      headerCell.cellStyle = excel_pkg.CellStyle(
+        bold: true,
+        fontSize: 12,
+        backgroundColorHex: excel_pkg.ExcelColor.blue200,
+        horizontalAlign: excel_pkg.HorizontalAlign.Center,
+        verticalAlign: excel_pkg.VerticalAlign.Center,
+      );
+    }
+
+    // 添加数据行
+    for (int rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+      final row = rows[rowIndex];
+      for (int colIndex = 0; colIndex < row.length; colIndex++) {
+        final dataCell = sheet.cell(
+          excel_pkg.CellIndex.indexByColumnRow(
+            columnIndex: colIndex,
+            rowIndex: rowIndex + 3,
+          ),
+        );
+
+        final value = row[colIndex];
+
+        // 根据数据类型设置单元格值
+        if (value is num) {
+          dataCell.value = excel_pkg.DoubleCellValue(value.toDouble());
+          dataCell.cellStyle = excel_pkg.CellStyle(
+            horizontalAlign: excel_pkg.HorizontalAlign.Right,
+          );
+        } else if (value is DateTime) {
+          dataCell.value = excel_pkg.DateTimeCellValue(
+            year: value.year,
+            month: value.month,
+            day: value.day,
+            hour: value.hour,
+            minute: value.minute,
+            second: value.second,
+          );
+        } else {
+          dataCell.value = excel_pkg.TextCellValue(value.toString());
+        }
+
+        // 斑马纹效果
+        if (rowIndex % 2 == 1) {
+          dataCell.cellStyle = excel_pkg.CellStyle(
+            backgroundColorHex: excel_pkg.ExcelColor.gray100,
+          );
+        }
+      }
+    }
+
+    // 添加页脚（生成时间）
+    final footerRow = rows.length + 4;
+    final footerCell = sheet.cell(
+      excel_pkg.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: footerRow),
+    );
+    footerCell.value = excel_pkg.TextCellValue(
+      '生成时间: ${DateTime.now().toString().substring(0, 19)}',
+    );
+    footerCell.cellStyle = excel_pkg.CellStyle(
+      fontSize: 10,
+      fontColorHex: excel_pkg.ExcelColor.gray,
+      italic: true,
+    );
+
+    // 保存文件
+    final directory = await getTemporaryDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final filePath = '${directory.path}/export_$timestamp.xlsx';
+
+    final fileBytes = excel.encode();
+    if (fileBytes != null) {
+      final file = File(filePath);
+      await file.writeAsBytes(fileBytes);
+      return filePath;
+    } else {
+      throw Exception('Excel文件生成失败');
+    }
+  }
+
+  /// 导出多表格Excel
+  Future<String> exportToExcelMultiSheet({
+    required String title,
+    required Map<String, Map<String, dynamic>> sheets,
+  }) async {
+    final excel = excel_pkg.Excel.createExcel();
+
+    // 删除默认的Sheet1
+    excel.delete('Sheet1');
+
+    for (final entry in sheets.entries) {
+      final sheetName = entry.key;
+      final sheetData = entry.value;
+      final headers = sheetData['headers'] as List<String>;
+      final rows = sheetData['rows'] as List<List<dynamic>>;
+
+      // 创建工作表
+      final sheet = excel[sheetName];
+
+      // 设置列宽
+      for (int i = 0; i < headers.length; i++) {
+        sheet.setColumnWidth(i, 15);
+      }
+
+      // 添加表头
+      for (int i = 0; i < headers.length; i++) {
+        final headerCell = sheet.cell(
+          excel_pkg.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+        );
+        headerCell.value = excel_pkg.TextCellValue(headers[i]);
+        headerCell.cellStyle = excel_pkg.CellStyle(
+          bold: true,
+          fontSize: 12,
+          backgroundColorHex: excel_pkg.ExcelColor.blue200,
+          horizontalAlign: excel_pkg.HorizontalAlign.Center,
+          verticalAlign: excel_pkg.VerticalAlign.Center,
+        );
+      }
+
+      // 添加数据行
+      for (int rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+        final row = rows[rowIndex];
+        for (int colIndex = 0; colIndex < row.length; colIndex++) {
+          final dataCell = sheet.cell(
+            excel_pkg.CellIndex.indexByColumnRow(
+              columnIndex: colIndex,
+              rowIndex: rowIndex + 1,
+            ),
+          );
+
+          final value = row[colIndex];
+
+          if (value is num) {
+            dataCell.value = excel_pkg.DoubleCellValue(value.toDouble());
+            dataCell.cellStyle = excel_pkg.CellStyle(
+              horizontalAlign: excel_pkg.HorizontalAlign.Right,
+            );
+          } else {
+            dataCell.value = excel_pkg.TextCellValue(value.toString());
+          }
+
+          // 斑马纹效果
+          if (rowIndex % 2 == 1) {
+            dataCell.cellStyle = excel_pkg.CellStyle(
+              backgroundColorHex: excel_pkg.ExcelColor.gray100,
+            );
+          }
+        }
+      }
+    }
+
+    // 保存文件
+    final directory = await getTemporaryDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final filePath = '${directory.path}/${title}_$timestamp.xlsx';
+
+    final fileBytes = excel.encode();
+    if (fileBytes != null) {
+      final file = File(filePath);
+      await file.writeAsBytes(fileBytes);
+      return filePath;
+    } else {
+      throw Exception('Excel文件生成失败');
+    }
   }
 }
