@@ -657,7 +657,8 @@
       "Bash(docker compose:*)",
       "Bash(cmd /c \"where docker\")",
       "Bash(cmd /c \"echo Docker not found\")",
-      "Bash(\"C:\\\\Program Files\\\\Docker\\\\Docker\\\\resources\\\\bin\\\\docker.exe\" --version)"
+      "Bash(\"C:\\\\Program Files\\\\Docker\\\\Docker\\\\resources\\\\bin\\\\docker.exe\" --version)",
+      "Bash(git check-ignore:*)"
     ]
   }
 }
