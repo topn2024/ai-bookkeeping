@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'bill_format_detector.dart';
 
 /// 智能目录扫描服务
@@ -323,13 +324,37 @@ class SmartDirectoryScannerService {
 
   /// 获取最近导入过的目录
   Future<List<String>> getRecentDirectories() async {
-    // TODO: 从数据库读取最近使用的目录
-    return [];
+    try {
+      // 从SharedPreferences读取最近使用的目录
+      final prefs = await SharedPreferences.getInstance();
+      final recentDirs = prefs.getStringList('recent_import_directories') ?? [];
+      return recentDirs;
+    } catch (e) {
+      return [];
+    }
   }
 
   /// 保存最近使用的目录
   Future<void> saveRecentDirectory(String path) async {
-    // TODO: 保存到数据库
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final recentDirs = prefs.getStringList('recent_import_directories') ?? [];
+
+      // 移除重复项
+      recentDirs.remove(path);
+
+      // 添加到开头
+      recentDirs.insert(0, path);
+
+      // 只保留最近10个
+      if (recentDirs.length > 10) {
+        recentDirs.removeRange(10, recentDirs.length);
+      }
+
+      await prefs.setStringList('recent_import_directories', recentDirs);
+    } catch (e) {
+      // 忽略错误
+    }
   }
 }
 
