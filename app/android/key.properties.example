@@ -1,0 +1,21 @@
+# 签名密钥配置文件
+#
+# 重要：此文件包含敏感信息，不要提交到版本控制系统！
+# 请复制此文件为 key.properties 并填入真实的密钥信息
+#
+# 使用方法：
+# 1. 复制此文件：cp key.properties.example key.properties
+# 2. 填写下面的配置信息
+# 3. 确保 key.properties 已被 .gitignore 忽略
+
+# 密钥库文件路径（相对于 android 目录）
+storeFile=keystore/release.keystore
+
+# 密钥库密码
+storePassword=your_keystore_password
+
+# 密钥别名
+keyAlias=ai-bookkeeping-release
+
+# 密钥密码
+keyPassword=your_key_password

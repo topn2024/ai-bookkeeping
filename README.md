@@ -127,6 +127,53 @@ ai-bookkeeping/
 └── ARCHITECTURE.md         # 架构设计文档
 ```
 
+## 开发环境配置
+
+### Android 开发环境
+
+#### 1. 环境变量
+已在 `~/.zshrc` 中配置以下环境变量：
+
+```bash
+# Java Configuration
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17
+export PATH="$JAVA_HOME/bin:$PATH"
+
+# Android SDK Configuration
+export ANDROID_HOME=$HOME/Library/Android/sdk
+export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+export PATH="$ANDROID_HOME/platform-tools:$PATH"
+export PATH="$ANDROID_HOME/emulator:$PATH"
+
+# Flutter Configuration
+export PATH="$HOME/tools/flutter/bin:$PATH"
+```
+
+应用配置：`source ~/.zshrc` 或重启终端
+
+#### 2. 签名密钥
+- **密钥文件**: `app/android/keystore/release.keystore`
+- **配置文件**: `app/android/key.properties`
+- **密钥别名**: `ai-bookkeeping-release`
+- **密钥密码**: `android123`
+
+⚠️ **重要**: 密钥文件和配置已添加到 `.gitignore`，请妥善保管密码和密钥备份
+
+#### 3. 验证环境
+```bash
+# 验证 Java
+java -version
+
+# 验证 Flutter
+flutter --version
+
+# 验证 Android 工具链
+flutter doctor
+
+# 构建 Release APK
+cd app && flutter build apk --release
+```
+
 ## 快速开始
 
 详见 [架构设计文档](./ARCHITECTURE.md)
