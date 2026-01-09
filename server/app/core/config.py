@@ -4,6 +4,7 @@ All sensitive configuration values should be set via environment variables
 or .env file. Never commit real credentials to the repository.
 """
 import os
+import sys
 from functools import lru_cache
 from pydantic_settings import BaseSettings
 
@@ -85,11 +86,37 @@ class Settings(BaseSettings):
         case_sensitive = True
         extra = "ignore"
 
+    def validate_required_settings(self):
+        """Validate that required settings are configured."""
+        required_fields = {
+            "SECRET_KEY": self.SECRET_KEY,
+            "DATABASE_URL": self.DATABASE_URL,
+            "REDIS_URL": self.REDIS_URL,
+            "JWT_SECRET_KEY": self.JWT_SECRET_KEY,
+        }
+
+        missing = [name for name, value in required_fields.items() if not value]
+
+        if missing:
+            print(f"ERROR: Missing required configuration: {', '.join(missing)}", file=sys.stderr)
+            print("Please set these environment variables or add them to .env file", file=sys.stderr)
+            sys.exit(1)
+
+        # Warn about insecure settings in production
+        if not self.DEBUG:
+            if self.CORS_ORIGINS == "*":
+                print("WARNING: CORS_ORIGINS is set to '*' in production. This is insecure!", file=sys.stderr)
+
+            if self.SKIP_SSL_VERIFICATION:
+                print("WARNING: SKIP_SSL_VERIFICATION is enabled in production. This is insecure!", file=sys.stderr)
+
 
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings."""
-    return Settings()
+    settings = Settings()
+    settings.validate_required_settings()
+    return settings
 
 
 settings = get_settings()

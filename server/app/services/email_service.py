@@ -145,7 +145,7 @@ class EmailService:
         if not imap_server or not binding.imap_password:
             raise Exception("IMAP server or password not configured")
 
-        mail = imaplib.IMAP4_SSL(imap_server, imap_port)
+        mail = imaplib.IMAP4_SSL(imap_server, imap_port, timeout=30)
 
         try:
             # Login with decrypted password
@@ -352,7 +352,7 @@ class EmailService:
             if not imap_server or not binding.imap_password:
                 return False, "IMAP server or password not configured"
 
-            mail = imaplib.IMAP4_SSL(imap_server, imap_port)
+            mail = imaplib.IMAP4_SSL(imap_server, imap_port, timeout=30)
             # Login with decrypted password
             decrypted_password = decrypt_sensitive_data(binding.imap_password)
             mail.login(binding.email, decrypted_password)
