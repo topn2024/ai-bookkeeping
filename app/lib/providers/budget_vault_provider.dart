@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/budget_vault.dart';
 import '../services/database_service.dart';
 import '../services/allocation_service.dart';
+import 'transaction_provider.dart';
 
 /// 小金库状态
 class BudgetVaultState {
@@ -116,9 +117,12 @@ class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
     try {
       final vaults = await _db.getBudgetVaults(ledgerId: _currentLedgerId);
 
-      // 计算待分配金额（需要获取总收入）
+      // 使用transaction provider的收入数据，确保与UI显示一致
+      final totalIncome = ref.read(monthlyIncomeProvider);
+
+      // 计算待分配金额
       final unallocated = _allocationService.calculateUnallocatedAmount(
-        totalIncome: await _getTotalIncome(),
+        totalIncome: totalIncome,
         vaults: vaults,
       );
 
@@ -134,16 +138,6 @@ class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
         error: e.toString(),
       );
     }
-  }
-
-  /// 获取总收入（当月）
-  Future<double> _getTotalIncome() async {
-    final now = DateTime.now();
-    return await _db.getMonthlyIncomeTotal(
-      year: now.year,
-      month: now.month,
-      ledgerId: _currentLedgerId,
-    );
   }
 
   /// 创建小金库
