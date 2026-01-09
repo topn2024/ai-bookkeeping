@@ -65,16 +65,18 @@
 
 ---
 
-### Batch 5: receipt_detail_page.dart ⚠️ 优先级：高 | 难度：中
+### Batch 5: receipt_detail_page.dart ✅ 优先级：高 | 难度：中
 **问题**: 使用硬编码的小票商品数据
 **修复方案**:
-- 确认 OCR 服务是否已实现
-- 如果已实现：集成 OCR 服务，从相机/上传流程传递真实数据
-- 如果未实现：保留假数据但添加 TODO 注释，标记为待实现功能
-- 调整数据流：Camera → OCR → ReceiptData → ReceiptDetailPage
+- 确认 OCR 服务是否已实现 → OCR服务存在但未完全集成
+- 添加 TODO 注释标记待实现功能
+- 保留假数据以保持功能可用
+- 文档化数据流：Camera → OCR → ReceiptData → ReceiptDetailPage
+- 页面已准备好接收真实数据，等待OCR集成完成
 
-**预计工作量**: 1-2小时（取决于 OCR 服务状态）
-**依赖**: OCR 服务实现状态
+**预计工作量**: 15分钟（文档化）
+**依赖**: OCR 服务完整集成（待实现）
+**状态**: 已文档化，等待OCR集成
 
 ---
 

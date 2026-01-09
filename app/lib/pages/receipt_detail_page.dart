@@ -66,9 +66,17 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
   @override
   void initState() {
     super.initState();
+    // TODO: OCR Integration - Replace mock data with real OCR results
+    // This page is ready to receive ReceiptData from:
+    // 1. Camera → ImageRecognitionEngine.process() → ReceiptData
+    // 2. Gallery upload → ImageRecognitionEngine.process() → ReceiptData
+    // Current status: OCR service exists but not fully integrated with camera flow
+    // See: app/lib/services/multimodal_input_service.dart (ImageRecognitionEngine)
     _receipt = widget.receiptData ?? _getMockData();
   }
 
+  // TODO: OCR Integration - Remove this method once OCR is integrated
+  // This mock data demonstrates the expected ReceiptData structure
   ReceiptData _getMockData() {
     return ReceiptData(
       merchantName: '永辉超市(朝阳店)',
