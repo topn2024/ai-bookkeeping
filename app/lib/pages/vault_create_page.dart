@@ -5,6 +5,7 @@ import '../models/budget_vault.dart';
 import '../services/vault_repository.dart';
 import '../services/database_service.dart';
 import '../providers/ledger_context_provider.dart';
+import '../providers/budget_vault_provider.dart';
 import 'package:uuid/uuid.dart';
 
 /// 创建/编辑小金库页面
@@ -530,6 +531,11 @@ class _VaultCreatePageState extends ConsumerState<VaultCreatePage> {
       final db = await DatabaseService().database;
       final repository = VaultRepository(db);
       await repository.create(vault);
+
+      // 刷新provider状态
+      if (mounted) {
+        await ref.read(budgetVaultProvider.notifier).refresh();
+      }
 
       if (mounted) {
         Navigator.pop(context, true);

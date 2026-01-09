@@ -209,6 +209,8 @@ class ResourcePool {
           : null,
     );
   }
+
+  factory ResourcePool.fromJson(Map<String, dynamic> json) => ResourcePool.fromMap(json);
 }
 
 /// 资源消费记录 - 记录每次支出对资源池的消耗

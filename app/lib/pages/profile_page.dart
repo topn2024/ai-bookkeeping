@@ -28,8 +28,6 @@ import 'system_settings_page.dart';
 import 'help_page.dart';
 import 'login_page.dart';
 import 'financial_freedom_simulator_page.dart';
-import 'actionable_advice_page.dart';
-import 'smart_feature_recommendation_page.dart';
 import 'user_profile_visualization_page.dart';
 import 'goal_achievement_dashboard_page.dart';
 import 'growth/nps_survey_page.dart';
@@ -378,12 +376,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             context,
             MaterialPageRoute(builder: (_) => const FinancialFreedomSimulatorPage()),
           ),
-        ),
-        _SettingsItem(
-          icon: Icons.tips_and_updates,
-          title: '智能建议',
-          subtitle: '查看个性化理财建议',
-          onTap: () => _navigateWithAuth(context, const ActionableAdvicePage()),
         ),
       ],
     );

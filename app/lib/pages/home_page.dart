@@ -362,7 +362,6 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     return InkWell(
       onTap: () {
-        // 跳转到钱龄页面
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const MoneyAgePage()),

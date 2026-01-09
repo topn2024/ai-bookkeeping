@@ -28,7 +28,7 @@ class MoneyAgeApiService {
         params['is_fully_consumed'] = isFullyConsumed;
       }
 
-      final response = await _http.get('/money-age/resource-pools', queryParameters: params);
+      final response = await _http.get('/money-age/resource-pools', queryParams: params);
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data;
         return data.map((json) => ResourcePool.fromJson(json)).toList();
@@ -45,7 +45,7 @@ class MoneyAgeApiService {
     try {
       final response = await _http.get(
         '/money-age/dashboard',
-        queryParameters: {'book_id': bookId},
+        queryParams: {'book_id': bookId},
       );
       if (response.statusCode == 200) {
         return MoneyAgeDashboard.fromJson(response.data);
@@ -62,7 +62,7 @@ class MoneyAgeApiService {
     try {
       final response = await _http.get(
         '/money-age/health',
-        queryParameters: {'book_id': bookId},
+        queryParams: {'book_id': bookId},
       );
       if (response.statusCode == 200) {
         return MoneyAgeHealth.fromJson(response.data);
@@ -132,30 +132,6 @@ class MoneyAgeApiService {
       debugPrint('MoneyAgeApiService: Failed to rebuild: $e');
       return false;
     }
-  }
-}
-
-/// Money Age Dashboard data
-class MoneyAgeDashboard {
-  final double averageMoneyAge;
-  final double totalBalance;
-  final int activePoolCount;
-  final String healthLevel;
-
-  MoneyAgeDashboard({
-    required this.averageMoneyAge,
-    required this.totalBalance,
-    required this.activePoolCount,
-    required this.healthLevel,
-  });
-
-  factory MoneyAgeDashboard.fromJson(Map<String, dynamic> json) {
-    return MoneyAgeDashboard(
-      averageMoneyAge: (json['average_money_age'] as num?)?.toDouble() ?? 0,
-      totalBalance: (json['total_balance'] as num?)?.toDouble() ?? 0,
-      activePoolCount: json['active_pool_count'] as int? ?? 0,
-      healthLevel: json['health_level'] as String? ?? 'unknown',
-    );
   }
 }
 
