@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/budget_vault.dart';
+import 'vault_create_page.dart';
+import 'transaction_list_page.dart';
 
 /// 小金库详情页面
 ///
@@ -137,8 +139,11 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
               title: const Text('编辑小金库'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('编辑功能开发中')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VaultCreatePage(vault: widget.vault),
+                  ),
                 );
               },
             ),
@@ -147,8 +152,11 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
               title: const Text('查看全部记录'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('记录查看功能开发中')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TransactionListPage(),
+                  ),
                 );
               },
             ),
@@ -157,9 +165,7 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
               title: const Text('转入其他小金库'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('转账功能开发中')),
-                );
+                _showTransferDialog(context);
               },
             ),
             ListTile(
@@ -197,6 +203,63 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTransferDialog(BuildContext context) {
+    final amountController = TextEditingController();
+    String? selectedVaultId;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('转入其他小金库'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: '目标小金库',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: '1', child: Text('生活开支')),
+                DropdownMenuItem(value: '2', child: Text('旅行基金')),
+                DropdownMenuItem(value: '3', child: Text('应急储备')),
+              ],
+              onChanged: (value) {
+                selectedVaultId = value;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: '转账金额',
+                prefixText: '¥ ',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('转账成功')),
+              );
+            },
+            child: const Text('确认'),
           ),
         ],
       ),

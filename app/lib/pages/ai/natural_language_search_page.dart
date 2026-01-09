@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 /// 自然语言搜索页面
 ///
@@ -17,17 +18,49 @@ class _NaturalLanguageSearchPageState
     extends ConsumerState<NaturalLanguageSearchPage> {
   final TextEditingController _searchController = TextEditingController();
   bool _hasSearched = false;
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isListening = false;
 
   @override
   void initState() {
     super.initState();
     _searchController.text = '上周在星巴克花了多少钱';
     _hasSearched = true;
+    _initSpeech();
+  }
+
+  Future<void> _initSpeech() async {
+    await _speech.initialize();
+  }
+
+  Future<void> _startListening() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize();
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(
+          onResult: (result) {
+            setState(() {
+              _searchController.text = result.recognizedWords;
+            });
+          },
+          localeId: 'zh_CN',
+        );
+      }
+    }
+  }
+
+  Future<void> _stopListening() async {
+    if (_isListening) {
+      await _speech.stop();
+      setState(() => _isListening = false);
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _speech.stop();
     super.dispose();
   }
 
@@ -42,6 +75,14 @@ class _NaturalLanguageSearchPageState
               controller: _searchController,
               onSearch: () {
                 setState(() => _hasSearched = true);
+              },
+              isListening: _isListening,
+              onVoiceInput: () {
+                if (_isListening) {
+                  _stopListening();
+                } else {
+                  _startListening();
+                }
               },
             ),
 
@@ -76,10 +117,14 @@ class _NaturalLanguageSearchPageState
 class _SearchHeader extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onSearch;
+  final bool isListening;
+  final VoidCallback onVoiceInput;
 
   const _SearchHeader({
     required this.controller,
     required this.onSearch,
+    required this.isListening,
+    required this.onVoiceInput,
   });
 
   @override
@@ -121,14 +166,10 @@ class _SearchHeader extends StatelessWidget {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('语音输入功能开发中')),
-                      );
-                    },
+                    onTap: onVoiceInput,
                     child: Icon(
-                      Icons.mic,
-                      color: Theme.of(context).primaryColor,
+                      isListening ? Icons.mic : Icons.mic_none,
+                      color: isListening ? Colors.red : Theme.of(context).primaryColor,
                     ),
                   ),
                 ],

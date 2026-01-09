@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/budget_vault.dart';
 
-/// 创建小金库页面
+/// 创建/编辑小金库页面
 /// 原型设计 3.04：创建小金库
 /// - 名称和图标设置
 /// - 小金库类型选择（固定支出/弹性支出/储蓄目标/债务还款）
 /// - 分配策略选择（固定金额/按百分比/补齐目标/分配剩余）
 /// - 金额设置（每月分配/目标金额）
 class VaultCreatePage extends ConsumerStatefulWidget {
-  const VaultCreatePage({super.key});
+  final BudgetVault? vault; // 如果提供，则为编辑模式
+
+  const VaultCreatePage({super.key, this.vault});
 
   @override
   ConsumerState<VaultCreatePage> createState() => _VaultCreatePageState();
@@ -73,12 +76,25 @@ class _VaultCreatePageState extends ConsumerState<VaultCreatePage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // 如果是编辑模式，预填充数据
+    if (widget.vault != null) {
+      _nameController.text = widget.vault!.name;
+      _monthlyController.text = widget.vault!.targetAllocation?.toStringAsFixed(0) ?? '0';
+      _targetController.text = widget.vault!.targetAmount.toStringAsFixed(0);
+    }
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _monthlyController.dispose();
     _targetController.dispose();
     super.dispose();
   }
+
+  bool get _isEditMode => widget.vault != null;
 
   @override
   Widget build(BuildContext context) {
@@ -127,11 +143,11 @@ class _VaultCreatePageState extends ConsumerState<VaultCreatePage> {
               child: const Icon(Icons.close),
             ),
           ),
-          const Expanded(
+          Expanded(
             child: Text(
-              '新建小金库',
+              _isEditMode ? '编辑小金库' : '新建小金库',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
           ),
           GestureDetector(
