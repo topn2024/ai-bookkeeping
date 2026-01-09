@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../theme/app_theme.dart';
+import '../transaction_list_page.dart';
 
 /// 导入成功页面
 /// 原型设计 5.15：导入成功
@@ -287,8 +288,12 @@ class ImportSuccessPage extends ConsumerWidget {
   }
 
   void _viewImportedRecords(BuildContext context) {
-    // 导航到导入历史或交易列表
+    // 导航到交易列表查看导入的记录
     Navigator.popUntil(context, (route) => route.isFirst);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TransactionListPage()),
+    );
   }
 
   void _returnToHome(BuildContext context) {

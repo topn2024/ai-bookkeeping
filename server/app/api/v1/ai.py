@@ -67,6 +67,55 @@ async def recognize_image(
     return result
 
 
+class BatchRecognitionResult(BaseModel):
+    """Schema for batch recognition result."""
+    transactions: List[RecognitionResult]
+    total_count: int
+
+
+@router.post("/recognize-image-batch", response_model=BatchRecognitionResult)
+async def recognize_image_batch(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Recognize multiple transactions from a long image (e.g., bill screenshot).
+
+    This endpoint is designed for long images that may contain multiple transaction records,
+    such as bank statements, credit card bills, or payment history screenshots.
+    """
+    start_time = time.time()
+    user_id = str(current_user.id)
+    logger.info(f"Batch image recognition started | user_id={user_id} | filename={file.filename}")
+
+    # Validate file type
+    if not file.content_type.startswith("image/"):
+        logger.warning(f"Invalid file type | user_id={user_id} | content_type={file.content_type}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an image",
+        )
+
+    # Read file content
+    content = await file.read()
+    file_size = len(content)
+    logger.debug(f"Image loaded | user_id={user_id} | size={file_size} bytes")
+
+    # Use AI service to recognize batch
+    ai_service = AIService()
+    transactions = await ai_service.recognize_image_batch(content)
+
+    elapsed = time.time() - start_time
+    logger.info(
+        f"Batch image recognition completed | user_id={user_id} | "
+        f"count={len(transactions)} | elapsed={elapsed:.2f}s"
+    )
+
+    return BatchRecognitionResult(
+        transactions=transactions,
+        total_count=len(transactions),
+    )
+
+
 @router.post("/recognize-voice", response_model=RecognitionResult)
 async def recognize_voice(
     text: str = Form(..., description="Voice transcription text"),

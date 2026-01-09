@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
+import 'main_navigation.dart';
 
 /// 8.30 批量训练AI页面
 /// 快速批量校正AI分类，加速准确率提升
@@ -70,7 +71,13 @@ class _BatchAITrainingPageState extends ConsumerState<BatchAITrainingPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // 返回首页而不是简单的pop
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const MainNavigation()),
+              (route) => false,
+            );
+          },
         ),
         title: Text(
           l10n.batchTrainAI,
@@ -345,7 +352,13 @@ class _BatchAITrainingPageState extends ConsumerState<BatchAITrainingPage> {
             ),
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                // 返回首页
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const MainNavigation()),
+                  (route) => false,
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 minimumSize: const Size(200, 48),

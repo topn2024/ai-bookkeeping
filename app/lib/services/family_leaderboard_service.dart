@@ -1,5 +1,7 @@
 import '../models/family_leaderboard.dart';
 import '../models/member.dart';
+import '../models/transaction.dart';
+import 'database_service.dart';
 
 /// 家庭排行榜服务
 class FamilyLeaderboardService {
@@ -92,16 +94,74 @@ class FamilyLeaderboardService {
     required LeaderboardType type,
     required LeaderboardPeriod period,
   }) async {
-    // 模拟数据 - 实际应从��据库计算
-    switch (type) {
-      case LeaderboardType.savings:
-        return 1000 + (memberId.hashCode % 5000).toDouble();
-      case LeaderboardType.recording:
-        return 10 + (memberId.hashCode % 50).toDouble();
-      case LeaderboardType.budgetControl:
-        return 50 + (memberId.hashCode % 50).toDouble();
-      case LeaderboardType.goalContribution:
-        return 500 + (memberId.hashCode % 2000).toDouble();
+    try {
+      final db = await DatabaseService().database;
+
+      // 计算时间范围
+      final now = DateTime.now();
+      DateTime startDate;
+      switch (period) {
+        case LeaderboardPeriod.week:
+          startDate = now.subtract(const Duration(days: 7));
+          break;
+        case LeaderboardPeriod.month:
+          startDate = DateTime(now.year, now.month, 1);
+          break;
+        case LeaderboardPeriod.year:
+          startDate = DateTime(now.year, 1, 1);
+          break;
+        case LeaderboardPeriod.allTime:
+          startDate = DateTime(2000, 1, 1);
+          break;
+      }
+
+      // 查询成员的交易记录
+      final results = await db.query(
+        'transactions',
+        where: 'ledgerId = ? AND createdBy = ? AND datetime >= ?',
+        whereArgs: [
+          ledgerId,
+          memberId,
+          startDate.millisecondsSinceEpoch,
+        ],
+      );
+
+      switch (type) {
+        case LeaderboardType.savings:
+          // 储蓄排行：收入 - 支出
+          double income = 0;
+          double expense = 0;
+          for (var row in results) {
+            final transaction = Transaction.fromMap(row);
+            if (transaction.type == TransactionType.income) {
+              income += transaction.amount;
+            } else if (transaction.type == TransactionType.expense) {
+              expense += transaction.amount;
+            }
+          }
+          return income - expense;
+
+        case LeaderboardType.recording:
+          // 记账排行：交易记录数量
+          return results.length.toDouble();
+
+        case LeaderboardType.budgetControl:
+          // 预算控制排行：简化实现，返回记录数量
+          return results.length.toDouble();
+
+        case LeaderboardType.goalContribution:
+          // 目标贡献排行：简化实现，返回收入总额
+          double income = 0;
+          for (var row in results) {
+            final transaction = Transaction.fromMap(row);
+            if (transaction.type == TransactionType.income) {
+              income += transaction.amount;
+            }
+          }
+          return income;
+      }
+    } catch (e) {
+      return 0;
     }
   }
 

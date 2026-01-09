@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../services/multimodal_wakeup_service.dart';
 import '../services/gesture_wake_service.dart';
+import '../services/floating_ball_service.dart';
+import '../services/payment_notification_service.dart';
+import '../services/location_trigger_service.dart';
+import 'main_navigation.dart';
 
 /// 多模态唤醒设置页面
 class MultimodalWakeUpSettingsPage extends StatefulWidget {
@@ -18,6 +22,16 @@ class _MultimodalWakeUpSettingsPageState extends State<MultimodalWakeUpSettingsP
     return Scaffold(
       appBar: AppBar(
         title: const Text('多模态唤醒设置'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // 返回首页而不是简单的pop
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const MainNavigation()),
+              (route) => false,
+            );
+          },
+        ),
       ),
       body: ListView(
         children: [
@@ -29,6 +43,15 @@ class _MultimodalWakeUpSettingsPageState extends State<MultimodalWakeUpSettingsP
           const Divider(height: 32),
           _buildSectionHeader('桌面小组件'),
           _buildWidgetSection(),
+          const Divider(height: 32),
+          _buildSectionHeader('全局悬浮球'),
+          _buildFloatingBallSection(),
+          const Divider(height: 32),
+          _buildSectionHeader('智能触发'),
+          _buildPaymentNotificationSection(),
+          _buildLocationTriggerSection(),
+          const SizedBox(height: 32),
+          _buildStatisticsCard(),
         ],
       ),
     );
@@ -227,6 +250,149 @@ class _MultimodalWakeUpSettingsPageState extends State<MultimodalWakeUpSettingsP
               }
             },
             child: const Text('添加'),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildFloatingBallSection() {
+    final floatingBallService = FloatingBallService();
+
+    return Column(
+      children: [
+        SwitchListTile(
+          title: const Text('启用全局悬浮球'),
+          subtitle: const Text('屏幕悬浮球，随时快速记账'),
+          value: floatingBallService.isEnabled,
+          onChanged: (value) async {
+            setState(() {
+              if (value) {
+                floatingBallService.show();
+              } else {
+                floatingBallService.hide();
+              }
+            });
+          },
+        ),
+        const ListTile(
+          leading: Icon(Icons.info_outline),
+          title: Text('悬浮球说明'),
+          subtitle: Text('悬浮球可拖动位置\n点击快速记账，长按展开更多功能'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentNotificationSection() {
+    final paymentService = PaymentNotificationService();
+
+    return Column(
+      children: [
+        SwitchListTile(
+          title: const Text('支付通知监听'),
+          subtitle: const Text('检测微信/支付宝支付通知，自动提醒记账'),
+          value: paymentService.isMonitoring,
+          onChanged: (value) async {
+            setState(() {
+              if (value) {
+                paymentService.startMonitoring();
+              } else {
+                paymentService.stopMonitoring();
+              }
+            });
+          },
+        ),
+        const ListTile(
+          leading: Icon(Icons.info_outline),
+          title: Text('权限说明'),
+          subtitle: Text('需要开启通知监听权限\n仅读取支付相关通知，不会上传任何数据'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationTriggerSection() {
+    final locationService = LocationTriggerService();
+
+    return Column(
+      children: [
+        SwitchListTile(
+          title: const Text('位置触发'),
+          subtitle: const Text('到达特定地点时自动提醒记账'),
+          value: locationService.isMonitoring,
+          onChanged: (value) async {
+            setState(() {
+              if (value) {
+                locationService.startMonitoring();
+              } else {
+                locationService.stopMonitoring();
+              }
+            });
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.location_on),
+          title: const Text('管理触发地点'),
+          subtitle: Text('已设置 ${locationService.triggers.length} 个地点'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            // TODO: 打开地点管理页面
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatisticsCard() {
+    final voiceService = _wakeUpService.voiceWakeService;
+    final gestureService = _wakeUpService.gestureWakeService;
+    final floatingBallService = FloatingBallService();
+    final paymentService = PaymentNotificationService();
+    final locationService = LocationTriggerService();
+
+    final enabledCount = [
+      voiceService.isListening,
+      gestureService.enabledGestures.isNotEmpty,
+      true, // 桌面小组件默认可用
+      floatingBallService.isEnabled,
+      paymentService.isMonitoring,
+      locationService.isMonitoring,
+    ].where((e) => e).length;
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).colorScheme.primaryContainer,
+            Theme.of(context).colorScheme.secondaryContainer,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Text(
+            '已启用 $enabledCount/6 个唤醒入口',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '多种方式随时记账，不错过每一笔',
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onPrimaryContainer
+                  .withValues(alpha: 0.8),
+            ),
           ),
         ],
       ),

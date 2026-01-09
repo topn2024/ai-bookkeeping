@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/resource_pool.dart';
 import '../services/money_age_level_service.dart';
 import '../theme/app_theme.dart';
+import '../providers/money_age_provider.dart';
+import '../providers/ledger_context_provider.dart';
 
 /// 钱龄详情页
 /// 原型设计 2.01：钱龄详情 Money Age Detail
@@ -12,58 +14,69 @@ import '../theme/app_theme.dart';
 /// - 等级进度条（紧凑版）
 /// - 趋势迷你图
 /// - ���金区：行动按钮
-class MoneyAgePage extends ConsumerStatefulWidget {
+class MoneyAgePage extends ConsumerWidget {
   const MoneyAgePage({super.key});
 
   @override
-  ConsumerState<MoneyAgePage> createState() => _MoneyAgePageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final ledgerContext = ref.watch(ledgerContextProvider);
+    final bookId = ledgerContext.currentLedger?.id;
 
-class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
-  // TODO: 替换为真实的 provider
-  late MoneyAgeStatistics _stats;
-  late MoneyAgeLevelService _levelService;
-  late StageProgress _stageProgress;
-  late LevelDetails _levelDetails;
+    if (bookId == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('钱龄分析')),
+        body: const Center(child: Text('请先选择账本')),
+      );
+    }
 
-  @override
-  void initState() {
-    super.initState();
-    _levelService = MoneyAgeLevelService();
-    _stats = _getMockStatistics();
-    _stageProgress = _levelService.getStageProgress(_stats.averageAge);
-    _levelDetails = _levelService.getLevelDetails(_stats.averageAge);
+    final dashboardAsync = ref.watch(moneyAgeDashboardProvider(bookId));
+
+    return dashboardAsync.when(
+      data: (dashboard) {
+        if (dashboard == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('钱龄分析')),
+            body: const Center(child: Text('暂无钱龄数据')),
+          );
+        }
+        return _buildContent(context, theme, dashboard as MoneyAgeDashboard, ref);
+      },
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('钱龄分析')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        appBar: AppBar(title: const Text('钱龄分析')),
+        body: Center(child: Text('加载失败: $error')),
+      ),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget _buildContent(BuildContext context, ThemeData theme, MoneyAgeDashboard dashboard, WidgetRef ref) {
+    final levelService = MoneyAgeLevelService();
+    final averageAge = dashboard.avgMoneyAge.round();
+    final stageProgress = levelService.getStageProgress(averageAge);
+    final levelDetails = levelService.getLevelDetails(averageAge);
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            // 页面头部
             _buildPageHeader(context, theme),
-            // 主内容区
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    // 核心数据区
-                    _buildCoreDataSection(context, theme),
-                    // 统计数据行
-                    _buildStatsRow(context, theme),
-                    // 等级进度条
-                    _buildLevelProgressCard(context, theme),
-                    // 趋势迷你图
-                    _buildTrendMiniChart(context, theme),
+                    _buildCoreDataSection(context, theme, averageAge, levelDetails),
+                    _buildStatsRow(context, theme, dashboard),
+                    _buildLevelProgressCard(context, theme, averageAge, stageProgress, levelDetails, levelService),
+                    _buildTrendMiniChart(context, theme, dashboard),
                   ],
                 ),
               ),
             ),
-            // 黄金区：行动按钮
-            _buildActionButton(context, theme),
+            _buildActionButton(context, theme, averageAge, levelDetails),
           ],
         ),
       ),
@@ -119,8 +132,8 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
   }
 
   /// 核心数据区：钱龄数字
-  Widget _buildCoreDataSection(BuildContext context, ThemeData theme) {
-    final levelColor = _getLevelColor(_levelDetails.level);
+  Widget _buildCoreDataSection(BuildContext context, ThemeData theme, int averageAge, LevelDetails levelDetails) {
+    final levelColor = _getLevelColor(levelDetails.level);
 
     return Container(
       margin: const EdgeInsets.all(12),
@@ -145,7 +158,7 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                '${_stats.averageAge}',
+                '$averageAge',
                 style: TextStyle(
                   fontSize: 64,
                   fontWeight: FontWeight.w700,
@@ -171,7 +184,7 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              '${_getLevelEmoji(_levelDetails.level)} ${_levelDetails.level.displayName} Lv.${_getLevelNumber(_levelDetails.level)}',
+              '${_getLevelEmoji(levelDetails.level)} ${levelDetails.level.displayName} Lv.${_getLevelNumber(levelDetails.level)}',
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -185,7 +198,23 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
   }
 
   /// 统计数据行
-  Widget _buildStatsRow(BuildContext context, ThemeData theme) {
+  Widget _buildStatsRow(BuildContext context, ThemeData theme, MoneyAgeDashboard dashboard) {
+    // Calculate stats from trend data if available
+    int monthlyMax = dashboard.avgMoneyAge.round();
+    int monthlyMin = dashboard.avgMoneyAge.round();
+    int monthlyChange = 0;
+
+    if (dashboard.trendData.isNotEmpty) {
+      final ages = dashboard.trendData.map((d) => (d['avg_age'] as num?)?.toInt() ?? 0).where((a) => a > 0).toList();
+      if (ages.isNotEmpty) {
+        monthlyMax = ages.reduce((a, b) => a > b ? a : b);
+        monthlyMin = ages.reduce((a, b) => a < b ? a : b);
+        if (ages.length > 1) {
+          monthlyChange = ages.first - ages.last;
+        }
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
@@ -195,7 +224,7 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
               context,
               theme,
               label: '本月最高',
-              value: '${_stats.monthlyMax}天',
+              value: '$monthlyMax天',
               valueColor: AppColors.success,
             ),
           ),
@@ -205,7 +234,7 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
               context,
               theme,
               label: '本月最低',
-              value: '${_stats.monthlyMin}天',
+              value: '$monthlyMin天',
             ),
           ),
           const SizedBox(width: 8),
@@ -214,11 +243,11 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
               context,
               theme,
               label: '较上月',
-              value: _stats.monthlyChange >= 0
-                  ? '+${_stats.monthlyChange}天'
-                  : '${_stats.monthlyChange}天',
+              value: monthlyChange >= 0
+                  ? '+$monthlyChange天'
+                  : '$monthlyChange天',
               valueColor:
-                  _stats.monthlyChange >= 0 ? AppColors.success : AppColors.error,
+                  monthlyChange >= 0 ? AppColors.success : AppColors.error,
             ),
           ),
         ],
@@ -270,9 +299,9 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
   }
 
   /// 等级进度条（紧凑版）
-  Widget _buildLevelProgressCard(BuildContext context, ThemeData theme) {
-    final nextStage = _stageProgress.nextStage;
-    final daysToNext = _stageProgress.daysToNextStage;
+  Widget _buildLevelProgressCard(BuildContext context, ThemeData theme, int averageAge, StageProgress stageProgress, LevelDetails levelDetails, MoneyAgeLevelService levelService) {
+    final nextStage = stageProgress.nextStage;
+    final daysToNext = stageProgress.daysToNextStage;
 
     return Container(
       margin: const EdgeInsets.all(12),
@@ -301,9 +330,9 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
                 ),
               ),
               GestureDetector(
-                onTap: () => _navigateToStageProgress(context),
+                onTap: () => _navigateToStageProgress(context, averageAge, stageProgress),
                 child: Text(
-                  nextStage != null ? '距Lv.${_getLevelNumber(_levelService.determineLevel(nextStage.minDays))}还需$daysToNext天 →' : '已达最高等级',
+                  nextStage != null ? '距Lv.${_getLevelNumber(levelService.determineLevel(nextStage.minDays))}还需$daysToNext天 →' : '已达最高等级',
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.colorScheme.primary,
@@ -316,7 +345,7 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
           // 6段式进度条
           Row(
             children: List.generate(6, (index) {
-              final isAchieved = index < _getLevelNumber(_levelDetails.level);
+              final isAchieved = index < _getLevelNumber(levelDetails.level);
               return Expanded(
                 child: Container(
                   height: 6,
@@ -337,7 +366,16 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
   }
 
   /// 趋势迷你图
-  Widget _buildTrendMiniChart(BuildContext context, ThemeData theme) {
+  Widget _buildTrendMiniChart(BuildContext context, ThemeData theme, MoneyAgeDashboard dashboard) {
+    // Calculate trend from trend data
+    int monthlyChange = 0;
+    if (dashboard.trendData.isNotEmpty) {
+      final ages = dashboard.trendData.map((d) => (d['avg_age'] as num?)?.toInt() ?? 0).where((a) => a > 0).toList();
+      if (ages.length > 1) {
+        monthlyChange = ages.first - ages.last;
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12),
       padding: const EdgeInsets.all(12),
@@ -388,12 +426,12 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    _stats.monthlyChange >= 0 ? Icons.trending_up : Icons.trending_down,
-                    color: _stats.monthlyChange >= 0 ? AppColors.success : AppColors.error,
+                    monthlyChange >= 0 ? Icons.trending_up : Icons.trending_down,
+                    color: monthlyChange >= 0 ? AppColors.success : AppColors.error,
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    _stats.monthlyChange >= 0 ? '稳步上升中' : '有所下降',
+                    monthlyChange >= 0 ? '稳步上升中' : '有所下降',
                     style: TextStyle(
                       fontSize: 13,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -409,14 +447,14 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
   }
 
   /// 黄金区：行动按钮
-  Widget _buildActionButton(BuildContext context, ThemeData theme) {
+  Widget _buildActionButton(BuildContext context, ThemeData theme, int averageAge, LevelDetails levelDetails) {
     return Container(
       padding: const EdgeInsets.all(12),
       child: SizedBox(
         width: double.infinity,
         height: 52,
         child: ElevatedButton.icon(
-          onPressed: () => _navigateToUpgradeGuide(context),
+          onPressed: () => _navigateToUpgradeGuide(context, averageAge, levelDetails),
           icon: const Icon(Icons.lightbulb, size: 20),
           label: const Text(
             '查看提升建议',
@@ -499,13 +537,13 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
     );
   }
 
-  void _navigateToUpgradeGuide(BuildContext context) {
+  void _navigateToUpgradeGuide(BuildContext context, int averageAge, LevelDetails levelDetails) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => MoneyAgeUpgradePage(
-          currentAge: _stats.averageAge,
-          levelDetails: _levelDetails,
+          currentAge: averageAge,
+          levelDetails: levelDetails,
         ),
       ),
     );
@@ -518,52 +556,17 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
     );
   }
 
-  void _navigateToStageProgress(BuildContext context) {
+  void _navigateToStageProgress(BuildContext context, int averageAge, StageProgress stageProgress) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => MoneyAgeStagePage(
-          currentAge: _stats.averageAge,
-          stageProgress: _stageProgress,
+          currentAge: averageAge,
+          stageProgress: stageProgress,
         ),
       ),
     );
   }
-
-  // Mock 数据
-  MoneyAgeStatistics _getMockStatistics() {
-    return MoneyAgeStatistics(
-      averageAge: 42,
-      monthlyMax: 48,
-      monthlyMin: 35,
-      monthlyChange: 5,
-      trendData: [],
-    );
-  }
-}
-
-/// 钱龄统计数据
-class MoneyAgeStatistics {
-  final int averageAge;
-  final int monthlyMax;
-  final int monthlyMin;
-  final int monthlyChange;
-  final List<MoneyAgeTrendPoint> trendData;
-
-  const MoneyAgeStatistics({
-    required this.averageAge,
-    required this.monthlyMax,
-    required this.monthlyMin,
-    required this.monthlyChange,
-    required this.trendData,
-  });
-}
-
-class MoneyAgeTrendPoint {
-  final DateTime date;
-  final int age;
-
-  const MoneyAgeTrendPoint({required this.date, required this.age});
 }
 
 // ============================================================

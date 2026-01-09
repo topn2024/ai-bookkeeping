@@ -8,6 +8,7 @@ import 'vault_detail_page.dart';
 import 'vault_create_page.dart';
 import 'vault_allocation_page.dart';
 import 'vault_health_page.dart';
+import 'vault_ai_suggestion_page.dart';
 
 /// 小金库概览页面
 /// 原型设计 3.01：小金库概览
@@ -109,6 +110,20 @@ class VaultOverviewPage extends ConsumerWidget {
                     ),
                 ],
               ),
+            ),
+          ),
+          // AI建议按钮
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const VaultAISuggestionPage()),
+            ),
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              child: Icon(Icons.auto_awesome,
+                  color: theme.colorScheme.primary),
             ),
           ),
           GestureDetector(

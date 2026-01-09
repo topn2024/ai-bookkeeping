@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/family_dashboard.dart';
 import '../models/member.dart';
+import '../models/transaction.dart';
+import 'database_service.dart';
 
 /// 家庭看板服务
 class FamilyDashboardService {
@@ -47,28 +49,71 @@ class FamilyDashboardService {
     String period,
     List<LedgerMember> members,
   ) async {
-    // 模拟数据 - 实际应从数据库查询
-    const totalIncome = 25000.0;
-    const totalExpense = 18500.0;
-    final netSavings = totalIncome - totalExpense;
-    final savingsRate = totalIncome > 0 ? (netSavings / totalIncome * 100) : 0;
+    try {
+      final db = await DatabaseService().database;
 
-    // 计算本期天数
-    final periodDate = DateTime.parse('$period-01');
-    final daysInPeriod =
-        DateTime(periodDate.year, periodDate.month + 1, 0).day;
-    final avgDailyExpense = totalExpense / daysInPeriod;
+      // 解析期间（格式：YYYY-MM）
+      final periodDate = DateTime.parse('$period-01');
+      final startOfMonth = DateTime(periodDate.year, periodDate.month, 1);
+      final endOfMonth = DateTime(periodDate.year, periodDate.month + 1, 0, 23, 59, 59);
 
-    return FamilySummary(
-      totalIncome: totalIncome,
-      totalExpense: totalExpense,
-      netSavings: netSavings,
-      savingsRate: savingsRate.toDouble(),
-      transactionCount: 156,
-      avgDailyExpense: avgDailyExpense,
-      expenseChange: -5.2, // 比上月减少5.2%
-      activeMemberCount: members.where((m) => m.isActive).length,
-    );
+      // 查询本期所有交易
+      final results = await db.query(
+        'transactions',
+        where: 'ledgerId = ? AND datetime >= ? AND datetime <= ?',
+        whereArgs: [
+          ledgerId,
+          startOfMonth.millisecondsSinceEpoch,
+          endOfMonth.millisecondsSinceEpoch,
+        ],
+      );
+
+      double totalIncome = 0;
+      double totalExpense = 0;
+      int transactionCount = results.length;
+
+      for (var row in results) {
+        final transaction = Transaction.fromMap(row);
+        if (transaction.type == TransactionType.income) {
+          totalIncome += transaction.amount;
+        } else if (transaction.type == TransactionType.expense) {
+          totalExpense += transaction.amount;
+        }
+      }
+
+      final netSavings = totalIncome - totalExpense;
+      final savingsRate = totalIncome > 0 ? (netSavings / totalIncome * 100) : 0;
+
+      // 计算本期天数
+      final daysInPeriod = endOfMonth.day;
+      final avgDailyExpense = totalExpense / daysInPeriod;
+
+      // 计算与上月对比（简化实现，返回0）
+      final expenseChange = 0.0;
+
+      return FamilySummary(
+        totalIncome: totalIncome,
+        totalExpense: totalExpense,
+        netSavings: netSavings,
+        savingsRate: savingsRate,
+        transactionCount: transactionCount,
+        avgDailyExpense: avgDailyExpense,
+        expenseChange: expenseChange,
+        activeMemberCount: members.where((m) => m.isActive).length,
+      );
+    } catch (e) {
+      // 出错时返回空数据
+      return FamilySummary(
+        totalIncome: 0,
+        totalExpense: 0,
+        netSavings: 0,
+        savingsRate: 0,
+        transactionCount: 0,
+        avgDailyExpense: 0,
+        expenseChange: 0,
+        activeMemberCount: members.where((m) => m.isActive).length,
+      );
+    }
   }
 
   /// 计算成员贡献
@@ -77,30 +122,85 @@ class FamilyDashboardService {
     String period,
     List<LedgerMember> members,
   ) async {
-    // 模拟数据 - 实际应从数据库查询
-    final contributions = <MemberContribution>[];
-    final totalExpense = 18500.0;
+    try {
+      final db = await DatabaseService().database;
 
-    for (int i = 0; i < members.length; i++) {
-      final member = members[i];
-      // 模拟不同成员的贡献
-      final expense = totalExpense * (0.3 + i * 0.1);
-      final income = 25000.0 * (0.4 + i * 0.15);
+      // 解析期间
+      final periodDate = DateTime.parse('$period-01');
+      final startOfMonth = DateTime(periodDate.year, periodDate.month, 1);
+      final endOfMonth = DateTime(periodDate.year, periodDate.month + 1, 0, 23, 59, 59);
 
-      contributions.add(MemberContribution(
-        memberId: member.userId,
-        memberName: member.displayName,
-        avatarUrl: member.avatarUrl,
-        income: income,
-        expense: expense,
-        transactionCount: 30 + i * 10,
-        contributionPercentage: totalExpense > 0 ? expense / totalExpense * 100 : 0,
-        topCategories: ['餐饮', '购物', '交通'],
-        lastActivityAt: DateTime.now().subtract(Duration(hours: i * 2)),
-      ));
+      final contributions = <MemberContribution>[];
+      double totalExpense = 0;
+
+      // 先计算总支出用于百分比计算
+      final allResults = await db.query(
+        'transactions',
+        where: 'ledgerId = ? AND datetime >= ? AND datetime <= ? AND type = ?',
+        whereArgs: [
+          ledgerId,
+          startOfMonth.millisecondsSinceEpoch,
+          endOfMonth.millisecondsSinceEpoch,
+          TransactionType.expense.index,
+        ],
+      );
+
+      for (var row in allResults) {
+        totalExpense += (row['amount'] as num).toDouble();
+      }
+
+      // 为每个成员计算贡献
+      for (final member in members) {
+        final results = await db.query(
+          'transactions',
+          where: 'ledgerId = ? AND createdBy = ? AND datetime >= ? AND datetime <= ?',
+          whereArgs: [
+            ledgerId,
+            member.userId,
+            startOfMonth.millisecondsSinceEpoch,
+            endOfMonth.millisecondsSinceEpoch,
+          ],
+        );
+
+        double income = 0;
+        double expense = 0;
+        final categoryMap = <String, double>{};
+
+        for (var row in results) {
+          final transaction = Transaction.fromMap(row);
+          if (transaction.type == TransactionType.income) {
+            income += transaction.amount;
+          } else if (transaction.type == TransactionType.expense) {
+            expense += transaction.amount;
+            categoryMap[transaction.category] =
+                (categoryMap[transaction.category] ?? 0) + transaction.amount;
+          }
+        }
+
+        // 获取前3个最高消费类别
+        final topCategories = categoryMap.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+        final topCategoryNames = topCategories.take(3).map((e) => e.key).toList();
+
+        contributions.add(MemberContribution(
+          memberId: member.userId,
+          memberName: member.displayName,
+          avatarUrl: member.avatarUrl,
+          income: income,
+          expense: expense,
+          transactionCount: results.length,
+          contributionPercentage: totalExpense > 0 ? expense / totalExpense * 100 : 0,
+          topCategories: topCategoryNames,
+          lastActivityAt: results.isNotEmpty
+              ? DateTime.fromMillisecondsSinceEpoch(results.first['datetime'] as int)
+              : member.joinedAt,
+        ));
+      }
+
+      return contributions;
+    } catch (e) {
+      return [];
     }
-
-    return contributions;
   }
 
   /// 计算分类分布
@@ -108,69 +208,85 @@ class FamilyDashboardService {
     String ledgerId,
     String period,
   ) async {
-    // 模拟数据
-    return [
-      CategoryBreakdown(
-        categoryId: 'food',
-        categoryName: '餐饮',
-        icon: Icons.restaurant,
-        color: const Color(0xFFFF9800),
-        amount: 4500,
-        percentage: 24.3,
-        transactionCount: 45,
-        change: 3.2,
-      ),
-      CategoryBreakdown(
-        categoryId: 'shopping',
-        categoryName: '购物',
-        icon: Icons.shopping_bag,
-        color: const Color(0xFFE91E63),
-        amount: 3800,
-        percentage: 20.5,
-        transactionCount: 28,
-        change: -8.5,
-      ),
-      CategoryBreakdown(
-        categoryId: 'transport',
-        categoryName: '交通',
-        icon: Icons.directions_car,
-        color: const Color(0xFF2196F3),
-        amount: 2200,
-        percentage: 11.9,
-        transactionCount: 35,
-        change: 1.5,
-      ),
-      CategoryBreakdown(
-        categoryId: 'housing',
-        categoryName: '住房',
-        icon: Icons.home,
-        color: const Color(0xFF4CAF50),
-        amount: 5000,
-        percentage: 27.0,
-        transactionCount: 5,
-        change: 0,
-      ),
-      CategoryBreakdown(
-        categoryId: 'entertainment',
-        categoryName: '娱乐',
-        icon: Icons.sports_esports,
-        color: const Color(0xFF9C27B0),
-        amount: 1500,
-        percentage: 8.1,
-        transactionCount: 20,
-        change: 12.3,
-      ),
-      CategoryBreakdown(
-        categoryId: 'others',
-        categoryName: '其他',
-        icon: Icons.more_horiz,
-        color: const Color(0xFF607D8B),
-        amount: 1500,
-        percentage: 8.2,
-        transactionCount: 23,
-        change: -2.1,
-      ),
+    try {
+      final db = await DatabaseService().database;
+
+      // 解析期间
+      final periodDate = DateTime.parse('$period-01');
+      final startOfMonth = DateTime(periodDate.year, periodDate.month, 1);
+      final endOfMonth = DateTime(periodDate.year, periodDate.month + 1, 0, 23, 59, 59);
+
+      // 查询本期支出交易
+      final results = await db.query(
+        'transactions',
+        where: 'ledgerId = ? AND datetime >= ? AND datetime <= ? AND type = ?',
+        whereArgs: [
+          ledgerId,
+          startOfMonth.millisecondsSinceEpoch,
+          endOfMonth.millisecondsSinceEpoch,
+          TransactionType.expense.index,
+        ],
+      );
+
+      // 按类别聚合
+      final categoryMap = <String, Map<String, dynamic>>{};
+      double totalExpense = 0;
+
+      for (var row in results) {
+        final transaction = Transaction.fromMap(row);
+        final category = transaction.category;
+
+        if (!categoryMap.containsKey(category)) {
+          categoryMap[category] = {
+            'amount': 0.0,
+            'count': 0,
+          };
+        }
+
+        categoryMap[category]!['amount'] += transaction.amount;
+        categoryMap[category]!['count']++;
+        totalExpense += transaction.amount;
+      }
+
+      // 转换为CategoryBreakdown列表
+      final breakdowns = <CategoryBreakdown>[];
+      for (var entry in categoryMap.entries) {
+        final amount = entry.value['amount'] as double;
+        final count = entry.value['count'] as int;
+        final percentage = totalExpense > 0 ? (amount / totalExpense * 100) : 0;
+
+        breakdowns.add(CategoryBreakdown(
+          categoryId: entry.key,
+          categoryName: entry.key,
+          icon: Icons.category,
+          color: _getCategoryColor(entry.key),
+          amount: amount,
+          percentage: percentage,
+          transactionCount: count,
+          change: 0, // 简化实现
+        ));
+      }
+
+      // 按金额排序
+      breakdowns.sort((a, b) => b.amount.compareTo(a.amount));
+
+      return breakdowns;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// 获取类别颜色（简化实现）
+  Color _getCategoryColor(String category) {
+    final colors = [
+      const Color(0xFFFF9800),
+      const Color(0xFFE91E63),
+      const Color(0xFF2196F3),
+      const Color(0xFF4CAF50),
+      const Color(0xFF9C27B0),
+      const Color(0xFF607D8B),
     ];
+    return colors[category.hashCode % colors.length];
   }
 
   /// 计算支出趋势
@@ -178,24 +294,64 @@ class FamilyDashboardService {
     String ledgerId,
     String period,
   ) async {
-    // 模拟数据 - 生成过去30天的趋势
-    final trends = <TrendPoint>[];
-    final now = DateTime.now();
+    try {
+      final db = await DatabaseService().database;
 
-    for (int i = 29; i >= 0; i--) {
-      final date = now.subtract(Duration(days: i));
-      final baseExpense = 500 + (i % 7) * 100; // 周期性波动
-      final baseIncome = i == 0 || i == 15 ? 12500 : 0; // 发薪日
+      // 解析期间
+      final periodDate = DateTime.parse('$period-01');
+      final startOfMonth = DateTime(periodDate.year, periodDate.month, 1);
+      final endOfMonth = DateTime(periodDate.year, periodDate.month + 1, 0, 23, 59, 59);
 
-      trends.add(TrendPoint(
-        date: date,
-        label: '${date.month}/${date.day}',
-        expense: baseExpense.toDouble() + (i % 3) * 50,
-        income: baseIncome.toDouble(),
-      ));
+      // 查询本期所有交易
+      final results = await db.query(
+        'transactions',
+        where: 'ledgerId = ? AND datetime >= ? AND datetime <= ?',
+        whereArgs: [
+          ledgerId,
+          startOfMonth.millisecondsSinceEpoch,
+          endOfMonth.millisecondsSinceEpoch,
+        ],
+        orderBy: 'datetime ASC',
+      );
+
+      // 按日期聚合
+      final dailyMap = <String, Map<String, double>>{};
+
+      for (var row in results) {
+        final transaction = Transaction.fromMap(row);
+        final date = DateTime.fromMillisecondsSinceEpoch(transaction.date.millisecondsSinceEpoch);
+        final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+        if (!dailyMap.containsKey(dateKey)) {
+          dailyMap[dateKey] = {'expense': 0.0, 'income': 0.0};
+        }
+
+        if (transaction.type == TransactionType.expense) {
+          dailyMap[dateKey]!['expense'] = dailyMap[dateKey]!['expense']! + transaction.amount;
+        } else if (transaction.type == TransactionType.income) {
+          dailyMap[dateKey]!['income'] = dailyMap[dateKey]!['income']! + transaction.amount;
+        }
+      }
+
+      // 转换为TrendPoint列表
+      final trends = <TrendPoint>[];
+      for (var entry in dailyMap.entries) {
+        final date = DateTime.parse(entry.key);
+        trends.add(TrendPoint(
+          date: date,
+          label: '${date.month}/${date.day}',
+          expense: entry.value['expense']!,
+          income: entry.value['income']!,
+        ));
+      }
+
+      // 按日期排序
+      trends.sort((a, b) => a.date.compareTo(b.date));
+
+      return trends;
+    } catch (e) {
+      return [];
     }
-
-    return trends;
   }
 
   /// 获取预算状态

@@ -4,6 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../theme/app_theme.dart';
+import '../services/database_service.dart';
+import '../models/import_batch.dart';
 import 'import/smart_format_detection_page.dart';
 import 'import/import_history_page.dart';
 
@@ -22,6 +24,13 @@ class ImportPage extends ConsumerStatefulWidget {
 class _ImportPageState extends ConsumerState<ImportPage> {
   String? _selectedBank;
   bool _isLoading = false;
+  List<RecentImport> _recentImports = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentImports();
+  }
 
   // 银行列表
   final List<BankInfo> _banks = [
@@ -35,21 +44,49 @@ class _ImportPageState extends ConsumerState<ImportPage> {
     BankInfo(id: 'other', name: '其他银行', shortName: '其他', color: Colors.grey),
   ];
 
-  // 最近导入记录（模拟数据）
-  final List<RecentImport> _recentImports = [
-    RecentImport(
-      fileName: '工商银行_202412.csv',
-      importDate: DateTime.now().subtract(const Duration(days: 2)),
-      count: 56,
-      status: ImportStatus.success,
-    ),
-    RecentImport(
-      fileName: '微信支付账单_202412.csv',
-      importDate: DateTime.now().subtract(const Duration(days: 5)),
-      count: 126,
-      status: ImportStatus.success,
-    ),
-  ];
+  /// 加载最近导入记录
+  Future<void> _loadRecentImports() async {
+    try {
+      final db = await DatabaseService().database;
+      final results = await db.query(
+        'import_batches',
+        orderBy: 'createdAt DESC',
+        limit: 3,
+      );
+
+      if (mounted) {
+        setState(() {
+          _recentImports = results.map((row) {
+            final batch = ImportBatch.fromMap(row);
+
+            // 根据导入结果确定状态
+            ImportStatus status;
+            if (batch.failedCount == 0 && batch.skippedCount < batch.totalCount / 2) {
+              status = ImportStatus.success;
+            } else if (batch.failedCount > 0 || batch.skippedCount >= batch.totalCount / 2) {
+              status = ImportStatus.partial;
+            } else {
+              status = ImportStatus.failed;
+            }
+
+            return RecentImport(
+              fileName: batch.fileName,
+              importDate: batch.createdAt,
+              count: batch.importedCount,
+              status: status,
+            );
+          }).toList();
+        });
+      }
+    } catch (e) {
+      // 加载失败时保持空列表
+      if (mounted) {
+        setState(() {
+          _recentImports = [];
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -357,7 +394,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
 
         if (mounted) {
           // 跳转到智能格式检测页面
-          Navigator.push(
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => SmartFormatDetectionPage(
@@ -367,6 +404,8 @@ class _ImportPageState extends ConsumerState<ImportPage> {
               ),
             ),
           );
+          // 返回后刷新导入记录
+          _loadRecentImports();
         }
       }
     } catch (e) {
@@ -383,11 +422,13 @@ class _ImportPageState extends ConsumerState<ImportPage> {
     }
   }
 
-  void _navigateToHistory(BuildContext context) {
-    Navigator.push(
+  void _navigateToHistory(BuildContext context) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const ImportHistoryPage()),
     );
+    // 返回后刷新导入记录
+    _loadRecentImports();
   }
 }
 

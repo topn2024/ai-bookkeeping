@@ -676,7 +676,7 @@ class AppLocalizations {
     'monthly': '月',
     'yearly': '年',
     // 设置
-    'profile': '个人资料',
+    'profile': '我的',
     'language': '语言',
     'currency': '货币',
     'theme': '主题',

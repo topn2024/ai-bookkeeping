@@ -11,6 +11,7 @@ import '../models/category.dart';
 import '../models/transaction.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/budget_provider.dart';
+import 'budget_center_page.dart';
 
 /// 今日可支出页面
 /// 原型设计 1.06：今日可支出
@@ -535,6 +536,18 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
       initialChildSize: 0.4,
       child: Column(
         children: [
+          ListTile(
+            leading: const Icon(Icons.account_balance_wallet),
+            title: const Text('查看预算详情'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BudgetCenterPage()),
+              );
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.calendar_today),
             title: const Text('计算周期'),

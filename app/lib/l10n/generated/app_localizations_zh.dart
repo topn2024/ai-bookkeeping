@@ -342,7 +342,7 @@ class SZh extends S {
   String get noStatisticsData => '暂无统计数据';
 
   @override
-  String get profile => '个人资料';
+  String get profile => '我的';
 
   @override
   String get language => '语言';
@@ -3216,7 +3216,7 @@ class SZhCn extends SZh {
   String get noStatisticsData => '暂无统计数据';
 
   @override
-  String get profile => '个人资料';
+  String get profile => '我的';
 
   @override
   String get language => '语言';

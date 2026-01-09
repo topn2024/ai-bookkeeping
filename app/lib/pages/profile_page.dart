@@ -38,6 +38,7 @@ import 'growth/invite_friend_page.dart';
 import 'growth/viral_campaign_page.dart';
 import 'growth/negative_experience_recovery_page.dart';
 import 'growth/detractor_care_page.dart';
+import 'multimodal_wakeup_settings_page.dart';
 
 /// 我的页面
 class ProfilePage extends ConsumerStatefulWidget {
@@ -521,6 +522,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       theme,
       title: '系统设置',
       items: [
+        _SettingsItem(
+          icon: Icons.touch_app,
+          title: '多模态唤醒',
+          subtitle: '语音、手势、悬浮球等快捷入口',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const MultimodalWakeUpSettingsPage()),
+          ),
+        ),
         _SettingsItem(
           icon: Icons.settings,
           title: context.l10n.systemSettings,

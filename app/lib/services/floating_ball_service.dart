@@ -65,22 +65,22 @@ class FloatingBallService {
 
   /// 显示悬浮球
   Future<void> show() async {
+    _isEnabled = true;
     try {
       await _channel.invokeMethod('showFloatingBall');
-      _isEnabled = true;
     } catch (e) {
-      debugPrint('Failed to show floating ball: $e');
+      debugPrint('Floating ball native implementation not available: $e');
     }
   }
 
   /// 隐藏悬浮球
   Future<void> hide() async {
+    _isEnabled = false;
+    _updateState(FloatingBallState.hidden);
     try {
       await _channel.invokeMethod('hideFloatingBall');
-      _isEnabled = false;
-      _updateState(FloatingBallState.hidden);
     } catch (e) {
-      debugPrint('Failed to hide floating ball: $e');
+      debugPrint('Floating ball native implementation not available: $e');
     }
   }
 

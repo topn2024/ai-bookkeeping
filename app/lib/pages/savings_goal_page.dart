@@ -5,6 +5,7 @@ import '../models/savings_goal.dart';
 import '../models/category.dart';
 import '../providers/savings_goal_provider.dart';
 import '../providers/category_provider.dart';
+import 'vault_overview_page.dart';
 
 class SavingsGoalPage extends ConsumerWidget {
   const SavingsGoalPage({super.key});
@@ -163,6 +164,21 @@ class SavingsGoalPage extends ConsumerWidget {
                   ],
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const VaultOverviewPage()),
+                ),
+                icon: const Icon(Icons.account_balance_wallet, size: 18),
+                label: const Text('管理小金库'),
+                style: TextButton.styleFrom(
+                  foregroundColor: theme.colorScheme.primary,
+                ),
+              ),
             ),
           ],
         ),

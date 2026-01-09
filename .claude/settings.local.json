@@ -690,7 +690,11 @@
       "Bash(then echo \"Missing import in: $file\" fi done)",
       "Bash(then sed -i '' \"1a\\\\ import ''''../theme/app_theme.dart'''';\n\" \"$file\" echo \"Added import to: $file\" fi done)",
       "Bash(alembic revision:*)",
-      "Bash(adb install:*)"
+      "Bash(adb install:*)",
+      "Bash(adb -s emulator-5554 install:*)",
+      "Bash(adb -s emulator-5554 logcat -d)",
+      "Bash(brew install:*)",
+      "Bash(dot:*)"
     ]
   }
 }

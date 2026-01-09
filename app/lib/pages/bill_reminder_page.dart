@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/bill_reminder.dart';
 import '../providers/bill_reminder_provider.dart';
+import 'transaction_list_page.dart';
 
 class BillReminderPage extends ConsumerWidget {
   const BillReminderPage({super.key});
@@ -152,6 +153,21 @@ class BillReminderPage extends ConsumerWidget {
                 ],
               ),
             ],
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TransactionListPage()),
+                ),
+                icon: const Icon(Icons.history, size: 18),
+                label: const Text('查看历史账单'),
+                style: TextButton.styleFrom(
+                  foregroundColor: theme.colorScheme.primary,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -422,15 +438,18 @@ class BillReminderPage extends ConsumerWidget {
     return '$days 天后到期 (${reminder.nextBillDate.month}/${reminder.nextBillDate.day})';
   }
 
-  void _handleMenuAction(BuildContext context, WidgetRef ref, BillReminder reminder, String action) {
+  void _handleMenuAction(BuildContext context, WidgetRef ref, BillReminder reminder, String action) async {
     switch (action) {
       case 'edit':
-        Navigator.push(
+        final result = await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => BillReminderFormPage(reminder: reminder),
           ),
         );
+        if (result == true && context.mounted) {
+          ref.invalidate(billReminderProvider);
+        }
         break;
       case 'toggle':
         ref.read(billReminderProvider.notifier).toggleReminder(reminder.id);
@@ -449,14 +468,17 @@ class BillReminderPage extends ConsumerWidget {
       ),
       builder: (context) => _ReminderDetailSheet(
         reminder: reminder,
-        onEdit: () {
+        onEdit: () async {
           Navigator.pop(context);
-          Navigator.push(
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => BillReminderFormPage(reminder: reminder),
             ),
           );
+          if (result == true && context.mounted) {
+            ref.invalidate(billReminderProvider);
+          }
         },
         onMarkDone: () {
           ref.read(billReminderProvider.notifier).markAsReminded(reminder.id);
@@ -483,14 +505,17 @@ class BillReminderPage extends ConsumerWidget {
         expand: false,
         builder: (context, scrollController) => _TypeSelectionSheet(
           scrollController: scrollController,
-          onSelectType: (type) {
+          onSelectType: (type) async {
             Navigator.pop(context);
-            Navigator.push(
+            final result = await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => BillReminderFormPage(initialType: type),
               ),
             );
+            if (result == true && context.mounted) {
+              ref.invalidate(billReminderProvider);
+            }
           },
         ),
       ),
@@ -1275,7 +1300,7 @@ class _BillReminderFormPageState extends ConsumerState<BillReminderFormPage> {
       ref.read(billReminderProvider.notifier).addReminder(reminder);
     }
 
-    Navigator.pop(context);
+    Navigator.pop(context, true);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(isEditing ? '提醒已更新' : '提醒已添加')),
     );

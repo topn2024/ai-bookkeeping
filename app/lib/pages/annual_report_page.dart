@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/transaction.dart';
 import '../providers/transaction_provider.dart';
+import 'reports/monthly_report_page.dart';
 
 class AnnualReportPage extends ConsumerStatefulWidget {
   const AnnualReportPage({super.key});
@@ -384,40 +385,50 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
                           : 0.0;
 
                       return Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: incomeHeight.clamp(2.0, 160.0),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green,
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Container(
-                                    width: 8,
-                                    height: expenseHeight.clamp(2.0, 160.0),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                ],
+                        child: GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MonthlyReportPage(
+                                initialDate: DateTime(_selectedYear, i + 1),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                months[i].substring(0, months[i].length - 1),
-                                style: const TextStyle(fontSize: 10, color: Colors.grey),
-                              ),
-                            ],
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: incomeHeight.clamp(2.0, 160.0),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green,
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Container(
+                                      width: 8,
+                                      height: expenseHeight.clamp(2.0, 160.0),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  months[i].substring(0, months[i].length - 1),
+                                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );

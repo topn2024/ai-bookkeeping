@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../l10n/l10n.dart';
 import '../models/category.dart';
 import '../providers/category_provider.dart';
+import 'category_detail_page.dart';
 
 /// 用于构建扁平化分类列表的辅助类
 class _CategoryListItem {
@@ -202,6 +203,20 @@ class _CategoryManagementPageState
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // 查看详情按钮
+                IconButton(
+                  icon: const Icon(Icons.bar_chart, color: AppColors.primary),
+                  tooltip: '查看统计',
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CategoryDetailPage(
+                        categoryId: category.id,
+                        isExpense: isExpense,
+                      ),
+                    ),
+                  ),
+                ),
                 // 添加子分类按钮（只有非子分类才显示）
                 if (!item.isChild)
                   IconButton(

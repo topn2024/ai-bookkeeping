@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/ledger.dart';
 import '../models/member.dart';
+import '../services/database_service.dart';
 
 /// 当前账本上下文状态
 class LedgerContextState {
@@ -157,16 +158,44 @@ class LedgerContextNotifier extends Notifier<LedgerContextState> {
 
   /// 加载用户的所有账本
   Future<List<Ledger>> _loadUserLedgers(String userId) async {
-    // 模拟数据 - 实际应从数据库加载
-    return [
-      DefaultLedgers.defaultLedger(userId),
-    ];
+    try {
+      final db = await DatabaseService().database;
+      final results = await db.query(
+        'ledgers',
+        where: 'ownerId = ? OR id IN (SELECT ledgerId FROM ledger_members WHERE userId = ?)',
+        whereArgs: [userId, userId],
+        orderBy: 'isDefault DESC, createdAt DESC',
+      );
+
+      if (results.isEmpty) {
+        // 如果没有账本，创建默认账本
+        final defaultLedger = DefaultLedgers.defaultLedger(userId);
+        await db.insert('ledgers', defaultLedger.toMap());
+        return [defaultLedger];
+      }
+
+      return results.map((row) => Ledger.fromMap(row)).toList();
+    } catch (e) {
+      // 出错时返回默认账本
+      return [DefaultLedgers.defaultLedger(userId)];
+    }
   }
 
   /// 加载账本成员
   Future<List<LedgerMember>> _loadLedgerMembers(String ledgerId) async {
-    // 模拟数据 - 实际应从数据库加载
-    return [];
+    try {
+      final db = await DatabaseService().database;
+      final results = await db.query(
+        'ledger_members',
+        where: 'ledgerId = ?',
+        whereArgs: [ledgerId],
+        orderBy: 'role ASC, joinedAt ASC',
+      );
+
+      return results.map((row) => LedgerMember.fromMap(row)).toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   /// 刷新当前账本

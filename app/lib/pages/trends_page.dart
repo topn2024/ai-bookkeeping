@@ -5,6 +5,8 @@ import '../l10n/l10n.dart';
 import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import 'category_detail_page.dart';
+import 'reports/trend_drill_page.dart';
 
 /// 趋势分析页面
 /// 原型设计 1.02：趋势分析 Trends
@@ -221,37 +223,43 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
 
   /// 图表占位区域
   Widget _buildChartPlaceholder(BuildContext context, ThemeData theme) {
-    return Container(
-      height: 200,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const TrendDrillPage()),
       ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.show_chart,
-              size: 48,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '消费趋势折线图',
-              style: TextStyle(
-                color: theme.colorScheme.onSurfaceVariant,
+      child: Container(
+        height: 200,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.show_chart,
+                size: 48,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '点击可下钻查看详情',
-              style: TextStyle(
-                fontSize: 12,
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              const SizedBox(height: 8),
+              Text(
+                '消费趋势折线图',
+                style: TextStyle(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                '点击可下钻查看详情',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -365,14 +373,25 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
         ...categories.take(5).map((entry) {
           final category = DefaultCategories.findById(entry.key);
           final count = categoryCount[entry.key] ?? 0;
-          return _buildCategoryItem(
-            context,
-            theme,
-            icon: category?.icon ?? Icons.help_outline,
-            iconColor: category?.color ?? Colors.grey,
-            name: category?.localizedName ?? entry.key,
-            count: count,
-            amount: entry.value,
+          return GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CategoryDetailPage(
+                  categoryId: entry.key,
+                  isExpense: true,
+                ),
+              ),
+            ),
+            child: _buildCategoryItem(
+              context,
+              theme,
+              icon: category?.icon ?? Icons.help_outline,
+              iconColor: category?.color ?? Colors.grey,
+              name: category?.localizedName ?? entry.key,
+              count: count,
+              amount: entry.value,
+            ),
           );
         }),
       ],

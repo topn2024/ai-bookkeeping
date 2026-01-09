@@ -532,3 +532,45 @@ class MoneyAgeImpactAnalysis {
     return '影响显著';
   }
 }
+
+/// 钱龄仪表盘数据（从后端API获取）
+class MoneyAgeDashboard {
+  final double avgMoneyAge;
+  final int medianMoneyAge;
+  final String currentHealthLevel;
+  final int healthCount;
+  final int warningCount;
+  final int dangerCount;
+  final int totalResourcePools;
+  final int activeResourcePools;
+  final double totalRemainingAmount;
+  final List<Map<String, dynamic>> trendData;
+
+  const MoneyAgeDashboard({
+    required this.avgMoneyAge,
+    required this.medianMoneyAge,
+    required this.currentHealthLevel,
+    required this.healthCount,
+    required this.warningCount,
+    required this.dangerCount,
+    required this.totalResourcePools,
+    required this.activeResourcePools,
+    required this.totalRemainingAmount,
+    required this.trendData,
+  });
+
+  factory MoneyAgeDashboard.fromJson(Map<String, dynamic> json) {
+    return MoneyAgeDashboard(
+      avgMoneyAge: (json['avg_money_age'] as num?)?.toDouble() ?? 0.0,
+      medianMoneyAge: json['median_money_age'] as int? ?? 0,
+      currentHealthLevel: json['current_health_level'] as String? ?? 'normal',
+      healthCount: json['health_count'] as int? ?? 0,
+      warningCount: json['warning_count'] as int? ?? 0,
+      dangerCount: json['danger_count'] as int? ?? 0,
+      totalResourcePools: json['total_resource_pools'] as int? ?? 0,
+      activeResourcePools: json['active_resource_pools'] as int? ?? 0,
+      totalRemainingAmount: (json['total_remaining_amount'] as num?)?.toDouble() ?? 0.0,
+      trendData: (json['trend_data'] as List?)?.cast<Map<String, dynamic>>() ?? [],
+    );
+  }
+}

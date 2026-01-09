@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
+import '../services/database_service.dart';
+import '../models/transaction.dart';
 
 /// 语音识别类型
 enum VoiceRecordType {
@@ -41,57 +43,56 @@ class VoiceHistoryPage extends ConsumerStatefulWidget {
 }
 
 class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
-  // 模拟数据 - 实际应从数据库加载
-  final List<VoiceRecord> _records = [
-    VoiceRecord(
-      id: '1',
-      type: VoiceRecordType.voice,
-      content: '午餐花了35块',
-      timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-      amount: 35.0,
-      category: '餐饮',
-    ),
-    VoiceRecord(
-      id: '2',
-      type: VoiceRecordType.voice,
-      content: '打车去公司58块',
-      timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-      amount: 58.0,
-      category: '交通',
-    ),
-    VoiceRecord(
-      id: '3',
-      type: VoiceRecordType.image,
-      content: '小票识别 · 超市购物',
-      timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
-      amount: 156.80,
-      category: '购物',
-    ),
-    VoiceRecord(
-      id: '4',
-      type: VoiceRecordType.voice,
-      content: '加油300',
-      timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 8)),
-      amount: 300.0,
-      category: '交通',
-    ),
-    VoiceRecord(
-      id: '5',
-      type: VoiceRecordType.voice,
-      content: '买水果68.5',
-      timestamp: DateTime.now().subtract(const Duration(days: 2, hours: 4)),
-      amount: 68.5,
-      category: '餐饮',
-    ),
-    VoiceRecord(
-      id: '6',
-      type: VoiceRecordType.image,
-      content: '餐厅账单识别',
-      timestamp: DateTime.now().subtract(const Duration(days: 3, hours: 6)),
-      amount: 238.0,
-      category: '餐饮',
-    ),
-  ];
+  List<VoiceRecord> _records = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVoiceRecords();
+  }
+
+  /// 从数据库加载语音和图片识别记录
+  Future<void> _loadVoiceRecords() async {
+    try {
+      final db = await DatabaseService().database;
+
+      // 查询来源为voice或image的交易记录
+      final results = await db.query(
+        'transactions',
+        where: 'source IN (?, ?)',
+        whereArgs: [TransactionSource.voice.index, TransactionSource.image.index],
+        orderBy: 'datetime DESC',
+      );
+
+      if (mounted) {
+        setState(() {
+          _records = results.map((row) {
+            final transaction = Transaction.fromMap(row);
+
+            return VoiceRecord(
+              id: transaction.id,
+              type: transaction.source == TransactionSource.voice
+                  ? VoiceRecordType.voice
+                  : VoiceRecordType.image,
+              content: transaction.note ?? '${transaction.category} ${transaction.amount}',
+              timestamp: transaction.date,
+              amount: transaction.amount,
+              category: transaction.category,
+            );
+          }).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _records = [];
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -124,16 +125,18 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
           ),
         ],
       ),
-      body: groupedRecords.isEmpty
-          ? _buildEmptyState(l10n)
-          : ListView.builder(
-              padding: const EdgeInsets.only(bottom: 100),
-              itemCount: groupedRecords.length,
-              itemBuilder: (context, index) {
-                final entry = groupedRecords.entries.elementAt(index);
-                return _buildDateSection(entry.key, entry.value, l10n);
-              },
-            ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : groupedRecords.isEmpty
+              ? _buildEmptyState(l10n)
+              : ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 100),
+                  itemCount: groupedRecords.length,
+                  itemBuilder: (context, index) {
+                    final entry = groupedRecords.entries.elementAt(index);
+                    return _buildDateSection(entry.key, entry.value, l10n);
+                  },
+                ),
       floatingActionButton: _buildVoiceFab(l10n),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );

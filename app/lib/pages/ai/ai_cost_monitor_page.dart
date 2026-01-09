@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../main_navigation.dart';
 
 /// AI成本监控页面
 ///
@@ -13,6 +14,16 @@ class AICostMonitorPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('AI成本'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // 返回首页而不是简单的pop
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const MainNavigation()),
+              (route) => false,
+            );
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.more_vert),

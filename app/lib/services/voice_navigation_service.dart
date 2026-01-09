@@ -216,6 +216,13 @@ class VoiceNavigationService extends ChangeNotifier {
       aliases: ['智能建议', '预算建议', '分配建议'],
       voiceAdaptation: VoiceAdaptation.high,
     ),
+    '/budget/vault-ai-suggestion': PageConfig(
+      route: '/budget/vault-ai-suggestion',
+      name: '小金库AI建议',
+      module: '零基预算',
+      aliases: ['小金库建议', '金库AI建议', '智能分配建议'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
     '/budget/carryover': PageConfig(
       route: '/budget/carryover',
       name: '预算结转',
@@ -505,6 +512,13 @@ class VoiceNavigationService extends ChangeNotifier {
       aliases: ['语言设置', '切换语言'],
       voiceAdaptation: VoiceAdaptation.low,
     ),
+    '/settings/ai-language': PageConfig(
+      route: '/settings/ai-language',
+      name: 'AI语言设置',
+      module: '设置中心',
+      aliases: ['AI语言', 'AI语言设置', '智能语言'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
     '/settings/notification': PageConfig(
       route: '/settings/notification',
       name: '通知设置',
@@ -779,7 +793,14 @@ class VoiceNavigationService extends ChangeNotifier {
       route: '/voice/split',
       name: 'AA分摊处理',
       module: '语音交互',
-      aliases: ['AA分摊', '分摊处理'],
+      aliases: ['AA分摊', '分摊处理', 'AA制', 'AA记账', '平摊'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/voice/wakeup-settings': PageConfig(
+      route: '/voice/wakeup-settings',
+      name: '多模态唤醒设置',
+      module: '语音交互',
+      aliases: ['唤醒设置', '多模态唤醒', '唤醒方式', '快捷唤醒'],
       voiceAdaptation: VoiceAdaptation.high,
     ),
     '/voice/timing': PageConfig(
@@ -896,6 +917,34 @@ class VoiceNavigationService extends ChangeNotifier {
       name: '学习进度',
       module: 'AI智能中心',
       aliases: ['学习进度', 'AI学习', '准确率'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/ai/learning-curve': PageConfig(
+      route: '/ai/learning-curve',
+      name: 'AI学习曲线',
+      module: 'AI智能中心',
+      aliases: ['学习曲线', 'AI成长', '准确率曲线', '成长曲线'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/ai/batch-training': PageConfig(
+      route: '/ai/batch-training',
+      name: '批量训练AI',
+      module: 'AI智能中心',
+      aliases: ['批量训练', 'AI训练', '训练AI', '批量校正'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/ai/cost-monitor': PageConfig(
+      route: '/ai/cost-monitor',
+      name: 'AI成本监控',
+      module: 'AI智能中心',
+      aliases: ['AI成本', '成本监控', 'AI费用', '成本统计'],
+      voiceAdaptation: VoiceAdaptation.medium,
+    ),
+    '/ai/learning-report': PageConfig(
+      route: '/ai/learning-report',
+      name: '智能学习报告',
+      module: 'AI智能中心',
+      aliases: ['学习报告', 'AI报告', '学习统计'],
       voiceAdaptation: VoiceAdaptation.medium,
     ),
     '/ai/profile': PageConfig(

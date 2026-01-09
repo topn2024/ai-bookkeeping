@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/budget_vault.dart';
+import '../services/vault_repository.dart';
+import '../services/database_service.dart';
+import '../providers/ledger_context_provider.dart';
+import 'package:uuid/uuid.dart';
 
 /// 创建/编辑小金库页面
 /// 原型设计 3.04：创建小金库
@@ -485,11 +489,61 @@ class _VaultCreatePageState extends ConsumerState<VaultCreatePage> {
     );
   }
 
-  void _saveVault() {
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('小金库 "${_nameController.text}" 创建成功')),
+  Future<void> _saveVault() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入小金库名称')),
+      );
+      return;
+    }
+
+    final ledgerId = ref.read(currentLedgerIdProvider);
+    if (ledgerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('未找到当前账本')),
+      );
+      return;
+    }
+
+    final monthlyText = _monthlyController.text.replaceAll(',', '').trim();
+    final targetText = _targetController.text.replaceAll(',', '').trim();
+    final monthlyAmount = double.tryParse(monthlyText) ?? 0;
+    final targetAmount = double.tryParse(targetText) ?? 0;
+
+    final vaultType = VaultType.values[_selectedTypeIndex];
+    final allocationType = AllocationType.values[_selectedStrategyIndex];
+
+    final vault = BudgetVault(
+      id: _isEditMode ? widget.vault!.id : const Uuid().v4(),
+      name: name,
+      icon: vaultType.defaultIcon,
+      color: vaultType.defaultColor,
+      type: vaultType,
+      targetAmount: targetAmount,
+      ledgerId: ledgerId,
+      allocationType: allocationType,
+      targetAllocation: monthlyAmount,
     );
+
+    try {
+      final db = await DatabaseService().database;
+      final repository = VaultRepository(db);
+      await repository.create(vault);
+
+      if (mounted) {
+        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('小金库 "$name" ${_isEditMode ? '更新' : '创建'}成功')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失败: $e')),
+        );
+      }
+    }
   }
 }
 

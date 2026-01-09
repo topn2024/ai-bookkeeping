@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
+import 'main_navigation.dart';
 
 /// AA分摊记账方式
 enum AASplitMode {
@@ -52,7 +53,13 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            // 返回首页而不是简单的pop
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const MainNavigation()),
+              (route) => false,
+            );
+          },
         ),
         title: Text(
           l10n.aaSplit,

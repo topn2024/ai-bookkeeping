@@ -94,6 +94,90 @@ class AIService:
             logger.error(f"AI recognition error: {e}", exc_info=True)
             return self._empty_result()
 
+    async def recognize_image_batch(self, image_content: bytes) -> list[dict]:
+        """Recognize multiple transactions from a long image (e.g., bill screenshot).
+
+        This method is designed for long images that may contain multiple transaction records,
+        such as bank statements, credit card bills, or payment history screenshots.
+
+        Args:
+            image_content: Image bytes
+
+        Returns:
+            List of transaction dictionaries
+        """
+        # Encode image to base64
+        image_base64 = base64.b64encode(image_content).decode("utf-8")
+
+        # Enhanced prompt for multiple transactions
+        prompt = """请分析这张图片，这可能是一张包含多条交易记录的长图（如账单截图、银行流水、支付记录等）。
+
+请识别图片中的所有交易记录，对每条交易提取：
+1. 消费金额（数字）
+2. 商户名称或交易描述
+3. 消费类型（餐饮/交通/购物/娱乐/住房/医疗/教育/转账/其他）
+4. 交易日期和时间
+5. 交易类型（支出/收入）
+
+请以JSON数组格式返回所有交易，格式如下：
+{
+    "transactions": [
+        {
+            "amount": 金额数字,
+            "merchant": "商户名称或描述",
+            "category": "消费类型",
+            "date": "日期时间",
+            "type": "expense或income",
+            "note": "备注说明"
+        },
+        ...
+    ],
+    "total_count": 交易总数
+}
+
+注意：
+- 如果只有一条交易，也返回数组格式
+- 按时间顺序排列（最新的在前）
+- 如果某项无法识别，设为null
+- 忽略余额、总计等非交易信息"""
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+                    headers={
+                        "Authorization": f"Bearer {self.qwen_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": "qwen-vl-plus",
+                        "input": {
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"image": f"data:image/jpeg;base64,{image_base64}"},
+                                        {"text": prompt}
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    timeout=60.0,  # Longer timeout for long images
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    text = result.get("output", {}).get("choices", [{}])[0].get("message", {}).get("content", "")
+                    return self._parse_batch_response(text)
+                else:
+                    logger.error(f"Batch recognition failed: {response.status_code}")
+                    return []
+
+        except Exception as e:
+            logger.error(f"Batch AI recognition error: {e}", exc_info=True)
+            return []
+
     async def parse_voice_text(self, text: str) -> dict:
         """Parse transaction from voice/text input.
 
@@ -270,6 +354,42 @@ class AIService:
             logger.warning(f"Parse error: {e}")
 
         return self._empty_result()
+
+    def _parse_batch_response(self, text: str) -> list[dict]:
+        """Parse batch AI response containing multiple transactions."""
+        try:
+            # Extract JSON from response
+            json_match = re.search(r'\{.*\}', text, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+                transactions = data.get("transactions", [])
+
+                results = []
+                for trans in transactions:
+                    try:
+                        result = {
+                            "amount": Decimal(str(trans.get("amount"))) if trans.get("amount") else None,
+                            "category_name": trans.get("category"),
+                            "category_type": 2 if trans.get("type") == "income" else 1,
+                            "note": trans.get("note") or trans.get("merchant"),
+                            "merchant": trans.get("merchant"),
+                            "date": trans.get("date"),
+                            "confidence": 0.85,
+                        }
+                        # Only add if has amount
+                        if result["amount"]:
+                            results.append(result)
+                    except Exception as e:
+                        logger.warning(f"Failed to parse transaction: {e}")
+                        continue
+
+                logger.info(f"Parsed {len(results)} transactions from batch image")
+                return results
+
+        except Exception as e:
+            logger.error(f"Batch parse error: {e}")
+
+        return []
 
     def _simple_parse(self, text: str) -> dict:
         """Simple regex-based parsing as fallback."""

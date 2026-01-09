@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
 import 'batch_ai_training_page.dart';
+import 'main_navigation.dart';
 
 /// 8.29 AI学习成长曲线页面
 /// 展示AI识别准确率的成长过程
@@ -24,7 +25,13 @@ class _AILearningCurvePageState extends ConsumerState<AILearningCurvePage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // 返回首页而不是简单的pop
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const MainNavigation()),
+              (route) => false,
+            );
+          },
         ),
         title: Text(
           l10n.aiLearningCurve,

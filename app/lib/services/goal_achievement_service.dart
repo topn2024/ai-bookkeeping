@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
 import 'database_service.dart';
 import 'financial_health_score_service.dart';
+import '../models/resource_pool.dart';
+import '../models/budget_vault.dart';
+import '../models/savings_goal.dart' as savings;
 
 /// 目标类型
 enum GoalType {
@@ -121,10 +125,12 @@ class GoalAchievementOverview {
 ///
 /// 追踪和计算用户在各个财务目标上的达成情况
 class GoalAchievementService {
+  final DatabaseService _dbService;
   final FinancialHealthScoreService _healthService;
 
   GoalAchievementService(DatabaseService db)
-      : _healthService = FinancialHealthScoreService(db);
+      : _dbService = db,
+        _healthService = FinancialHealthScoreService(db);
 
   /// 获取目标达成概览
   Future<GoalAchievementOverview> getOverview() async {
@@ -156,8 +162,17 @@ class GoalAchievementService {
     // 获取健康分数
     final healthScore = await _healthService.calculateScore();
 
-    // 计算月度进展（模拟数据）
-    final monthlyProgress = 5; // TODO: 从历史数据计算
+    // 计算月度进展（比较本月与上月的达成率）
+    int monthlyProgress = 0;
+    try {
+      final lastMonthRate = await _getLastMonthAchievementRate();
+      if (lastMonthRate != null) {
+        final improvement = ((overallRate - lastMonthRate) * 100).round();
+        monthlyProgress = improvement.clamp(-100, 100);
+      }
+    } catch (e) {
+      debugPrint('Calculate monthly progress error: $e');
+    }
 
     return GoalAchievementOverview(
       overallRate: overallRate.clamp(0.0, 1.0),
@@ -173,13 +188,43 @@ class GoalAchievementService {
   /// 计算钱龄健康目标
   Future<GoalAchievement> _calculateMoneyAgeGoal() async {
     try {
-      // 目标：钱龄达到30天
       const targetDays = 30.0;
 
-      // TODO: 从资源池计算实际钱龄
-      // 暂时使用模拟数据
-      const currentAge = 25.0;
+      final db = await _dbService.database;
 
+      // 查询所有有剩余金额的资源池
+      final results = await db.query(
+        'resource_pools',
+        where: 'remainingAmount > 0',
+        orderBy: 'createdAt DESC',
+      );
+
+      if (results.isEmpty) {
+        return GoalAchievement(
+          type: GoalType.moneyAgeHealth,
+          currentValue: 0,
+          targetValue: targetDays,
+          achievementRate: 0,
+          status: '暂无数据',
+          tip: '开始记录收入以追踪钱龄',
+          lastUpdated: DateTime.now(),
+        );
+      }
+
+      // 计算加权平均钱龄（按剩余金额加权）
+      double totalWeightedAge = 0;
+      double totalRemaining = 0;
+
+      for (var row in results) {
+        final createdAt = DateTime.fromMillisecondsSinceEpoch(row['createdAt'] as int);
+        final remaining = (row['remainingAmount'] as num).toDouble();
+        final age = DateTime.now().difference(createdAt).inDays;
+
+        totalWeightedAge += age * remaining;
+        totalRemaining += remaining;
+      }
+
+      final currentAge = totalRemaining > 0 ? totalWeightedAge / totalRemaining : 0.0;
       final rate = (currentAge / targetDays).clamp(0.0, 1.5);
 
       String status;
@@ -219,10 +264,39 @@ class GoalAchievementService {
   /// 计算预算执行目标
   Future<GoalAchievement> _calculateBudgetGoal() async {
     try {
-      // TODO: 从预算表计算实际执行情况
-      // 暂时使用模拟数据
-      const total = 5;
-      const withinBudget = 4;
+      final db = await _dbService.database;
+
+      // 获取当前月份的所有启用的小金库
+      final vaultResults = await db.query(
+        'budget_vaults',
+        where: 'isEnabled = 1',
+      );
+
+      if (vaultResults.isEmpty) {
+        return GoalAchievement(
+          type: GoalType.budgetExecution,
+          currentValue: 0,
+          targetValue: 1,
+          achievementRate: 0,
+          status: '暂无预算',
+          tip: '创建小金库开始预算管理',
+          lastUpdated: DateTime.now(),
+        );
+      }
+
+      int total = vaultResults.length;
+      int withinBudget = 0;
+
+      // 检查每个小金库是否在预算内
+      for (var row in vaultResults) {
+        final allocated = (row['allocatedAmount'] as num?)?.toDouble() ?? 0;
+        final spent = (row['spentAmount'] as num?)?.toDouble() ?? 0;
+
+        // 如果已花费金额不超过已分配金额，则视为达标
+        if (spent <= allocated) {
+          withinBudget++;
+        }
+      }
 
       final rate = total > 0 ? withinBudget / total : 1.0;
 
@@ -253,7 +327,7 @@ class GoalAchievementService {
         type: GoalType.budgetExecution,
         currentValue: 0,
         targetValue: 1,
-        achievementRate: 0.8,
+        achievementRate: 0,
         status: '暂无预算',
         lastUpdated: DateTime.now(),
       );
@@ -263,12 +337,52 @@ class GoalAchievementService {
   /// 计算记账习惯目标
   Future<GoalAchievement> _calculateRecordingHabitGoal() async {
     try {
-      // 目标：连续记账21天
       const targetStreak = 21.0;
 
-      // TODO: 从用户记录获取连续记账天数
-      // 暂时使用模拟数据
-      const currentStreak = 15.0;
+      final db = await _dbService.database;
+
+      // 获取最近30天的交易记录，按日期分组
+      final now = DateTime.now();
+      final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+
+      final results = await db.rawQuery('''
+        SELECT DATE(datetime / 1000, 'unixepoch', 'localtime') as date
+        FROM transactions
+        WHERE datetime >= ?
+        GROUP BY date
+        ORDER BY date DESC
+      ''', [thirtyDaysAgo.millisecondsSinceEpoch]);
+
+      if (results.isEmpty) {
+        return GoalAchievement(
+          type: GoalType.recordingHabit,
+          currentValue: 0,
+          targetValue: targetStreak,
+          achievementRate: 0,
+          status: '开始记账',
+          tip: '开始每日记账吧',
+          lastUpdated: DateTime.now(),
+        );
+      }
+
+      // 计算连续记账天数
+      int currentStreak = 0;
+      DateTime checkDate = DateTime(now.year, now.month, now.day);
+
+      for (var row in results) {
+        final dateStr = row['date'] as String;
+        final recordDate = DateTime.parse(dateStr);
+
+        // 检查是否是连续的日期
+        if (recordDate.year == checkDate.year &&
+            recordDate.month == checkDate.month &&
+            recordDate.day == checkDate.day) {
+          currentStreak++;
+          checkDate = checkDate.subtract(const Duration(days: 1));
+        } else {
+          break;
+        }
+      }
 
       final rate = (currentStreak / targetStreak).clamp(0.0, 1.5);
 
@@ -277,7 +391,7 @@ class GoalAchievementService {
       if (currentStreak >= targetStreak) {
         status = '已达成';
       } else {
-        status = '连续${currentStreak.toInt()}天';
+        status = '连续${currentStreak}天';
         if (currentStreak < 7) {
           tip = '坚持每日记账，培养好习惯';
         } else {
@@ -287,7 +401,7 @@ class GoalAchievementService {
 
       return GoalAchievement(
         type: GoalType.recordingHabit,
-        currentValue: currentStreak,
+        currentValue: currentStreak.toDouble(),
         targetValue: targetStreak,
         achievementRate: rate.clamp(0.0, 1.0),
         status: status,
@@ -311,10 +425,32 @@ class GoalAchievementService {
   /// 计算储蓄目标
   Future<GoalAchievement> _calculateSavingsGoal() async {
     try {
-      // TODO: 从储蓄目标表获取数据
-      // 暂时使用模拟数据
-      const targetAmount = 5000.0;
-      const currentAmount = 3200.0;
+      final db = await _dbService.database;
+
+      // 获取当前活跃的储蓄目标
+      final results = await db.query(
+        'savings_goals',
+        where: 'status = ?',
+        whereArgs: ['active'],
+        orderBy: 'targetDate ASC',
+        limit: 1,
+      );
+
+      if (results.isEmpty) {
+        return GoalAchievement(
+          type: GoalType.savingsGoal,
+          currentValue: 0,
+          targetValue: 1000,
+          achievementRate: 0,
+          status: '设置目标',
+          tip: '设置一个储蓄目标开始吧',
+          lastUpdated: DateTime.now(),
+        );
+      }
+
+      final goal = results.first;
+      final targetAmount = (goal['targetAmount'] as num).toDouble();
+      final currentAmount = (goal['currentAmount'] as num?)?.toDouble() ?? 0;
 
       final rate = targetAmount > 0 ? currentAmount / targetAmount : 0.0;
 
@@ -359,5 +495,17 @@ class GoalAchievementService {
   }) async {
     // TODO: 实现历史趋势查询
     return [];
+  }
+
+  /// 获取上月的总体达成率（用于计算月度进展）
+  Future<double?> _getLastMonthAchievementRate() async {
+    try {
+      // 简化实现：返回null表示没有历史数据
+      // 完整实现需要存储每日/每月的达成率快照
+      return null;
+    } catch (e) {
+      debugPrint('Get last month achievement rate error: $e');
+      return null;
+    }
   }
 }

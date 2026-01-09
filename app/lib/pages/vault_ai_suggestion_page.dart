@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../theme/app_theme.dart';
+import 'main_navigation.dart';
 
 /// 自学习预算建议页面
 /// 原型设计 3.10：自学习预算建议
@@ -45,7 +46,13 @@ class VaultAISuggestionPage extends ConsumerWidget {
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              // 返回首页而不是简单的pop
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const MainNavigation()),
+                (route) => false,
+              );
+            },
             child: Container(
               width: 40,
               height: 40,

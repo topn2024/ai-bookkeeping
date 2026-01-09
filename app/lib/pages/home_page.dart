@@ -15,6 +15,7 @@ import 'transaction_list_page.dart';
 import 'add_transaction_page.dart';
 import 'goal_achievement_dashboard_page.dart';
 import 'today_allowance_page.dart';
+import 'money_age_page.dart';
 
 /// 仪表盘首页
 /// 原型设计 1.01：仪表盘 Dashboard
@@ -361,10 +362,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     return InkWell(
       onTap: () {
-        // 跳转到目标达成仪表盘
+        // 跳转到钱龄页面
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const GoalAchievementDashboardPage()),
+          MaterialPageRoute(builder: (_) => const MoneyAgePage()),
         );
       },
       borderRadius: BorderRadius.circular(16),
