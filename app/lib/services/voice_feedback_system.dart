@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import '../models/transaction.dart';
 import 'tts_service.dart';
 import 'voice/voice_intent_router.dart';
-import 'voice_service_coordinator.dart';
+import 'voice_service_coordinator.dart' show VoiceIntentType;
 
 /// 语音反馈系统
 ///
@@ -51,10 +51,9 @@ class VoiceFeedbackSystem extends ChangeNotifier {
   /// 更新配置
   void updateConfig(VoiceFeedbackConfig newConfig) {
     _config = newConfig;
-    // TODO: Implement TTS configuration methods
-    // _ttsService.setVolume(_config.volume);
-    // _ttsService.setSpeechRate(_config.speechRate);
-    // _ttsService.setPitch(_config.pitch);
+    _ttsService.setVolume(_config.volume);
+    _ttsService.setSpeechRate(_config.speechRate);
+    _ttsService.setPitch(_config.pitch);
     notifyListeners();
   }
 
@@ -335,8 +334,8 @@ class VoiceFeedbackSystem extends ChangeNotifier {
           return '操作已成功完成';
       }
     } else {
-      final suggestion = _generateErrorSuggestion(result.error ?? '');
-      return '操作失败：${result.error ?? "未知错误"}${suggestion.isNotEmpty ? "。$suggestion" : ""}';
+      final suggestion = _generateErrorSuggestion(result.error);
+      return '操作失败：${result.error}${suggestion.isNotEmpty ? "。$suggestion" : ""}';
     }
   }
 
