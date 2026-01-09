@@ -81,3 +81,11 @@ server/.env.*
 *.p12
 *.jks
 local.properties
+
+# Documentation files that may contain secrets
+本地环境配置说明.md
+服务器连接验证报告.md
+环境配置完成报告.md
+*配置*.md
+*密钥*.md
+*API*.md

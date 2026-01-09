@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
 
+    # CORS - comma-separated list of allowed origins, or "*" for all
+    CORS_ORIGINS: str = "*"
+
+    # SSL/TLS
+    SKIP_SSL_VERIFICATION: bool = False  # Set to True only for development
+
     class Config:
         env_file = ".env"
         case_sensitive = True

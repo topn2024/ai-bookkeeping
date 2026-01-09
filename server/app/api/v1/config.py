@@ -255,15 +255,13 @@ async def get_app_settings(
     Does not require authentication (for initial app setup).
     Sensitive data (API keys) requires authentication via /config/ai endpoint.
     """
-    # 服务器当前使用自签名证书，需要跳过验证
-    # TODO: 部署正式证书后改为 False
-    skip_cert_verification = True
+    settings = get_settings()
 
     return AppSettingsConfig(
         config_version="1.0.0",
         min_app_version="1.1.0",
         api_base_url="https://160.202.238.29/api/v1",
-        skip_certificate_verification=skip_cert_verification,
+        skip_certificate_verification=settings.SKIP_SSL_VERIFICATION,
         ai_models=AIModelConfig(),
         network=NetworkConfig(),
         duplicate_detection=DuplicateDetectionConfig(),
