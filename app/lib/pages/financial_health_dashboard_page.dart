@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'money_age_page.dart';
+import 'budget_center_page.dart';
+import 'vault_health_page.dart';
+
 /// 财务健康仪表盘页面
 ///
 /// 对应原型设计 10.01 财务健康仪表盘
@@ -43,27 +47,39 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
           ),
 
           // 钱龄得分
-          _DimensionCard(
-            icon: Icons.schedule,
-            iconColor: AppTheme.primaryColor,
-            iconBgColor: const Color(0xFFEBF3FF),
-            title: '钱龄',
-            score: 16,
-            maxScore: 20,
-            status: '当前42天，良好状态',
-            statusColor: Colors.green,
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MoneyAgePage()),
+            ),
+            child: _DimensionCard(
+              icon: Icons.schedule,
+              iconColor: AppTheme.primaryColor,
+              iconBgColor: const Color(0xFFEBF3FF),
+              title: '钱龄',
+              score: 16,
+              maxScore: 20,
+              status: '当前42天，良好状态',
+              statusColor: Colors.green,
+            ),
           ),
 
           // 预算控制
-          _DimensionCard(
-            icon: Icons.account_balance_wallet,
-            iconColor: const Color(0xFFFFB74D),
-            iconBgColor: const Color(0xFFFFF3E0),
-            title: '预算控制',
-            score: 14,
-            maxScore: 20,
-            status: '餐饮预算略有超支',
-            statusColor: Colors.orange,
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BudgetCenterPage()),
+            ),
+            child: _DimensionCard(
+              icon: Icons.account_balance_wallet,
+              iconColor: const Color(0xFFFFB74D),
+              iconBgColor: const Color(0xFFFFF3E0),
+              title: '预算控制',
+              score: 14,
+              maxScore: 20,
+              status: '餐饮预算略有超支',
+              statusColor: Colors.orange,
+            ),
           ),
 
           // 应急金

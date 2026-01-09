@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../budget_management_page.dart';
+
 /// 消费趋势预测页面
 ///
 /// 对应原型设计 14.03 消费趋势预测
@@ -37,6 +39,25 @@ class SpendingPredictionPage extends ConsumerWidget {
 
           // 预测说明
           _PredictionExplanation(),
+
+          // 调整预算按钮
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BudgetManagementPage()),
+                ),
+                icon: const Icon(Icons.tune, size: 18),
+                label: const Text('调整预算'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+          ),
 
           const SizedBox(height: 24),
         ],

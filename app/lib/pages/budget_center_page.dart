@@ -5,6 +5,8 @@ import '../providers/transaction_provider.dart';
 import '../providers/budget_vault_provider.dart';
 import '../providers/budget_provider.dart';
 import 'vault_create_page.dart';
+import 'vault_detail_page.dart';
+import 'reports/budget_report_page.dart';
 
 /// 预算中心页面
 /// 原型设计 1.04：预算中心 Budget
@@ -83,13 +85,26 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                '¥${monthlyIncome.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '¥${monthlyIncome.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.bar_chart, color: Colors.white),
+                    tooltip: '查看预算报告',
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const BudgetReportPage()),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
               Row(
@@ -188,13 +203,16 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
                 ),
               ),
               TextButton.icon(
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const VaultCreatePage(),
                     ),
                   );
+                  if (result == true && mounted) {
+                    ref.invalidate(budgetVaultProvider);
+                  }
                 },
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('新建'),
@@ -226,15 +244,23 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
                   : 0;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: _buildVaultCard(
-                  context,
-                  theme,
-                  name: vault.name,
-                  balance: vault.allocatedAmount,
-                  target: vault.targetAmount,
-                  percent: percent,
-                  gradient: [vault.color, vault.color.withValues(alpha: 0.7)],
-                  icon: vault.icon,
+                child: GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => VaultDetailPage(vault: vault),
+                    ),
+                  ),
+                  child: _buildVaultCard(
+                    context,
+                    theme,
+                    name: vault.name,
+                    balance: vault.allocatedAmount,
+                    target: vault.targetAmount,
+                    percent: percent,
+                    gradient: [vault.color, vault.color.withValues(alpha: 0.7)],
+                    icon: vault.icon,
+                  ),
                 ),
               );
             }),

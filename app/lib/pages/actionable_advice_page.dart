@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
+import 'budget_center_page.dart';
+import 'budget_management_page.dart';
+import 'money_age_page.dart';
 
 /// 建议类型枚举
 enum AdviceType {
@@ -424,22 +427,18 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
   void _handlePrimaryAction(ActionableAdvice advice) {
     switch (advice.type) {
       case AdviceType.budgetWarning:
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('已设置餐饮预算提醒'),
-            backgroundColor: AppTheme.successColor,
-          ),
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const BudgetCenterPage()),
         );
         break;
       case AdviceType.overspending:
         _showReallocationDialog(advice);
         break;
       case AdviceType.moneyAge:
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('已添加到待办事项'),
-            backgroundColor: AppTheme.successColor,
-          ),
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MoneyAgePage()),
         );
         break;
       default:

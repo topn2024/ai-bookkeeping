@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../latte_factor_page.dart';
+import '../budget_management_page.dart';
+import 'budget_report_page.dart';
+import '../trends_page.dart';
+
 /// 洞察分析页面
 /// 原型设计 7.02：洞察分析
 /// - 拿铁因子分析
@@ -83,7 +88,10 @@ class InsightAnalysisPage extends ConsumerWidget {
       content: '本月咖啡支出 ¥456，日均 ¥15.2',
       actionText: '查看详情 →',
       actionColor: theme.colorScheme.primary,
-      onAction: () {},
+      onAction: (context) => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const LatteFactorPage()),
+      ),
     );
   }
 
@@ -119,7 +127,12 @@ class InsightAnalysisPage extends ConsumerWidget {
       title: '消费习惯',
       badge: _InsightBadge(text: '良好', color: Colors.green),
       content: '周末消费占比下降至28%，较上月减少12%',
-      onAction: null,
+      actionText: '查看趋势 →',
+      actionColor: Colors.green,
+      onAction: (context) => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const TrendsPage()),
+      ),
     );
   }
 
@@ -138,7 +151,10 @@ class InsightAnalysisPage extends ConsumerWidget {
       content: '餐饮类目已使用79%，按当前速度月底将超支¥180',
       actionText: '调整预算 →',
       actionColor: Colors.blue,
-      onAction: () {},
+      onAction: (context) => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const BudgetManagementPage()),
+      ),
     );
   }
 }
@@ -159,7 +175,7 @@ class _InsightCard extends StatelessWidget {
   final String content;
   final String? actionText;
   final Color? actionColor;
-  final VoidCallback? onAction;
+  final void Function(BuildContext)? onAction;
 
   const _InsightCard({
     required this.gradient,
@@ -226,7 +242,7 @@ class _InsightCard extends StatelessWidget {
           if (actionText != null && onAction != null) ...[
             const SizedBox(height: 8),
             GestureDetector(
-              onTap: onAction,
+              onTap: () => onAction!(context),
               child: Text(
                 actionText!,
                 style: TextStyle(

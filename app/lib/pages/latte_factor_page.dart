@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import 'category_detail_page.dart';
 
 /// 拿铁因子分析页面
 ///
@@ -51,6 +52,7 @@ class LatteFactorPage extends ConsumerWidget {
       final weeklyCount = weeks > 0 ? (stats.count / weeks).round() : stats.count;
       final avgAmount = stats.count > 0 ? stats.total / stats.count : 0.0;
       return LatteFactorCategory(
+        categoryId: stats.category,
         emoji: _getCategoryEmoji(stats.category),
         name: category?.name ?? stats.category,
         weeklyCount: weeklyCount,
@@ -121,7 +123,18 @@ class LatteFactorPage extends ConsumerWidget {
                     ),
                   )
                 else
-                  ...displayCategories.map((c) => _CategoryCard(category: c)),
+                  ...displayCategories.map((c) => GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CategoryDetailPage(
+                          categoryId: c.categoryId,
+                          isExpense: true,
+                        ),
+                      ),
+                    ),
+                    child: _CategoryCard(category: c),
+                  )),
 
                 const SizedBox(height: 16),
               ],
@@ -443,6 +456,7 @@ class _CategoryCard extends StatelessWidget {
 
 /// 拿铁因子类别数据模型
 class LatteFactorCategory {
+  final String categoryId;
   final String emoji;
   final String name;
   final int weeklyCount;
@@ -453,6 +467,7 @@ class LatteFactorCategory {
   final Color color;
 
   LatteFactorCategory({
+    required this.categoryId,
     required this.emoji,
     required this.name,
     required this.weeklyCount,
