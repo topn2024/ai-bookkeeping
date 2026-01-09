@@ -10,10 +10,22 @@ export interface AppVersion {
   file_size: number | null
   file_size_formatted: string
   file_md5: string | null
+  // Patch file info
+  patch_from_version: string | null
+  patch_from_code: number | null
+  patch_file_url: string | null
+  patch_file_size: number | null
+  patch_file_size_formatted: string
+  patch_file_md5: string | null
+  // Release info
   release_notes: string
   release_notes_en: string | null
   is_force_update: boolean
   min_supported_version: string | null
+  // Rollout settings
+  rollout_percentage: number
+  rollout_start_date: string | null
+  // Status
   status: number
   status_text: string
   published_at: string | null
@@ -42,6 +54,8 @@ export interface AppVersionUpdate {
   release_notes_en?: string
   is_force_update?: boolean
   min_supported_version?: string
+  rollout_percentage?: number
+  rollout_start_date?: string
 }
 
 // API functions
@@ -140,4 +154,33 @@ export const deleteDeprecatedVersion = (versionId: string, password: string): Pr
   version: string
 }> => {
   return post(`/app-versions/${versionId}/delete`, { password })
+}
+
+/**
+ * Upload patch file for incremental update
+ */
+export const uploadPatch = (versionId: string, file: File, patchFromVersion: string, patchFromCode: number): Promise<{
+  message: string
+  url: string
+  size: number
+  size_formatted: string
+  md5: string
+  patch_from_version: string
+  patch_from_code: number
+}> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('patch_from_version', patchFromVersion)
+  formData.append('patch_from_code', patchFromCode.toString())
+  return upload(`/app-versions/${versionId}/upload-patch`, formData)
+}
+
+/**
+ * Delete patch file
+ */
+export const deletePatch = (versionId: string): Promise<{
+  message: string
+  version: string
+}> => {
+  return del(`/app-versions/${versionId}/patch`)
 }
