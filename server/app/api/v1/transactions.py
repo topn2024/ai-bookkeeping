@@ -327,7 +327,15 @@ async def update_transaction(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update a transaction."""
+    """Update a transaction with Saga protection.
+
+    Uses Saga pattern to ensure atomicity across:
+    1. Revert old balance changes
+    2. Apply new balance changes
+    3. Update transaction record
+
+    If any step fails, all previous steps are compensated.
+    """
     result = await db.execute(
         select(Transaction).where(Transaction.id == transaction_id, Transaction.user_id == current_user.id)
     )
@@ -345,87 +353,181 @@ async def update_transaction(
     balance_affecting_fields = {'amount', 'fee', 'transaction_type', 'account_id', 'target_account_id'}
     needs_balance_update = bool(balance_affecting_fields & set(update_data.keys()))
 
-    if needs_balance_update:
-        # Store old values
-        old_amount = transaction.amount
-        old_fee = transaction.fee
-        old_type = transaction.transaction_type
-        old_account_id = transaction.account_id
-        old_target_account_id = transaction.target_account_id
+    if not needs_balance_update:
+        # Simple update without balance changes
+        for field, value in update_data.items():
+            setattr(transaction, field, value)
+        await db.commit()
+        await db.refresh(transaction)
+        await _invalidate_transaction_cache(current_user.id)
+        return TransactionResponse.model_validate(transaction)
 
-        # Get new values (use old if not provided)
-        new_amount = update_data.get('amount', old_amount)
-        new_fee = update_data.get('fee', old_fee)
-        new_type = update_data.get('transaction_type', old_type)
-        new_account_id = update_data.get('account_id', old_account_id)
-        new_target_account_id = update_data.get('target_account_id', old_target_account_id)
+    # Store old values for Saga compensation
+    old_amount = transaction.amount
+    old_fee = transaction.fee or Decimal(0)
+    old_type = transaction.transaction_type
+    old_account_id = transaction.account_id
+    old_target_account_id = transaction.target_account_id
 
-        # Validate transfer type requires target_account_id
-        if new_type == 3 and not new_target_account_id:
+    # Get new values (use old if not provided)
+    new_amount = update_data.get('amount', old_amount)
+    new_fee = update_data.get('fee', old_fee) or Decimal(0)
+    new_type = update_data.get('transaction_type', old_type)
+    new_account_id = update_data.get('account_id', old_account_id)
+    new_target_account_id = update_data.get('target_account_id', old_target_account_id)
+
+    # Validate transfer type requires target_account_id
+    if new_type == 3 and not new_target_account_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Target account is required for transfers",
+        )
+
+    # Validate new account exists
+    if new_account_id != old_account_id:
+        result = await db.execute(
+            select(Account).where(Account.id == new_account_id, Account.user_id == current_user.id)
+        )
+        if not result.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Target account is required for transfers",
+                detail="Account not found",
             )
 
-        # Validate new account exists
-        if new_account_id != old_account_id:
-            result = await db.execute(
-                select(Account).where(Account.id == new_account_id, Account.user_id == current_user.id)
+    # Validate new target account exists for transfers
+    if new_type == 3 and new_target_account_id and new_target_account_id != old_target_account_id:
+        result = await db.execute(
+            select(Account).where(Account.id == new_target_account_id, Account.user_id == current_user.id)
+        )
+        if not result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Target account not found",
             )
-            if not result.scalar_one_or_none():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Account not found",
-                )
 
-        # Validate new target account exists for transfers
-        if new_type == 3 and new_target_account_id and new_target_account_id != old_target_account_id:
-            result = await db.execute(
-                select(Account).where(Account.id == new_target_account_id, Account.user_id == current_user.id)
-            )
-            if not result.scalar_one_or_none():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Target account not found",
-                )
+    # ==================== Saga Definition ====================
 
-        # Step 1: Revert old balance changes on old accounts
+    # Step 1: Revert old source account balance
+    async def revert_old_source_balance(ctx: SagaContext):
         result = await db.execute(select(Account).where(Account.id == old_account_id))
-        old_account = result.scalar_one_or_none()
-        if old_account:
+        account = result.scalar_one_or_none()
+        if account:
             if old_type == 1:  # Was expense
-                old_account.balance += old_amount + old_fee
+                account.balance += old_amount + old_fee
             elif old_type == 2:  # Was income
-                old_account.balance -= old_amount
+                account.balance -= old_amount
             elif old_type == 3:  # Was transfer
-                old_account.balance += old_amount + old_fee
+                account.balance += old_amount + old_fee
+            ctx.data['old_source_reverted'] = True
 
+    async def compensate_old_source_revert(ctx: SagaContext):
+        if ctx.data.get('old_source_reverted'):
+            result = await db.execute(select(Account).where(Account.id == old_account_id))
+            account = result.scalar_one_or_none()
+            if account:
+                if old_type == 1:
+                    account.balance -= old_amount + old_fee
+                elif old_type == 2:
+                    account.balance += old_amount
+                elif old_type == 3:
+                    account.balance -= old_amount + old_fee
+
+    # Step 2: Revert old target account balance (for transfers)
+    async def revert_old_target_balance(ctx: SagaContext):
         if old_type == 3 and old_target_account_id:
             result = await db.execute(select(Account).where(Account.id == old_target_account_id))
-            old_target_account = result.scalar_one_or_none()
-            if old_target_account:
-                old_target_account.balance -= old_amount
+            account = result.scalar_one_or_none()
+            if account:
+                account.balance -= old_amount
+                ctx.data['old_target_reverted'] = True
 
-        # Step 2: Apply new balance changes on new accounts
+    async def compensate_old_target_revert(ctx: SagaContext):
+        if ctx.data.get('old_target_reverted'):
+            result = await db.execute(select(Account).where(Account.id == old_target_account_id))
+            account = result.scalar_one_or_none()
+            if account:
+                account.balance += old_amount
+
+    # Step 3: Apply new source account balance
+    async def apply_new_source_balance(ctx: SagaContext):
         result = await db.execute(select(Account).where(Account.id == new_account_id))
-        new_account = result.scalar_one_or_none()
-        if new_account:
+        account = result.scalar_one_or_none()
+        if account:
             if new_type == 1:  # Expense
-                new_account.balance -= new_amount + new_fee
+                account.balance -= new_amount + new_fee
             elif new_type == 2:  # Income
-                new_account.balance += new_amount
+                account.balance += new_amount
             elif new_type == 3:  # Transfer
-                new_account.balance -= new_amount + new_fee
+                account.balance -= new_amount + new_fee
+            ctx.data['new_source_applied'] = True
 
+    async def compensate_new_source_apply(ctx: SagaContext):
+        if ctx.data.get('new_source_applied'):
+            result = await db.execute(select(Account).where(Account.id == new_account_id))
+            account = result.scalar_one_or_none()
+            if account:
+                if new_type == 1:
+                    account.balance += new_amount + new_fee
+                elif new_type == 2:
+                    account.balance -= new_amount
+                elif new_type == 3:
+                    account.balance += new_amount + new_fee
+
+    # Step 4: Apply new target account balance (for transfers)
+    async def apply_new_target_balance(ctx: SagaContext):
         if new_type == 3 and new_target_account_id:
             result = await db.execute(select(Account).where(Account.id == new_target_account_id))
-            new_target_account = result.scalar_one_or_none()
-            if new_target_account:
-                new_target_account.balance += new_amount
+            account = result.scalar_one_or_none()
+            if account:
+                account.balance += new_amount
+                ctx.data['new_target_applied'] = True
 
-    # Update transaction fields
-    for field, value in update_data.items():
-        setattr(transaction, field, value)
+    async def compensate_new_target_apply(ctx: SagaContext):
+        if ctx.data.get('new_target_applied'):
+            result = await db.execute(select(Account).where(Account.id == new_target_account_id))
+            account = result.scalar_one_or_none()
+            if account:
+                account.balance -= new_amount
+
+    # Step 5: Update transaction record
+    async def update_record(ctx: SagaContext):
+        for field, value in update_data.items():
+            setattr(transaction, field, value)
+        ctx.data['record_updated'] = True
+
+    async def compensate_record_update(ctx: SagaContext):
+        # Restore old values
+        if ctx.data.get('record_updated'):
+            transaction.amount = old_amount
+            transaction.fee = old_fee
+            transaction.transaction_type = old_type
+            transaction.account_id = old_account_id
+            transaction.target_account_id = old_target_account_id
+
+    # ==================== Execute Saga ====================
+
+    saga_result = await saga(
+        name="update_transaction",
+        steps=[
+            (revert_old_source_balance, compensate_old_source_revert),
+            (revert_old_target_balance, compensate_old_target_revert),
+            (apply_new_source_balance, compensate_new_source_apply),
+            (apply_new_target_balance, compensate_new_target_apply),
+            (update_record, compensate_record_update),
+        ],
+        context=SagaContext(data={
+            'transaction_id': str(transaction_id),
+            'user_id': str(current_user.id),
+        }),
+    )
+
+    if saga_result.status != SagaStatus.COMPLETED:
+        await db.rollback()
+        logger.error(f"Transaction update saga failed: {saga_result.error}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update transaction: {saga_result.error or 'Unknown error'}",
+        )
 
     await db.commit()
     await db.refresh(transaction)

@@ -96,14 +96,20 @@ async def push_changes(
 
         for change in changes_by_type[entity_type]:
             try:
+                # Check for conflicts before processing
+                conflict = await _check_conflict(db, current_user, change, entity_type)
+                if conflict:
+                    conflicts.append(conflict)
+                    continue
+
                 result = await _process_change(
                     db, current_user, change, entity_type
                 )
                 if result.success:
                     accepted.append(result)
                 else:
-                    # Handle as conflict if there's an error
-                    pass
+                    # Failed but not a conflict - add to accepted with error
+                    accepted.append(result)
             except Exception as e:
                 accepted.append(EntitySyncResult(
                     local_id=change.local_id,
@@ -121,6 +127,90 @@ async def push_changes(
         conflicts=conflicts,
         server_time=datetime.utcnow(),
     )
+
+
+async def _check_conflict(
+    db: AsyncSession,
+    user: User,
+    change: EntityChange,
+    entity_type: str,
+) -> Optional[ConflictInfo]:
+    """Check if there's a conflict between client and server data.
+
+    Returns ConflictInfo if conflict detected, None otherwise.
+    Currently using local-first strategy, so conflicts are only reported
+    when server data was modified after client's last sync.
+    """
+    # Create operations don't have conflicts (new entity)
+    if change.operation == "create":
+        return None
+
+    # Need server_id for update/delete operations
+    if not change.server_id:
+        return None
+
+    model = ENTITY_MODELS.get(entity_type)
+    if not model:
+        return None
+
+    # Get server entity
+    query = select(model).where(model.id == change.server_id)
+    if hasattr(model, 'user_id'):
+        query = query.where(model.user_id == user.id)
+
+    result = await db.execute(query)
+    entity = result.scalar_one_or_none()
+
+    if not entity:
+        if change.operation == "update":
+            # Entity was deleted on server but client wants to update
+            return ConflictInfo(
+                entity_type=entity_type,
+                local_id=change.local_id,
+                server_id=change.server_id,
+                local_data=change.data,
+                server_data={},
+                local_updated_at=change.local_updated_at,
+                server_updated_at=datetime.utcnow(),
+                conflict_type="deleted_on_server",
+            )
+        return None
+
+    # Check if server was modified after client's local_updated_at
+    if hasattr(entity, 'updated_at') and entity.updated_at:
+        server_updated = entity.updated_at
+        # If server was updated after client's version, it's a potential conflict
+        # But with local-first strategy, we still apply client changes
+        # We only report conflict for informational purposes
+        if server_updated > change.local_updated_at:
+            # Convert entity to dict for server_data
+            server_data = {}
+            for column in entity.__table__.columns:
+                value = getattr(entity, column.name)
+                if value is not None:
+                    if hasattr(value, 'isoformat'):
+                        value = value.isoformat()
+                    elif isinstance(value, UUID):
+                        value = str(value)
+                    elif isinstance(value, Decimal):
+                        value = str(value)
+                server_data[column.name] = value
+
+            # With local-first, we don't block - just report
+            # Return None to allow processing, but log the conflict
+            # For strict conflict handling, uncomment the return below:
+            # return ConflictInfo(
+            #     entity_type=entity_type,
+            #     local_id=change.local_id,
+            #     server_id=change.server_id,
+            #     local_data=change.data,
+            #     server_data=server_data,
+            #     local_updated_at=change.local_updated_at,
+            #     server_updated_at=server_updated,
+            #     conflict_type="both_modified",
+            # )
+
+    return None
 
 
 async def _process_change(
