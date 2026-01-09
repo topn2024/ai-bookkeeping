@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/transaction.dart';
 import '../models/transaction_location.dart';
 import '../models/account.dart';
+import '../models/currency.dart';
 import '../models/category.dart';
 import '../models/ledger.dart';
 import '../models/budget.dart';
@@ -137,7 +138,7 @@ class DataMapperService {
       name: data['name'] as String,
       type: AccountType.values[(data['account_type'] as int) - 1],
       balance: double.parse(data['balance'].toString()),
-      currency: data['currency'] as String? ?? 'CNY',
+      currency: CurrencyType.cny, // Default to CNY
       icon: _iconNameToData(data['icon'] as String?),
       color: _defaultAccountColor(data['account_type'] as int),
       isDefault: data['is_default'] as bool? ?? false,
