@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/budget_vault_provider.dart';
 import '../providers/budget_provider.dart';
+import 'vault_create_page.dart';
 
 /// 预算中心页面
 /// 原型设计 1.04：预算中心 Budget
@@ -187,7 +188,14 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
                 ),
               ),
               TextButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const VaultCreatePage(),
+                    ),
+                  );
+                },
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('新建'),
                 style: TextButton.styleFrom(
