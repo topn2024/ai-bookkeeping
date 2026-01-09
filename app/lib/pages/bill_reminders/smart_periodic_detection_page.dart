@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 智能识别周期性收支页面
@@ -100,10 +101,10 @@ class _SmartPeriodicDetectionPageState extends ConsumerState<SmartPeriodicDetect
                 ),
               ],
             ),
-            child: const Icon(
+            child: Icon(
               Icons.auto_awesome,
               size: 28,
-              color: Color(0xFF6495ED),
+              color: AppTheme.primaryColor,
             ),
           ),
           const SizedBox(width: 14),

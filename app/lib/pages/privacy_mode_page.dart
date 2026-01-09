@@ -26,7 +26,6 @@ class _PrivacyModePageState extends ConsumerState<PrivacyModePage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),

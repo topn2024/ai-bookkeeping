@@ -21,7 +21,7 @@ class _GeofenceManagementPageState extends ConsumerState<GeofenceManagementPage>
       name: '商圈提醒',
       description: '进入商圈提醒购物预算',
       icon: Icons.shopping_bag,
-      gradientColors: [const Color(0xFF6495ED), const Color(0xFF9370DB)],
+      gradientColors: [AppTheme.primaryColor, const Color(0xFF9370DB)],
       enabled: true,
       tags: ['陆家嘴', '南京路', '淮海路'],
     ),
@@ -53,7 +53,6 @@ class _GeofenceManagementPageState extends ConsumerState<GeofenceManagementPage>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),

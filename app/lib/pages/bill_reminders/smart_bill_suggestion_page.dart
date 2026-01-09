@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 智能账单建议页面
@@ -76,8 +77,8 @@ class _SmartBillSuggestionPageState extends ConsumerState<SmartBillSuggestionPag
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6495ED), Color(0xFF9370DB)],
+        gradient: LinearGradient(
+          colors: [AppTheme.primaryColor, Color(0xFF9370DB)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -136,7 +137,7 @@ class _SmartBillSuggestionPageState extends ConsumerState<SmartBillSuggestionPag
         'icon': Icons.fitness_center,
         'name': '健身房月卡',
         'description': '检测到每月10号有¥299支出',
-        'color': const Color(0xFF6495ED),
+        'color': AppTheme.primaryColor,
       },
       {
         'icon': Icons.subscriptions,

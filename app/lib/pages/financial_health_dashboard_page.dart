@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 财务健康仪表盘页面
@@ -44,7 +45,7 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
           // 钱龄得分
           _DimensionCard(
             icon: Icons.schedule,
-            iconColor: const Color(0xFF6495ED),
+            iconColor: AppTheme.primaryColor,
             iconBgColor: const Color(0xFFEBF3FF),
             title: '钱龄',
             score: 16,

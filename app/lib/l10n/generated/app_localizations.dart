@@ -5466,6 +5466,222 @@ abstract class S {
   /// In en, this message translates to:
   /// **'You Can Ask'**
   String get youCanAsk;
+
+  /// No description provided for @onboardingWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome'**
+  String get onboardingWelcome;
+
+  /// No description provided for @onboardingAppName.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Bookkeeping'**
+  String get onboardingAppName;
+
+  /// No description provided for @onboardingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Make bookkeeping simple and fun\\nHelp you develop good financial habits'**
+  String get onboardingSubtitle;
+
+  /// No description provided for @onboardingStartExperience.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Started'**
+  String get onboardingStartExperience;
+
+  /// No description provided for @onboardingFeatureAI.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Recognition'**
+  String get onboardingFeatureAI;
+
+  /// No description provided for @onboardingFeatureInsights.
+  ///
+  /// In en, this message translates to:
+  /// **'Spending Insights'**
+  String get onboardingFeatureInsights;
+
+  /// No description provided for @onboardingFeatureSavings.
+  ///
+  /// In en, this message translates to:
+  /// **'Savings Goals'**
+  String get onboardingFeatureSavings;
+
+  /// No description provided for @onboardingSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get onboardingSkip;
+
+  /// No description provided for @onboardingNextStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get onboardingNextStep;
+
+  /// No description provided for @onboardingStartUsing.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Using'**
+  String get onboardingStartUsing;
+
+  /// No description provided for @onboardingFeaturePhotoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo Bookkeeping'**
+  String get onboardingFeaturePhotoTitle;
+
+  /// No description provided for @onboardingFeaturePhotoDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'AI automatically recognizes receipts and invoices\\nSnap and record, save time and effort'**
+  String get onboardingFeaturePhotoDesc;
+
+  /// No description provided for @onboardingFeatureVoiceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice Bookkeeping'**
+  String get onboardingFeatureVoiceTitle;
+
+  /// No description provided for @onboardingFeatureVoiceDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete bookkeeping with one sentence\\nFree your hands'**
+  String get onboardingFeatureVoiceDesc;
+
+  /// No description provided for @onboardingFeatureAnalysisTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Spending Analysis'**
+  String get onboardingFeatureAnalysisTitle;
+
+  /// No description provided for @onboardingFeatureAnalysisDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart categorization, automatic reports\\nUnderstand your spending habits'**
+  String get onboardingFeatureAnalysisDesc;
+
+  /// No description provided for @onboardingFeatureSavingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Savings Goals'**
+  String get onboardingFeatureSavingsTitle;
+
+  /// No description provided for @onboardingFeatureSavingsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Set goals, track progress\\nMake saving money motivating'**
+  String get onboardingFeatureSavingsDesc;
+
+  /// No description provided for @onboardingFirstTransactionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Your First Transaction'**
+  String get onboardingFirstTransactionTitle;
+
+  /// No description provided for @onboardingFirstTransactionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Try it, bookkeeping is that simple'**
+  String get onboardingFirstTransactionSubtitle;
+
+  /// No description provided for @onboardingFirstTransactionComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete'**
+  String get onboardingFirstTransactionComplete;
+
+  /// No description provided for @onboardingCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'All Set!'**
+  String get onboardingCompleteTitle;
+
+  /// No description provided for @onboardingCompleteDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re ready to start your smart bookkeeping journey'**
+  String get onboardingCompleteDesc;
+
+  /// No description provided for @onboardingCompleteGoHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Home'**
+  String get onboardingCompleteGoHome;
+
+  /// No description provided for @onboardingCompleteTryVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Try Voice Assistant'**
+  String get onboardingCompleteTryVoice;
+
+  /// No description provided for @onboardingCompleteSetBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Set Budget'**
+  String get onboardingCompleteSetBudget;
+
+  /// No description provided for @onboardingCompleteImportBills.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Bills'**
+  String get onboardingCompleteImportBills;
+
+  /// No description provided for @onboardingAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get onboardingAmountLabel;
+
+  /// No description provided for @onboardingCategoryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Category'**
+  String get onboardingCategoryLabel;
+
+  /// No description provided for @onboardingNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add note (optional)'**
+  String get onboardingNoteHint;
+
+  /// No description provided for @onboardingTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter amount and select category to complete'**
+  String get onboardingTip;
+
+  /// No description provided for @onboardingSaveFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Save My First Transaction'**
+  String get onboardingSaveFirst;
+
+  /// No description provided for @categoryDining.
+  ///
+  /// In en, this message translates to:
+  /// **'Dining'**
+  String get categoryDining;
+
+  /// No description provided for @categoryTransport.
+  ///
+  /// In en, this message translates to:
+  /// **'Transport'**
+  String get categoryTransport;
+
+  /// No description provided for @categoryShopping.
+  ///
+  /// In en, this message translates to:
+  /// **'Shopping'**
+  String get categoryShopping;
+
+  /// No description provided for @categoryEntertainment.
+  ///
+  /// In en, this message translates to:
+  /// **'Entertainment'**
+  String get categoryEntertainment;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

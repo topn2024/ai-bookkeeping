@@ -204,7 +204,7 @@ class _AnnualSummaryPageState extends ConsumerState<AnnualSummaryPage> {
             theme,
             icon: Icons.savings,
             iconColor: Colors.white,
-            iconBgColor: const Color(0xFF6495ED),
+            iconBgColor: AppTheme.primaryColor,
             title: '达成3个储蓄目标',
             subtitle: '日本旅行、新电脑、应急基金',
           ),

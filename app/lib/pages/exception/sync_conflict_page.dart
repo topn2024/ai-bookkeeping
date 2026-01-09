@@ -246,7 +246,7 @@ class SyncConflictPage extends StatelessWidget {
                     size: 16,
                     color: isLocal
                         ? theme.colorScheme.primary
-                        : const Color(0xFF6495ED),
+                        : AppTheme.primaryColor,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -343,7 +343,7 @@ class SyncConflictPage extends StatelessWidget {
           child: ElevatedButton(
             onPressed: onUseCloud,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6495ED).withValues(alpha: 0.15),
+              backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.15),
               foregroundColor: const Color(0xFF4169E1),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),

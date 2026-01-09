@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 预算结转设置页面
@@ -44,7 +45,7 @@ class _VaultCarryoverPageState extends ConsumerState<VaultCarryoverPage> {
       name: '交通',
       rule: '自定义：清零重置',
       isCustom: true,
-      customColor: const Color(0xFF6495ED),
+      customColor: AppTheme.primaryColor,
     ),
     _CategoryCarryover(
       emoji: '🛒',
@@ -123,7 +124,7 @@ class _VaultCarryoverPageState extends ConsumerState<VaultCarryoverPage> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [Color(0xFFFFF8E1), Color(0xFFFFECB3)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -356,7 +357,7 @@ class _VaultCarryoverPageState extends ConsumerState<VaultCarryoverPage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,

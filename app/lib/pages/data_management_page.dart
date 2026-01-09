@@ -22,7 +22,6 @@ class _DataManagementPageState extends ConsumerState<DataManagementPage> {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -57,8 +56,8 @@ class _DataManagementPageState extends ConsumerState<DataManagementPage> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6495ED), Color(0xFF4169E1)],
+        gradient: LinearGradient(
+          colors: [AppTheme.primaryColor, Color(0xFF4169E1)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

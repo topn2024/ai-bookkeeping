@@ -102,7 +102,7 @@ class OfflineQueuePage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFF6495ED),
+              color: AppTheme.primaryColor,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(

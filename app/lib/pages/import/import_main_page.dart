@@ -48,7 +48,7 @@ class _ImportMainPageState extends ConsumerState<ImportMainPage> {
       id: 'generic',
       name: '通用格式',
       icon: Icons.description,
-      color: const Color(0xFF6495ED),
+      color: AppTheme.primaryColor,
     ),
   ];
 

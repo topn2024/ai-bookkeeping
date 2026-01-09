@@ -178,16 +178,7 @@ class _MainNavigationState extends State<MainNavigation> {
   Widget _buildMainFab(BuildContext context, {required bool isClose}) {
     return GlassFab(
       onPressed: () {
-        if (isClose) {
-          setState(() => _isFabExpanded = false);
-        } else {
-          // 长按展开菜单，单击直接进入记账
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const AddTransactionPage(),
-            ),
-          );
-        }
+        setState(() => _isFabExpanded = !_isFabExpanded);
       },
       backgroundColor: AntigravityColors.primary,
       enableBreathe: !isClose,

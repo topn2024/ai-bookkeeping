@@ -114,7 +114,7 @@ class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF6495ED)
+                      ? AppTheme.primaryColor
                       : theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(20),
                 ),

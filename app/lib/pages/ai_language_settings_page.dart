@@ -25,7 +25,6 @@ class _AILanguageSettingsPageState
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -58,8 +57,8 @@ class _AILanguageSettingsPageState
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6495ED), Color(0xFF9370DB)],
+        gradient: LinearGradient(
+          colors: [AppTheme.primaryColor, Color(0xFF9370DB)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

@@ -1287,7 +1287,7 @@ class MoneyAgeStagePage extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: const Color(0xFF6495ED),
+          color: AppTheme.primaryColor,
           shape: BoxShape.circle,
         ),
         child: Center(

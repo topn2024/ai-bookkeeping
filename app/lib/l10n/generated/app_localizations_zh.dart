@@ -2771,6 +2771,114 @@ class SZh extends S {
 
   @override
   String get youCanAsk => '你可以问';
+
+  @override
+  String get onboardingWelcome => '欢迎使用';
+
+  @override
+  String get onboardingAppName => 'AI 智能记账';
+
+  @override
+  String get onboardingSubtitle => '让记账变得简单有趣\\n助你养成良好的理财习惯';
+
+  @override
+  String get onboardingStartExperience => '开始体验';
+
+  @override
+  String get onboardingFeatureAI => 'AI智能识别';
+
+  @override
+  String get onboardingFeatureInsights => '消费洞察';
+
+  @override
+  String get onboardingFeatureSavings => '储蓄目标';
+
+  @override
+  String get onboardingSkip => '跳过';
+
+  @override
+  String get onboardingNextStep => '下一步';
+
+  @override
+  String get onboardingStartUsing => '开始使用';
+
+  @override
+  String get onboardingFeaturePhotoTitle => '拍照记账';
+
+  @override
+  String get onboardingFeaturePhotoDesc => 'AI自动识别小票、发票\\n一拍即记，省时省力';
+
+  @override
+  String get onboardingFeatureVoiceTitle => '语音记账';
+
+  @override
+  String get onboardingFeatureVoiceDesc => '说一句话完成记账\\n解放你的双手';
+
+  @override
+  String get onboardingFeatureAnalysisTitle => '消费分析';
+
+  @override
+  String get onboardingFeatureAnalysisDesc => '智能分类，自动生成报表\\n了解你的消费习惯';
+
+  @override
+  String get onboardingFeatureSavingsTitle => '储蓄目标';
+
+  @override
+  String get onboardingFeatureSavingsDesc => '设定目标，追踪进度\\n让存钱变得有动力';
+
+  @override
+  String get onboardingFirstTransactionTitle => '记下你的第一笔账';
+
+  @override
+  String get onboardingFirstTransactionSubtitle => '试试看，记账就是这么简单';
+
+  @override
+  String get onboardingFirstTransactionComplete => '完成';
+
+  @override
+  String get onboardingCompleteTitle => '一切就绪！';
+
+  @override
+  String get onboardingCompleteDesc => '你已准备好开始智能记账之旅';
+
+  @override
+  String get onboardingCompleteGoHome => '进入首页';
+
+  @override
+  String get onboardingCompleteTryVoice => '试试语音助手';
+
+  @override
+  String get onboardingCompleteSetBudget => '设置预算';
+
+  @override
+  String get onboardingCompleteImportBills => '导入账单';
+
+  @override
+  String get onboardingAmountLabel => '消费金额';
+
+  @override
+  String get onboardingCategoryLabel => '选择分类';
+
+  @override
+  String get onboardingNoteHint => '添加备注（选填）';
+
+  @override
+  String get onboardingTip => '输入金额，选择分类即可完成';
+
+  @override
+  String get onboardingSaveFirst => '保存我的第一笔账';
+
+  @override
+  String get categoryDining => '餐饮';
+
+  @override
+  String get categoryTransport => '交通';
+
+  @override
+  String get categoryShopping => '购物';
+
+  @override
+  String get categoryEntertainment => '娱乐';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).

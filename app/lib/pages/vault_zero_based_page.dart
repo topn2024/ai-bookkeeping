@@ -85,8 +85,8 @@ class VaultZeroBasedPage extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6495ED), Color(0xFF87CEFA)],
+        gradient: LinearGradient(
+          colors: [AppTheme.primaryColor, Color(0xFF87CEFA)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

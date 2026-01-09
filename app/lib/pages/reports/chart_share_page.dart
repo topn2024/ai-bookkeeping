@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../theme/app_theme.dart';
 
 /// 图表分享页面
 /// 原型设计 7.10：图表分享
@@ -86,8 +87,8 @@ class _ChartSharePageState extends ConsumerState<ChartSharePage> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6495ED), Color(0xFF9370DB)],
+        gradient: LinearGradient(
+          colors: [AppTheme.primaryColor, Color(0xFF9370DB)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -312,7 +313,7 @@ class _ChartSharePageState extends ConsumerState<ChartSharePage> {
           Switch(
             value: _hideAmount,
             onChanged: (v) => setState(() => _hideAmount = v),
-            activeTrackColor: const Color(0xFF6495ED),
+            activeTrackColor: AppTheme.primaryColor,
           ),
         ],
       ),

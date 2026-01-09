@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math' as math;
 
@@ -33,7 +34,7 @@ class _UserProfileVisualizationPageState
     _profileData = UserProfileDisplayData(
       personaType: '目标导向型',
       personaDescription: '理性消费，注重规划',
-      avatarColor: const Color(0xFF6495ED),
+      avatarColor: AppTheme.primaryColor,
       demographics: [
         DemographicTag(label: '26-35岁', icon: Icons.cake),
         DemographicTag(label: '新一线', icon: Icons.location_city),
@@ -287,7 +288,7 @@ class _DemographicsSection extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(tag.icon, size: 16, color: const Color(0xFF6495ED)),
+          Icon(tag.icon, size: 16, color: AppTheme.primaryColor),
           const SizedBox(width: 6),
           Text(
             tag.label,
@@ -494,11 +495,11 @@ class _RadarChartPainter extends CustomPainter {
   void _drawDataArea(
       Canvas canvas, Offset center, double radius, double angleStep) {
     final fillPaint = Paint()
-      ..color = const Color(0xFF6495ED).withValues(alpha: 0.3)
+      ..color = AppTheme.primaryColor.withValues(alpha: 0.3)
       ..style = PaintingStyle.fill;
 
     final strokePaint = Paint()
-      ..color = const Color(0xFF6495ED)
+      ..color = AppTheme.primaryColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 
@@ -523,7 +524,7 @@ class _RadarChartPainter extends CustomPainter {
 
     // 绘制数据点
     final dotPaint = Paint()
-      ..color = const Color(0xFF6495ED)
+      ..color = AppTheme.primaryColor
       ..style = PaintingStyle.fill;
 
     for (int i = 0; i < data.values.length; i++) {

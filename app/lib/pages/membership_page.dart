@@ -40,7 +40,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
 
   Widget _buildAppBar(AppLocalizations l10n) {
     return SliverAppBar(
-      backgroundColor: const Color(0xFF6495ED),
+      backgroundColor: AppTheme.primaryColor,
       expandedHeight: 120,
       pinned: true,
       leading: IconButton(
@@ -57,9 +57,9 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
           ),
         ),
         background: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF6495ED), Color(0xFF9370DB)],
+              colors: [AppTheme.primaryColor, Color(0xFF9370DB)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

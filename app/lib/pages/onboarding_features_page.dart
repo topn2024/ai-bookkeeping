@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../l10n/app_localizations.dart';
+import '../l10n/l10n.dart';
 
 /// 功能介绍引导页
 ///
@@ -23,7 +23,7 @@ class _OnboardingFeaturesPageState extends State<OnboardingFeaturesPage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  List<_FeatureData> _getFeatures(AppLocalizations l10n) {
+  List<_FeatureData> _getFeatures(S l10n) {
     return [
       _FeatureData(
         icon: Icons.camera_alt,
@@ -64,7 +64,7 @@ class _OnboardingFeaturesPageState extends State<OnboardingFeaturesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.l10n;
     final features = _getFeatures(l10n);
 
     return Scaffold(

@@ -334,8 +334,8 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
           Container(
             width: 32,
             height: 32,
-            decoration: const BoxDecoration(
-              color: Color(0xFF6495ED),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor,
               shape: BoxShape.circle,
             ),
             child: const Icon(

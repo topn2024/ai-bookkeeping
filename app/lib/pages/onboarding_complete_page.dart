@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../l10n/app_localizations.dart';
+import '../l10n/l10n.dart';
 
 /// 引导完成庆祝页
 ///
@@ -21,7 +21,7 @@ class OnboardingCompletePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.l10n;
 
     return Scaffold(
       body: Container(

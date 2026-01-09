@@ -20,7 +20,6 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -77,7 +76,7 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
           Positioned(
             left: 140,
             top: 72,
-            child: _buildMapPoint(32, const Color(0xFF6495ED)),
+            child: _buildMapPoint(32, AppTheme.primaryColor),
           ),
           Positioned(
             left: 200,
@@ -137,7 +136,7 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
     final locations = [
       {'name': '家附近', 'amount': 2340, 'percent': 0.45, 'icon': Icons.home, 'color': const Color(0xFFFF6B6B)},
       {'name': '公司附近', 'amount': 1680, 'percent': 0.32, 'icon': Icons.business, 'color': const Color(0xFF4ECDC4)},
-      {'name': '商圈消费', 'amount': 860, 'percent': 0.16, 'icon': Icons.shopping_bag, 'color': const Color(0xFF6495ED)},
+      {'name': '商圈消费', 'amount': 860, 'percent': 0.16, 'icon': Icons.shopping_bag, 'color': AppTheme.primaryColor},
       {'name': '其他区域', 'amount': 340, 'percent': 0.07, 'icon': Icons.place, 'color': const Color(0xFF9E9E9E)},
     ];
 

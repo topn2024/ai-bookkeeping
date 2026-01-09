@@ -143,7 +143,7 @@ class _DataFilterPageState extends ConsumerState<DataFilterPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF6495ED)
+                      ? AppTheme.primaryColor
                       : theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(20),
                 ),

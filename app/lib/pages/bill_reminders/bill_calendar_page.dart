@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/bill_reminder.dart';
@@ -244,7 +245,7 @@ class _BillCalendarPageState extends ConsumerState<BillCalendarPage> {
     } else if (soonBill) {
       backgroundColor = const Color(0xFFFFB74D).withValues(alpha: 0.2);
     } else if (hasBills) {
-      backgroundColor = const Color(0xFF6495ED).withValues(alpha: 0.2);
+      backgroundColor = AppTheme.primaryColor.withValues(alpha: 0.2);
     }
 
     return GestureDetector(
@@ -278,7 +279,7 @@ class _BillCalendarPageState extends ConsumerState<BillCalendarPage> {
                   } else if (bill.daysUntilBill <= 3) {
                     dotColor = const Color(0xFFFFB74D);
                   } else {
-                    dotColor = const Color(0xFF6495ED);
+                    dotColor = AppTheme.primaryColor;
                   }
                   return Container(
                     width: 6,
@@ -429,7 +430,7 @@ class _BillCalendarPageState extends ConsumerState<BillCalendarPage> {
           const SizedBox(width: 16),
           _buildLegendItem(const Color(0xFFFFB74D), '即将到期'),
           const SizedBox(width: 16),
-          _buildLegendItem(const Color(0xFF6495ED), '正常'),
+          _buildLegendItem(AppTheme.primaryColor, '正常'),
         ],
       ),
     );

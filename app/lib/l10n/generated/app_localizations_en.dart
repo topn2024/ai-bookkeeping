@@ -2781,4 +2781,119 @@ class SEn extends S {
 
   @override
   String get youCanAsk => 'You Can Ask';
+
+  @override
+  String get onboardingWelcome => 'Welcome';
+
+  @override
+  String get onboardingAppName => 'AI Bookkeeping';
+
+  @override
+  String get onboardingSubtitle =>
+      'Make bookkeeping simple and fun\\nHelp you develop good financial habits';
+
+  @override
+  String get onboardingStartExperience => 'Get Started';
+
+  @override
+  String get onboardingFeatureAI => 'AI Recognition';
+
+  @override
+  String get onboardingFeatureInsights => 'Spending Insights';
+
+  @override
+  String get onboardingFeatureSavings => 'Savings Goals';
+
+  @override
+  String get onboardingSkip => 'Skip';
+
+  @override
+  String get onboardingNextStep => 'Next';
+
+  @override
+  String get onboardingStartUsing => 'Start Using';
+
+  @override
+  String get onboardingFeaturePhotoTitle => 'Photo Bookkeeping';
+
+  @override
+  String get onboardingFeaturePhotoDesc =>
+      'AI automatically recognizes receipts and invoices\\nSnap and record, save time and effort';
+
+  @override
+  String get onboardingFeatureVoiceTitle => 'Voice Bookkeeping';
+
+  @override
+  String get onboardingFeatureVoiceDesc =>
+      'Complete bookkeeping with one sentence\\nFree your hands';
+
+  @override
+  String get onboardingFeatureAnalysisTitle => 'Spending Analysis';
+
+  @override
+  String get onboardingFeatureAnalysisDesc =>
+      'Smart categorization, automatic reports\\nUnderstand your spending habits';
+
+  @override
+  String get onboardingFeatureSavingsTitle => 'Savings Goals';
+
+  @override
+  String get onboardingFeatureSavingsDesc =>
+      'Set goals, track progress\\nMake saving money motivating';
+
+  @override
+  String get onboardingFirstTransactionTitle => 'Record Your First Transaction';
+
+  @override
+  String get onboardingFirstTransactionSubtitle =>
+      'Try it, bookkeeping is that simple';
+
+  @override
+  String get onboardingFirstTransactionComplete => 'Complete';
+
+  @override
+  String get onboardingCompleteTitle => 'All Set!';
+
+  @override
+  String get onboardingCompleteDesc =>
+      'You\'re ready to start your smart bookkeeping journey';
+
+  @override
+  String get onboardingCompleteGoHome => 'Go to Home';
+
+  @override
+  String get onboardingCompleteTryVoice => 'Try Voice Assistant';
+
+  @override
+  String get onboardingCompleteSetBudget => 'Set Budget';
+
+  @override
+  String get onboardingCompleteImportBills => 'Import Bills';
+
+  @override
+  String get onboardingAmountLabel => 'Amount';
+
+  @override
+  String get onboardingCategoryLabel => 'Select Category';
+
+  @override
+  String get onboardingNoteHint => 'Add note (optional)';
+
+  @override
+  String get onboardingTip => 'Enter amount and select category to complete';
+
+  @override
+  String get onboardingSaveFirst => 'Save My First Transaction';
+
+  @override
+  String get categoryDining => 'Dining';
+
+  @override
+  String get categoryTransport => 'Transport';
+
+  @override
+  String get categoryShopping => 'Shopping';
+
+  @override
+  String get categoryEntertainment => 'Entertainment';
 }

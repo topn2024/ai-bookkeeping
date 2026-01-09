@@ -21,7 +21,6 @@ class _AILearningCurvePageState extends ConsumerState<AILearningCurvePage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -54,8 +53,8 @@ class _AILearningCurvePageState extends ConsumerState<AILearningCurvePage> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6495ED), Color(0xFF9370DB)],
+        gradient: LinearGradient(
+          colors: [AppTheme.primaryColor, Color(0xFF9370DB)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -359,7 +358,7 @@ class _GrowthChartPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF6495ED)
+      ..color = AppTheme.primaryColor
       ..strokeWidth = 3
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
@@ -369,8 +368,8 @@ class _GrowthChartPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          const Color(0xFF6495ED).withValues(alpha: 0.3),
-          const Color(0xFF6495ED).withValues(alpha: 0.05),
+          AppTheme.primaryColor.withValues(alpha: 0.3),
+          AppTheme.primaryColor.withValues(alpha: 0.05),
         ],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
@@ -405,7 +404,7 @@ class _GrowthChartPainter extends CustomPainter {
 
     // Draw points
     final pointPaint = Paint()
-      ..color = const Color(0xFF6495ED)
+      ..color = AppTheme.primaryColor
       ..style = PaintingStyle.fill;
 
     for (var point in dataPoints) {

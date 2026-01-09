@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 信用卡还款提醒页面
@@ -332,18 +333,18 @@ class _CreditCardRepaymentPageState extends ConsumerState<CreditCardRepaymentPag
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF6495ED).withValues(alpha: 0.1),
+        color: AppTheme.primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF6495ED).withValues(alpha: 0.3),
+          color: AppTheme.primaryColor.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.tips_and_updates,
-            color: Color(0xFF6495ED),
+            color: AppTheme.primaryColor,
             size: 20,
           ),
           const SizedBox(width: 10),
@@ -351,12 +352,12 @@ class _CreditCardRepaymentPageState extends ConsumerState<CreditCardRepaymentPag
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '智能建议',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF6495ED),
+                    color: AppTheme.primaryColor,
                   ),
                 ),
                 const SizedBox(height: 4),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/budget_vault.dart';
 
@@ -30,7 +31,7 @@ class _VaultCreatePageState extends ConsumerState<VaultCreatePage> {
       icon: Icons.lock,
       name: '固定支出',
       description: '房租、水电',
-      color: const Color(0xFF6495ED),
+      color: AppTheme.primaryColor,
     ),
     _VaultTypeOption(
       icon: Icons.tune,
@@ -184,7 +185,7 @@ class _VaultCreatePageState extends ConsumerState<VaultCreatePage> {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 colors: [Color(0xFFFF6B6B), Color(0xFFFF8E8E)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -256,7 +257,7 @@ class _VaultCreatePageState extends ConsumerState<VaultCreatePage> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF6495ED)
+                      ? AppTheme.primaryColor
                       : theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(10),
                 ),

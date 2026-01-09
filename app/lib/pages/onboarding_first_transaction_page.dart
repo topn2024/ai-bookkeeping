@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../l10n/app_localizations.dart';
+import '../l10n/l10n.dart';
 
 /// 首笔记账引导页
 ///
@@ -26,7 +26,7 @@ class _OnboardingFirstTransactionPageState
   final TextEditingController _noteController = TextEditingController();
   String? _selectedCategory;
 
-  List<_QuickCategory> _getCategories(AppLocalizations l10n) {
+  List<_QuickCategory> _getCategories(S l10n) {
     return [
       _QuickCategory(emoji: '🍽️', name: l10n.categoryDining, color: Colors.orange),
       _QuickCategory(emoji: '🚗', name: l10n.categoryTransport, color: Colors.blue),
@@ -47,7 +47,7 @@ class _OnboardingFirstTransactionPageState
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.l10n;
     final categories = _getCategories(l10n);
 
     return Scaffold(

@@ -206,7 +206,7 @@ class SystemSettingsPage extends ConsumerWidget {
                 _buildDivider(),
                 _buildMenuItem(
                   icon: Icons.trending_up,
-                  iconColor: const Color(0xFF6495ED),
+                  iconColor: AppTheme.primaryColor,
                   title: 'AI学习成长',
                   subtitle: '查看AI准确率提升',
                   onTap: () {

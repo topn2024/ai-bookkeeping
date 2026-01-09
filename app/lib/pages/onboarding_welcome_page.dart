@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../l10n/app_localizations.dart';
+import '../l10n/l10n.dart';
 
 /// 新用户欢迎页
 ///
@@ -15,7 +15,7 @@ class OnboardingWelcomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.l10n;
 
     return Scaffold(
       body: SafeArea(
@@ -113,7 +113,7 @@ class OnboardingWelcomePage extends StatelessWidget {
 }
 
 class _FeatureHighlights extends StatelessWidget {
-  final AppLocalizations l10n;
+  final S l10n;
 
   const _FeatureHighlights({required this.l10n});
 

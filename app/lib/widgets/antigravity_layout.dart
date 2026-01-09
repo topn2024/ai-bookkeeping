@@ -581,7 +581,7 @@ class ThumbZoneContainer extends StatelessWidget {
   /// 热区高度占比（默认45%）
   final double hotZoneRatio;
 
-  const ThumbZoneContainer({
+  ThumbZoneContainer({
     super.key,
     required this.coldZoneContent,
     required this.warmZoneContent,
