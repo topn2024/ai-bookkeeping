@@ -62,6 +62,15 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = ""
 
+    # SMTP Email
+    SMTP_HOST: str = ""  # e.g., smtp.gmail.com
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""  # Sender email address
+    SMTP_FROM_NAME: str = "AI Bookkeeping"
+    SMTP_USE_TLS: bool = True
+
     # Logging
     LOG_LEVEL: str = "INFO"
 

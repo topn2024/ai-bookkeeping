@@ -23,6 +23,7 @@ from app.schemas.user import (
 )
 from app.api.deps import get_current_user
 from app.services.init_service import init_user_data
+from app.services.notification_email_service import notification_email_service
 import secrets
 import logging
 
@@ -238,9 +239,16 @@ async def request_password_reset(
     # Store the code (in production, use Redis with TTL)
     _reset_codes[request.email] = (code, expire_at)
 
-    # TODO: Send email with the code
-    # For now, log it (in production, integrate email service)
-    logger.info(f"Password reset code for {request.email}: {code}")
+    # Send email with the code
+    email_sent = await notification_email_service.send_password_reset_code(
+        to_email=request.email,
+        reset_code=code,
+        expires_minutes=10,
+    )
+
+    if not email_sent:
+        # Log for debugging but don't reveal to user
+        logger.warning(f"Failed to send password reset email to {request.email}")
 
     return ResetPasswordResponse(
         success=True,
