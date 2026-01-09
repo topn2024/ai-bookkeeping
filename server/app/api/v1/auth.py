@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
+from app.core.redis import get_redis
 from app.core.security import (
     verify_password,
     get_password_hash,
@@ -28,10 +29,6 @@ import secrets
 import logging
 
 logger = logging.getLogger(__name__)
-
-# Simple in-memory store for reset codes (in production, use Redis or database)
-_reset_codes: dict[str, tuple[str, float]] = {}  # email -> (code, expire_timestamp)
-
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -234,10 +231,18 @@ async def request_password_reset(
 
     # Generate 6-digit reset code
     code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
-    expire_at = time.time() + 600  # 10 minutes validity
 
-    # Store the code (in production, use Redis with TTL)
-    _reset_codes[request.email] = (code, expire_at)
+    # Store the code in Redis with 10 minutes TTL
+    redis = await get_redis()
+    if redis:
+        reset_key = f"password_reset:{request.email}"
+        await redis.setex(reset_key, 600, code)  # 600 seconds = 10 minutes
+    else:
+        logger.error("Redis not available for password reset")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable",
+        )
 
     # Send email with the code
     email_sent = await notification_email_service.send_password_reset_code(
@@ -262,23 +267,26 @@ async def confirm_password_reset(
     db: AsyncSession = Depends(get_db),
 ):
     """Confirm password reset with the code received via email."""
-    import time
+    # Get code from Redis
+    redis = await get_redis()
+    if not redis:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable",
+        )
 
-    # Check if code exists and is valid
-    if request.email not in _reset_codes:
+    reset_key = f"password_reset:{request.email}"
+    stored_code = await redis.get(reset_key)
+
+    if not stored_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset code",
         )
 
-    stored_code, expire_at = _reset_codes[request.email]
-
-    if time.time() > expire_at:
-        del _reset_codes[request.email]
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Reset code has expired",
-        )
+    # Decode bytes to string
+    if isinstance(stored_code, bytes):
+        stored_code = stored_code.decode('utf-8')
 
     if request.code != stored_code:
         raise HTTPException(
@@ -299,8 +307,8 @@ async def confirm_password_reset(
     user.password_hash = get_password_hash(request.new_password)
     await db.commit()
 
-    # Remove used code
-    del _reset_codes[request.email]
+    # Remove used code from Redis
+    await redis.delete(reset_key)
 
     return ResetPasswordResponse(
         success=True,
