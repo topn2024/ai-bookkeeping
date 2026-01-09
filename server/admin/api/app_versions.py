@@ -57,6 +57,8 @@ class AppVersionUpdate(BaseModel):
     release_notes_en: Optional[str] = None
     is_force_update: Optional[bool] = None
     min_supported_version: Optional[str] = None
+    rollout_percentage: Optional[int] = None  # 0-100
+    rollout_start_date: Optional[datetime] = None
 
 
 class DeleteVersionRequest(BaseModel):
@@ -74,10 +76,22 @@ class AppVersionResponse(BaseModel):
     file_size: Optional[int]
     file_size_formatted: str
     file_md5: Optional[str]
+    # Patch file info
+    patch_from_version: Optional[str]
+    patch_from_code: Optional[int]
+    patch_file_url: Optional[str]
+    patch_file_size: Optional[int]
+    patch_file_size_formatted: str
+    patch_file_md5: Optional[str]
+    # Release info
     release_notes: str
     release_notes_en: Optional[str]
     is_force_update: bool
     min_supported_version: Optional[str]
+    # Rollout settings
+    rollout_percentage: int
+    rollout_start_date: Optional[datetime]
+    # Status
     status: int
     status_text: str
     published_at: Optional[datetime]
@@ -97,10 +111,18 @@ class AppVersionResponse(BaseModel):
             file_size=model.file_size,
             file_size_formatted=format_size(model.file_size) if model.file_size else "-",
             file_md5=model.file_md5,
+            patch_from_version=model.patch_from_version,
+            patch_from_code=model.patch_from_code,
+            patch_file_url=model.patch_file_url,
+            patch_file_size=model.patch_file_size,
+            patch_file_size_formatted=format_size(model.patch_file_size) if model.patch_file_size else "-",
+            patch_file_md5=model.patch_file_md5,
             release_notes=model.release_notes,
             release_notes_en=model.release_notes_en,
             is_force_update=model.is_force_update,
             min_supported_version=model.min_supported_version,
+            rollout_percentage=model.rollout_percentage,
+            rollout_start_date=model.rollout_start_date,
             status=model.status,
             status_text=status_map.get(model.status, "未知"),
             published_at=model.published_at,
@@ -281,12 +303,12 @@ async def update_version(
             detail="版本不存在",
         )
 
-    # For published versions, only allow updating release notes
+    # For published versions, only allow updating release notes and rollout settings
     if version.status == 1:
         if data.is_force_update is not None or data.min_supported_version is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="已发布版本只能修改 release notes",
+                detail="已发布版本只能修改更新说明和灰度发布设置",
             )
 
     # Update fields
@@ -298,6 +320,15 @@ async def update_version(
         version.is_force_update = data.is_force_update
     if data.min_supported_version is not None:
         version.min_supported_version = data.min_supported_version
+    if data.rollout_percentage is not None:
+        if data.rollout_percentage < 0 or data.rollout_percentage > 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="灰度发布百分比必须在0-100之间",
+            )
+        version.rollout_percentage = data.rollout_percentage
+    if data.rollout_start_date is not None:
+        version.rollout_start_date = data.rollout_start_date
 
     # Audit log
     await create_audit_log(
@@ -409,6 +440,192 @@ async def upload_apk(
         "size": file_size,
         "size_formatted": format_size(file_size),
         "md5": file_md5,
+    }
+
+
+@router.post("/{version_id}/upload-patch")
+async def upload_patch(
+    request: Request,
+    version_id: UUID,
+    patch_from_version: str = Form(..., description="Base version for patch, e.g., 1.2.0"),
+    patch_from_code: int = Form(..., description="Base version code for patch"),
+    file: UploadFile = File(...),
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload patch file for incremental update.
+
+    Patch file is generated using bsdiff from base APK to target APK.
+    Only draft versions can have patch uploaded. If patch already exists, it will be replaced.
+    """
+    result = await db.execute(
+        select(AppVersion).where(AppVersion.id == version_id)
+    )
+    version = result.scalar_one_or_none()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="版本不存在",
+        )
+
+    if version.status == 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="已发布版本不能修改补丁包",
+        )
+
+    if not version.file_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="请先上传完整APK文件",
+        )
+
+    # Validate patch_from_code
+    if patch_from_code >= version.version_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="补丁基础版本号必须小于目标版本号",
+        )
+
+    # Validate file type
+    if not file.filename or not file.filename.lower().endswith('.patch'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="只支持 .patch 文件",
+        )
+
+    # Read file content
+    content = await file.read()
+    file_size = len(content)
+
+    # Calculate MD5
+    file_md5 = hashlib.md5(content).hexdigest()
+
+    # Upload to MinIO
+    settings = get_settings()
+    object_name = f"app-releases/{version.platform}/{version.version_name}/patch-{patch_from_code}-to-{version.version_code}.patch"
+
+    # Ensure bucket exists
+    await file_storage_service.ensure_bucket()
+
+    # Upload file
+    file_storage_service.client.put_object(
+        settings.MINIO_BUCKET,
+        object_name,
+        io.BytesIO(content),
+        length=file_size,
+        content_type="application/octet-stream",
+    )
+
+    # Build URL
+    protocol = "https" if settings.MINIO_SECURE else "http"
+    file_url = f"{protocol}://{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET}/{object_name}"
+
+    # Update version record
+    version.patch_from_version = patch_from_version
+    version.patch_from_code = patch_from_code
+    version.patch_file_url = file_url
+    version.patch_file_size = file_size
+    version.patch_file_md5 = file_md5
+
+    # Audit log
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="app_version.upload_patch",
+        module="app_version",
+        target_type="app_version",
+        target_id=str(version_id),
+        target_name=version.full_version,
+        description=f"上传增量补丁: {version.full_version}, 基础版本: {patch_from_version}+{patch_from_code}, 大小: {format_size(file_size)}",
+        request=request,
+    )
+
+    await db.commit()
+
+    return {
+        "message": "补丁上传成功",
+        "url": file_url,
+        "size": file_size,
+        "size_formatted": format_size(file_size),
+        "md5": file_md5,
+        "patch_from_version": patch_from_version,
+        "patch_from_code": patch_from_code,
+    }
+
+
+@router.delete("/{version_id}/patch")
+async def delete_patch(
+    request: Request,
+    version_id: UUID,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete patch file for a version.
+
+    Only draft versions can have patch deleted.
+    """
+    result = await db.execute(
+        select(AppVersion).where(AppVersion.id == version_id)
+    )
+    version = result.scalar_one_or_none()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="版本不存在",
+        )
+
+    if version.status == 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="已发布版本不能删除补丁包",
+        )
+
+    if not version.patch_file_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="该版本没有补丁包",
+        )
+
+    # Delete patch file from MinIO
+    try:
+        settings = get_settings()
+        object_name = f"app-releases/{version.platform}/{version.version_name}/patch-{version.patch_from_code}-to-{version.version_code}.patch"
+        file_storage_service.client.remove_object(settings.MINIO_BUCKET, object_name)
+    except Exception:
+        pass  # Ignore errors when deleting file
+
+    old_patch_info = f"{version.patch_from_version}+{version.patch_from_code}"
+
+    # Clear patch info
+    version.patch_from_version = None
+    version.patch_from_code = None
+    version.patch_file_url = None
+    version.patch_file_size = None
+    version.patch_file_md5 = None
+
+    # Audit log
+    await create_audit_log(
+        db=db,
+        admin_id=current_admin.id,
+        admin_username=current_admin.username,
+        action="app_version.delete_patch",
+        module="app_version",
+        target_type="app_version",
+        target_id=str(version_id),
+        target_name=version.full_version,
+        description=f"删除增量补丁: {version.full_version}, 基础版本: {old_patch_info}",
+        request=request,
+    )
+
+    await db.commit()
+
+    return {
+        "message": "补丁已删除",
+        "version": version.full_version,
     }
 
 
