@@ -275,9 +275,9 @@ class Category {
 ## 四、修复优先级建议
 
 ### 阶段1: 紧急修复 (影响数据一致性)
-1. [ ] P1-S1: 统一货币字段为 Decimal
-2. [ ] P1-I3: 修复 Category 类型不匹配
-3. [ ] P1-C1/P1-I1: 添加 Transaction.updatedAt
+1. [x] P1-S1: 统一货币字段为 Decimal ✅ 已修复 (2026-01-09)
+2. [ ] P1-I3: 修复 Category 类型不匹配 (需评估影响范围)
+3. [x] P1-C1/P1-I1: 添加 Transaction.updatedAt ✅ 已存在
 
 ### 阶段2: 重要优化 (影响可维护性)
 1. [ ] P1-S2: 消除重复计算逻辑
@@ -286,18 +286,68 @@ class Category {
 4. [ ] P1-I4: 统一字段命名
 
 ### 阶段3: 架构改进 (提升代码质量)
-1. [ ] P1-S3: 统一 ORM 关系定义
+1. [ ] P1-S3: 统一 ORM 关系定义 (backref → back_populates)
 2. [ ] P2-C2: 整合 Provider 状态管理
 3. [ ] P2-I2: 实现分页同步
 
 ### 阶段4: 技术债务清理
-1. [ ] P2-S1: 升级 SQLAlchemy 类型注解
+1. [x] P2-S1: 升级 SQLAlchemy 类型注解 ✅ 已修复 (2026-01-09)
 2. [ ] P2-C1: 集中 API 端点配置
 3. [ ] P3-*: 所有低优先级项
 
+### 阶段5: 客户端模型同步
+1. [x] P1-C2: Account 添加 isActive 字段 ✅ 已修复 (2026-01-09)
+
 ---
 
-## 五、附录
+## 五、修复记录
+
+### 2026-01-09 修复内容
+
+#### 1. P1-S1: 货币字段类型统一 (已修复)
+**文件**: `server/app/schemas/family.py`
+
+将所有金额相关字段从 `float` 改为 `Decimal`，涉及：
+- `MemberBudgetCreate.allocated`
+- `FamilyBudgetCreate.total_budget`
+- `FamilyBudgetUpdate.total_budget`
+- `MemberBudgetResponse`: allocated, spent, remaining, percentage
+- `FamilyBudgetResponse`: total_budget, total_spent, total_remaining, usage_percentage
+- `BudgetAlertResponse.current_usage`
+- `SplitParticipantCreate`: amount, percentage
+- `SplitParticipantResponse`: amount, percentage
+- `TransactionSplitResponse`: total_amount, settled_amount
+- `GoalContributionCreate.amount`
+- `GoalContributionResponse.amount`
+- `FamilySavingGoalCreate.target_amount`
+- `FamilySavingGoalUpdate.target_amount`
+- `FamilySavingGoalResponse`: target_amount, current_amount, progress_percentage
+- `MemberContribution`: income, expense, contribution_percentage
+- `FamilySummary`: total_income, total_expense, net_savings, savings_rate, avg_daily_expense
+- `CategoryBreakdown`: amount, percentage
+- `PendingSplit`: total_amount, your_amount
+- `FamilyLeaderboardEntry.metric_value`
+
+#### 2. P1-C2: Account 模型添加 isActive 字段 (已修复)
+**文件**: `app/lib/models/account.dart`
+
+- 添加 `isActive` 字段，默认值为 `true`
+- 更新 `copyWith` 方法支持该字段
+
+#### 3. P2-S1: UpgradeAnalytics 升级为 SQLAlchemy 2.0 类型注解 (已修复)
+**文件**: `server/app/models/upgrade_analytics.py`
+
+- 将所有 `Column()` 定义改为 `Mapped[T] = mapped_column()` 格式
+- 添加正确的类型导入 (`Mapped`, `mapped_column`, `Optional`)
+
+#### 4. P1-C1: Transaction.updatedAt 字段 (已存在)
+**文件**: `app/lib/models/transaction.dart`
+
+经检查，`updatedAt` 字段已存在于 Transaction 模型中 (Line 49)，此问题为误报。
+
+---
+
+## 六、附录
 
 ### A. 受影响文件清单
 

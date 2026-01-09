@@ -18,6 +18,7 @@ class Account {
   final IconData icon;
   final Color color;
   final bool isDefault;
+  final bool isActive;
   final DateTime createdAt;
   final CurrencyType currency; // 账户货币类型
   final bool isCustom; // 是否为用户自定义账户
@@ -30,6 +31,7 @@ class Account {
     required this.icon,
     required this.color,
     this.isDefault = false,
+    this.isActive = true,
     required this.createdAt,
     this.currency = CurrencyType.cny, // 默认人民币
     this.isCustom = false,
@@ -52,6 +54,7 @@ class Account {
     IconData? icon,
     Color? color,
     bool? isDefault,
+    bool? isActive,
     CurrencyType? currency,
     bool? isCustom,
   }) {
@@ -63,6 +66,7 @@ class Account {
       icon: icon ?? this.icon,
       color: color ?? this.color,
       isDefault: isDefault ?? this.isDefault,
+      isActive: isActive ?? this.isActive,
       createdAt: createdAt,
       currency: currency ?? this.currency,
       isCustom: isCustom ?? this.isCustom,

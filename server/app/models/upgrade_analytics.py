@@ -1,6 +1,12 @@
 """Upgrade analytics model for tracking app upgrade events."""
+import uuid
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, Index
+from typing import Optional
+
+from sqlalchemy import String, Integer, DateTime, Text, Index
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 from app.core.timezone import beijing_now_naive
 
@@ -10,53 +16,53 @@ class UpgradeAnalytics(Base):
 
     __tablename__ = "upgrade_analytics"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     # Event identification
-    event_type = Column(String(50), nullable=False, index=True,
-                       comment="Event type: check_update, download_start, etc.")
-    platform = Column(String(20), nullable=False, default="android",
-                     comment="Platform: android/ios")
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True,
+                                           comment="Event type: check_update, download_start, etc.")
+    platform: Mapped[str] = mapped_column(String(20), nullable=False, default="android",
+                                         comment="Platform: android/ios")
 
     # Version info
-    from_version = Column(String(20), nullable=False,
-                         comment="Version before upgrade")
-    to_version = Column(String(20), nullable=True,
-                       comment="Target version for upgrade")
-    from_build = Column(Integer, nullable=True,
-                       comment="Build number before upgrade")
-    to_build = Column(Integer, nullable=True,
-                     comment="Target build number")
+    from_version: Mapped[str] = mapped_column(String(20), nullable=False,
+                                             comment="Version before upgrade")
+    to_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True,
+                                                       comment="Target version for upgrade")
+    from_build: Mapped[Optional[int]] = mapped_column(Integer, nullable=True,
+                                                       comment="Build number before upgrade")
+    to_build: Mapped[Optional[int]] = mapped_column(Integer, nullable=True,
+                                                     comment="Target build number")
 
     # Download metrics
-    download_progress = Column(Integer, nullable=True,
-                              comment="Download progress percentage (0-100)")
-    download_size = Column(Integer, nullable=True,
-                          comment="Total download size in bytes")
-    download_duration_ms = Column(Integer, nullable=True,
-                                 comment="Download duration in milliseconds")
+    download_progress: Mapped[Optional[int]] = mapped_column(Integer, nullable=True,
+                                                             comment="Download progress percentage (0-100)")
+    download_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True,
+                                                         comment="Total download size in bytes")
+    download_duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True,
+                                                                comment="Download duration in milliseconds")
 
     # Error info
-    error_message = Column(Text, nullable=True,
-                          comment="Error message if failed")
-    error_code = Column(String(50), nullable=True,
-                       comment="Error code for categorization")
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True,
+                                                          comment="Error message if failed")
+    error_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True,
+                                                       comment="Error code for categorization")
 
     # Device info
-    device_id = Column(String(100), nullable=True, index=True,
-                      comment="Unique device identifier")
-    device_model = Column(String(100), nullable=True,
-                         comment="Device model name")
+    device_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True,
+                                                      comment="Unique device identifier")
+    device_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True,
+                                                         comment="Device model name")
 
     # Extra data (JSON)
-    extra_data = Column(Text, nullable=True,
-                       comment="Additional JSON data")
+    extra_data: Mapped[Optional[str]] = mapped_column(Text, nullable=True,
+                                                       comment="Additional JSON data")
 
     # Timestamps
-    event_time = Column(DateTime, nullable=False,
-                       comment="When the event occurred on client")
-    created_at = Column(DateTime, default=beijing_now_naive, nullable=False,
-                       comment="When the event was recorded on server")
+    event_time: Mapped[datetime] = mapped_column(DateTime, nullable=False,
+                                                  comment="When the event occurred on client")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, nullable=False,
+                                                  comment="When the event was recorded on server")
 
     # Indexes for common queries
     __table_args__ = (

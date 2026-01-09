@@ -62,21 +62,21 @@ class InvitationAcceptResponse(BaseModel):
 class MemberBudgetCreate(BaseModel):
     """Schema for creating a member budget allocation."""
     user_id: UUID
-    allocated: float = Field(..., ge=0)
+    allocated: Decimal = Field(..., ge=0, decimal_places=2)
 
 
 class FamilyBudgetCreate(BaseModel):
     """Schema for creating a family budget."""
     period: str = Field(..., pattern=r"^\d{4}-\d{2}$", description="Period in YYYY-MM format")
     strategy: int = Field(default=0, ge=0, le=3, description="0=unified, 1=per_member, 2=per_category, 3=hybrid")
-    total_budget: float = Field(..., gt=0)
+    total_budget: Decimal = Field(..., gt=0, decimal_places=2)
     member_allocations: Optional[List[MemberBudgetCreate]] = None
     rules: Optional[Dict] = None
 
 
 class FamilyBudgetUpdate(BaseModel):
     """Schema for updating a family budget."""
-    total_budget: Optional[float] = Field(None, gt=0)
+    total_budget: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
     strategy: Optional[int] = Field(None, ge=0, le=3)
     member_allocations: Optional[List[MemberBudgetCreate]] = None
     rules: Optional[Dict] = None
@@ -87,11 +87,11 @@ class MemberBudgetResponse(BaseModel):
     id: UUID
     user_id: UUID
     user_name: Optional[str] = None
-    allocated: float
-    spent: float
-    remaining: float
-    percentage: float
-    category_spent: Optional[Dict[str, float]] = None
+    allocated: Decimal
+    spent: Decimal
+    remaining: Decimal
+    percentage: Decimal
+    category_spent: Optional[Dict[str, Decimal]] = None
 
     class Config:
         from_attributes = True
@@ -103,10 +103,10 @@ class FamilyBudgetResponse(BaseModel):
     book_id: UUID
     period: str
     strategy: int
-    total_budget: float
-    total_spent: float
-    total_remaining: float
-    usage_percentage: float
+    total_budget: Decimal
+    total_spent: Decimal
+    total_remaining: Decimal
+    usage_percentage: Decimal
     member_budgets: List[MemberBudgetResponse]
     rules: Optional[Dict] = None
     created_at: datetime
@@ -120,7 +120,7 @@ class BudgetAlertResponse(BaseModel):
     """Schema for budget alert."""
     type: str  # "threshold", "exceeded", "large_expense"
     threshold: int
-    current_usage: float
+    current_usage: Decimal
     member_id: UUID
     member_name: Optional[str] = None
     message: str
@@ -133,8 +133,8 @@ class BudgetAlertResponse(BaseModel):
 class SplitParticipantCreate(BaseModel):
     """Schema for creating a split participant."""
     user_id: UUID
-    amount: Optional[float] = None  # For exact split
-    percentage: Optional[float] = None  # For percentage split
+    amount: Optional[Decimal] = Field(None, decimal_places=2)  # For exact split
+    percentage: Optional[Decimal] = Field(None, decimal_places=2)  # For percentage split
     shares: Optional[int] = None  # For shares split
     is_payer: bool = False
 
@@ -151,8 +151,8 @@ class SplitParticipantResponse(BaseModel):
     id: UUID
     user_id: UUID
     user_name: Optional[str] = None
-    amount: float
-    percentage: Optional[float] = None
+    amount: Decimal
+    percentage: Optional[Decimal] = None
     shares: Optional[int] = None
     is_payer: bool
     is_settled: bool
@@ -168,8 +168,8 @@ class TransactionSplitResponse(BaseModel):
     transaction_id: UUID
     split_type: int
     status: int
-    total_amount: float
-    settled_amount: float
+    total_amount: Decimal
+    settled_amount: Decimal
     participants: List[SplitParticipantResponse]
     created_at: datetime
     settled_at: Optional[datetime] = None
@@ -189,7 +189,7 @@ class SplitSettleRequest(BaseModel):
 
 class GoalContributionCreate(BaseModel):
     """Schema for creating a goal contribution."""
-    amount: float = Field(..., gt=0)
+    amount: Decimal = Field(..., gt=0, decimal_places=2)
     note: Optional[str] = Field(None, max_length=200)
 
 
@@ -199,7 +199,7 @@ class GoalContributionResponse(BaseModel):
     goal_id: UUID
     user_id: UUID
     user_name: Optional[str] = None
-    amount: float
+    amount: Decimal
     note: Optional[str] = None
     created_at: datetime
 
@@ -212,7 +212,7 @@ class FamilySavingGoalCreate(BaseModel):
     name: str = Field(..., max_length=100)
     description: Optional[str] = None
     icon: Optional[str] = Field(None, max_length=50)
-    target_amount: float = Field(..., gt=0)
+    target_amount: Decimal = Field(..., gt=0, decimal_places=2)
     deadline: Optional[datetime] = None
 
 
@@ -221,7 +221,7 @@ class FamilySavingGoalUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=100)
     description: Optional[str] = None
     icon: Optional[str] = Field(None, max_length=50)
-    target_amount: Optional[float] = Field(None, gt=0)
+    target_amount: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
     deadline: Optional[datetime] = None
     status: Optional[int] = Field(None, ge=0, le=2)
 
@@ -233,9 +233,9 @@ class FamilySavingGoalResponse(BaseModel):
     name: str
     description: Optional[str] = None
     icon: Optional[str] = None
-    target_amount: float
-    current_amount: float
-    progress_percentage: float
+    target_amount: Decimal
+    current_amount: Decimal
+    progress_percentage: Decimal
     deadline: Optional[datetime] = None
     status: int
     created_by: UUID
@@ -257,21 +257,21 @@ class MemberContribution(BaseModel):
     member_id: UUID
     member_name: str
     avatar_url: Optional[str] = None
-    income: float
-    expense: float
+    income: Decimal
+    expense: Decimal
     transaction_count: int
-    contribution_percentage: float
+    contribution_percentage: Decimal
     top_categories: List[str]
 
 
 class FamilySummary(BaseModel):
     """Schema for family financial summary."""
-    total_income: float
-    total_expense: float
-    net_savings: float
-    savings_rate: float
+    total_income: Decimal
+    total_expense: Decimal
+    net_savings: Decimal
+    savings_rate: Decimal
     transaction_count: int
-    avg_daily_expense: float
+    avg_daily_expense: Decimal
 
 
 class CategoryBreakdown(BaseModel):
@@ -279,9 +279,9 @@ class CategoryBreakdown(BaseModel):
     category_id: UUID
     category_name: str
     category_icon: Optional[str] = None
-    amount: float
-    percentage: float
-    member_breakdown: Optional[Dict[str, float]] = None  # member_id -> amount
+    amount: Decimal
+    percentage: Decimal
+    member_breakdown: Optional[Dict[str, Decimal]] = None  # member_id -> amount
 
 
 class PendingSplit(BaseModel):
@@ -289,8 +289,8 @@ class PendingSplit(BaseModel):
     split_id: UUID
     transaction_id: UUID
     description: str
-    total_amount: float
-    your_amount: float
+    total_amount: Decimal
+    your_amount: Decimal
     payer_name: str
     created_at: datetime
 
@@ -314,7 +314,7 @@ class FamilyLeaderboardEntry(BaseModel):
     member_id: UUID
     member_name: str
     avatar_url: Optional[str] = None
-    metric_value: float
+    metric_value: Decimal
     metric_name: str
 
 
