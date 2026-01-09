@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'theme/app_theme.dart';
 import 'pages/main_navigation.dart';
+import 'pages/onboarding_flow_page.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
+import 'providers/onboarding_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/generated/app_localizations.dart' as gen;
 import 'core/logger.dart';
@@ -133,6 +135,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     final themeNotifier = ref.read(themeProvider.notifier);
     final localeState = ref.watch(localeProvider);
     final l10n = ref.watch(localeProvider.notifier).l10n;
+    final onboardingState = ref.watch(onboardingProvider);
 
     // 根据是否使用自定义主题选择对应的 ThemeData
     final lightTheme = themeState.isUsingCustomTheme
@@ -141,6 +144,22 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     final darkTheme = themeState.isUsingCustomTheme
         ? themeNotifier.getDarkTheme()
         : AppTheme.createDarkTheme(themeNotifier.primaryColor);
+
+    // Show loading screen while checking onboarding status
+    if (onboardingState.isLoading) {
+      return MaterialApp(
+        title: l10n.appName,
+        debugShowCheckedModeBanner: false,
+        theme: lightTheme,
+        darkTheme: darkTheme,
+        themeMode: themeNotifier.themeMode,
+        home: const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
 
     return MaterialApp(
       title: l10n.appName,
@@ -157,7 +176,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         GlobalCupertinoLocalizations.delegate,
         AppLocalizationsDelegate(localeState.effectiveLanguage),
       ],
-      home: const MainNavigation(),
+      home: onboardingState.isCompleted
+          ? const MainNavigation()
+          : const OnboardingFlowPage(),
     );
   }
 }
