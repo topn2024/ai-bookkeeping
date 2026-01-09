@@ -145,6 +145,8 @@ export interface Transaction {
   book_name: string | null
   account_id: string
   account_name: string | null
+  target_account_id: string | null  // For transfers
+  target_account_name: string | null  // For transfers
   category_id: string
   category_name: string | null
   transaction_type: number  // Backend: 1=expense, 2=income, 3=transfer
@@ -155,10 +157,17 @@ export interface Transaction {
   transaction_time: string | null  // Time part: "HH:mm:ss"
   note: string | null
   tags: string[] | null
+  images: string[] | null  // Image attachments
+  location: string | null  // Location string
   source: number
   is_reimbursable: boolean
   is_reimbursed: boolean
+  is_exclude_stats: boolean  // Exclude from statistics
+  ai_confidence: number | null  // AI recognition confidence
+  source_file_url: string | null  // Source file URL for AI recognition
+  source_file_type: string | null  // Source file MIME type
   created_at: string
+  updated_at: string | null  // Update timestamp
 }
 
 export interface TransactionStats {
