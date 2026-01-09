@@ -7,6 +7,7 @@ import '../services/secure_storage_service.dart';
 import '../services/http_service.dart';
 import '../services/qwen_service.dart';
 import '../core/config.dart';
+import 'ledger_context_provider.dart';
 
 enum AuthStatus {
   initial,
@@ -51,6 +52,15 @@ class AuthNotifier extends Notifier<AuthState> {
     return const AuthState(status: AuthStatus.loading);
   }
 
+  /// 初始化账本上下文
+  Future<void> _initializeLedgerContext(String userId) async {
+    try {
+      await ref.read(ledgerContextProvider.notifier).initialize(userId);
+    } catch (e) {
+      debugPrint('Failed to initialize ledger context: $e');
+    }
+  }
+
   /// 从本地存储加载用户（用于离线访问）
   Future<void> _loadUser() async {
     try {
@@ -89,6 +99,8 @@ class AuthNotifier extends Notifier<AuthState> {
                   status: AuthStatus.authenticated,
                   user: serverUser,
                 );
+                // 初始化账本上下文
+                await _initializeLedgerContext(serverUser.id);
                 return;
               }
             } catch (e) {
@@ -99,6 +111,8 @@ class AuthNotifier extends Notifier<AuthState> {
                 status: AuthStatus.authenticated,
                 user: user,
               );
+              // 初始化账本上下文
+              await _initializeLedgerContext(user.id);
               return;
             }
           }
@@ -169,6 +183,9 @@ class AuthNotifier extends Notifier<AuthState> {
           status: AuthStatus.authenticated,
           user: user,
         );
+
+        // 初始化账本上下文
+        await _initializeLedgerContext(user.id);
 
         return true;
       } else {
@@ -245,6 +262,9 @@ class AuthNotifier extends Notifier<AuthState> {
           status: AuthStatus.authenticated,
           user: user,
         );
+
+        // 初始化账本上下文
+        await _initializeLedgerContext(user.id);
 
         return true;
       } else {

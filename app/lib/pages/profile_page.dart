@@ -4,12 +4,27 @@ import '../providers/auth_provider.dart';
 import '../providers/account_provider.dart';
 import '../services/gamification_service.dart';
 import '../services/database_service.dart';
+import '../l10n/l10n.dart';
 import 'account_management_page.dart';
 import 'credit_card_page.dart';
+import 'ledger_management_page.dart';
+import 'category_management_page.dart';
+import 'budget_management_page.dart';
+import 'savings_goal_page.dart';
+import 'template_management_page.dart';
+import 'recurring_management_page.dart';
+import 'bill_reminder_page.dart';
+import 'reimbursement_page.dart';
+import 'tag_statistics_page.dart';
+import 'investment_page.dart';
 import 'import_page.dart';
+import 'import/smart_import_page.dart';
 import 'export_page.dart';
 import 'backup_page.dart';
-import 'settings_page.dart';
+import 'annual_report_page.dart';
+import 'custom_report_page.dart';
+import 'asset_overview_page.dart';
+import 'system_settings_page.dart';
 import 'help_page.dart';
 import 'login_page.dart';
 import 'financial_freedom_simulator_page.dart';
@@ -24,13 +39,8 @@ import 'growth/viral_campaign_page.dart';
 import 'growth/negative_experience_recovery_page.dart';
 import 'growth/detractor_care_page.dart';
 
-/// 个人中心页面
-/// 原型设计 1.05：个人中心 Profile
-/// - 用户头像和基本信息
-/// - 成就卡片横向滚动
-/// - 账户管理分组
-/// - 数据管理分组
-/// - 系统设置分组
+/// 个人中心页面 (2.0 整合版)
+/// 整合了 1.0 设置页面的所有功能
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
@@ -40,7 +50,6 @@ class ProfilePage extends ConsumerStatefulWidget {
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
   /// 导航到需要登录的页面
-  /// 如果未登录，跳转到登录页面
   void _navigateWithAuth(BuildContext context, Widget page) {
     final authState = ref.read(authProvider);
     if (authState.isAuthenticated) {
@@ -62,12 +71,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             children: [
               _buildUserHeader(context, theme),
               _buildAchievementCards(context, theme),
-              _buildAccountManagementGroup(context, theme),
+              _buildAccountGroup(context, theme),
+              _buildBudgetGroup(context, theme),
               _buildFinancialToolsGroup(context, theme),
+              _buildDataGroup(context, theme),
+              _buildReportGroup(context, theme),
               _buildGrowthGroup(context, theme),
-              _buildDataManagementGroup(context, theme),
-              _buildSystemSettingsGroup(context, theme),
-              const SizedBox(height: 100), // 底部导航栏留白
+              _buildSystemGroup(context, theme),
+              const SizedBox(height: 100),
             ],
           ),
         ),
@@ -76,21 +87,22 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   /// 用户头部信息
-  /// 原型设计：头像、用户名、记账天数
   Widget _buildUserHeader(BuildContext context, ThemeData theme) {
     final authState = ref.watch(authProvider);
     final userName = authState.user?.nickname ?? authState.user?.email?.split('@').first ?? '未登录';
 
     return InkWell(
       onTap: () {
-        // 跳转到用户画像页面（需要登录）
-        _navigateWithAuth(context, const UserProfileVisualizationPage());
+        if (authState.isAuthenticated) {
+          _navigateWithAuth(context, const UserProfileVisualizationPage());
+        } else {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginPage()));
+        }
       },
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            // 头像
             Container(
               width: 64,
               height: 64,
@@ -110,7 +122,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               ),
             ),
             const SizedBox(width: 16),
-            // 用户信息
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,7 +160,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   /// 成就卡片横向滚动
-  /// 原型设计：钱龄达人、连续记账、储蓄能手
   Widget _buildAchievementCards(BuildContext context, ThemeData theme) {
     return FutureBuilder<StreakStats>(
       future: GamificationService(DatabaseService()).getStreakStats(),
@@ -224,7 +234,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   /// 账户管理分组
-  Widget _buildAccountManagementGroup(BuildContext context, ThemeData theme) {
+  Widget _buildAccountGroup(BuildContext context, ThemeData theme) {
     final accounts = ref.watch(accountProvider);
     final accountCount = accounts.length;
 
@@ -234,8 +244,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       title: '账户管理',
       items: [
         _SettingsItem(
+          icon: Icons.book,
+          title: context.l10n.ledgerManagement,
+          subtitle: '管理多账本',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LedgerManagementPage()),
+          ),
+        ),
+        _SettingsItem(
           icon: Icons.account_balance,
-          title: '我的账户',
+          title: context.l10n.accountManagement,
           subtitle: accountCount > 0 ? '$accountCount个账户' : '暂无账户',
           onTap: () => Navigator.push(
             context,
@@ -244,11 +263,103 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         ),
         _SettingsItem(
           icon: Icons.credit_card,
-          title: '信用卡管理',
+          title: context.l10n.creditCard,
           subtitle: '管理信用卡',
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CreditCardPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.trending_up,
+          title: context.l10n.investmentAccount,
+          subtitle: '投资理财账户',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const InvestmentPage()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 预算与目标分组
+  Widget _buildBudgetGroup(BuildContext context, ThemeData theme) {
+    return _buildSettingsGroup(
+      context,
+      theme,
+      title: '预算与目标',
+      items: [
+        _SettingsItem(
+          icon: Icons.category,
+          title: context.l10n.categoryManagement,
+          subtitle: '管理收支分类',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CategoryManagementPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.savings,
+          title: context.l10n.budgetManagement,
+          subtitle: '设置预算计划',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const BudgetManagementPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.flag,
+          title: context.l10n.savingsGoal,
+          subtitle: '储蓄目标管理',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SavingsGoalPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.flash_on,
+          title: context.l10n.templateManagement,
+          subtitle: '快速记账模板',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TemplateManagementPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.schedule,
+          title: context.l10n.recurringManagement,
+          subtitle: '周期性交易',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const RecurringManagementPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.notifications_active,
+          title: context.l10n.billReminder,
+          subtitle: '账单提醒设置',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const BillReminderPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.receipt_long,
+          title: context.l10n.reimbursement,
+          subtitle: '报销管理',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ReimbursementPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.label,
+          title: context.l10n.tagStatistics,
+          subtitle: '标签统计分析',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TagStatisticsPage()),
           ),
         ),
       ],
@@ -256,7 +367,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   /// 财务工具分组
-  /// 原型设计 10.18-10.20：习惯培养工具
   Widget _buildFinancialToolsGroup(BuildContext context, ThemeData theme) {
     return _buildSettingsGroup(
       context,
@@ -303,8 +413,92 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
   }
 
+  /// 数据管理分组
+  Widget _buildDataGroup(BuildContext context, ThemeData theme) {
+    return _buildSettingsGroup(
+      context,
+      theme,
+      title: '数据管理',
+      items: [
+        _SettingsItem(
+          icon: Icons.file_upload,
+          title: context.l10n.dataImportTitle,
+          subtitle: '导入银行账单',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ImportPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.auto_awesome,
+          title: '智能账单导入',
+          subtitle: '自动识别微信/支付宝账单',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SmartImportPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.file_download,
+          title: context.l10n.dataExportTitle,
+          subtitle: '导出为CSV/Excel',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ExportPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.backup,
+          title: context.l10n.dataBackupTitle,
+          subtitle: '备份与恢复',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const BackupPage()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 报表分析分组
+  Widget _buildReportGroup(BuildContext context, ThemeData theme) {
+    return _buildSettingsGroup(
+      context,
+      theme,
+      title: '报表分析',
+      items: [
+        _SettingsItem(
+          icon: Icons.account_balance,
+          title: context.l10n.assetOverview,
+          subtitle: '资产总览与趋势',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AssetOverviewPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.assessment,
+          title: context.l10n.annualReportTitle,
+          subtitle: '年度账单总结',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AnnualReportPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.analytics,
+          title: context.l10n.customReportTitle,
+          subtitle: '多维度数据分析',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CustomReportPage()),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// 增长与分享分组
-  /// 原型设计 14：增长与裂变模块
   Widget _buildGrowthGroup(BuildContext context, ThemeData theme) {
     return _buildSettingsGroup(
       context,
@@ -363,44 +557,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
   }
 
-  /// 数据管理分组
-  Widget _buildDataManagementGroup(BuildContext context, ThemeData theme) {
-    return _buildSettingsGroup(
-      context,
-      theme,
-      title: '数据管理',
-      items: [
-        _SettingsItem(
-          icon: Icons.file_upload,
-          title: '导入账单',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ImportPage()),
-          ),
-        ),
-        _SettingsItem(
-          icon: Icons.file_download,
-          title: '导出数据',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ExportPage()),
-          ),
-        ),
-        _SettingsItem(
-          icon: Icons.backup,
-          title: '备份与恢复',
-          subtitle: '上次备份: 今天 09:30',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const BackupPage()),
-          ),
-        ),
-      ],
-    );
-  }
-
   /// 系统设置分组
-  Widget _buildSystemSettingsGroup(BuildContext context, ThemeData theme) {
+  Widget _buildSystemGroup(BuildContext context, ThemeData theme) {
     return _buildSettingsGroup(
       context,
       theme,
@@ -408,15 +566,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       items: [
         _SettingsItem(
           icon: Icons.settings,
-          title: '设置',
+          title: context.l10n.systemSettings,
+          subtitle: '主题、语言、安全',
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const SettingsPage()),
+            MaterialPageRoute(builder: (_) => const SystemSettingsPage()),
           ),
         ),
         _SettingsItem(
           icon: Icons.help_outline,
           title: '帮助与反馈',
+          subtitle: '使用帮助与问题反馈',
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const HelpPage()),
