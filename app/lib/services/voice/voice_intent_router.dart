@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import '../nlu_engine.dart';
-import '../voice_service_coordinator.dart' show VoiceIntentType;
+import '../voice_service_coordinator.dart' show VoiceIntentType, VoiceSessionContext;
 import '../../models/transaction.dart';
 
 /// 语音意图路由器
@@ -555,19 +555,6 @@ class IntentCandidate {
       'confidence': confidence,
     };
   }
-}
-
-/// 会话上下文
-class VoiceSessionContext {
-  final VoiceIntentType intentType;
-  final Map<String, dynamic> data;
-  final DateTime createdAt;
-
-  const VoiceSessionContext({
-    required this.intentType,
-    required this.data,
-    required this.createdAt,
-  });
 }
 
 /// 内部类：意图分数

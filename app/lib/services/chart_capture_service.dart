@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:gal/gal.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:excel/excel.dart' as excel_pkg;
@@ -385,16 +385,8 @@ class ChartCaptureService {
   /// 保存到相册
   Future<bool> saveToGallery(String filePath) async {
     try {
-      final file = File(filePath);
-      final bytes = await file.readAsBytes();
-
-      final result = await ImageGallerySaver.saveImage(
-        bytes,
-        quality: 100,
-        name: 'chart_${DateTime.now().millisecondsSinceEpoch}',
-      );
-
-      return result != null && result['isSuccess'] == true;
+      await Gal.putImage(filePath);
+      return true;
     } catch (e) {
       return false;
     }
@@ -403,13 +395,12 @@ class ChartCaptureService {
   /// 保存图片字节到相册
   Future<bool> saveImageBytesToGallery(Uint8List bytes, {String? name}) async {
     try {
-      final result = await ImageGallerySaver.saveImage(
-        bytes,
-        quality: 100,
-        name: name ?? 'chart_${DateTime.now().millisecondsSinceEpoch}',
-      );
-
-      return result != null && result['isSuccess'] == true;
+      final tempDir = await getTemporaryDirectory();
+      final fileName = name ?? 'chart_${DateTime.now().millisecondsSinceEpoch}';
+      final tempFile = File('${tempDir.path}/$fileName.png');
+      await tempFile.writeAsBytes(bytes);
+      await Gal.putImage(tempFile.path);
+      return true;
     } catch (e) {
       return false;
     }

@@ -183,7 +183,7 @@ class VoiceDeleteService extends ChangeNotifier {
     if (confirmLevel == ConfirmLevel.level1 && !needExtraConfirm) {
       // Level 1: 轻量确认，直接请求语音确认
       _currentSession = DeleteSessionContext(
-        targetRecords: [record],
+        targetRecords: [ScoredCandidate(record: record, confidence: 1.0)],
         confirmLevel: confirmLevel,
         awaitingConfirmation: true,
       );
@@ -197,7 +197,7 @@ class VoiceDeleteService extends ChangeNotifier {
 
     // Level 2: 标准确认，需要语音或屏幕确认
     _currentSession = DeleteSessionContext(
-      targetRecords: [record],
+      targetRecords: [ScoredCandidate(record: record, confidence: 1.0)],
       confirmLevel: confirmLevel,
       awaitingConfirmation: true,
     );

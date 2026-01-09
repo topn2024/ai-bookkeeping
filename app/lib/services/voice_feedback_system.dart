@@ -334,8 +334,9 @@ class VoiceFeedbackSystem extends ChangeNotifier {
           return '操作已成功完成';
       }
     } else {
-      final suggestion = _generateErrorSuggestion(result.error);
-      return '操作失败：${result.error}${suggestion.isNotEmpty ? "。$suggestion" : ""}';
+      final errorMsg = result.error ?? '未知错误';
+      final suggestion = _generateErrorSuggestion(errorMsg);
+      return '操作失败：$errorMsg${suggestion.isNotEmpty ? "。$suggestion" : ""}';
     }
   }
 

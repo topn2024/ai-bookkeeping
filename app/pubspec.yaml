@@ -63,7 +63,7 @@ dependencies:
   pdf: ^3.11.1
 
   # Image gallery saver
-  image_gallery_saver: ^2.0.3
+  gal: ^2.3.0
 
   # Network & HTTP
   dio: ^5.4.0

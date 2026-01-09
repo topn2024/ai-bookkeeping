@@ -223,6 +223,30 @@ class TTSService {
     }
   }
 
+  /// 设置音量
+  Future<void> setVolume(double volume) async {
+    _settings.volume = volume;
+    if (_isInitialized) {
+      await _engine.setVolume(volume);
+    }
+  }
+
+  /// 设置语速
+  Future<void> setSpeechRate(double rate) async {
+    _settings.rate = rate;
+    if (_isInitialized) {
+      await _engine.setRate(rate);
+    }
+  }
+
+  /// 设置音调
+  Future<void> setPitch(double pitch) async {
+    _settings.pitch = pitch;
+    if (_isInitialized) {
+      await _engine.setPitch(pitch);
+    }
+  }
+
   /// 获取可用的语音列表
   Future<List<TTSVoice>> getAvailableVoices() async {
     if (!_isInitialized) {
