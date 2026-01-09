@@ -225,11 +225,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return response
 
     def _get_client_ip(self, request: Request) -> str:
-        """Extract client IP from request."""
-        # Check X-Forwarded-For header
+        """Extract client IP from request.
+
+        Note: X-Forwarded-For can be spoofed by clients. In production,
+        ensure your reverse proxy (nginx/cloudflare) overwrites this header.
+        """
+        # Check X-Forwarded-For header (first IP is the original client)
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
-            return forwarded.split(",")[0].strip()
+            # Take first IP, which should be the original client
+            ips = [ip.strip() for ip in forwarded.split(",")]
+            return ips[0] if ips else "unknown"
 
         # Check X-Real-IP header
         real_ip = request.headers.get("X-Real-IP")

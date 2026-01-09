@@ -184,8 +184,8 @@ class EmailService:
             try:
                 mail.close()
                 mail.logout()
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Error closing IMAP connection: {e}")
 
     def _fetch_and_parse_email(self, mail: imaplib.IMAP4_SSL, email_id: bytes) -> Optional[dict]:
         """Fetch and parse a single email.
@@ -211,7 +211,8 @@ class EmailService:
 
         try:
             email_date = parsedate_to_datetime(date_str) if date_str else None
-        except:
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Failed to parse email date '{date_str}': {e}")
             email_date = None
 
         # Extract body content
@@ -235,7 +236,7 @@ class EmailService:
             if isinstance(part, bytes):
                 try:
                     decoded_parts.append(part.decode(encoding or "utf-8", errors="replace"))
-                except:
+                except (UnicodeDecodeError, LookupError):
                     decoded_parts.append(part.decode("utf-8", errors="replace"))
             else:
                 decoded_parts.append(str(part))
@@ -261,7 +262,7 @@ class EmailService:
                         payload = part.get_payload(decode=True)
                         if payload:
                             content_parts.append(payload.decode(charset, errors="replace"))
-                    except:
+                    except (UnicodeDecodeError, LookupError, AttributeError):
                         pass
                 elif content_type == "text/html":
                     try:
@@ -271,7 +272,7 @@ class EmailService:
                             html_content = payload.decode(charset, errors="replace")
                             text_content = self._html_to_text(html_content)
                             content_parts.append(text_content)
-                    except:
+                    except (UnicodeDecodeError, LookupError, AttributeError):
                         pass
         else:
             content_type = msg.get_content_type()
@@ -283,7 +284,7 @@ class EmailService:
                         content_parts.append(self._html_to_text(payload.decode(charset, errors="replace")))
                     else:
                         content_parts.append(payload.decode(charset, errors="replace"))
-            except:
+            except (UnicodeDecodeError, LookupError, AttributeError):
                 pass
 
         return "\n".join(content_parts)
@@ -306,7 +307,7 @@ class EmailService:
             text = "\n".join(chunk for chunk in chunks if chunk)
 
             return unescape(text)
-        except:
+        except Exception:
             # Fallback: simple regex removal of tags
             clean = re.sub(r'<[^>]+>', ' ', html_content)
             return unescape(clean)

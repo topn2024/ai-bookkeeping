@@ -162,7 +162,8 @@ class SignedUrlService:
 
             expires = int(expires_list[0])
             signature = sign_list[0]
-            user_id = params.get("uid", [None])[0]
+            uid_list = params.get("uid", [])
+            user_id = uid_list[0] if uid_list else None
 
             return self.validate_signature(base_url, signature, expires, user_id)
 

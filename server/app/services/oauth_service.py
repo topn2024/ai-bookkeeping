@@ -43,7 +43,7 @@ class OAuthService:
 
     async def _get_wechat_user_info(self, code: str) -> OAuthCallbackData:
         """Get WeChat user info from authorization code."""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             # Step 1: Exchange code for access token
             token_url = "https://api.weixin.qq.com/sns/oauth2/access_token"
             token_params = {
@@ -90,7 +90,7 @@ class OAuthService:
 
     async def _get_apple_user_info(self, code: str) -> OAuthCallbackData:
         """Get Apple user info from authorization code."""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             # Step 1: Exchange code for tokens
             token_url = "https://appleid.apple.com/auth/token"
 
@@ -152,7 +152,7 @@ class OAuthService:
 
     async def _get_google_user_info(self, code: str) -> OAuthCallbackData:
         """Get Google user info from authorization code."""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             # Step 1: Exchange code for access token
             token_url = "https://oauth2.googleapis.com/token"
             token_data = {
