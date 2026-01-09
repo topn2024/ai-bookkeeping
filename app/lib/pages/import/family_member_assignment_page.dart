@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/auth_provider.dart';
 
 
 /// 家庭成员分配页面
@@ -29,27 +30,19 @@ class _FamilyMemberAssignmentPageState
   String _selectedAssignment = 'me';
   bool _enableAIRecognition = true;
 
-  // 模拟家庭成员数据
-  final List<FamilyMember> _members = [
-    FamilyMember(
-      id: 'me',
-      name: '张三',
-      avatar: '我',
-      isMe: true,
-    ),
-    FamilyMember(
-      id: 'member1',
-      name: '小美',
-      avatar: '👩',
-      isMe: false,
-    ),
-    FamilyMember(
-      id: 'member2',
-      name: '小宝',
-      avatar: '👶',
-      isMe: false,
-    ),
-  ];
+  List<FamilyMember> get _members {
+    final authState = ref.watch(authProvider);
+    final userName = authState.user?.nickname ?? authState.user?.email?.split('@').first ?? '我';
+    return [
+      FamilyMember(
+        id: 'me',
+        name: userName,
+        avatar: '我',
+        isMe: true,
+      ),
+      // 其他家庭成员应从家庭服务获取
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,25 +195,6 @@ class _FamilyMemberAssignmentPageState
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // 分配给其他成员
-          _buildAssignmentOption(
-            theme,
-            'member1',
-            '全部分配给小美',
-            '这是小美的账单',
-            Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE8F5E9),
-                shape: BoxShape.circle,
-              ),
-              child: const Center(
-                child: Text('👩', style: TextStyle(fontSize: 18)),
               ),
             ),
           ),

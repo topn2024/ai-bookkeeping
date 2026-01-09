@@ -311,11 +311,16 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
       endDate = now;
     }
 
-    final transactions = await _databaseService.queryTransactions(
-      startDate: startDate,
-      endDate: endDate,
-      limit: 10,
-    );
+    var transactions = await _databaseService.getTransactions();
+
+    // 应用日期过滤
+    if (startDate != null) {
+      transactions = transactions.where((t) => t.date.isAfter(startDate!.subtract(const Duration(days: 1)))).toList();
+    }
+    if (endDate != null) {
+      transactions = transactions.where((t) => t.date.isBefore(endDate!.add(const Duration(days: 1)))).toList();
+    }
+    transactions = transactions.take(10).toList();
 
     if (transactions.isEmpty) {
       await _provideFeedback('没有找到符合条件的记录');

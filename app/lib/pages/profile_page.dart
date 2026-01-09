@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/auth_provider.dart';
+import '../providers/account_provider.dart';
+import '../services/gamification_service.dart';
+import '../services/database_service.dart';
 import 'account_management_page.dart';
 import 'credit_card_page.dart';
 import 'import_page.dart';
@@ -62,6 +66,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   /// 用户头部信息
   /// 原型设计：头像、用户名、记账天数
   Widget _buildUserHeader(BuildContext context, ThemeData theme) {
+    final authState = ref.watch(authProvider);
+    final userName = authState.user?.nickname ?? authState.user?.email?.split('@').first ?? '未登录';
+
     return InkWell(
       onTap: () {
         // 跳转到用户画像页面
@@ -100,18 +107,24 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '张三',
+                    userName,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    '已记账 186 天',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                  FutureBuilder<StreakStats>(
+                    future: GamificationService(DatabaseService()).getStreakStats(),
+                    builder: (context, snapshot) {
+                      final totalDays = snapshot.data?.totalDaysRecorded ?? 0;
+                      return Text(
+                        totalDays > 0 ? '已记账 $totalDays 天' : '开始记账吧',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -129,40 +142,31 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   /// 成就卡片横向滚动
   /// 原型设计：钱龄达人、连续记账、储蓄能手
   Widget _buildAchievementCards(BuildContext context, ThemeData theme) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          _buildAchievementCard(
-            context,
-            theme,
-            emoji: '🏆',
-            title: '钱龄达人',
-            subtitle: 'Lv.3',
-            gradientColors: const [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
+    return FutureBuilder<StreakStats>(
+      future: GamificationService(DatabaseService()).getStreakStats(),
+      builder: (context, snapshot) {
+        final streakDays = snapshot.data?.currentStreak ?? 0;
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              if (streakDays > 0) ...[
+                _buildAchievementCard(
+                  context,
+                  theme,
+                  emoji: '🔥',
+                  title: '连续记账',
+                  subtitle: '$streakDays天',
+                  gradientColors: const [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
+                ),
+                const SizedBox(width: 16),
+              ],
+            ],
           ),
-          const SizedBox(width: 12),
-          _buildAchievementCard(
-            context,
-            theme,
-            emoji: '🔥',
-            title: '连续记账',
-            subtitle: '32天',
-            gradientColors: const [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
-          ),
-          const SizedBox(width: 12),
-          _buildAchievementCard(
-            context,
-            theme,
-            emoji: '💰',
-            title: '储蓄能手',
-            subtitle: '累计¥5万',
-            gradientColors: const [Color(0xFFEBF3FF), Color(0xFFBBDEFB)],
-          ),
-          const SizedBox(width: 16),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -212,6 +216,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   /// 账户管理分组
   Widget _buildAccountManagementGroup(BuildContext context, ThemeData theme) {
+    final accounts = ref.watch(accountProvider);
+    final accountCount = accounts.length;
+
     return _buildSettingsGroup(
       context,
       theme,
@@ -220,7 +227,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         _SettingsItem(
           icon: Icons.account_balance,
           title: '我的账户',
-          subtitle: '5个账户',
+          subtitle: accountCount > 0 ? '$accountCount个账户' : '暂无账户',
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const AccountManagementPage()),
@@ -229,7 +236,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         _SettingsItem(
           icon: Icons.credit_card,
           title: '信用卡管理',
-          subtitle: '2张信用卡',
+          subtitle: '管理信用卡',
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CreditCardPage()),

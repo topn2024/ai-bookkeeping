@@ -100,3 +100,6 @@ class AppConfig {
     return missing;
   }
 }
+
+/// Global app config instance
+final appConfig = AppConfig();
