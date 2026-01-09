@@ -50,6 +50,7 @@ async def create_account(
         account_type=account_data.account_type,
         icon=account_data.icon,
         balance=account_data.balance,
+        currency=account_data.currency,
         credit_limit=account_data.credit_limit,
         bill_day=account_data.bill_day,
         repay_day=account_data.repay_day,

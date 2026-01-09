@@ -93,6 +93,7 @@ extension VoiceQueryExtension on DatabaseService {
 
       transactions.add(model.Transaction(
         id: map['id'] as String,
+        type: model.TransactionType.values[map['type'] as int? ?? 0],
         amount: map['amount'] as double,
         category: map['category'] as String? ?? '',
         subcategory: map['sub_category'] as String?,
@@ -108,13 +109,6 @@ extension VoiceQueryExtension on DatabaseService {
         updatedAt: map['updated_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
           DateTime.now(),
-          DateTime.fromMillisecondsSinceEpoch(map['last_sync_at'] as int) :
-          null,
-        version: map['version'] as int? ?? 1,
-        deleted: map['deleted'] == 1,
-        deletedAt: map['deleted_at'] != null ?
-          DateTime.fromMillisecondsSinceEpoch(map['deleted_at'] as int) :
-          null,
       ));
     }
 
@@ -160,6 +154,7 @@ extension VoiceQueryExtension on DatabaseService {
 
       transactions.add(model.Transaction(
         id: map['id'] as String,
+        type: model.TransactionType.values[map['type'] as int? ?? 0],
         amount: map['amount'] as double,
         category: map['category'] as String? ?? '',
         subcategory: map['sub_category'] as String?,
@@ -175,13 +170,6 @@ extension VoiceQueryExtension on DatabaseService {
         updatedAt: map['updated_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
           DateTime.now(),
-          DateTime.fromMillisecondsSinceEpoch(map['last_sync_at'] as int) :
-          null,
-        version: map['version'] as int? ?? 1,
-        deleted: map['deleted'] == 1,
-        deletedAt: map['deleted_at'] != null ?
-          DateTime.fromMillisecondsSinceEpoch(map['deleted_at'] as int) :
-          null,
       ));
     }
 
@@ -218,6 +206,7 @@ extension VoiceQueryExtension on DatabaseService {
 
       transactions.add(model.Transaction(
         id: map['id'] as String,
+        type: model.TransactionType.values[map['type'] as int? ?? 0],
         amount: map['amount'] as double,
         category: map['category'] as String? ?? '',
         subcategory: map['sub_category'] as String?,
@@ -233,13 +222,6 @@ extension VoiceQueryExtension on DatabaseService {
         updatedAt: map['updated_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
           DateTime.now(),
-          DateTime.fromMillisecondsSinceEpoch(map['last_sync_at'] as int) :
-          null,
-        version: map['version'] as int? ?? 1,
-        deleted: map['deleted'] == 1,
-        deletedAt: map['deleted_at'] != null ?
-          DateTime.fromMillisecondsSinceEpoch(map['deleted_at'] as int) :
-          null,
       ));
     }
 
@@ -284,6 +266,7 @@ extension VoiceQueryExtension on DatabaseService {
 
       transactions.add(model.Transaction(
         id: map['id'] as String,
+        type: model.TransactionType.values[map['type'] as int? ?? 0],
         amount: map['amount'] as double,
         category: map['category'] as String? ?? '',
         subcategory: map['sub_category'] as String?,
@@ -299,13 +282,6 @@ extension VoiceQueryExtension on DatabaseService {
         updatedAt: map['updated_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
           DateTime.now(),
-          DateTime.fromMillisecondsSinceEpoch(map['last_sync_at'] as int) :
-          null,
-        version: map['version'] as int? ?? 1,
-        deleted: map['deleted'] == 1,
-        deletedAt: map['deleted_at'] != null ?
-          DateTime.fromMillisecondsSinceEpoch(map['deleted_at'] as int) :
-          null,
       ));
     }
 
@@ -371,6 +347,7 @@ extension VoiceQueryExtension on DatabaseService {
 
       transactions.add(model.Transaction(
         id: map['id'] as String,
+        type: model.TransactionType.values[map['type'] as int? ?? 0],
         amount: map['amount'] as double,
         category: map['category'] as String? ?? '',
         subcategory: map['sub_category'] as String?,
@@ -386,13 +363,6 @@ extension VoiceQueryExtension on DatabaseService {
         updatedAt: map['updated_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
           DateTime.now(),
-          DateTime.fromMillisecondsSinceEpoch(map['last_sync_at'] as int) :
-          null,
-        version: map['version'] as int? ?? 1,
-        deleted: map['deleted'] == 1,
-        deletedAt: map['deleted_at'] != null ?
-          DateTime.fromMillisecondsSinceEpoch(map['deleted_at'] as int) :
-          null,
       ));
     }
 
@@ -433,6 +403,7 @@ extension VoiceQueryExtension on DatabaseService {
 
     return model.Transaction(
       id: map['id'] as String,
+        type: model.TransactionType.values[map['type'] as int? ?? 0],
       amount: map['amount'] as double,
       category: map['category'] as String? ?? '',
       subcategory: map['sub_category'] as String?,
@@ -448,13 +419,6 @@ extension VoiceQueryExtension on DatabaseService {
       updatedAt: map['updated_at'] != null ?
         DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
         DateTime.now(),
-        DateTime.fromMillisecondsSinceEpoch(map['last_sync_at'] as int) :
-        null,
-      version: map['version'] as int? ?? 1,
-      deleted: map['deleted'] == 1,
-      deletedAt: map['deleted_at'] != null ?
-        DateTime.fromMillisecondsSinceEpoch(map['deleted_at'] as int) :
-        null,
     );
   }
 }

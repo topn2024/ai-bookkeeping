@@ -27,33 +27,29 @@ class TransactionCreate(BaseModel):
     note: Optional[str] = Field(None, max_length=500)
     tags: Optional[List[str]] = None
     images: Optional[List[str]] = None
-    location: Optional[str] = Field(None, max_length=200)  # Legacy: simple location string
-
-    # Structured location fields (Chapter 14: Location Intelligence)
-    location_latitude: Optional[Decimal] = Field(None, ge=-90, le=90)
-    location_longitude: Optional[Decimal] = Field(None, ge=-180, le=180)
+    location: Optional[str] = Field(None, max_length=200)
+    # Structured location fields (Chapter 14)
+    location_latitude: Optional[Decimal] = None
+    location_longitude: Optional[Decimal] = None
     location_place_name: Optional[str] = Field(None, max_length=200)
     location_address: Optional[str] = Field(None, max_length=500)
     location_city: Optional[str] = Field(None, max_length=100)
     location_district: Optional[str] = Field(None, max_length=100)
-    location_type: Optional[int] = Field(None, ge=0, le=10)  # LocationType enum
+    location_type: Optional[int] = None  # 0: home, 1: work, 2: shop, 3: restaurant, 4: transport, 5: other
     location_poi_id: Optional[str] = Field(None, max_length=100)
-    geofence_region: Optional[str] = Field(None, max_length=100)  # home/work/shopping etc
-    is_cross_region: bool = False  # Cross-region transaction flag
-
-    # Money Age fields
-    money_age: Optional[int] = None  # Age in days
-    money_age_level: Optional[str] = Field(None, max_length=20)  # health/warning/danger
-    resource_pool_id: Optional[UUID] = None  # For income tracking
-
+    geofence_region: Optional[str] = Field(None, max_length=100)
+    is_cross_region: bool = False
     is_reimbursable: bool = False
     is_exclude_stats: bool = False
     visibility: int = Field(default=1, ge=0, le=2)  # 0: private, 1: all_members, 2: admins_only
     source: int = Field(default=0, ge=0, le=3)  # 0: manual, 1: image, 2: voice, 3: email
     ai_confidence: Optional[Decimal] = Field(None, ge=0, le=1)
-
+    # Money Age fields
+    money_age: Optional[int] = None
+    money_age_level: Optional[str] = Field(None, max_length=20)  # health, warning, danger
+    resource_pool_id: Optional[UUID] = None
     # Source file fields for AI recognition
-    source_file_url: Optional[str] = Field(None, max_length=500)  # MinIO file URL
+    source_file_url: Optional[str] = Field(None, max_length=500)
     source_file_type: Optional[str] = Field(None, max_length=50)  # MIME type
     source_file_size: Optional[int] = Field(None, ge=0)  # File size in bytes
     recognition_raw_response: Optional[str] = Field(None, max_length=5000)  # AI raw response
@@ -75,24 +71,17 @@ class TransactionUpdate(BaseModel):
     tags: Optional[List[str]] = None
     images: Optional[List[str]] = None
     location: Optional[str] = Field(None, max_length=200)
-
-    # Structured location fields (Chapter 14: Location Intelligence)
-    location_latitude: Optional[Decimal] = Field(None, ge=-90, le=90)
-    location_longitude: Optional[Decimal] = Field(None, ge=-180, le=180)
+    # Structured location fields
+    location_latitude: Optional[Decimal] = None
+    location_longitude: Optional[Decimal] = None
     location_place_name: Optional[str] = Field(None, max_length=200)
     location_address: Optional[str] = Field(None, max_length=500)
     location_city: Optional[str] = Field(None, max_length=100)
     location_district: Optional[str] = Field(None, max_length=100)
-    location_type: Optional[int] = Field(None, ge=0, le=10)
+    location_type: Optional[int] = None
     location_poi_id: Optional[str] = Field(None, max_length=100)
     geofence_region: Optional[str] = Field(None, max_length=100)
     is_cross_region: Optional[bool] = None
-
-    # Money Age fields
-    money_age: Optional[int] = None
-    money_age_level: Optional[str] = Field(None, max_length=20)
-    resource_pool_id: Optional[UUID] = None
-
     is_reimbursable: Optional[bool] = None
     is_reimbursed: Optional[bool] = None
     is_exclude_stats: Optional[bool] = None
@@ -115,9 +104,8 @@ class TransactionResponse(BaseModel):
     note: Optional[str] = None
     tags: Optional[List[str]] = None
     images: Optional[List[str]] = None
-    location: Optional[str] = None  # Legacy: simple location string
-
-    # Structured location fields (Chapter 14: Location Intelligence)
+    location: Optional[str] = None
+    # Structured location fields (Chapter 14)
     location_latitude: Optional[Decimal] = None
     location_longitude: Optional[Decimal] = None
     location_place_name: Optional[str] = None
@@ -128,19 +116,16 @@ class TransactionResponse(BaseModel):
     location_poi_id: Optional[str] = None
     geofence_region: Optional[str] = None
     is_cross_region: bool = False
-
-    # Money Age fields
-    money_age: Optional[int] = None
-    money_age_level: Optional[str] = None
-    resource_pool_id: Optional[UUID] = None
-
     is_reimbursable: bool
     is_reimbursed: bool
     is_exclude_stats: bool
     visibility: int = 1
     source: int
     ai_confidence: Optional[Decimal] = None
-
+    # Money Age fields
+    money_age: Optional[int] = None
+    money_age_level: Optional[str] = None
+    resource_pool_id: Optional[UUID] = None
     # Source file fields
     source_file_url: Optional[str] = None
     source_file_type: Optional[str] = None
@@ -148,7 +133,6 @@ class TransactionResponse(BaseModel):
     recognition_raw_response: Optional[str] = None
     recognition_timestamp: Optional[datetime] = None
     source_file_expires_at: Optional[datetime] = None
-
     created_at: datetime
     updated_at: datetime
 

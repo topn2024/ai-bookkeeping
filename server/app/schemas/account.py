@@ -13,6 +13,7 @@ class AccountCreate(BaseModel):
     account_type: int = Field(..., ge=1, le=5)  # 1: cash, 2: debit, 3: credit, 4: alipay, 5: wechat
     icon: Optional[str] = Field(None, max_length=50)
     balance: Decimal = Field(default=Decimal("0"))
+    currency: str = Field(default="CNY", max_length=10)
     credit_limit: Optional[Decimal] = None
     bill_day: Optional[int] = Field(None, ge=1, le=31)
     repay_day: Optional[int] = Field(None, ge=1, le=31)
@@ -24,10 +25,12 @@ class AccountUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=100)
     icon: Optional[str] = Field(None, max_length=50)
     balance: Optional[Decimal] = None
+    currency: Optional[str] = Field(None, max_length=10)
     credit_limit: Optional[Decimal] = None
     bill_day: Optional[int] = Field(None, ge=1, le=31)
     repay_day: Optional[int] = Field(None, ge=1, le=31)
     is_default: Optional[bool] = None
+    is_active: Optional[bool] = None
 
 
 class AccountResponse(BaseModel):
@@ -38,12 +41,14 @@ class AccountResponse(BaseModel):
     account_type: int
     icon: Optional[str] = None
     balance: Decimal
+    currency: str = "CNY"
     credit_limit: Optional[Decimal] = None
     bill_day: Optional[int] = None
     repay_day: Optional[int] = None
     is_default: bool
     is_active: bool
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
