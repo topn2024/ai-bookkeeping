@@ -255,7 +255,7 @@ class AppTheme {
         seedColor: primaryColor,
         brightness: Brightness.light,
       ),
-      scaffoldBackgroundColor: AppColors.background,
+      scaffoldBackgroundColor: AntigravityColors.surface,
       appBarTheme: AppBarTheme(
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
