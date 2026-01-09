@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 /// 引导完成庆祝页
 ///
@@ -20,6 +21,8 @@ class OnboardingCompletePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -60,15 +63,15 @@ class OnboardingCompletePage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        '进入首页',
-                        style: TextStyle(fontSize: 16),
+                        l10n.onboardingCompleteGoHome,
+                        style: const TextStyle(fontSize: 16),
                       ),
-                      SizedBox(width: 8),
-                      Icon(Icons.home, size: 20),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.home, size: 20),
                     ],
                   ),
                 ),

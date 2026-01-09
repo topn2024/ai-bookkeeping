@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 /// 首笔记账引导页
 ///
@@ -25,12 +26,14 @@ class _OnboardingFirstTransactionPageState
   final TextEditingController _noteController = TextEditingController();
   String? _selectedCategory;
 
-  final List<_QuickCategory> _categories = [
-    _QuickCategory(emoji: '🍽️', name: '餐饮', color: Colors.orange),
-    _QuickCategory(emoji: '🚗', name: '交通', color: Colors.blue),
-    _QuickCategory(emoji: '🛒', name: '购物', color: Colors.pink),
-    _QuickCategory(emoji: '🎮', name: '娱乐', color: Colors.purple),
-  ];
+  List<_QuickCategory> _getCategories(AppLocalizations l10n) {
+    return [
+      _QuickCategory(emoji: '🍽️', name: l10n.categoryDining, color: Colors.orange),
+      _QuickCategory(emoji: '🚗', name: l10n.categoryTransport, color: Colors.blue),
+      _QuickCategory(emoji: '🛒', name: l10n.categoryShopping, color: Colors.pink),
+      _QuickCategory(emoji: '🎮', name: l10n.categoryEntertainment, color: Colors.purple),
+    ];
+  }
 
   @override
   void dispose() {
@@ -44,6 +47,9 @@ class _OnboardingFirstTransactionPageState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final categories = _getCategories(l10n);
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -79,16 +85,16 @@ class _OnboardingFirstTransactionPageState
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               child: Column(
                 children: [
-                  const Text(
-                    '记下你的第一笔账',
-                    style: TextStyle(
+                  Text(
+                    l10n.onboardingFirstTransactionTitle,
+                    style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '试试看，记账就是这么简单',
+                    l10n.onboardingFirstTransactionSubtitle,
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[600],
@@ -137,7 +143,7 @@ class _OnboardingFirstTransactionPageState
                         children: [
                           // 金额输入
                           Text(
-                            '消费金额',
+                            l10n.onboardingAmountLabel,
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[600],
@@ -182,7 +188,7 @@ class _OnboardingFirstTransactionPageState
 
                           // 分类选择
                           Text(
-                            '选择分类',
+                            l10n.onboardingCategoryLabel,
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[600],
@@ -192,7 +198,7 @@ class _OnboardingFirstTransactionPageState
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: _categories.map((category) {
+                            children: categories.map((category) {
                               final isSelected =
                                   _selectedCategory == category.name;
                               return GestureDetector(
@@ -241,7 +247,7 @@ class _OnboardingFirstTransactionPageState
                           TextField(
                             controller: _noteController,
                             decoration: InputDecoration(
-                              hintText: '添加备注（选填）',
+                              hintText: l10n.onboardingNoteHint,
                               hintStyle: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[400],
@@ -290,7 +296,7 @@ class _OnboardingFirstTransactionPageState
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            '输入金额，选择分类即可完成',
+                            l10n.onboardingTip,
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.green[700],
@@ -315,14 +321,14 @@ class _OnboardingFirstTransactionPageState
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check, size: 20),
-                    SizedBox(width: 8),
+                    const Icon(Icons.check, size: 20),
+                    const SizedBox(width: 8),
                     Text(
-                      '保存我的第一笔账',
-                      style: TextStyle(fontSize: 16),
+                      l10n.onboardingSaveFirst,
+                      style: const TextStyle(fontSize: 16),
                     ),
                   ],
                 ),

@@ -1089,8 +1089,8 @@
   "onboardingFeatureSavingsTitle": "储蓄目标",
   "onboardingFeatureSavingsDesc": "设定目标，追踪进度\\n让存钱变得有动力",
 
-  "onboardingFirstTransactionTitle": "尝试第一笔记录",
-  "onboardingFirstTransactionDesc": "让我们一起记录你的第一笔交易",
+  "onboardingFirstTransactionTitle": "记下你的第一笔账",
+  "onboardingFirstTransactionSubtitle": "试试看，记账就是这么简单",
   "onboardingFirstTransactionComplete": "完成",
 
   "onboardingCompleteTitle": "一切就绪！",
@@ -1098,5 +1098,16 @@
   "onboardingCompleteGoHome": "进入首页",
   "onboardingCompleteTryVoice": "试试语音助手",
   "onboardingCompleteSetBudget": "设置预算",
-  "onboardingCompleteImportBills": "导入账单"
+  "onboardingCompleteImportBills": "导入账单",
+
+  "onboardingAmountLabel": "消费金额",
+  "onboardingCategoryLabel": "选择分类",
+  "onboardingNoteHint": "添加备注（选填）",
+  "onboardingTip": "输入金额，选择分类即可完成",
+  "onboardingSaveFirst": "保存我的第一笔账",
+
+  "categoryDining": "餐饮",
+  "categoryTransport": "交通",
+  "categoryShopping": "购物",
+  "categoryEntertainment": "娱乐"
 }

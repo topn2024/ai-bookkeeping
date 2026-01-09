@@ -1310,8 +1310,8 @@
   "onboardingFeatureSavingsTitle": "Savings Goals",
   "onboardingFeatureSavingsDesc": "Set goals, track progress\\nMake saving money motivating",
 
-  "onboardingFirstTransactionTitle": "Try Your First Record",
-  "onboardingFirstTransactionDesc": "Let's record your first transaction together",
+  "onboardingFirstTransactionTitle": "Record Your First Transaction",
+  "onboardingFirstTransactionSubtitle": "Try it, bookkeeping is that simple",
   "onboardingFirstTransactionComplete": "Complete",
 
   "onboardingCompleteTitle": "All Set!",
@@ -1319,5 +1319,16 @@
   "onboardingCompleteGoHome": "Go to Home",
   "onboardingCompleteTryVoice": "Try Voice Assistant",
   "onboardingCompleteSetBudget": "Set Budget",
-  "onboardingCompleteImportBills": "Import Bills"
+  "onboardingCompleteImportBills": "Import Bills",
+
+  "onboardingAmountLabel": "Amount",
+  "onboardingCategoryLabel": "Select Category",
+  "onboardingNoteHint": "Add note (optional)",
+  "onboardingTip": "Enter amount and select category to complete",
+  "onboardingSaveFirst": "Save My First Transaction",
+
+  "categoryDining": "Dining",
+  "categoryTransport": "Transport",
+  "categoryShopping": "Shopping",
+  "categoryEntertainment": "Entertainment"
 }
