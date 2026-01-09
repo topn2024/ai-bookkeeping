@@ -84,13 +84,49 @@ class EmergencyFundPage extends ConsumerWidget {
               title: const Text('目标月数'),
               subtitle: const Text('覆盖几个月的支出'),
               trailing: const Text('3个月'),
-              onTap: () {},
+              onTap: () {
+                Navigator.pop(context);
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('设置目标月数'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        RadioListTile(
+                          title: const Text('3个月'),
+                          value: 3,
+                          groupValue: 3,
+                          onChanged: (v) => Navigator.pop(ctx),
+                        ),
+                        RadioListTile(
+                          title: const Text('6个月'),
+                          value: 6,
+                          groupValue: 3,
+                          onChanged: (v) => Navigator.pop(ctx),
+                        ),
+                        RadioListTile(
+                          title: const Text('12个月'),
+                          value: 12,
+                          groupValue: 3,
+                          onChanged: (v) => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
             ListTile(
               title: const Text('月均支出'),
               subtitle: const Text('用于计算目标金额'),
               trailing: Text('¥${monthlyExpense.toStringAsFixed(0)}'),
-              onTap: () {},
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('月均支出自动根据历史数据计算')),
+                );
+              },
             ),
           ],
         ),

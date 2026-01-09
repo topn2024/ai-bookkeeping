@@ -457,13 +457,21 @@ class _FeedbackCard extends StatelessWidget {
               _FeedbackButton(
                 icon: Icons.thumb_up,
                 color: Colors.green,
-                onTap: () {},
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('感谢您的反馈！')),
+                  );
+                },
               ),
               const SizedBox(width: 8),
               _FeedbackButton(
                 icon: Icons.thumb_down,
                 color: Colors.red,
-                onTap: () {},
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('我们会改进建议质量')),
+                  );
+                },
               ),
             ],
           ),

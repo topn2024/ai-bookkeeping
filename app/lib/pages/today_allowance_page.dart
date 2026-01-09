@@ -540,14 +540,68 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
             title: const Text('计算周期'),
             subtitle: const Text('按月'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('选择计算周期'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RadioListTile(
+                        title: const Text('按日'),
+                        value: 'daily',
+                        groupValue: 'monthly',
+                        onChanged: (v) => Navigator.pop(context),
+                      ),
+                      RadioListTile(
+                        title: const Text('按周'),
+                        value: 'weekly',
+                        groupValue: 'monthly',
+                        onChanged: (v) => Navigator.pop(context),
+                      ),
+                      RadioListTile(
+                        title: const Text('按月'),
+                        value: 'monthly',
+                        groupValue: 'monthly',
+                        onChanged: (v) => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.account_balance_wallet),
             title: const Text('预算来源'),
             subtitle: const Text('月度总预算'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('选择预算来源'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RadioListTile(
+                        title: const Text('月度总预算'),
+                        value: 'total',
+                        groupValue: 'total',
+                        onChanged: (v) => Navigator.pop(context),
+                      ),
+                      RadioListTile(
+                        title: const Text('指定小金库'),
+                        value: 'vault',
+                        groupValue: 'total',
+                        onChanged: (v) => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.notifications),

@@ -240,7 +240,11 @@ class FamilyBirthdayPage extends ConsumerWidget {
         width: double.infinity,
         height: 52,
         child: ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.generateBirthdayCard + '功能开发中')),
+            );
+          },
           icon: const Icon(Icons.card_giftcard, size: 18),
           label: Text(l10n.generateBirthdayCard),
           style: ElevatedButton.styleFrom(
