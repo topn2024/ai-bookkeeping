@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'user_profile_service.dart';
 import 'user_profile_scheduler.dart';
+import 'database_service.dart';
+import '../models/transaction.dart' as model;
 
 /// 用户画像系统集成服务
 ///
@@ -139,11 +141,39 @@ class UserProfileIntegration {
 
 // ==================== Riverpod Providers ====================
 
-/// 交易数据源 Provider（需要在应用中实现具体的数据源）
+/// 数据库服务 Provider
+final _databaseServiceProvider = Provider<DatabaseService>((ref) {
+  return DatabaseService();
+});
+
+/// 交易数据源实现
+class DatabaseTransactionDataSource implements TransactionDataSource {
+  final DatabaseService _db;
+
+  DatabaseTransactionDataSource(this._db);
+
+  @override
+  Future<List<TransactionData>> getAll(String userId) async {
+    final transactions = await _db.getTransactions();
+    return transactions.map((t) => TransactionData(
+      id: t.id,
+      type: t.type == model.TransactionType.income
+          ? 'income'
+          : t.type == model.TransactionType.expense
+              ? 'expense'
+              : 'transfer',
+      amount: t.amount,
+      category: t.category,
+      merchant: t.rawMerchant,
+      date: t.date,
+    )).toList();
+  }
+}
+
+/// 交易数据源 Provider
 final transactionDataSourceProvider = Provider<TransactionDataSource>((ref) {
-  throw UnimplementedError(
-    'transactionDataSourceProvider must be overridden in the app',
-  );
+  final db = ref.watch(_databaseServiceProvider);
+  return DatabaseTransactionDataSource(db);
 });
 
 /// 用户画像集成服务 Provider
