@@ -124,54 +124,81 @@ async def get_family_dashboard(
         avg_daily_expense=round(avg_daily_expense, 2),
     )
 
-    # Calculate member contributions
+    # Calculate member contributions - optimized to avoid N+1 queries
+    # First, get all member stats in one query
+    member_stats_result = await db.execute(
+        select(
+            Transaction.user_id,
+            func.coalesce(func.sum(
+                func.case((Transaction.transaction_type == 2, Transaction.amount), else_=0)
+            ), 0).label('income'),
+            func.coalesce(func.sum(
+                func.case((Transaction.transaction_type == 1, Transaction.amount), else_=0)
+            ), 0).label('expense'),
+            func.count(Transaction.id).label('count'),
+        )
+        .where(
+            Transaction.book_id == book_id,
+            func.extract('year', Transaction.transaction_date) == int(year),
+            func.extract('month', Transaction.transaction_date) == int(month),
+        )
+        .group_by(Transaction.user_id)
+    )
+    member_stats_map = {row.user_id: row for row in member_stats_result.all()}
+
+    # Get top categories for all members in one query
+    top_cats_result = await db.execute(
+        select(
+            Transaction.user_id,
+            Category.name,
+            func.sum(Transaction.amount).label('total')
+        )
+        .join(Category, Transaction.category_id == Category.id)
+        .where(
+            Transaction.book_id == book_id,
+            Transaction.transaction_type == 1,
+            func.extract('year', Transaction.transaction_date) == int(year),
+            func.extract('month', Transaction.transaction_date) == int(month),
+        )
+        .group_by(Transaction.user_id, Category.id, Category.name)
+        .order_by(Transaction.user_id, func.sum(Transaction.amount).desc())
+    )
+
+    # Group top categories by user
+    member_top_cats = {}
+    for row in top_cats_result.all():
+        if row.user_id not in member_top_cats:
+            member_top_cats[row.user_id] = []
+        if len(member_top_cats[row.user_id]) < 3:
+            member_top_cats[row.user_id].append(row.name)
+
     member_contributions = []
     for member_id, member_name, avatar_url in members:
-        result = await db.execute(
-            select(
-                func.coalesce(func.sum(
-                    func.case((Transaction.transaction_type == 2, Transaction.amount), else_=0)
-                ), 0).label('income'),
-                func.coalesce(func.sum(
-                    func.case((Transaction.transaction_type == 1, Transaction.amount), else_=0)
-                ), 0).label('expense'),
-                func.count(Transaction.id).label('count'),
-            )
-            .where(
-                Transaction.book_id == book_id,
-                Transaction.user_id == member_id,
-                func.extract('year', Transaction.transaction_date) == int(year),
-                func.extract('month', Transaction.transaction_date) == int(month),
-            )
-        )
-        r = result.first()
+        stats = member_stats_map.get(member_id)
+        if not stats:
+            # Member has no transactions this month
+            member_contributions.append(MemberContribution(
+                member_id=member_id,
+                member_name=member_name,
+                avatar_url=avatar_url,
+                income=0,
+                expense=0,
+                contribution_percentage=0,
+                transaction_count=0,
+                top_categories=[],
+            ))
+            continue
 
-        # Get top categories
-        result = await db.execute(
-            select(Category.name)
-            .join(Transaction, Transaction.category_id == Category.id)
-            .where(
-                Transaction.book_id == book_id,
-                Transaction.user_id == member_id,
-                Transaction.transaction_type == 1,
-                func.extract('year', Transaction.transaction_date) == int(year),
-                func.extract('month', Transaction.transaction_date) == int(month),
-            )
-            .group_by(Category.id, Category.name)
-            .order_by(func.sum(Transaction.amount).desc())
-            .limit(3)
-        )
-        top_categories = [cat for (cat,) in result.all()]
-
-        contribution_pct = (float(r.expense) / total_expense * 100) if total_expense > 0 else 0
+        top_categories = member_top_cats.get(member_id, [])
+        contribution_pct = (float(stats.expense) / total_expense * 100) if total_expense > 0 else 0
 
         member_contributions.append(MemberContribution(
             member_id=member_id,
             member_name=member_name,
             avatar_url=avatar_url,
-            income=float(r.income),
-            expense=float(r.expense),
-            transaction_count=r.count,
+            income=float(stats.income),
+            expense=float(stats.expense),
+            transaction_count=stats.count,
             contribution_percentage=round(contribution_pct, 2),
             top_categories=top_categories,
         ))

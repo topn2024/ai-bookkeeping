@@ -98,6 +98,13 @@ async def create_split(
     db.add(split)
     await db.flush()
 
+    # Fetch all participant users at once to avoid N+1 queries
+    participant_ids = [p.user_id for p in split_data.participants]
+    users_result = await db.execute(
+        select(User).where(User.id.in_(participant_ids))
+    )
+    users_map = {user.id: user for user in users_result.scalars().all()}
+
     # Create participants based on split type
     participant_responses = []
 
@@ -116,9 +123,8 @@ async def create_split(
             db.add(participant)
             await db.flush()
 
-            # Get user name
-            result = await db.execute(select(User).where(User.id == p.user_id))
-            user = result.scalar_one_or_none()
+            # Get user from pre-fetched map
+            user = users_map.get(p.user_id)
 
             participant_responses.append(SplitParticipantResponse(
                 id=participant.id,
@@ -152,8 +158,8 @@ async def create_split(
             db.add(participant)
             await db.flush()
 
-            result = await db.execute(select(User).where(User.id == p.user_id))
-            user = result.scalar_one_or_none()
+            # Get user from pre-fetched map
+            user = users_map.get(p.user_id)
 
             participant_responses.append(SplitParticipantResponse(
                 id=participant.id,
@@ -185,8 +191,8 @@ async def create_split(
             db.add(participant)
             await db.flush()
 
-            result = await db.execute(select(User).where(User.id == p.user_id))
-            user = result.scalar_one_or_none()
+            # Get user from pre-fetched map
+            user = users_map.get(p.user_id)
 
             participant_responses.append(SplitParticipantResponse(
                 id=participant.id,
@@ -217,8 +223,8 @@ async def create_split(
             db.add(participant)
             await db.flush()
 
-            result = await db.execute(select(User).where(User.id == p.user_id))
-            user = result.scalar_one_or_none()
+            # Get user from pre-fetched map
+            user = users_map.get(p.user_id)
 
             participant_responses.append(SplitParticipantResponse(
                 id=participant.id,
