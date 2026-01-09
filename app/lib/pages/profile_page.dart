@@ -39,8 +39,7 @@ import 'growth/viral_campaign_page.dart';
 import 'growth/negative_experience_recovery_page.dart';
 import 'growth/detractor_care_page.dart';
 
-/// 个人中心页面 (2.0 整合版)
-/// 整合了 1.0 设置页面的所有功能
+/// 我的页面
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
@@ -353,15 +352,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             MaterialPageRoute(builder: (_) => const ReimbursementPage()),
           ),
         ),
-        _SettingsItem(
-          icon: Icons.label,
-          title: context.l10n.tagStatistics,
-          subtitle: '标签统计分析',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const TagStatisticsPage()),
-          ),
-        ),
       ],
     );
   }
@@ -373,12 +363,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       theme,
       title: '财务工具',
       items: [
-        _SettingsItem(
-          icon: Icons.flag,
-          title: '目标达成',
-          subtitle: '追踪你的财务目标',
-          onTap: () => _navigateWithAuth(context, const GoalAchievementDashboardPage()),
-        ),
         _SettingsItem(
           icon: Icons.person_search,
           title: '我的画像',
@@ -400,15 +384,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           subtitle: '查看个性化理财建议',
           onTap: () => _navigateWithAuth(context, const ActionableAdvicePage()),
         ),
-        _SettingsItem(
-          icon: Icons.auto_awesome,
-          title: '功能推荐',
-          subtitle: '发现更多实用功能',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const SmartFeatureRecommendationPage()),
-          ),
-        ),
       ],
     );
   }
@@ -423,16 +398,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         _SettingsItem(
           icon: Icons.file_upload,
           title: context.l10n.dataImportTitle,
-          subtitle: '导入银行账单',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ImportPage()),
-          ),
-        ),
-        _SettingsItem(
-          icon: Icons.auto_awesome,
-          title: '智能账单导入',
-          subtitle: '自动识别微信/支付宝账单',
+          subtitle: '导入银行账单、微信/支付宝账单',
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const SmartImportPage()),
@@ -494,6 +460,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             MaterialPageRoute(builder: (_) => const CustomReportPage()),
           ),
         ),
+        _SettingsItem(
+          icon: Icons.label,
+          title: context.l10n.tagStatistics,
+          subtitle: '标签统计分析',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TagStatisticsPage()),
+          ),
+        ),
       ],
     );
   }
@@ -505,15 +480,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       theme,
       title: '增长与分享',
       items: [
-        _SettingsItem(
-          icon: Icons.thumb_up,
-          title: '满意度调查',
-          subtitle: '给我们反馈',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const NpsSurveyPage()),
-          ),
-        ),
         _SettingsItem(
           icon: Icons.share,
           title: '分享成就',
@@ -536,21 +502,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
         ),
         _SettingsItem(
-          icon: Icons.healing,
-          title: '体验恢复',
-          subtitle: '遇到问题？我们来帮你',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const NegativeExperienceRecoveryPage()),
-          ),
-        ),
-        _SettingsItem(
           icon: Icons.feedback,
-          title: '深度反馈',
-          subtitle: '告诉我们如何改进',
+          title: '反馈中心',
+          subtitle: '满意度调查、问题反馈',
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const DetractorCarePage()),
+            MaterialPageRoute(builder: (_) => const NpsSurveyPage()),
           ),
         ),
       ],
