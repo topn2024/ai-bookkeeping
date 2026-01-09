@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
+import '../models/transaction.dart';
+import '../services/database_service.dart';
 
 /// 商品明细项
 class ReceiptItem {
@@ -568,8 +570,17 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
                 flex: 2,
                 child: ElevatedButton(
                   onPressed: () {
+                    // 保存编辑的商品
+                    final newPrice = double.tryParse(priceController.text) ?? item.totalPrice;
+                    final newItem = ReceiptItem(
+                      name: nameController.text,
+                      specification: item.specification,
+                      quantity: item.quantity,
+                      unitPrice: newPrice / item.quantity,
+                      totalPrice: newPrice,
+                    );
+                    _updateItem(item, newItem);
                     Navigator.pop(context);
-                    // TODO: 保存编辑
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryColor,
@@ -586,15 +597,68 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
     );
   }
 
+  /// 更新商品项
+  void _updateItem(ReceiptItem oldItem, ReceiptItem newItem) {
+    setState(() {
+      final index = _receipt.items.indexOf(oldItem);
+      if (index != -1) {
+        final newItems = List<ReceiptItem>.from(_receipt.items);
+        newItems[index] = newItem;
+        final newSubtotal = newItems.fold(0.0, (sum, item) => sum + item.totalPrice);
+        _receipt = ReceiptData(
+          merchantName: _receipt.merchantName,
+          merchantAddress: _receipt.merchantAddress,
+          receiptNumber: _receipt.receiptNumber,
+          timestamp: _receipt.timestamp,
+          items: newItems,
+          subtotal: newSubtotal,
+          discount: _receipt.discount,
+          totalAmount: newSubtotal - _receipt.discount,
+          confidence: _receipt.confidence,
+          imageUrl: _receipt.imageUrl,
+        );
+      }
+    });
+  }
+
   /// 确认记账
-  void _confirmBookkeeping() {
-    // TODO: 实现记账逻辑
-    Navigator.pop(context, _receipt);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('已记账 ¥${_receipt.totalAmount.toStringAsFixed(2)}'),
-        backgroundColor: AppTheme.successColor,
-      ),
+  Future<void> _confirmBookkeeping() async {
+    final db = DatabaseService();
+
+    // 创建交易记录
+    final transaction = Transaction(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      type: TransactionType.expense,
+      amount: _receipt.totalAmount,
+      category: 'shopping',
+      note: '${_receipt.merchantName} - ${_receipt.items.length}件商品',
+      date: _receipt.timestamp,
+      accountId: 'default',
+      rawMerchant: _receipt.merchantName,
+      source: TransactionSource.image,
+      aiConfidence: _receipt.confidence,
     );
+
+    try {
+      await db.insertTransaction(transaction);
+      if (mounted) {
+        Navigator.pop(context, _receipt);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已记账 ¥${_receipt.totalAmount.toStringAsFixed(2)}'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('记账失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
