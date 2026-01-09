@@ -19,7 +19,7 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     phone: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(100), unique=True, nullable=True)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Nullable for OAuth users
     nickname: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     member_level: Mapped[int] = mapped_column(Integer, default=0)  # 0: normal, 1: VIP
