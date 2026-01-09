@@ -1,10 +1,10 @@
 // Application configuration service.
 //
 // Manages app configuration including API keys and endpoints.
-// API keys are fetched from the server and cached locally.
+// API keys are provided via compile-time environment variables for security.
+// Server only returns availability status, not actual keys.
 
 import 'package:flutter/foundation.dart';
-import '../services/secure_storage_service.dart';
 import '../services/http_service.dart';
 
 /// Application configuration
@@ -13,12 +13,11 @@ class AppConfig {
   factory AppConfig() => _instance;
   AppConfig._internal();
 
-  final SecureStorageService _secureStorage = SecureStorageService();
   final HttpService _http = HttpService();
 
-  // Cached API keys
-  String? _qwenApiKey;
-  String? _zhipuApiKey;
+  // AI availability status from server
+  bool _qwenAvailable = false;
+  bool _zhipuAvailable = false;
   bool _initialized = false;
 
   /// Backend API URL (compile-time constant)
@@ -28,23 +27,21 @@ class AppConfig {
         defaultValue: 'https://160.202.238.29/api/v1',
       );
 
-  /// Get Qwen API Key (from cache or compile-time)
+  /// Get Qwen API Key (compile-time only for security)
   String get qwenApiKey {
-    // First try cached value from server
-    if (_qwenApiKey != null && _qwenApiKey!.isNotEmpty) {
-      return _qwenApiKey!;
-    }
-    // Fall back to compile-time value
     return const String.fromEnvironment('QWEN_API_KEY', defaultValue: '');
   }
 
-  /// Get Zhipu API Key (from cache or compile-time)
+  /// Get Zhipu API Key (compile-time only for security)
   String get zhipuApiKey {
-    if (_zhipuApiKey != null && _zhipuApiKey!.isNotEmpty) {
-      return _zhipuApiKey!;
-    }
     return const String.fromEnvironment('ZHIPU_API_KEY', defaultValue: '');
   }
+
+  /// Whether Qwen AI is available on server
+  bool get isQwenAvailable => _qwenAvailable;
+
+  /// Whether Zhipu AI is available on server
+  bool get isZhipuAvailable => _zhipuAvailable;
 
   /// Whether running in debug mode
   bool get isDebug => kDebugMode;
@@ -55,63 +52,45 @@ class AppConfig {
   /// Check if required configuration is present
   bool get isConfigured => qwenApiKey.isNotEmpty;
 
-  /// Initialize config - load cached values from secure storage
+  /// Initialize config
   Future<void> initialize() async {
     if (_initialized) return;
-
-    try {
-      _qwenApiKey = await _secureStorage.read('qwen_api_key');
-      _zhipuApiKey = await _secureStorage.read('zhipu_api_key');
-      _initialized = true;
-      debugPrint('AppConfig: Initialized from cache, qwenApiKey=${_qwenApiKey?.isNotEmpty == true ? "[SET:${_qwenApiKey!.substring(0, 8)}...]" : "[EMPTY/NULL]"}');
-    } catch (e) {
-      debugPrint('AppConfig: Failed to load cached API keys: $e');
-    }
+    _initialized = true;
+    debugPrint('AppConfig: Initialized, qwenApiKey=${qwenApiKey.isNotEmpty ? "[SET]" : "[EMPTY]"}');
   }
 
-  /// Fetch API keys from server and cache them
+  /// Fetch AI availability status from server
   /// Call this after user logs in
   Future<bool> fetchFromServer() async {
     try {
-      debugPrint('AppConfig: Fetching API keys from /config/ai...');
+      debugPrint('AppConfig: Fetching AI availability from /config/ai...');
       final response = await _http.get('/config/ai');
 
       debugPrint('AppConfig: Response status=${response.statusCode}');
       if (response.statusCode == 200) {
         final data = response.data;
         debugPrint('AppConfig: Response data=$data');
-        _qwenApiKey = data['qwen_api_key'] as String?;
-        _zhipuApiKey = data['zhipu_api_key'] as String?;
 
-        debugPrint('AppConfig: Parsed qwen_api_key=${_qwenApiKey?.isNotEmpty == true ? "[SET:${_qwenApiKey!.substring(0, 8)}...]" : "[EMPTY]"}');
+        // Server now returns availability flags, not actual keys
+        _qwenAvailable = data['qwen_available'] as bool? ?? false;
+        _zhipuAvailable = data['zhipu_available'] as bool? ?? false;
 
-        // Cache to secure storage
-        if (_qwenApiKey != null && _qwenApiKey!.isNotEmpty) {
-          await _secureStorage.write('qwen_api_key', _qwenApiKey!);
-          debugPrint('AppConfig: Cached qwen_api_key to secure storage');
-        }
-        if (_zhipuApiKey != null && _zhipuApiKey!.isNotEmpty) {
-          await _secureStorage.write('zhipu_api_key', _zhipuApiKey!);
-        }
-
-        debugPrint('AppConfig: API keys fetched and cached from server');
+        debugPrint('AppConfig: qwen_available=$_qwenAvailable, zhipu_available=$_zhipuAvailable');
         return true;
       } else {
         debugPrint('AppConfig: Unexpected status code: ${response.statusCode}');
       }
     } catch (e, stack) {
-      debugPrint('AppConfig: Failed to fetch API keys from server: $e');
+      debugPrint('AppConfig: Failed to fetch AI availability from server: $e');
       debugPrint('AppConfig: Stack trace: $stack');
     }
     return false;
   }
 
-  /// Clear cached API keys (call on logout)
+  /// Clear cached data (call on logout)
   Future<void> clearCache() async {
-    _qwenApiKey = null;
-    _zhipuApiKey = null;
-    await _secureStorage.delete('qwen_api_key');
-    await _secureStorage.delete('zhipu_api_key');
+    _qwenAvailable = false;
+    _zhipuAvailable = false;
   }
 
   /// Validate configuration and return missing items
@@ -120,16 +99,4 @@ class AppConfig {
     if (qwenApiKey.isEmpty) missing.add('QWEN_API_KEY');
     return missing;
   }
-
-  @override
-  String toString() {
-    return 'AppConfig('
-        'qwenApiKey: ${qwenApiKey.isNotEmpty ? "[SET]" : "[MISSING]"}, '
-        'zhipuApiKey: ${zhipuApiKey.isNotEmpty ? "[SET]" : "[MISSING]"}, '
-        'apiBaseUrl: $apiBaseUrl'
-        ')';
-  }
 }
-
-/// Global config instance
-final appConfig = AppConfig();
