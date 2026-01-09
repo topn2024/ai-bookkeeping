@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/transaction.dart' as model;
 import '../models/transaction_split.dart';
+import '../models/transaction_location.dart';
 import '../models/account.dart';
 import '../models/category.dart';
 import '../models/ledger.dart';
@@ -129,6 +130,9 @@ class DatabaseService {
         rawMerchant TEXT,
         vaultId TEXT,
         moneyAge INTEGER,
+        moneyAgeLevel TEXT,
+        resourcePoolId TEXT,
+        visibility INTEGER NOT NULL DEFAULT 1,
         locationJson TEXT
       )
     ''');
@@ -1203,6 +1207,14 @@ class DatabaseService {
       'externalSource': transaction.externalSource?.index,
       'importBatchId': transaction.importBatchId,
       'rawMerchant': transaction.rawMerchant,
+      'vaultId': transaction.vaultId,
+      'moneyAge': transaction.moneyAge,
+      'moneyAgeLevel': transaction.moneyAgeLevel,
+      'resourcePoolId': transaction.resourcePoolId,
+      'visibility': transaction.visibility,
+      'locationJson': transaction.location != null
+          ? '${transaction.location!.latitude},${transaction.location!.longitude},${transaction.location!.placeName ?? ''},${transaction.location!.address ?? ''}'
+          : null,
     });
 
     // Insert splits if this is a split transaction
@@ -1263,6 +1275,12 @@ class DatabaseService {
             : null,
         importBatchId: map['importBatchId'] as String?,
         rawMerchant: map['rawMerchant'] as String?,
+        vaultId: map['vaultId'] as String?,
+        moneyAge: map['moneyAge'] as int?,
+        moneyAgeLevel: map['moneyAgeLevel'] as String?,
+        resourcePoolId: map['resourcePoolId'] as String?,
+        visibility: (map['visibility'] as int?) ?? 1,
+        location: _parseLocationJson(map['locationJson'] as String?),
       ));
     }
 
@@ -1299,6 +1317,14 @@ class DatabaseService {
         'externalSource': transaction.externalSource?.index,
         'importBatchId': transaction.importBatchId,
         'rawMerchant': transaction.rawMerchant,
+        'vaultId': transaction.vaultId,
+        'moneyAge': transaction.moneyAge,
+        'moneyAgeLevel': transaction.moneyAgeLevel,
+        'resourcePoolId': transaction.resourcePoolId,
+        'visibility': transaction.visibility,
+        'locationJson': transaction.location != null
+            ? '${transaction.location!.latitude},${transaction.location!.longitude},${transaction.location!.placeName ?? ''},${transaction.location!.address ?? ''}'
+            : null,
       },
       where: 'id = ?',
       whereArgs: [transaction.id],
@@ -2678,6 +2704,12 @@ class DatabaseService {
             : null,
         importBatchId: map['importBatchId'] as String?,
         rawMerchant: map['rawMerchant'] as String?,
+        vaultId: map['vaultId'] as String?,
+        moneyAge: map['moneyAge'] as int?,
+        moneyAgeLevel: map['moneyAgeLevel'] as String?,
+        resourcePoolId: map['resourcePoolId'] as String?,
+        visibility: (map['visibility'] as int?) ?? 1,
+        location: _parseLocationJson(map['locationJson'] as String?),
       ));
     }
 
@@ -3085,6 +3117,34 @@ class DatabaseService {
     await db.rawUpdate(
       'UPDATE budget_vaults SET spentAmount = spentAmount + ?, updatedAt = ? WHERE id = ?',
       [amount, DateTime.now().millisecondsSinceEpoch, vaultId],
+    );
+  }
+
+  /// 执行原始SQL查询
+  Future<List<Map<String, Object?>>> rawQuery(String sql, [List<Object?>? arguments]) async {
+    final db = await database;
+    return await db.rawQuery(sql, arguments);
+  }
+
+  /// 执行原始SQL插入
+  Future<int> rawInsert(String sql, [List<Object?>? arguments]) async {
+    final db = await database;
+    return await db.rawInsert(sql, arguments);
+  }
+
+  /// Parse location JSON string to TransactionLocation
+  TransactionLocation? _parseLocationJson(String? locationJson) {
+    if (locationJson == null || locationJson.isEmpty) return null;
+    final parts = locationJson.split(',');
+    if (parts.length < 2) return null;
+    final lat = double.tryParse(parts[0]);
+    final lng = double.tryParse(parts[1]);
+    if (lat == null || lng == null) return null;
+    return TransactionLocation(
+      latitude: lat,
+      longitude: lng,
+      placeName: parts.length > 2 && parts[2].isNotEmpty ? parts[2] : null,
+      address: parts.length > 3 && parts[3].isNotEmpty ? parts[3] : null,
     );
   }
 }

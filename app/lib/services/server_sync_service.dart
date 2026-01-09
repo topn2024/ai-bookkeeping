@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import 'database_service.dart';
 import 'http_service.dart';
 import 'data_mapper_service.dart';
+import '../core/logger.dart';
 
 /// Sync status constants
 class SyncStatus {
@@ -81,6 +82,7 @@ class ServerSyncService {
   final HttpService _http = HttpService();
   final DataMapperService _mapper = DataMapperService();
   final _uuid = const Uuid();
+  final Logger _logger = Logger();
 
   final _progressController = StreamController<SyncProgress>.broadcast();
   Stream<SyncProgress> get progressStream => _progressController.stream;
@@ -244,6 +246,8 @@ class ServerSyncService {
           return await _mapper.budgetToServer(budget);
         }
         break;
+      default:
+        _logger.warning('Unknown entity type in _getEntityData: $entityType');
     }
     return null;
   }
@@ -458,6 +462,8 @@ class ServerSyncService {
         final budget = _mapper.budgetFromServer(data, localId);
         await _db.insertBudget(budget);
         break;
+      default:
+        _logger.warning('Unknown entity type in _createLocalEntity: $entityType');
     }
   }
 
@@ -484,6 +490,8 @@ class ServerSyncService {
         final budget = _mapper.budgetFromServer(data, localId);
         await _db.updateBudget(budget);
         break;
+      default:
+        _logger.warning('Unknown entity type in _updateLocalEntity: $entityType');
     }
   }
 
@@ -505,6 +513,8 @@ class ServerSyncService {
       case 'budget':
         await _db.deleteBudget(localId);
         break;
+      default:
+        _logger.warning('Unknown entity type in _deleteLocalEntity: $entityType');
     }
   }
 
