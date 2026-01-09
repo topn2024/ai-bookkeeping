@@ -48,10 +48,29 @@ class DataMapperService {
       'transaction_time': _formatTime(tx.date),
       'note': tx.note,
       'tags': tx.tags,
+      // Location fields (Chapter 14)
+      'location': tx.location,
+      'location_latitude': tx.locationLatitude?.toString(),
+      'location_longitude': tx.locationLongitude?.toString(),
+      'location_place_name': tx.locationPlaceName,
+      'location_address': tx.locationAddress,
+      'location_city': tx.locationCity,
+      'location_district': tx.locationDistrict,
+      'location_type': tx.locationType,
+      'location_poi_id': tx.locationPoiId,
+      'geofence_region': tx.geofenceRegion,
+      'is_cross_region': tx.isCrossRegion ?? false,
+      // Money Age fields
+      'money_age': tx.moneyAge,
+      'money_age_level': tx.moneyAgeLevel,
+      'resource_pool_id': tx.resourcePoolId,
+      // Other fields
       'is_reimbursable': tx.isReimbursable,
       'is_reimbursed': tx.isReimbursed,
       'is_exclude_stats': false,
-      'source': 0, // Manual
+      'source': tx.source ?? 0, // 0: manual, 1: image, 2: voice, 3: email
+      'ai_confidence': tx.aiConfidence?.toString(),
+      'visibility': tx.visibility ?? 1,
     };
   }
 
@@ -70,6 +89,32 @@ class DataMapperService {
       isReimbursable: data['is_reimbursable'] as bool? ?? false,
       isReimbursed: data['is_reimbursed'] as bool? ?? false,
       tags: (data['tags'] as List<dynamic>?)?.cast<String>(),
+      // Location fields (Chapter 14)
+      location: data['location'] as String?,
+      locationLatitude: data['location_latitude'] != null
+          ? double.tryParse(data['location_latitude'].toString())
+          : null,
+      locationLongitude: data['location_longitude'] != null
+          ? double.tryParse(data['location_longitude'].toString())
+          : null,
+      locationPlaceName: data['location_place_name'] as String?,
+      locationAddress: data['location_address'] as String?,
+      locationCity: data['location_city'] as String?,
+      locationDistrict: data['location_district'] as String?,
+      locationType: data['location_type'] as int?,
+      locationPoiId: data['location_poi_id'] as String?,
+      geofenceRegion: data['geofence_region'] as String?,
+      isCrossRegion: data['is_cross_region'] as bool? ?? false,
+      // Money Age fields
+      moneyAge: data['money_age'] as int?,
+      moneyAgeLevel: data['money_age_level'] as String?,
+      resourcePoolId: data['resource_pool_id'] as String?,
+      // Source and AI fields
+      source: data['source'] as int?,
+      aiConfidence: data['ai_confidence'] != null
+          ? double.tryParse(data['ai_confidence'].toString())
+          : null,
+      visibility: data['visibility'] as int? ?? 1,
     );
   }
 
@@ -95,6 +140,7 @@ class DataMapperService {
       name: data['name'] as String,
       type: AccountType.values[(data['account_type'] as int) - 1],
       balance: double.parse(data['balance'].toString()),
+      currency: data['currency'] as String? ?? 'CNY',
       icon: _iconNameToData(data['icon'] as String?),
       color: _defaultAccountColor(data['account_type'] as int),
       isDefault: data['is_default'] as bool? ?? false,
