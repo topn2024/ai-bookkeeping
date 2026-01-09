@@ -32,6 +32,16 @@ class Transaction(Base):
     tags: Mapped[Optional[List[str]]] = mapped_column(ARRAY(String(50)), nullable=True)
     images: Mapped[Optional[List[str]]] = mapped_column(ARRAY(String(500)), nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+
+    # Money Age fields - for tracking financial health
+    money_age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Age in days
+    money_age_level: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # health/warning/danger
+    resource_pool_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)  # For income tracking
+
+    # Location enhancement fields
+    geofence_region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # home/work/shopping etc
+    is_cross_region: Mapped[bool] = mapped_column(Boolean, default=False)  # Cross-region transaction flag
+
     is_reimbursable: Mapped[bool] = mapped_column(Boolean, default=False)
     is_reimbursed: Mapped[bool] = mapped_column(Boolean, default=False)
     is_exclude_stats: Mapped[bool] = mapped_column(Boolean, default=False)
