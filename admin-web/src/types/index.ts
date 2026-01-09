@@ -159,13 +159,33 @@ export interface Transaction {
   tags: string[] | null
   images: string[] | null  // Image attachments
   location: string | null  // Location string
+  // Location Intelligence fields
+  location_latitude: string | null
+  location_longitude: string | null
+  location_place_name: string | null
+  location_address: string | null
+  location_city: string | null
+  location_district: string | null
+  location_type: number | null
+  location_poi_id: string | null
+  geofence_region: string | null
+  is_cross_region: boolean
+  // Money Age fields
+  money_age: number | null
+  money_age_level: string | null  // health/warning/danger
+  resource_pool_id: string | null
+  // Other fields
   source: number
   is_reimbursable: boolean
   is_reimbursed: boolean
   is_exclude_stats: boolean  // Exclude from statistics
+  visibility: number  // 0: private, 1: all_members, 2: admins_only
   ai_confidence: number | null  // AI recognition confidence
   source_file_url: string | null  // Source file URL for AI recognition
   source_file_type: string | null  // Source file MIME type
+  source_file_size: number | null
+  recognition_timestamp: string | null
+  source_file_expires_at: string | null
   created_at: string
   updated_at: string | null  // Update timestamp
 }

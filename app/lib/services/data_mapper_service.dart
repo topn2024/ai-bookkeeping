@@ -61,6 +61,10 @@ class DataMapperService {
       'location_poi_id': tx.location?.poiId,
       // Money Age fields
       'money_age': tx.moneyAge,
+      'money_age_level': tx.moneyAgeLevel,
+      'resource_pool_id': tx.resourcePoolId,
+      // Visibility
+      'visibility': tx.visibility,
       // Other fields
       'is_reimbursable': tx.isReimbursable,
       'is_reimbursed': tx.isReimbursed,
@@ -106,6 +110,10 @@ class DataMapperService {
       location: location,
       // Money Age
       moneyAge: data['money_age'] as int?,
+      moneyAgeLevel: data['money_age_level'] as String?,
+      resourcePoolId: data['resource_pool_id']?.toString(),
+      // Visibility
+      visibility: data['visibility'] as int? ?? 1,
       // Source and AI fields
       source: data['source'] != null
           ? TransactionSource.values[data['source'] as int]

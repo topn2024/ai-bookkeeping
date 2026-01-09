@@ -188,16 +188,21 @@ class MoneyAgeSnapshotResponse(BaseModel):
     snapshot_date: date
     snapshot_type: str
     avg_money_age: Decimal
-    median_money_age: Optional[int]
+    median_money_age: Optional[int] = None
+    min_money_age: Optional[int] = None
+    max_money_age: Optional[int] = None
     health_level: str
-    health_count: int
-    warning_count: int
-    danger_count: int
-    total_resource_pools: int
-    active_resource_pools: int
+    health_count: int = 0
+    warning_count: int = 0
+    danger_count: int = 0
+    total_resource_pools: int = 0
+    active_resource_pools: int = 0
     total_remaining_amount: Decimal
-    category_breakdown: Optional[Dict]
-    monthly_trend: Optional[Dict]
+    total_transactions: int = 0
+    expense_transactions: int = 0
+    income_transactions: int = 0
+    category_breakdown: Optional[Dict] = None
+    monthly_trend: Optional[Dict] = None
     created_at: datetime
 
 

@@ -72,6 +72,11 @@ class Transaction {
 
   // === 2.0新增：钱龄相关 ===
   final int? moneyAge;                // 该笔消费的钱龄（天数，仅支出有值）
+  final String? moneyAgeLevel;        // 钱龄健康等级: health/warning/danger
+  final String? resourcePoolId;       // 关联的资源池ID
+
+  // === 2.0新增：可见性控制（家庭账本） ===
+  final int visibility;               // 0: private, 1: all_members, 2: admins_only
 
   Transaction({
     required this.id,
@@ -106,6 +111,9 @@ class Transaction {
     this.vaultId,
     this.location,
     this.moneyAge,
+    this.moneyAgeLevel,
+    this.resourcePoolId,
+    this.visibility = 1,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
@@ -151,6 +159,9 @@ class Transaction {
     String? vaultId,
     TransactionLocation? location,
     int? moneyAge,
+    String? moneyAgeLevel,
+    String? resourcePoolId,
+    int? visibility,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -185,6 +196,9 @@ class Transaction {
       vaultId: vaultId ?? this.vaultId,
       location: location ?? this.location,
       moneyAge: moneyAge ?? this.moneyAge,
+      moneyAgeLevel: moneyAgeLevel ?? this.moneyAgeLevel,
+      resourcePoolId: resourcePoolId ?? this.resourcePoolId,
+      visibility: visibility ?? this.visibility,
     );
   }
 
@@ -225,6 +239,9 @@ class Transaction {
       'address': location?.address,
       'locationType': location?.locationType?.index,
       'moneyAge': moneyAge,
+      'moneyAgeLevel': moneyAgeLevel,
+      'resourcePoolId': resourcePoolId,
+      'visibility': visibility,
     };
   }
 
@@ -282,6 +299,9 @@ class Transaction {
             )
           : null,
       moneyAge: map['moneyAge'] as int?,
+      moneyAgeLevel: map['moneyAgeLevel'] as String?,
+      resourcePoolId: map['resourcePoolId'] as String?,
+      visibility: map['visibility'] as int? ?? 1,
     );
   }
 
