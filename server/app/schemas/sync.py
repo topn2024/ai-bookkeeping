@@ -112,12 +112,39 @@ class TransactionSyncData(BaseModel):
     note: Optional[str] = Field(None, max_length=500)
     tags: Optional[List[str]] = None
     images: Optional[List[str]] = None
-    location: Optional[str] = Field(None, max_length=200)
+    location: Optional[str] = Field(None, max_length=200)  # Legacy: simple location string
+
+    # Structured location fields (Chapter 14: Location Intelligence)
+    location_latitude: Optional[Decimal] = Field(None, ge=-90, le=90)
+    location_longitude: Optional[Decimal] = Field(None, ge=-180, le=180)
+    location_place_name: Optional[str] = Field(None, max_length=200)
+    location_address: Optional[str] = Field(None, max_length=500)
+    location_city: Optional[str] = Field(None, max_length=100)
+    location_district: Optional[str] = Field(None, max_length=100)
+    location_type: Optional[int] = Field(None, ge=0, le=10)
+    location_poi_id: Optional[str] = Field(None, max_length=100)
+    geofence_region: Optional[str] = Field(None, max_length=100)
+    is_cross_region: bool = False
+
+    # Money Age fields
+    money_age: Optional[int] = None
+    money_age_level: Optional[str] = Field(None, max_length=20)
+    resource_pool_id: Optional[UUID] = None
+
     is_reimbursable: bool = False
     is_reimbursed: bool = False
     is_exclude_stats: bool = False
+    visibility: int = Field(default=1, ge=0, le=2)
     source: int = Field(default=0, ge=0, le=3)
     ai_confidence: Optional[Decimal] = Field(None, ge=0, le=1)
+
+    # Source file fields
+    source_file_url: Optional[str] = Field(None, max_length=500)
+    source_file_type: Optional[str] = Field(None, max_length=50)
+    source_file_size: Optional[int] = Field(None, ge=0)
+    recognition_raw_response: Optional[str] = Field(None, max_length=5000)
+    recognition_timestamp: Optional[str] = None  # ISO datetime string
+    source_file_expires_at: Optional[str] = None  # ISO datetime string
 
 
 class AccountSyncData(BaseModel):

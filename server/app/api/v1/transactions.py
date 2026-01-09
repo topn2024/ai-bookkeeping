@@ -186,10 +186,34 @@ async def create_transaction(
             tags=transaction_data.tags,
             images=transaction_data.images,
             location=transaction_data.location,
+            # Structured location fields (Chapter 14)
+            location_latitude=transaction_data.location_latitude,
+            location_longitude=transaction_data.location_longitude,
+            location_place_name=transaction_data.location_place_name,
+            location_address=transaction_data.location_address,
+            location_city=transaction_data.location_city,
+            location_district=transaction_data.location_district,
+            location_type=transaction_data.location_type,
+            location_poi_id=transaction_data.location_poi_id,
+            geofence_region=transaction_data.geofence_region,
+            is_cross_region=transaction_data.is_cross_region,
+            # Money Age fields
+            money_age=transaction_data.money_age,
+            money_age_level=transaction_data.money_age_level,
+            resource_pool_id=transaction_data.resource_pool_id,
+            # Other fields
             is_reimbursable=transaction_data.is_reimbursable,
             is_exclude_stats=transaction_data.is_exclude_stats,
+            visibility=transaction_data.visibility,
             source=transaction_data.source,
             ai_confidence=transaction_data.ai_confidence,
+            # Source file fields
+            source_file_url=transaction_data.source_file_url,
+            source_file_type=transaction_data.source_file_type,
+            source_file_size=transaction_data.source_file_size,
+            recognition_raw_response=transaction_data.recognition_raw_response,
+            recognition_timestamp=transaction_data.recognition_timestamp,
+            source_file_expires_at=transaction_data.source_file_expires_at,
         )
         db.add(txn)
         await db.flush()  # Get the ID without committing

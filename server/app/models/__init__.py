@@ -17,6 +17,17 @@ from app.models.backup import Backup
 from app.models.app_version import AppVersion
 from app.models.upgrade_analytics import UpgradeAnalytics
 
+# Money Age models (Chapter 14+)
+from app.models.money_age import (
+    ResourcePool, ConsumptionRecord, MoneyAgeSnapshot, MoneyAgeConfig
+)
+
+# Location models (Chapter 14: Location Intelligence)
+from app.models.location import (
+    GeoFence, FrequentLocation, UserHomeLocation,
+    LocationType, GeoFenceAction
+)
+
 __all__ = [
     "User",
     "Book",
@@ -40,4 +51,15 @@ __all__ = [
     "Backup",
     "AppVersion",
     "UpgradeAnalytics",
+    # Money Age
+    "ResourcePool",
+    "ConsumptionRecord",
+    "MoneyAgeSnapshot",
+    "MoneyAgeConfig",
+    # Location
+    "GeoFence",
+    "FrequentLocation",
+    "UserHomeLocation",
+    "LocationType",
+    "GeoFenceAction",
 ]

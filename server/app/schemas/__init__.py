@@ -73,6 +73,31 @@ from app.schemas.family import (
     PendingSplit, FamilyLeaderboardEntry, FamilyLeaderboardResponse
 )
 
+# Location schemas (Chapter 14: Location Intelligence)
+from app.schemas.location import (
+    LocationType, GeoFenceAction,
+    TransactionLocationData,
+    GeoFenceCreate, GeoFenceUpdate, GeoFenceResponse,
+    FrequentLocationCreate, FrequentLocationUpdate, FrequentLocationResponse,
+    UserHomeLocationCreate, UserHomeLocationUpdate, UserHomeLocationResponse,
+    LocationCheckRequest, LocationCheckResponse,
+    LocationSpendingStats, LocationAnalyticsResponse
+)
+
+# Money Age schemas
+from app.schemas.money_age import (
+    ResourcePoolCreate, ResourcePoolUpdate, ResourcePoolResponse,
+    ConsumptionRecordCreate, ConsumptionRecordResponse,
+    MoneyAgeCalculateRequest, MoneyAgeCalculateResponse,
+    MoneyAgeBatchCalculateRequest, MoneyAgeBatchCalculateResponse,
+    MoneyAgeDashboardResponse,
+    MoneyAgeTrendRequest, MoneyAgeTrendResponse,
+    HealthLevelDistribution, MoneyAgeHealthResponse,
+    MoneyAgeSnapshotResponse,
+    MoneyAgeConfigCreate, MoneyAgeConfigUpdate, MoneyAgeConfigResponse,
+    MoneyAgeRebuildRequest, MoneyAgeRebuildResponse
+)
+
 
 __all__ = [
     # User
@@ -117,4 +142,23 @@ __all__ = [
     "GoalContributionCreate", "GoalContributionResponse",
     "FamilyDashboardResponse", "FamilySummary", "MemberContribution", "CategoryBreakdown",
     "PendingSplit", "FamilyLeaderboardEntry", "FamilyLeaderboardResponse",
+    # Location (Chapter 14)
+    "LocationType", "GeoFenceAction",
+    "TransactionLocationData",
+    "GeoFenceCreate", "GeoFenceUpdate", "GeoFenceResponse",
+    "FrequentLocationCreate", "FrequentLocationUpdate", "FrequentLocationResponse",
+    "UserHomeLocationCreate", "UserHomeLocationUpdate", "UserHomeLocationResponse",
+    "LocationCheckRequest", "LocationCheckResponse",
+    "LocationSpendingStats", "LocationAnalyticsResponse",
+    # Money Age
+    "ResourcePoolCreate", "ResourcePoolUpdate", "ResourcePoolResponse",
+    "ConsumptionRecordCreate", "ConsumptionRecordResponse",
+    "MoneyAgeCalculateRequest", "MoneyAgeCalculateResponse",
+    "MoneyAgeBatchCalculateRequest", "MoneyAgeBatchCalculateResponse",
+    "MoneyAgeDashboardResponse",
+    "MoneyAgeTrendRequest", "MoneyAgeTrendResponse",
+    "HealthLevelDistribution", "MoneyAgeHealthResponse",
+    "MoneyAgeSnapshotResponse",
+    "MoneyAgeConfigCreate", "MoneyAgeConfigUpdate", "MoneyAgeConfigResponse",
+    "MoneyAgeRebuildRequest", "MoneyAgeRebuildResponse",
 ]
