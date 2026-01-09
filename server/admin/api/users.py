@@ -1,5 +1,6 @@
 """Admin user management endpoints (managing app users)."""
 import io
+import logging
 import secrets
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -37,6 +38,8 @@ from admin.schemas.user import (
 )
 from pydantic import BaseModel
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["Admin User Management"])
 
@@ -889,10 +892,9 @@ async def clear_user_sessions(
             {"user_id": str(user_id)}
         )
         sessions_cleared = result.rowcount or 0
-    except Exception:
+    except Exception as e:
         # Table doesn't exist - in JWT-based auth, we might use a token blacklist
-        # For now, we'll increment a token version to invalidate existing tokens
-        pass
+        logger.debug(f"user_sessions table not available: {e}")
 
     # If using refresh tokens, invalidate them
     try:
@@ -900,8 +902,8 @@ async def clear_user_sessions(
             text("UPDATE refresh_tokens SET revoked = true WHERE user_id = :user_id"),
             {"user_id": str(user_id)}
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"refresh_tokens table not available: {e}")
 
     # Audit log
     await create_audit_log(

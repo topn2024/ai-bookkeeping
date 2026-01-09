@@ -3,6 +3,7 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID, uuid4
+import logging
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +39,8 @@ from admin.schemas.statistics import (
     CustomReportResponse,
 )
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/statistics", tags=["Statistics & Analytics"])
 
@@ -1144,8 +1147,8 @@ async def get_paid_user_analysis(
                 "feature": source_names.get(row.source, "未知"),
                 "usage_count": row.count,
             })
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to get feature usage stats: {e}")
 
     # Subscription tier distribution - based on member_level field
     # member_level: 0=普通, 1=VIP (no detailed tier info available)

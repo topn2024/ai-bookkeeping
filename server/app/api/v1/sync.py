@@ -1,4 +1,5 @@
 """Sync endpoints for data synchronization between client and server."""
+import logging
 from datetime import datetime, date, time
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
@@ -24,6 +25,8 @@ from app.schemas.sync import (
 )
 from app.api.deps import get_current_user
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sync", tags=["Sync"])
 
@@ -250,8 +253,8 @@ async def _handle_create(
         if data.get("book_id"):
             try:
                 book_id = UUID(data["book_id"]) if isinstance(data["book_id"], str) else data["book_id"]
-            except ValueError:
-                pass
+            except ValueError as e:
+                logger.debug(f"Invalid book_id UUID format: {e}")
         if not book_id:
             # Get or create default book for user
             default_book = await db.execute(
@@ -275,8 +278,8 @@ async def _handle_create(
         if data.get("account_id"):
             try:
                 account_id = UUID(data["account_id"]) if isinstance(data["account_id"], str) else data["account_id"]
-            except ValueError:
-                pass
+            except ValueError as e:
+                logger.debug(f"Invalid account_id UUID format: {e}")
         if not account_id:
             default_account = await db.execute(
                 select(Account).where(Account.user_id == user.id, Account.is_default == True)
@@ -298,8 +301,8 @@ async def _handle_create(
         if data.get("category_id"):
             try:
                 category_id = UUID(data["category_id"]) if isinstance(data["category_id"], str) else data["category_id"]
-            except ValueError:
-                pass
+            except ValueError as e:
+                logger.debug(f"Invalid category_id UUID format: {e}")
         if not category_id:
             tx_type = data.get("transaction_type", 1)
             default_category = await db.execute(
