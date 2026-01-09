@@ -2890,6 +2890,36 @@ class DatabaseService {
     await batch.commit(noResult: true);
   }
 
+  /// Get total income for a specific month
+  Future<double> getMonthlyIncomeTotal({
+    required int year,
+    required int month,
+    String? ledgerId,
+  }) async {
+    final db = await database;
+    final startOfMonth = DateTime(year, month, 1);
+    final endOfMonth = DateTime(year, month + 1, 1);
+
+    String where = 'type = ? AND date >= ? AND date < ?';
+    List<dynamic> whereArgs = [
+      model.TransactionType.income.index,
+      startOfMonth.millisecondsSinceEpoch,
+      endOfMonth.millisecondsSinceEpoch,
+    ];
+
+    if (ledgerId != null) {
+      where += ' AND ledgerId = ?';
+      whereArgs.add(ledgerId);
+    }
+
+    final result = await db.rawQuery(
+      'SELECT SUM(amount) as total FROM transactions WHERE $where',
+      whereArgs,
+    );
+
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
   // ==================== 2.0新增：资源池 CRUD ====================
 
   /// 插入资源池

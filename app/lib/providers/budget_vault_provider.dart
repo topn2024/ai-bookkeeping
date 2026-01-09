@@ -138,9 +138,12 @@ class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
 
   /// 获取总收入（当月）
   Future<double> _getTotalIncome() async {
-    // TODO: 从交易服务获取当月收入
-    // 暂时返回0，需要集成 TransactionProvider
-    return 0;
+    final now = DateTime.now();
+    return await _db.getMonthlyIncomeTotal(
+      year: now.year,
+      month: now.month,
+      ledgerId: _currentLedgerId,
+    );
   }
 
   /// 创建小金库
