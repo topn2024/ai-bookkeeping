@@ -39,7 +39,7 @@ class BudgetResponse(BaseModel):
     month: Optional[int] = None
     is_active: bool = True
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime
     # Computed fields
     spent: Optional[Decimal] = None
     remaining: Optional[Decimal] = None

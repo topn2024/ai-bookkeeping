@@ -15,7 +15,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, or_
 
 from app.core.database import get_db
 from app.core.saga import saga, SagaContext, SagaStatus
@@ -139,14 +139,17 @@ async def create_transaction(
             detail="Account not found",
         )
 
-    # Verify category exists
+    # Verify category exists and belongs to user (or is system category)
     result = await db.execute(
-        select(Category).where(Category.id == transaction_data.category_id)
+        select(Category).where(
+            Category.id == transaction_data.category_id,
+            or_(Category.user_id == current_user.id, Category.is_system == True)
+        )
     )
     if not result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Category not found",
+            detail="Category not found or not accessible",
         )
 
     # For transfers, verify target account

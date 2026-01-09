@@ -14,9 +14,9 @@ router = APIRouter(prefix="/config", tags=["Configuration"])
 # ============== 基础配置模型 ==============
 
 class AIConfig(BaseModel):
-    """AI API configuration for client."""
-    qwen_api_key: str
-    zhipu_api_key: str | None = None
+    """AI API configuration for client - only shows availability status."""
+    qwen_available: bool = False
+    zhipu_available: bool = False
 
 
 class AIModelConfig(BaseModel):
@@ -208,14 +208,15 @@ class AppConfig(BaseModel):
 async def get_ai_config(
     current_user: User = Depends(get_current_user),
 ):
-    """Get AI API configuration.
+    """Get AI API availability status.
 
-    Returns API keys for AI services. Requires authentication.
+    Returns whether AI services are configured and available.
+    API keys are NOT exposed to clients for security reasons.
     """
     settings = get_settings()
     return AIConfig(
-        qwen_api_key=settings.QWEN_API_KEY,
-        zhipu_api_key=settings.ZHIPU_API_KEY if settings.ZHIPU_API_KEY else None,
+        qwen_available=bool(settings.QWEN_API_KEY),
+        zhipu_available=bool(settings.ZHIPU_API_KEY),
     )
 
 
@@ -226,12 +227,13 @@ async def get_app_config(
     """Get full application configuration (legacy).
 
     Returns all client configuration. Requires authentication.
+    Note: API keys are NOT exposed for security reasons.
     """
     settings = get_settings()
     return AppConfig(
         ai=AIConfig(
-            qwen_api_key=settings.QWEN_API_KEY,
-            zhipu_api_key=settings.ZHIPU_API_KEY if settings.ZHIPU_API_KEY else None,
+            qwen_available=bool(settings.QWEN_API_KEY),
+            zhipu_available=bool(settings.ZHIPU_API_KEY),
         ),
         version="1.0.0",
     )

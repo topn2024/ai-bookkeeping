@@ -48,7 +48,7 @@ class AccountResponse(BaseModel):
     is_default: bool
     is_active: bool
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime
 
     class Config:
         from_attributes = True
