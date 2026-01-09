@@ -27,7 +27,7 @@ import 'nlu_engine.dart';
 /// - 语音反馈
 class VoiceServiceCoordinator extends ChangeNotifier {
   final VoiceRecognitionEngine _recognitionEngine;
-  final TtsService _ttsService;
+  final TTSService _ttsService;
   final EntityDisambiguationService _disambiguationService;
   final VoiceDeleteService _deleteService;
   final VoiceModifyService _modifyService;
@@ -50,7 +50,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   VoiceServiceCoordinator({
     VoiceRecognitionEngine? recognitionEngine,
-    TtsService? ttsService,
+    TTSService? ttsService,
     EntityDisambiguationService? disambiguationService,
     VoiceDeleteService? deleteService,
     VoiceModifyService? modifyService,
@@ -59,14 +59,14 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     VoiceFeedbackSystem? feedbackSystem,
     DatabaseService? databaseService,
   }) : _recognitionEngine = recognitionEngine ?? VoiceRecognitionEngine(),
-       _ttsService = ttsService ?? TtsService(),
+       _ttsService = ttsService ?? TTSService(),
        _disambiguationService = disambiguationService ?? EntityDisambiguationService(),
        _deleteService = deleteService ?? VoiceDeleteService(),
        _modifyService = modifyService ?? VoiceModifyService(),
        _navigationService = navigationService ?? VoiceNavigationService(),
        _intentRouter = intentRouter ?? VoiceIntentRouter(),
        _feedbackSystem = feedbackSystem ?? VoiceFeedbackSystem(),
-       _databaseService = databaseService ?? DatabaseService.instance;
+       _databaseService = databaseService ?? DatabaseService();
 
   /// 当前会话状态
   VoiceSessionState get sessionState => _sessionState;
@@ -125,7 +125,8 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       final contextData = _currentSession != null
           ? VoiceSessionContext(
               intentType: _currentSession!.intentType,
-              data: _currentSession!.sessionData ?? {},
+              sessionData: _currentSession!.sessionData ?? {},
+              needsContinuation: true,
               createdAt: _currentSession!.createdAt,
             )
           : null;
@@ -395,6 +396,15 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       case VoiceIntentType.modifyTransaction:
         _modifyService.cancelModification();
         break;
+      case VoiceIntentType.unknown:
+      case VoiceIntentType.addTransaction:
+      case VoiceIntentType.queryTransaction:
+      case VoiceIntentType.navigateToPage:
+      case VoiceIntentType.confirmAction:
+      case VoiceIntentType.cancelAction:
+      case VoiceIntentType.clarifySelection:
+        // No specific cleanup needed for these types
+        break;
     }
 
     _clearSession();
@@ -480,9 +490,12 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     IntentAnalysisResult intentResult,
     String originalInput,
   ) async {
-    final result = await _navigationService.handleNavigationCommand(originalInput);
-    await _ttsService.speak(result.message ?? '正在跳转');
-    return VoiceSessionResult.success(result.message ?? '导航成功');
+    final result = _navigationService.parseNavigation(originalInput);
+    final message = result.success
+        ? '正在跳转到${result.pageName}'
+        : result.errorMessage ?? '导航失败';
+    await _ttsService.speak(message);
+    return VoiceSessionResult.success(message);
   }
 
   /// 处理未知意图
@@ -515,13 +528,13 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       id: t.id,
       amount: t.amount,
       category: t.category,
-      subCategory: t.subCategory,
-      merchant: t.merchant,
-      description: t.description,
+      subCategory: t.subcategory,
+      merchant: t.rawMerchant,
+      description: t.note,
       date: t.date,
-      account: t.account,
-      tags: t.tags,
-      type: t.type,
+      account: t.accountId,
+      tags: t.tags ?? [],
+      type: t.type.name,
     )).toList();
   }
 
@@ -544,15 +557,15 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     try {
       await _databaseService.updateTransaction(model.Transaction(
         id: record.id,
+        type: TransactionType.values.firstWhere((e) => e.name == record.type, orElse: () => TransactionType.expense),
         amount: record.amount,
         category: record.category ?? '',
-        subCategory: record.subCategory,
-        merchant: record.merchant,
-        description: record.description,
+        subcategory: record.subCategory,
+        note: record.description,
         date: record.date,
-        account: record.account ?? '',
-        tags: record.tags,
-        type: record.type,
+        accountId: record.account ?? '',
+        tags: record.tags.isEmpty ? null : record.tags,
+        rawMerchant: record.merchant,
       ));
       return true;
     } catch (e) {

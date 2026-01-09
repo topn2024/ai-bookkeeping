@@ -95,30 +95,19 @@ extension VoiceQueryExtension on DatabaseService {
         id: map['id'] as String,
         amount: map['amount'] as double,
         category: map['category'] as String? ?? '',
-        subCategory: map['sub_category'] as String?,
-        merchant: map['merchant'] as String?,
-        description: map['description'] as String?,
+        subcategory: map['sub_category'] as String?,
+        rawMerchant: map['merchant'] as String?,
+        note: map['description'] as String?,
         date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
-        account: map['account'] as String? ?? '',
+        accountId: map['account'] as String? ?? '',
         tags: (map['tags'] as String?)?.split(',').where((tag) => tag.isNotEmpty).toList() ?? [],
-        type: map['type'] as String? ?? 'expense',
         splits: splits,
-        isRecurring: map['is_recurring'] == 1,
-        recurringGroupId: map['recurring_group_id'] as String?,
-        parentId: map['parent_id'] as String?,
-        batchId: map['batch_id'] as String?,
-        confidence: map['confidence'] as double?,
-        needsReview: map['needs_review'] == 1,
-        originalText: map['original_text'] as String?,
-        processingStatus: map['processing_status'] as String? ?? 'completed',
         createdAt: map['created_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int) :
           DateTime.now(),
         updatedAt: map['updated_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
           DateTime.now(),
-        syncStatus: map['sync_status'] as String? ?? 'local',
-        lastSyncAt: map['last_sync_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['last_sync_at'] as int) :
           null,
         version: map['version'] as int? ?? 1,
@@ -173,30 +162,19 @@ extension VoiceQueryExtension on DatabaseService {
         id: map['id'] as String,
         amount: map['amount'] as double,
         category: map['category'] as String? ?? '',
-        subCategory: map['sub_category'] as String?,
-        merchant: map['merchant'] as String?,
-        description: map['description'] as String?,
+        subcategory: map['sub_category'] as String?,
+        rawMerchant: map['merchant'] as String?,
+        note: map['description'] as String?,
         date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
-        account: map['account'] as String? ?? '',
+        accountId: map['account'] as String? ?? '',
         tags: (map['tags'] as String?)?.split(',').where((tag) => tag.isNotEmpty).toList() ?? [],
-        type: map['type'] as String? ?? 'expense',
         splits: splits,
-        isRecurring: map['is_recurring'] == 1,
-        recurringGroupId: map['recurring_group_id'] as String?,
-        parentId: map['parent_id'] as String?,
-        batchId: map['batch_id'] as String?,
-        confidence: map['confidence'] as double?,
-        needsReview: map['needs_review'] == 1,
-        originalText: map['original_text'] as String?,
-        processingStatus: map['processing_status'] as String? ?? 'completed',
         createdAt: map['created_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int) :
           DateTime.now(),
         updatedAt: map['updated_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
           DateTime.now(),
-        syncStatus: map['sync_status'] as String? ?? 'local',
-        lastSyncAt: map['last_sync_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['last_sync_at'] as int) :
           null,
         version: map['version'] as int? ?? 1,
@@ -242,30 +220,19 @@ extension VoiceQueryExtension on DatabaseService {
         id: map['id'] as String,
         amount: map['amount'] as double,
         category: map['category'] as String? ?? '',
-        subCategory: map['sub_category'] as String?,
-        merchant: map['merchant'] as String?,
-        description: map['description'] as String?,
+        subcategory: map['sub_category'] as String?,
+        rawMerchant: map['merchant'] as String?,
+        note: map['description'] as String?,
         date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
-        account: map['account'] as String? ?? '',
+        accountId: map['account'] as String? ?? '',
         tags: (map['tags'] as String?)?.split(',').where((tag) => tag.isNotEmpty).toList() ?? [],
-        type: map['type'] as String? ?? 'expense',
         splits: splits,
-        isRecurring: map['is_recurring'] == 1,
-        recurringGroupId: map['recurring_group_id'] as String?,
-        parentId: map['parent_id'] as String?,
-        batchId: map['batch_id'] as String?,
-        confidence: map['confidence'] as double?,
-        needsReview: map['needs_review'] == 1,
-        originalText: map['original_text'] as String?,
-        processingStatus: map['processing_status'] as String? ?? 'completed',
         createdAt: map['created_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int) :
           DateTime.now(),
         updatedAt: map['updated_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
           DateTime.now(),
-        syncStatus: map['sync_status'] as String? ?? 'local',
-        lastSyncAt: map['last_sync_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['last_sync_at'] as int) :
           null,
         version: map['version'] as int? ?? 1,
@@ -319,30 +286,19 @@ extension VoiceQueryExtension on DatabaseService {
         id: map['id'] as String,
         amount: map['amount'] as double,
         category: map['category'] as String? ?? '',
-        subCategory: map['sub_category'] as String?,
-        merchant: map['merchant'] as String?,
-        description: map['description'] as String?,
+        subcategory: map['sub_category'] as String?,
+        rawMerchant: map['merchant'] as String?,
+        note: map['description'] as String?,
         date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
-        account: map['account'] as String? ?? '',
+        accountId: map['account'] as String? ?? '',
         tags: (map['tags'] as String?)?.split(',').where((tag) => tag.isNotEmpty).toList() ?? [],
-        type: map['type'] as String? ?? 'expense',
         splits: splits,
-        isRecurring: map['is_recurring'] == 1,
-        recurringGroupId: map['recurring_group_id'] as String?,
-        parentId: map['parent_id'] as String?,
-        batchId: map['batch_id'] as String?,
-        confidence: map['confidence'] as double?,
-        needsReview: map['needs_review'] == 1,
-        originalText: map['original_text'] as String?,
-        processingStatus: map['processing_status'] as String? ?? 'completed',
         createdAt: map['created_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int) :
           DateTime.now(),
         updatedAt: map['updated_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
           DateTime.now(),
-        syncStatus: map['sync_status'] as String? ?? 'local',
-        lastSyncAt: map['last_sync_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['last_sync_at'] as int) :
           null,
         version: map['version'] as int? ?? 1,
@@ -417,30 +373,19 @@ extension VoiceQueryExtension on DatabaseService {
         id: map['id'] as String,
         amount: map['amount'] as double,
         category: map['category'] as String? ?? '',
-        subCategory: map['sub_category'] as String?,
-        merchant: map['merchant'] as String?,
-        description: map['description'] as String?,
+        subcategory: map['sub_category'] as String?,
+        rawMerchant: map['merchant'] as String?,
+        note: map['description'] as String?,
         date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
-        account: map['account'] as String? ?? '',
+        accountId: map['account'] as String? ?? '',
         tags: (map['tags'] as String?)?.split(',').where((tag) => tag.isNotEmpty).toList() ?? [],
-        type: map['type'] as String? ?? 'expense',
         splits: splits,
-        isRecurring: map['is_recurring'] == 1,
-        recurringGroupId: map['recurring_group_id'] as String?,
-        parentId: map['parent_id'] as String?,
-        batchId: map['batch_id'] as String?,
-        confidence: map['confidence'] as double?,
-        needsReview: map['needs_review'] == 1,
-        originalText: map['original_text'] as String?,
-        processingStatus: map['processing_status'] as String? ?? 'completed',
         createdAt: map['created_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int) :
           DateTime.now(),
         updatedAt: map['updated_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
           DateTime.now(),
-        syncStatus: map['sync_status'] as String? ?? 'local',
-        lastSyncAt: map['last_sync_at'] != null ?
           DateTime.fromMillisecondsSinceEpoch(map['last_sync_at'] as int) :
           null,
         version: map['version'] as int? ?? 1,
@@ -490,30 +435,19 @@ extension VoiceQueryExtension on DatabaseService {
       id: map['id'] as String,
       amount: map['amount'] as double,
       category: map['category'] as String? ?? '',
-      subCategory: map['sub_category'] as String?,
-      merchant: map['merchant'] as String?,
-      description: map['description'] as String?,
+      subcategory: map['sub_category'] as String?,
+      rawMerchant: map['merchant'] as String?,
+      note: map['description'] as String?,
       date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
-      account: map['account'] as String? ?? '',
+      accountId: map['account'] as String? ?? '',
       tags: (map['tags'] as String?)?.split(',').where((tag) => tag.isNotEmpty).toList() ?? [],
-      type: map['type'] as String? ?? 'expense',
       splits: splits,
-      isRecurring: map['is_recurring'] == 1,
-      recurringGroupId: map['recurring_group_id'] as String?,
-      parentId: map['parent_id'] as String?,
-      batchId: map['batch_id'] as String?,
-      confidence: map['confidence'] as double?,
-      needsReview: map['needs_review'] == 1,
-      originalText: map['original_text'] as String?,
-      processingStatus: map['processing_status'] as String? ?? 'completed',
       createdAt: map['created_at'] != null ?
         DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int) :
         DateTime.now(),
       updatedAt: map['updated_at'] != null ?
         DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
         DateTime.now(),
-      syncStatus: map['sync_status'] as String? ?? 'local',
-      lastSyncAt: map['last_sync_at'] != null ?
         DateTime.fromMillisecondsSinceEpoch(map['last_sync_at'] as int) :
         null,
       version: map['version'] as int? ?? 1,

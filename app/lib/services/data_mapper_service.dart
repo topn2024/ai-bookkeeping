@@ -157,6 +157,7 @@ class DataMapperService {
       description: data['description'] as String?,
       icon: _iconNameToData(data['icon'] as String?),
       color: _defaultLedgerColor(),
+      ownerId: 'default_user',
       isDefault: data['is_default'] as bool? ?? false,
       createdAt: DateTime.now(),
     );

@@ -7,6 +7,8 @@ import '../theme/antigravity_shadows.dart';
 import '../widgets/glass_components.dart';
 import '../widgets/antigravity_animations.dart';
 import '../l10n/l10n.dart';
+import '../models/category.dart';
+import '../models/transaction.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/budget_provider.dart';
 
@@ -388,7 +390,7 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
                     ),
                   ),
                   title: Text(
-                    expense.description ?? expense.category.name,
+                    expense.note ?? expense.category,
                     style: theme.textTheme.bodyMedium,
                   ),
                   subtitle: Text(
@@ -560,7 +562,7 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
     );
   }
 
-  Color _getCategoryColor(Category category) {
+  Color _getCategoryColor(String categoryName) {
     // 简化的分类颜色映射
     final colors = {
       '餐饮': const Color(0xFFFF7043),
@@ -568,10 +570,10 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
       '购物': const Color(0xFFAB47BC),
       '娱乐': const Color(0xFF66BB6A),
     };
-    return colors[category.name] ?? AppColors.primary;
+    return colors[categoryName] ?? AppColors.primary;
   }
 
-  IconData _getCategoryIcon(Category category) {
+  IconData _getCategoryIcon(String categoryName) {
     // 简化的分类图标映射
     final icons = {
       '餐饮': Icons.restaurant,
@@ -579,7 +581,7 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
       '购物': Icons.shopping_bag,
       '娱乐': Icons.sports_esports,
     };
-    return icons[category.name] ?? Icons.category;
+    return icons[categoryName] ?? Icons.category;
   }
 }
 

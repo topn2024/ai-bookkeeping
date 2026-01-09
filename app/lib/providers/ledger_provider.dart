@@ -19,8 +19,10 @@ class LedgerNotifier extends SimpleCrudNotifier<Ledger, String> {
     final ledgers = await db.getLedgers();
     if (ledgers.isEmpty) {
       // Initialize with default ledger
-      await db.insertLedger(DefaultLedgers.defaultLedger);
-      return [DefaultLedgers.defaultLedger];
+      const defaultOwnerId = 'default_user';
+      final defaultLedger = DefaultLedgers.defaultLedger(defaultOwnerId);
+      await db.insertLedger(defaultLedger);
+      return [defaultLedger];
     }
     return ledgers;
   }

@@ -1476,6 +1476,7 @@ class DatabaseService {
       color: Color(map['colorValue'] as int),
       isDefault: (map['isDefault'] as int) == 1,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
+      ownerId: (map['ownerId'] as String?) ?? 'default_user',
     )).toList();
   }
 
@@ -1499,6 +1500,7 @@ class DatabaseService {
       color: Color(map['colorValue'] as int),
       isDefault: (map['isDefault'] as int) == 1,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
+      ownerId: (map['ownerId'] as String?) ?? 'default_user',
     );
   }
 
@@ -2250,7 +2252,8 @@ class DatabaseService {
 
     if (ledgerCount == 0) {
       // Insert default ledger
-      await insertLedger(DefaultLedgers.defaultLedger);
+      const defaultOwnerId = 'default_user';
+      await insertLedger(DefaultLedgers.defaultLedger(defaultOwnerId));
     }
   }
 

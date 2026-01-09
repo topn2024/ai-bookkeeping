@@ -285,6 +285,15 @@ final zeroBasedBudgetProvider =
     NotifierProvider<ZeroBasedBudgetNotifier, Map<String, ZeroBasedAllocation>>(
         ZeroBasedBudgetNotifier.new);
 
+/// 月度预算总额Provider
+final monthlyBudgetProvider = Provider<double>((ref) {
+  final budgets = ref.watch(budgetProvider);
+  final now = DateTime.now();
+  return budgets
+      .where((b) => b.period == BudgetPeriod.monthly)
+      .fold(0.0, (sum, b) => sum + b.amount);
+});
+
 /// 获取当月可分配资金（收入 - 已分配）
 final availableToAssignProvider = Provider<double>((ref) {
   final transactions = ref.watch(transactionProvider);

@@ -258,6 +258,30 @@ final monthlyIncomeProvider = Provider<double>((ref) {
   return ref.watch(transactionProvider).currentMonth.totalIncome;
 });
 
+// 今日支出Provider
+final todayExpenseProvider = Provider<double>((ref) {
+  final transactions = ref.watch(transactionProvider);
+  final today = DateTime.now();
+  return transactions
+      .where((t) => t.type == TransactionType.expense &&
+          t.date.year == today.year &&
+          t.date.month == today.month &&
+          t.date.day == today.day)
+      .fold(0.0, (sum, t) => sum + t.amount);
+});
+
+// 今日交易Provider
+final todayTransactionsProvider = Provider<List<Transaction>>((ref) {
+  final transactions = ref.watch(transactionProvider);
+  final today = DateTime.now();
+  return transactions
+      .where((t) =>
+          t.date.year == today.year &&
+          t.date.month == today.month &&
+          t.date.day == today.day)
+      .toList();
+});
+
 final expenseByCategoryProvider = Provider<Map<String, double>>((ref) {
   return ref.watch(transactionProvider).expenseByCategory;
 });

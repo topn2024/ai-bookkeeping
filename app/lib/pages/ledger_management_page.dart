@@ -364,6 +364,7 @@ class LedgerManagementPage extends ConsumerWidget {
                       isDefault: ledger?.isDefault ?? false,
                       createdAt: ledger?.createdAt ?? DateTime.now(),
                       memberIds: ledger?.memberIds ?? [],
+                      ownerId: 'default_user',
                     );
 
                     if (isEdit) {

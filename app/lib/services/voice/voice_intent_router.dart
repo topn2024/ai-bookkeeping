@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import '../nlu_engine.dart';
+import '../voice_service_coordinator.dart';
 import '../../models/transaction.dart';
 
 /// 语音意图路由器

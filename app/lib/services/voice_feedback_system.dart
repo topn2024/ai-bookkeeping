@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../models/transaction.dart';
 import 'tts_service.dart';
 import 'voice/voice_intent_router.dart';
+import 'voice_service_coordinator.dart';
 
 /// 语音反馈系统
 ///
@@ -20,7 +21,7 @@ import 'voice/voice_intent_router.dart';
 /// - 多语言支持
 /// - 情感化反馈
 class VoiceFeedbackSystem extends ChangeNotifier {
-  final TtsService _ttsService;
+  final TTSService _ttsService;
 
   /// 当前反馈状态
   VoiceFeedbackState _state = const VoiceFeedbackState();
@@ -35,8 +36,8 @@ class VoiceFeedbackSystem extends ChangeNotifier {
   VoiceFeedbackConfig _config = VoiceFeedbackConfig.defaultConfig();
 
   VoiceFeedbackSystem({
-    TtsService? ttsService,
-  }) : _ttsService = ttsService ?? TtsService();
+    TTSService? ttsService,
+  }) : _ttsService = ttsService ?? TTSService();
 
   /// 当前反馈状态
   VoiceFeedbackState get state => _state;
@@ -50,9 +51,10 @@ class VoiceFeedbackSystem extends ChangeNotifier {
   /// 更新配置
   void updateConfig(VoiceFeedbackConfig newConfig) {
     _config = newConfig;
-    _ttsService.setVolume(_config.volume);
-    _ttsService.setSpeechRate(_config.speechRate);
-    _ttsService.setPitch(_config.pitch);
+    // TODO: Implement TTS configuration methods
+    // _ttsService.setVolume(_config.volume);
+    // _ttsService.setSpeechRate(_config.speechRate);
+    // _ttsService.setPitch(_config.pitch);
     notifyListeners();
   }
 
@@ -333,8 +335,8 @@ class VoiceFeedbackSystem extends ChangeNotifier {
           return '操作已成功完成';
       }
     } else {
-      final suggestion = _generateErrorSuggestion(result.error);
-      return '操作失败：${result.error}${suggestion.isNotEmpty ? "。$suggestion" : ""}';
+      final suggestion = _generateErrorSuggestion(result.error ?? '');
+      return '操作失败：${result.error ?? "未知错误"}${suggestion.isNotEmpty ? "。$suggestion" : ""}';
     }
   }
 

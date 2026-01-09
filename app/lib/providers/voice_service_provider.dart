@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod/riverpod.dart';
 
 import '../models/transaction.dart';
 import '../services/database_service.dart';
@@ -33,13 +34,13 @@ final voiceRecognitionEngineProvider = Provider<VoiceRecognitionEngine>((ref) {
 });
 
 /// TTS服务Provider
-final ttsServiceProvider = Provider<TtsService>((ref) {
-  return TtsService();
+final ttsServiceProvider = Provider<TTSService>((ref) {
+  return TTSService();
 });
 
 /// 数据库服务Provider
 final databaseServiceProvider = Provider<DatabaseService>((ref) {
-  return DatabaseService.instance;
+  return DatabaseService();
 });
 
 /// 语音意图路由器Provider
@@ -126,7 +127,7 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
   final VoiceDeleteService _deleteService;
   final VoiceModifyService _modifyService;
   final VoiceRecognitionEngine _recognitionEngine;
-  final TtsService _ttsService;
+  final TTSService _ttsService;
   final DatabaseService _databaseService;
 
   VoiceInteractionNotifier({
@@ -134,7 +135,7 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
     required VoiceDeleteService deleteService,
     required VoiceModifyService modifyService,
     required VoiceRecognitionEngine recognitionEngine,
-    required TtsService ttsService,
+    required TTSService ttsService,
     required DatabaseService databaseService,
   }) : _entityService = entityService,
        _deleteService = deleteService,
@@ -344,28 +345,43 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
   /// 查询交易记录回调
   Future<List<TransactionRecord>> _queryTransactions(QueryConditions conditions) async {
     // 调用数据库服务查询交易记录
-    final transactions = await _databaseService.queryTransactions(
-      startDate: conditions.startDate,
-      endDate: conditions.endDate,
-      category: conditions.categoryHint,
-      merchant: conditions.merchantHint,
-      minAmount: conditions.amountMin,
-      maxAmount: conditions.amountMax,
-      limit: conditions.limit,
-    );
+    var transactions = await _databaseService.getTransactions();
+
+    // 应用过滤条件
+    if (conditions.startDate != null) {
+      transactions = transactions.where((t) => t.date.isAfter(conditions.startDate!.subtract(const Duration(days: 1)))).toList();
+    }
+    if (conditions.endDate != null) {
+      transactions = transactions.where((t) => t.date.isBefore(conditions.endDate!.add(const Duration(days: 1)))).toList();
+    }
+    if (conditions.categoryHint != null) {
+      transactions = transactions.where((t) => t.category.contains(conditions.categoryHint!)).toList();
+    }
+    if (conditions.merchantHint != null) {
+      transactions = transactions.where((t) => t.rawMerchant?.contains(conditions.merchantHint!) ?? false).toList();
+    }
+    if (conditions.amountMin != null) {
+      transactions = transactions.where((t) => t.amount >= conditions.amountMin!).toList();
+    }
+    if (conditions.amountMax != null) {
+      transactions = transactions.where((t) => t.amount <= conditions.amountMax!).toList();
+    }
+    if (conditions.limit != null && conditions.limit! > 0) {
+      transactions = transactions.take(conditions.limit!).toList();
+    }
 
     // 转换为TransactionRecord格式
     return transactions.map((t) => TransactionRecord(
       id: t.id,
       amount: t.amount,
       category: t.category,
-      subCategory: t.subCategory,
-      merchant: t.merchant,
-      description: t.description,
+      subCategory: t.subcategory,
+      merchant: t.rawMerchant,
+      description: t.note,
       date: t.date,
-      account: t.account,
-      tags: t.tags,
-      type: t.type,
+      account: t.accountId,
+      tags: t.tags ?? [],
+      type: t.type.name,
     )).toList();
   }
 
@@ -386,15 +402,15 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
     try {
       await _databaseService.updateTransaction(Transaction(
         id: record.id,
+        type: TransactionType.values.firstWhere((e) => e.name == record.type, orElse: () => TransactionType.expense),
         amount: record.amount,
         category: record.category ?? '',
-        subCategory: record.subCategory,
-        merchant: record.merchant,
-        description: record.description,
+        subcategory: record.subCategory,
+        note: record.description,
         date: record.date,
-        account: record.account ?? '',
+        accountId: record.account ?? '',
         tags: record.tags,
-        type: record.type,
+        rawMerchant: record.merchant,
       ));
       return true;
     } catch (e) {
