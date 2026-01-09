@@ -2,46 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
-
-/// 成员消费数据
-class SimpleModeExpense {
-  final String memberId;
-  final String memberName;
-  final String memberEmoji;
-  final Color memberColor;
-  final double amount;
-  final double percentage;
-
-  SimpleModeExpense({
-    required this.memberId,
-    required this.memberName,
-    required this.memberEmoji,
-    required this.memberColor,
-    required this.amount,
-    required this.percentage,
-  });
-}
-
-/// 简单模式交易记录
-class SimpleModeTransaction {
-  final String id;
-  final String category;
-  final String categoryEmoji;
-  final String description;
-  final String memberName;
-  final double amount;
-  final DateTime time;
-
-  SimpleModeTransaction({
-    required this.id,
-    required this.category,
-    required this.categoryEmoji,
-    required this.description,
-    required this.memberName,
-    required this.amount,
-    required this.time,
-  });
-}
+import '../providers/member_statistics_provider.dart';
+import '../providers/transaction_provider.dart';
+import '../providers/ledger_context_provider.dart';
+import '../models/transaction.dart';
 
 /// 15.13 家庭账本简单模式页面
 /// 精简版家庭账本，适合双人记账场景
@@ -58,62 +22,35 @@ class FamilySimpleModePage extends ConsumerStatefulWidget {
 }
 
 class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
-  late List<SimpleModeExpense> _expenses;
-  late List<SimpleModeTransaction> _transactions;
-
-  @override
-  void initState() {
-    super.initState();
-    _initMockData();
-  }
-
-  void _initMockData() {
-    _expenses = [
-      SimpleModeExpense(
-        memberId: '1',
-        memberName: '小明',
-        memberEmoji: '👨',
-        memberColor: const Color(0xFF42A5F5),
-        amount: 4280,
-        percentage: 0.5,
-      ),
-      SimpleModeExpense(
-        memberId: '2',
-        memberName: '小红',
-        memberEmoji: '👩',
-        memberColor: const Color(0xFFE91E63),
-        amount: 4280,
-        percentage: 0.5,
-      ),
-    ];
-
-    _transactions = [
-      SimpleModeTransaction(
-        id: '1',
-        category: '餐饮',
-        categoryEmoji: '🍜',
-        description: '晚餐-海底捞',
-        memberName: '小明',
-        amount: 286,
-        time: DateTime.now().subtract(const Duration(hours: 2)),
-      ),
-      SimpleModeTransaction(
-        id: '2',
-        category: '购物',
-        categoryEmoji: '🛒',
-        description: '超市采购',
-        memberName: '小红',
-        amount: 158,
-        time: DateTime.now().subtract(const Duration(hours: 5)),
-      ),
-    ];
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final totalExpense = _expenses.fold<double>(0, (sum, e) => sum + e.amount);
-    final lastMonthDiff = -320.0;
+    final ledgerContext = ref.watch(ledgerContextProvider);
+    final ledgerId = ledgerContext.currentLedger?.id;
+
+    if (ledgerId == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.familyName)),
+        body: const Center(child: Text('请先选择账本')),
+      );
+    }
+
+    final memberStats = ref.watch(memberSpendingRankProvider(ledgerId));
+    final allTransactions = ref.watch(transactionProvider);
+
+    // 获取本月交易
+    final now = DateTime.now();
+    final monthTransactions = allTransactions.where((t) =>
+      t.date.year == now.year && t.date.month == now.month
+    ).toList();
+
+    // 计算总支出
+    final totalExpense = memberStats.fold<double>(0, (sum, m) => sum + m.totalExpense);
+
+    // 获取最近的交易（最多5条）
+    final recentTransactions = monthTransactions.take(5).toList();
+
+    final lastMonthDiff = 0.0; // TODO: 计算与上月的差异
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
@@ -154,11 +91,11 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
             // 共同支出总览
             _buildTotalExpenseCard(totalExpense, lastMonthDiff, l10n),
             // 成员贡献
-            _buildMemberContributions(l10n),
+            _buildMemberContributions(l10n, memberStats, totalExpense),
             // 温馨提示
             _buildWarmTip(),
             // 最近记录
-            _buildRecentTransactions(l10n),
+            _buildRecentTransactions(l10n, recentTransactions),
             // 升级提示
             _buildUpgradeHint(l10n),
             const SizedBox(height: 24),
@@ -213,7 +150,19 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
     );
   }
 
-  Widget _buildMemberContributions(AppLocalizations l10n) {
+  Widget _buildMemberContributions(AppLocalizations l10n, List<MemberSpendingStats> memberStats, double totalExpense) {
+    if (memberStats.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(child: Text('暂无成员数据')),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -241,14 +190,15 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
               ],
             ),
             child: Column(
-              children: _expenses.asMap().entries.map((entry) {
+              children: memberStats.asMap().entries.map((entry) {
                 final index = entry.key;
-                final expense = entry.value;
-                final isLast = index == _expenses.length - 1;
+                final member = entry.value;
+                final isLast = index == memberStats.length - 1;
+                final percentage = totalExpense > 0 ? member.totalExpense / totalExpense : 0.0;
 
                 return Column(
                   children: [
-                    _buildMemberExpenseItem(expense),
+                    _buildMemberExpenseItem(member, percentage),
                     if (!isLast)
                       Divider(
                         height: 28,
@@ -264,22 +214,26 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
     );
   }
 
-  Widget _buildMemberExpenseItem(SimpleModeExpense expense) {
+  Widget _buildMemberExpenseItem(MemberSpendingStats member, double percentage) {
+    final memberInitial = member.memberName.isNotEmpty ? member.memberName[0] : '?';
+
     return Row(
       children: [
         Container(
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [expense.memberColor, expense.memberColor.withValues(alpha: 0.7)],
-            ),
+            color: AppTheme.primaryColor.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(22),
           ),
           child: Center(
             child: Text(
-              expense.memberEmoji,
-              style: const TextStyle(fontSize: 20),
+              memberInitial,
+              style: TextStyle(
+                fontSize: 20,
+                color: AppTheme.primaryColor,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -292,18 +246,18 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    expense.memberName,
+                    member.memberName,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   Text(
-                    '¥${expense.amount.toStringAsFixed(0)}',
+                    '¥${member.totalExpense.toStringAsFixed(0)}',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: expense.memberColor,
+                      color: AppTheme.primaryColor,
                     ),
                   ),
                 ],
@@ -312,15 +266,15 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(3),
                 child: LinearProgressIndicator(
-                  value: expense.percentage,
+                  value: percentage,
                   backgroundColor: AppTheme.surfaceVariantColor,
-                  valueColor: AlwaysStoppedAnimation<Color>(expense.memberColor),
+                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                   minHeight: 6,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                '${(expense.percentage * 100).toStringAsFixed(0)}%',
+                '${(percentage * 100).toStringAsFixed(0)}%',
                 style: TextStyle(
                   fontSize: 11,
                   color: AppTheme.textSecondaryColor,
@@ -364,7 +318,7 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
     );
   }
 
-  Widget _buildRecentTransactions(AppLocalizations l10n) {
+  Widget _buildRecentTransactions(AppLocalizations l10n, List<Transaction> transactions) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -396,45 +350,55 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
               ),
             ],
           ),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              children: _transactions.asMap().entries.map((entry) {
-                final index = entry.key;
-                final tx = entry.value;
-                final isLast = index == _transactions.length - 1;
+          if (transactions.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(child: Text('暂无交易记录')),
+            )
+          else
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: transactions.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final tx = entry.value;
+                  final isLast = index == transactions.length - 1;
 
-                return Column(
-                  children: [
-                    _buildTransactionItem(tx),
-                    if (!isLast)
-                      Divider(
-                        height: 1,
-                        indent: 60,
-                        color: AppTheme.dividerColor,
-                      ),
-                  ],
-                );
-              }).toList(),
+                  return Column(
+                    children: [
+                      _buildTransactionItem(tx),
+                      if (!isLast)
+                        Divider(
+                          height: 1,
+                          indent: 60,
+                          color: AppTheme.dividerColor,
+                        ),
+                    ],
+                  );
+                }).toList(),
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildTransactionItem(SimpleModeTransaction tx) {
-    final timeStr = _formatTime(tx.time);
+  Widget _buildTransactionItem(Transaction tx) {
+    final timeStr = _formatTime(tx.date);
 
     return Padding(
       padding: const EdgeInsets.all(14),
@@ -449,8 +413,8 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
             ),
             child: Center(
               child: Text(
-                tx.categoryEmoji,
-                style: const TextStyle(fontSize: 18),
+                tx.category.isNotEmpty ? tx.category[0] : '?',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -460,14 +424,14 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  tx.description,
+                  tx.note ?? tx.category,
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
-                  '${tx.memberName} · $timeStr',
+                  timeStr,
                   style: TextStyle(
                     fontSize: 11,
                     color: AppTheme.textSecondaryColor,
@@ -477,11 +441,15 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
             ),
           ),
           Text(
-            '-¥${tx.amount.toStringAsFixed(0)}',
+            tx.type == TransactionType.expense
+                ? '-¥${tx.amount.toStringAsFixed(0)}'
+                : '+¥${tx.amount.toStringAsFixed(0)}',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppTheme.expenseColor,
+              color: tx.type == TransactionType.expense
+                  ? AppTheme.expenseColor
+                  : AppTheme.incomeColor,
             ),
           ),
         ],
