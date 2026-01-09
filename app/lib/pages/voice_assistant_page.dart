@@ -472,66 +472,67 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
                 Navigator.pushNamed(context, '/voice-history');
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.edit_note),
-              title: const Text('编辑记录'),
-              subtitle: const Text('查看语音编辑历史'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const VoiceEditRecordPage()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.undo),
-              title: const Text('撤销操作'),
-              subtitle: const Text('语音撤销最近的操作'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const VoiceUndoPage()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.timer),
-              title: const Text('记录时间统计'),
-              subtitle: const Text('查看语音记账效率'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RecordingTimeStatsPage()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.gesture),
-              title: const Text('手写输入'),
-              subtitle: const Text('切换到手写记账'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HandwritingRecognitionPage()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.input),
-              title: const Text('多模态输入'),
-              subtitle: const Text('语音/手写/拍照/键盘'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const MultimodalInputPage()),
-                );
-              },
-            ),
+            // TODO: Implement these pages
+            // ListTile(
+            //   leading: const Icon(Icons.edit_note),
+            //   title: const Text('编辑记录'),
+            //   subtitle: const Text('查看语音编辑历史'),
+            //   onTap: () {
+            //     Navigator.pop(context);
+            //     Navigator.push(
+            //       context,
+            //       MaterialPageRoute(builder: (_) => const VoiceEditRecordPage()),
+            //     );
+            //   },
+            // ),
+            // ListTile(
+            //   leading: const Icon(Icons.undo),
+            //   title: const Text('撤销操作'),
+            //   subtitle: const Text('语音撤销最近的操作'),
+            //   onTap: () {
+            //     Navigator.pop(context);
+            //     Navigator.push(
+            //       context,
+            //       MaterialPageRoute(builder: (_) => const VoiceUndoPage()),
+            //     );
+            //   },
+            // ),
+            // ListTile(
+            //   leading: const Icon(Icons.timer),
+            //   title: const Text('记录时间统计'),
+            //   subtitle: const Text('查看语音记账效率'),
+            //   onTap: () {
+            //     Navigator.pop(context);
+            //     Navigator.push(
+            //       context,
+            //       MaterialPageRoute(builder: (_) => const RecordingTimeStatsPage()),
+            //     );
+            //   },
+            // ),
+            // ListTile(
+            //   leading: const Icon(Icons.gesture),
+            //   title: const Text('手写输入'),
+            //   subtitle: const Text('切换到手写记账'),
+            //   onTap: () {
+            //     Navigator.pop(context);
+            //     Navigator.push(
+            //       context,
+            //       MaterialPageRoute(builder: (_) => const HandwritingRecognitionPage()),
+            //     );
+            //   },
+            // ),
+            // ListTile(
+            //   leading: const Icon(Icons.input),
+            //   title: const Text('多模态输入'),
+            //   subtitle: const Text('语音/手写/拍照/键盘'),
+            //   onTap: () {
+            //     Navigator.pop(context);
+            //     Navigator.push(
+            //       context,
+            //       MaterialPageRoute(builder: (_) => const MultimodalInputPage()),
+            //     );
+            //   },
+            // ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.delete_outline),

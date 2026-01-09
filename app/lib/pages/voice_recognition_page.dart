@@ -714,7 +714,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
-                              AppDateUtils.formatDateTime(t.date),
+                              '${t.date.year}-${t.date.month.toString().padLeft(2, '0')}-${t.date.day.toString().padLeft(2, '0')} ${t.date.hour.toString().padLeft(2, '0')}:${t.date.minute.toString().padLeft(2, '0')}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white54 : Colors.grey,

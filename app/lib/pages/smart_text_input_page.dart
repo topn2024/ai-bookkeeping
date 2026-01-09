@@ -137,7 +137,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
               height: 1.5,
             ),
             decoration: InputDecoration(
-              hintText: l10n.inputHint午餐35块"',
+              hintText: '例如：午餐35块',
               hintStyle: TextStyle(
                 color: AppTheme.textSecondaryColor.withValues(alpha: 0.7),
               ),
