@@ -59,7 +59,7 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
                 borderRadius: BorderRadius.circular(18),
               ),
               child: const Icon(
-                Icons.smart_toy,
+                Icons.psychology,
                 color: Colors.white,
                 size: 20,
               ),
@@ -139,7 +139,7 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Icon(
-                Icons.smart_toy,
+                Icons.psychology,
                 color: Colors.white,
                 size: 18,
               ),

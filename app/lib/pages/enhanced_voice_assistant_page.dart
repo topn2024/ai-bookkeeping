@@ -126,7 +126,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
               borderRadius: BorderRadius.circular(18),
             ),
             child: const Icon(
-              Icons.smart_toy,
+              Icons.psychology,
               color: Colors.white,
               size: 20,
             ),
@@ -348,7 +348,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
         color = AppTheme.primaryColor;
         break;
       case MessageType.assistant:
-        icon = Icons.smart_toy;
+        icon = Icons.psychology;
         color = AppColors.income;
         break;
       case MessageType.system:
