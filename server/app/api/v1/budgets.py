@@ -58,11 +58,14 @@ async def get_budgets(
             "user_id": budget.user_id,
             "book_id": budget.book_id,
             "category_id": budget.category_id,
+            "name": budget.name,
             "budget_type": budget.budget_type,
             "amount": budget.amount,
             "year": budget.year,
             "month": budget.month,
+            "is_active": budget.is_active,
             "created_at": budget.created_at,
+            "updated_at": budget.updated_at,
             "spent": spent,
             "remaining": remaining,
             "percentage": round(percentage, 2),
@@ -136,10 +139,12 @@ async def create_budget(
         user_id=current_user.id,
         book_id=budget_data.book_id,
         category_id=budget_data.category_id,
+        name=budget_data.name,
         budget_type=budget_data.budget_type,
         amount=budget_data.amount,
         year=budget_data.year,
         month=budget_data.month,
+        is_active=budget_data.is_active,
     )
     db.add(budget)
     await db.commit()
@@ -157,11 +162,14 @@ async def create_budget(
         user_id=budget.user_id,
         book_id=budget.book_id,
         category_id=budget.category_id,
+        name=budget.name,
         budget_type=budget.budget_type,
         amount=budget.amount,
         year=budget.year,
         month=budget.month,
+        is_active=budget.is_active,
         created_at=budget.created_at,
+        updated_at=budget.updated_at,
         spent=spent,
         remaining=remaining,
         percentage=round(percentage, 2),
@@ -198,11 +206,14 @@ async def get_budget(
         user_id=budget.user_id,
         book_id=budget.book_id,
         category_id=budget.category_id,
+        name=budget.name,
         budget_type=budget.budget_type,
         amount=budget.amount,
         year=budget.year,
         month=budget.month,
+        is_active=budget.is_active,
         created_at=budget.created_at,
+        updated_at=budget.updated_at,
         spent=spent,
         remaining=remaining,
         percentage=round(percentage, 2),
@@ -228,9 +239,13 @@ async def update_budget(
             detail="Budget not found",
         )
 
-    # Update amount
+    # Update fields
+    if budget_data.name is not None:
+        budget.name = budget_data.name
     if budget_data.amount is not None:
         budget.amount = budget_data.amount
+    if budget_data.is_active is not None:
+        budget.is_active = budget_data.is_active
 
     await db.commit()
     await db.refresh(budget)
@@ -247,11 +262,14 @@ async def update_budget(
         user_id=budget.user_id,
         book_id=budget.book_id,
         category_id=budget.category_id,
+        name=budget.name,
         budget_type=budget.budget_type,
         amount=budget.amount,
         year=budget.year,
         month=budget.month,
+        is_active=budget.is_active,
         created_at=budget.created_at,
+        updated_at=budget.updated_at,
         spent=spent,
         remaining=remaining,
         percentage=round(percentage, 2),

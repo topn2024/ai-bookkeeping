@@ -45,10 +45,13 @@ async def create_book(
     book = Book(
         user_id=current_user.id,
         name=book_data.name,
+        description=book_data.description,
         icon=book_data.icon,
         cover_image=book_data.cover_image,
         book_type=book_data.book_type,
+        currency=book_data.currency,
         is_default=book_data.is_default,
+        settings=book_data.settings,
     )
     db.add(book)
     await db.commit()

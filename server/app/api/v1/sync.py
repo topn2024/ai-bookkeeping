@@ -314,8 +314,11 @@ async def _handle_create(
             description=data.get("description"),
             book_type=data.get("book_type", 0),
             icon=data.get("icon"),
+            cover_image=data.get("cover_image"),
+            currency=data.get("currency", "CNY"),
             is_default=data.get("is_default", False),
             is_archived=data.get("is_archived", False),
+            settings=data.get("settings"),
         )
         db.add(entity)
         await db.flush()
@@ -591,14 +594,32 @@ async def _handle_update(
     for key, value in data.items():
         if hasattr(entity, key) and key not in ['id', 'user_id', 'created_at']:
             # Handle special types
-            if key in ['book_id', 'account_id', 'target_account_id', 'category_id', 'parent_id'] and value:
+            # UUID fields
+            if key in ['book_id', 'account_id', 'target_account_id', 'category_id', 'parent_id',
+                       'resource_pool_id', 'income_transaction_id', 'expense_transaction_id',
+                       'family_budget_id', 'goal_id', 'transaction_id', 'split_id',
+                       'linked_category_id', 'default_category_id', 'income_category_id',
+                       'invited_by', 'created_by'] and value:
                 value = UUID(value) if isinstance(value, str) else value
-            elif key in ['amount', 'fee', 'balance', 'credit_limit', 'location_latitude', 'location_longitude'] and value is not None:
+            # Decimal fields
+            elif key in ['amount', 'fee', 'balance', 'credit_limit', 'location_latitude', 'location_longitude',
+                         'ai_confidence', 'original_amount', 'remaining_amount', 'consumed_amount',
+                         'target_amount', 'current_amount', 'total_budget', 'allocated', 'spent',
+                         'percentage', 'avg_money_age', 'total_remaining_amount', 'total_spent',
+                         'center_latitude', 'center_longitude', 'latitude', 'longitude',
+                         'budget_limit'] and value is not None:
                 value = Decimal(str(value))
-            elif key == 'transaction_date' and value:
+            # Date fields
+            elif key in ['transaction_date', 'income_date', 'first_consumed_date', 'last_consumed_date',
+                         'fully_consumed_date', 'consumption_date', 'snapshot_date'] and value:
                 value = date.fromisoformat(value) if isinstance(value, str) else value
+            # Time fields
             elif key == 'transaction_time' and value:
                 value = time.fromisoformat(value) if isinstance(value, str) else value
+            # Datetime fields
+            elif key in ['recognition_timestamp', 'source_file_expires_at', 'deadline', 'completed_at',
+                         'settled_at', 'joined_at', 'last_visit_at', 'updated_at'] and value:
+                value = datetime.fromisoformat(value) if isinstance(value, str) else value
             setattr(entity, key, value)
 
     # Re-apply balance for transactions
@@ -828,8 +849,11 @@ def _entity_to_dict(entity, entity_type: str) -> Dict[str, Any]:
             "description": entity.description if hasattr(entity, 'description') else None,
             "book_type": entity.book_type,
             "icon": entity.icon if hasattr(entity, 'icon') else None,
+            "cover_image": entity.cover_image if hasattr(entity, 'cover_image') else None,
+            "currency": entity.currency if hasattr(entity, 'currency') else "CNY",
             "is_default": entity.is_default,
             "is_archived": entity.is_archived if hasattr(entity, 'is_archived') else False,
+            "settings": entity.settings if hasattr(entity, 'settings') else None,
         }
     elif entity_type == "budget":
         data = {
