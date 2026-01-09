@@ -383,7 +383,7 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
       lastDate: DateTime.now(),
       initialDatePickerMode: DatePickerMode.year,
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         _selectedMonth = DateTime(picked.year, picked.month);
       });
