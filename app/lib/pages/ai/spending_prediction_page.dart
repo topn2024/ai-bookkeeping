@@ -16,7 +16,14 @@ class SpendingPredictionPage extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_month),
-            onPressed: () {},
+            onPressed: () {
+              showDatePicker(
+                context: context,
+                initialDate: DateTime.now(),
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2030),
+              );
+            },
           ),
         ],
       ),

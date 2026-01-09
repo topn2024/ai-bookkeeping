@@ -53,7 +53,11 @@ class _AnomalyDetectionSettingsPageState
           Padding(
             padding: const EdgeInsets.all(16),
             child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('异常历史记录功能开发中')),
+                );
+              },
               icon: const Icon(Icons.history),
               label: const Text('查看异常历史记录'),
               style: OutlinedButton.styleFrom(

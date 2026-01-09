@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 /// 智能学习报告页面
 ///
@@ -16,7 +17,14 @@ class AILearningReportPage extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.share),
-            onPressed: () {},
+            onPressed: () {
+              Share.share(
+                'AI学习报告\n'
+                '本月识别准确率: 95%\n'
+                '累计学习次数: 1,234次\n'
+                '分享自AI记账',
+              );
+            },
           ),
         ],
       ),
