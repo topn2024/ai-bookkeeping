@@ -269,23 +269,84 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
 
   /// 处理添加命令
   Future<void> _handleAddCommand(String command) async {
-    // TODO: 实现添加交易的语音处理逻辑
     await _provideFeedback('正在添加新交易记录...');
-    // 这里可以解析语音中的交易信息并创建新记录
+    // 解析语音中的交易信息
+    final amountMatch = RegExp(r'(\d+(?:\.\d+)?)\s*[元块钱]?').firstMatch(command);
+    final amount = amountMatch != null ? double.tryParse(amountMatch.group(1)!) : null;
+
+    if (amount == null || amount <= 0) {
+      await _provideFeedback('请告诉我金额是多少');
+      return;
+    }
+
+    // 创建交易记录
+    final transaction = Transaction(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      type: TransactionType.expense,
+      amount: amount,
+      category: 'other_expense',
+      note: command,
+      date: DateTime.now(),
+      accountId: 'default',
+      source: TransactionSource.voice,
+    );
+
+    await _databaseService.insertTransaction(transaction);
+    await _provideFeedback('已记录消费${amount.toStringAsFixed(2)}元');
   }
 
   /// 处理查询命令
   Future<void> _handleQueryCommand(String command) async {
-    // TODO: 实现查询的语音处理逻辑
     await _provideFeedback('正在查询相关信息...');
-    // 这里可以根据语音查询并返回结果
+
+    DateTime? startDate;
+    DateTime? endDate;
+    final now = DateTime.now();
+
+    if (command.contains('今天')) {
+      startDate = DateTime(now.year, now.month, now.day);
+      endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    } else if (command.contains('本月') || command.contains('这个月')) {
+      startDate = DateTime(now.year, now.month, 1);
+      endDate = now;
+    }
+
+    final transactions = await _databaseService.queryTransactions(
+      startDate: startDate,
+      endDate: endDate,
+      limit: 10,
+    );
+
+    if (transactions.isEmpty) {
+      await _provideFeedback('没有找到符合条件的记录');
+      return;
+    }
+
+    final total = transactions
+        .where((t) => t.type == TransactionType.expense)
+        .fold(0.0, (sum, t) => sum + t.amount);
+    await _provideFeedback('共${transactions.length}条记录，总支出${total.toStringAsFixed(2)}元');
   }
 
   /// 处理导航命令
   Future<void> _handleNavigationCommand(String command) async {
-    // TODO: 实现页面导航的语音处理逻辑
-    await _provideFeedback('正在跳转到相关页面...');
-    // 这里可以根据语音命令导航到不同页面
+    String? targetPage;
+    if (command.contains('首页') || command.contains('主页')) {
+      targetPage = '首页';
+    } else if (command.contains('统计') || command.contains('报表')) {
+      targetPage = '统计页面';
+    } else if (command.contains('设置')) {
+      targetPage = '设置页面';
+    } else if (command.contains('账户')) {
+      targetPage = '账户页面';
+    }
+
+    if (targetPage != null) {
+      await _provideFeedback('正在跳转到$targetPage');
+      // 实际导航由UI层处理
+    } else {
+      await _provideFeedback('抱歉，我不知道要跳转到哪个页面');
+    }
   }
 
   /// 处理未识别命令

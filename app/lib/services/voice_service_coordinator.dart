@@ -468,10 +468,47 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     IntentAnalysisResult intentResult,
     String originalInput,
   ) async {
-    // TODO: 实现语音添加交易功能
-    const message = '语音添加交易功能正在开发中';
-    await _ttsService.speak(message);
-    return VoiceSessionResult.success(message);
+    try {
+      final entities = intentResult.entities;
+      final amount = entities['amount'] as double?;
+      final category = entities['category'] as String?;
+      final merchant = entities['merchant'] as String?;
+
+      if (amount == null || amount <= 0) {
+        const message = '请告诉我金额是多少';
+        await _ttsService.speak(message);
+        return VoiceSessionResult.error(message);
+      }
+
+      // 创建交易记录
+      final transaction = model.Transaction(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: model.TransactionType.expense,
+        amount: amount,
+        category: category ?? 'other_expense',
+        note: merchant != null ? '在$merchant消费' : originalInput,
+        date: DateTime.now(),
+        accountId: 'default',
+        rawMerchant: merchant,
+        source: model.TransactionSource.voice,
+      );
+
+      await _databaseService.insertTransaction(transaction);
+
+      final message = '已记录${category ?? ""}消费${amount.toStringAsFixed(2)}元';
+      await _feedbackSystem.provideOperationFeedback(
+        result: OperationResult.success('add', {'amount': amount}),
+      );
+      await _ttsService.speak(message);
+
+      _clearSession();
+      notifyListeners();
+      return VoiceSessionResult.success(message);
+    } catch (e) {
+      final message = '添加记录失败: $e';
+      await _ttsService.speak('添加记录失败，请重试');
+      return VoiceSessionResult.error(message);
+    }
   }
 
   /// 处理查询意图
@@ -479,10 +516,52 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     IntentAnalysisResult intentResult,
     String originalInput,
   ) async {
-    // TODO: 实现语音查询功能
-    const message = '语音查询功能正在开发中';
-    await _ttsService.speak(message);
-    return VoiceSessionResult.success(message);
+    try {
+      final entities = intentResult.entities;
+      final startDate = entities['startDate'] as DateTime?;
+      final endDate = entities['endDate'] as DateTime?;
+      final category = entities['category'] as String?;
+
+      // 查询交易记录
+      final transactions = await _databaseService.queryTransactions(
+        startDate: startDate,
+        endDate: endDate,
+        category: category,
+        limit: 10,
+      );
+
+      if (transactions.isEmpty) {
+        const message = '没有找到符合条件的记录';
+        await _ttsService.speak(message);
+        return VoiceSessionResult.success(message);
+      }
+
+      // 计算总金额
+      final totalExpense = transactions
+          .where((t) => t.type == model.TransactionType.expense)
+          .fold(0.0, (sum, t) => sum + t.amount);
+      final totalIncome = transactions
+          .where((t) => t.type == model.TransactionType.income)
+          .fold(0.0, (sum, t) => sum + t.amount);
+
+      String message;
+      if (totalExpense > 0 && totalIncome > 0) {
+        message = '共${transactions.length}条记录，支出${totalExpense.toStringAsFixed(2)}元，收入${totalIncome.toStringAsFixed(2)}元';
+      } else if (totalExpense > 0) {
+        message = '共${transactions.length}条记录，总支出${totalExpense.toStringAsFixed(2)}元';
+      } else {
+        message = '共${transactions.length}条记录，总收入${totalIncome.toStringAsFixed(2)}元';
+      }
+
+      await _ttsService.speak(message);
+      _clearSession();
+      notifyListeners();
+      return VoiceSessionResult.success(message);
+    } catch (e) {
+      final message = '查询失败: $e';
+      await _ttsService.speak('查询失败，请重试');
+      return VoiceSessionResult.error(message);
+    }
   }
 
   /// 处理导航意图
@@ -557,7 +636,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     try {
       await _databaseService.updateTransaction(model.Transaction(
         id: record.id,
-        type: TransactionType.values.firstWhere((e) => e.name == record.type, orElse: () => TransactionType.expense),
+        type: model.TransactionType.values.firstWhere((e) => e.name == record.type, orElse: () => model.TransactionType.expense),
         amount: record.amount,
         category: record.category ?? '',
         subcategory: record.subCategory,
