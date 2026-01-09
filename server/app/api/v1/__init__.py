@@ -25,6 +25,8 @@ from app.api.v1.family_budget import router as family_budget_router
 from app.api.v1.splits import router as splits_router
 from app.api.v1.saving_goals import router as saving_goals_router
 from app.api.v1.family_stats import router as family_stats_router
+# Chapter 14: Location Intelligence
+from app.api.v1.locations import router as locations_router
 
 api_router = APIRouter()
 
@@ -53,3 +55,5 @@ api_router.include_router(family_budget_router)
 api_router.include_router(splits_router)
 api_router.include_router(saving_goals_router)
 api_router.include_router(family_stats_router)
+# Chapter 14: Location Intelligence
+api_router.include_router(locations_router)

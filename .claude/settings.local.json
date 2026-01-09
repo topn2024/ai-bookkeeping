@@ -659,7 +659,9 @@
       "Bash(cmd /c \"echo Docker not found\")",
       "Bash(\"C:\\\\Program Files\\\\Docker\\\\Docker\\\\resources\\\\bin\\\\docker.exe\" --version)",
       "Bash(git check-ignore:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(git rebase:*)",
+      "Bash(GIT_EDITOR=true git rebase:*)"
     ]
   }
 }

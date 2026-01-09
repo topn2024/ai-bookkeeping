@@ -31,16 +31,24 @@ class Transaction(Base):
     note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     tags: Mapped[Optional[List[str]]] = mapped_column(ARRAY(String(50)), nullable=True)
     images: Mapped[Optional[List[str]]] = mapped_column(ARRAY(String(500)), nullable=True)
-    location: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    location: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)  # Legacy: simple location string
+
+    # Structured location fields (Chapter 14: Location Intelligence)
+    location_latitude: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 7), nullable=True)  # -90 to 90
+    location_longitude: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 7), nullable=True)  # -180 to 180
+    location_place_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)  # e.g., "沃尔玛超市"
+    location_address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # Full address
+    location_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    location_district: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    location_type: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 0-10: LocationType enum
+    location_poi_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # Map service POI ID
+    geofence_region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # home/work/shopping etc
+    is_cross_region: Mapped[bool] = mapped_column(Boolean, default=False)  # Cross-region transaction flag
 
     # Money Age fields - for tracking financial health
     money_age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Age in days
     money_age_level: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # health/warning/danger
     resource_pool_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)  # For income tracking
-
-    # Location enhancement fields
-    geofence_region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # home/work/shopping etc
-    is_cross_region: Mapped[bool] = mapped_column(Boolean, default=False)  # Cross-region transaction flag
 
     is_reimbursable: Mapped[bool] = mapped_column(Boolean, default=False)
     is_reimbursed: Mapped[bool] = mapped_column(Boolean, default=False)

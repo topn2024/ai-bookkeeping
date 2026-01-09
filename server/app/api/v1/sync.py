@@ -209,6 +209,15 @@ async def _handle_create(
             tags=data.get("tags"),
             images=data.get("images"),
             location=data.get("location"),
+            # Structured location fields (Chapter 14)
+            location_latitude=Decimal(str(data["location_latitude"])) if data.get("location_latitude") else None,
+            location_longitude=Decimal(str(data["location_longitude"])) if data.get("location_longitude") else None,
+            location_place_name=data.get("location_place_name"),
+            location_address=data.get("location_address"),
+            location_city=data.get("location_city"),
+            location_district=data.get("location_district"),
+            location_type=data.get("location_type"),
+            location_poi_id=data.get("location_poi_id"),
             is_reimbursable=data.get("is_reimbursable", False),
             is_reimbursed=data.get("is_reimbursed", False),
             is_exclude_stats=data.get("is_exclude_stats", False),
@@ -326,7 +335,7 @@ async def _handle_update(
             # Handle special types
             if key in ['book_id', 'account_id', 'target_account_id', 'category_id', 'parent_id'] and value:
                 value = UUID(value) if isinstance(value, str) else value
-            elif key in ['amount', 'fee', 'balance', 'credit_limit'] and value is not None:
+            elif key in ['amount', 'fee', 'balance', 'credit_limit', 'location_latitude', 'location_longitude'] and value is not None:
                 value = Decimal(str(value))
             elif key == 'transaction_date' and value:
                 value = date.fromisoformat(value) if isinstance(value, str) else value
@@ -502,6 +511,15 @@ def _entity_to_dict(entity, entity_type: str) -> Dict[str, Any]:
             "tags": entity.tags,
             "images": entity.images,
             "location": entity.location,
+            # Structured location fields (Chapter 14)
+            "location_latitude": str(entity.location_latitude) if entity.location_latitude else None,
+            "location_longitude": str(entity.location_longitude) if entity.location_longitude else None,
+            "location_place_name": entity.location_place_name if hasattr(entity, 'location_place_name') else None,
+            "location_address": entity.location_address if hasattr(entity, 'location_address') else None,
+            "location_city": entity.location_city if hasattr(entity, 'location_city') else None,
+            "location_district": entity.location_district if hasattr(entity, 'location_district') else None,
+            "location_type": entity.location_type if hasattr(entity, 'location_type') else None,
+            "location_poi_id": entity.location_poi_id if hasattr(entity, 'location_poi_id') else None,
             "is_reimbursable": entity.is_reimbursable,
             "is_reimbursed": entity.is_reimbursed,
             "is_exclude_stats": entity.is_exclude_stats,
