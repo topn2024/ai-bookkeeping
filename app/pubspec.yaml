@@ -82,6 +82,10 @@ dependencies:
   just_audio: ^0.9.40  # Audio playback for source audio files
   http: ^1.2.2  # HTTP client for file sync
 
+  # Multimodal wake-up
+  sensors_plus: ^6.0.1  # Accelerometer for shake detection
+  geolocator: ^13.0.2  # Location services for scene-aware wake-up
+
   # App upgrade
   open_filex: ^4.5.0  # Open APK files for installation
   url_launcher: ^6.2.5  # Open URLs in browser

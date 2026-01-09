@@ -17,6 +17,7 @@ import 'services/app_config_service.dart';
 import 'services/http_service.dart';
 import 'services/app_upgrade_service.dart';
 import 'services/auto_sync_service.dart';
+import 'services/multimodal_wakeup_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,6 +77,14 @@ void main() async {
     logger.info('Auto-sync service initialized', tag: 'App');
   } catch (e) {
     logger.warning('Failed to initialize auto-sync service: $e', tag: 'App');
+  }
+
+  // Initialize multimodal wake-up service
+  try {
+    await MultimodalWakeUpService().initialize();
+    logger.info('Multimodal wake-up service initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize multimodal wake-up service: $e', tag: 'App');
   }
 
   // Check for app updates (non-blocking)

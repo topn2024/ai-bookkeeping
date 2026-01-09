@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/voice_service_provider.dart';
 import '../services/voice_service_coordinator.dart';
@@ -27,17 +29,21 @@ class EnhancedVoiceAssistantPage extends ConsumerStatefulWidget {
 
 class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssistantPage>
     with TickerProviderStateMixin {
+  static const String _chatHistoryKey = 'voice_assistant_chat_history';
+  static const int _maxHistoryDays = 30; // 保留30天的聊天记录
+
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   late AnimationController _pulseController;
   late AnimationController _waveController;
   bool _hasPermission = false;
+  bool _isLoadingHistory = true;
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
-    _initializeChat();
+    _loadChatHistory();
     _checkPermissions();
   }
 
@@ -52,12 +58,79 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     );
   }
 
-  void _initializeChat() {
-    _messages.add(ChatMessage(
+  /// 加载聊天历史记录
+  Future<void> _loadChatHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyJson = prefs.getString(_chatHistoryKey);
+
+      if (historyJson != null) {
+        final List<dynamic> historyList = json.decode(historyJson);
+        final loadedMessages = historyList
+            .map((item) => ChatMessage.fromJson(item))
+            .toList();
+
+        // 清理超过30天的旧记录
+        final cutoffDate = DateTime.now().subtract(Duration(days: _maxHistoryDays));
+        final recentMessages = loadedMessages
+            .where((msg) => msg.timestamp.isAfter(cutoffDate))
+            .toList();
+
+        setState(() {
+          _messages.clear();
+          _messages.addAll(recentMessages);
+          _isLoadingHistory = false;
+        });
+
+        // 如果清理了旧记录，保存更新后的历史
+        if (recentMessages.length < loadedMessages.length) {
+          await _saveChatHistory();
+        }
+      } else {
+        // 首次使用，添加欢迎消息
+        setState(() {
+          _isLoadingHistory = false;
+        });
+        _addWelcomeMessage();
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingHistory = false;
+      });
+      _addWelcomeMessage();
+    }
+  }
+
+  /// 添加欢迎消息
+  void _addWelcomeMessage() {
+    _addMessage(ChatMessage(
       type: MessageType.assistant,
       content: '您好！我是您的智能语音助手 🤖\n\n我可以帮您：\n• 语音记账和管理\n• 删除和修改记录\n• 查询财务信息\n• 导航到各个页面\n\n请点击麦克风开始语音交互！',
       timestamp: DateTime.now(),
     ));
+  }
+
+  /// 保存聊天历史记录
+  Future<void> _saveChatHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyJson = json.encode(
+        _messages.map((msg) => msg.toJson()).toList(),
+      );
+      await prefs.setString(_chatHistoryKey, historyJson);
+    } catch (e) {
+      // 保存失败，静默处理
+    }
+  }
+
+  /// 清除所有聊天记录
+  Future<void> _clearChatHistory() async {
+    setState(() {
+      _messages.clear();
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_chatHistoryKey);
+    _addWelcomeMessage();
   }
 
   Future<void> _checkPermissions() async {
@@ -155,6 +228,33 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
         ],
       ),
       actions: [
+        // 清除历史记录按钮
+        IconButton(
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('清除聊天记录'),
+                content: const Text('确定要清除所有聊天记录吗？此操作不可恢复。'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('取消'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('确定'),
+                  ),
+                ],
+              ),
+            );
+            if (confirm == true) {
+              await _clearChatHistory();
+            }
+          },
+          tooltip: '清除聊天记录',
+        ),
         // 会话控制按钮
         if (voiceState.currentSessionType != null)
           IconButton(
@@ -654,6 +754,9 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
       _messages.add(message);
     });
 
+    // 保存聊天历史
+    _saveChatHistory();
+
     // 自动滚动到底部
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -848,4 +951,22 @@ class ChatMessage {
     required this.content,
     required this.timestamp,
   });
+
+  /// 转换为JSON
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type.index,
+      'content': content,
+      'timestamp': timestamp.toIso8601String(),
+    };
+  }
+
+  /// 从JSON创建
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    return ChatMessage(
+      type: MessageType.values[json['type'] as int],
+      content: json['content'] as String,
+      timestamp: DateTime.parse(json['timestamp'] as String),
+    );
+  }
 }
