@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../theme/antigravity_shadows.dart';
 import '../widgets/glass_components.dart';
 import '../widgets/antigravity_animations.dart';
 import '../services/app_upgrade_service.dart';
+import '../services/secure_storage_service.dart';
 import '../widgets/app_update_dialog.dart';
 import '../l10n/l10n.dart';
+import '../providers/ledger_context_provider.dart';
 import 'home_page.dart';
 import 'trends_page.dart';
 import 'budget_center_page.dart';
@@ -21,14 +24,14 @@ import 'image_recognition_page.dart';
 /// - 趋势（趋势分析）
 /// - 预算（预算中心）
 /// - 我的（个人中心）
-class MainNavigation extends StatefulWidget {
+class MainNavigation extends ConsumerStatefulWidget {
   const MainNavigation({super.key});
 
   @override
-  State<MainNavigation> createState() => _MainNavigationState();
+  ConsumerState<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
+class _MainNavigationState extends ConsumerState<MainNavigation> {
   int _currentIndex = 0;
   bool _hasCheckedUpdate = false;
   bool _isFabExpanded = false;
@@ -45,7 +48,26 @@ class _MainNavigationState extends State<MainNavigation> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowUpdate();
+      _initializeLedgerContext();
     });
+  }
+
+  /// 初始化账本上下文
+  Future<void> _initializeLedgerContext() async {
+    try {
+      final secureStorage = SecureStorageService();
+      String? userId = await secureStorage.getUserId();
+
+      // 如果没有用户ID，使用guest ID
+      if (userId == null || userId.isEmpty) {
+        userId = 'guest';
+      }
+
+      // 初始化账本上下文
+      await ref.read(ledgerContextProvider.notifier).initialize(userId);
+    } catch (e) {
+      debugPrint('Failed to initialize ledger context in MainNavigation: $e');
+    }
   }
 
   Future<void> _checkAndShowUpdate() async {

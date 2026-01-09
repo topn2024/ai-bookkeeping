@@ -18,6 +18,9 @@ import 'services/http_service.dart';
 import 'services/app_upgrade_service.dart';
 import 'services/auto_sync_service.dart';
 import 'services/multimodal_wakeup_service.dart';
+import 'services/secure_storage_service.dart';
+import 'services/database_service.dart';
+import 'models/ledger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -87,6 +90,14 @@ void main() async {
     logger.warning('Failed to initialize multimodal wake-up service: $e', tag: 'App');
   }
 
+  // Initialize default ledger for guest/anonymous users
+  try {
+    await _initializeDefaultLedger();
+    logger.info('Default ledger initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize default ledger: $e', tag: 'App');
+  }
+
   // Check for app updates (non-blocking)
   AppUpgradeService().checkUpdate().then((result) {
     if (result.hasUpdate) {
@@ -101,6 +112,34 @@ void main() async {
   });
 
   runApp(const ProviderScope(child: MyApp()));
+}
+
+/// 初始化默认账本（用于未登录用户）
+Future<void> _initializeDefaultLedger() async {
+  final secureStorage = SecureStorageService();
+  final db = await DatabaseService().database;
+
+  // 检查是否已有用户ID（已登录）
+  String? userId = await secureStorage.getUserId();
+
+  // 如果没有用户ID，使用guest ID
+  if (userId == null || userId.isEmpty) {
+    userId = 'guest';
+  }
+
+  // 检查是否已有账本
+  final existingLedgers = await db.query(
+    'ledgers',
+    where: 'ownerId = ?',
+    whereArgs: [userId],
+  );
+
+  // 如果没有账本，创建默认账本
+  if (existingLedgers.isEmpty) {
+    final defaultLedger = DefaultLedgers.defaultLedger(userId);
+    await db.insert('ledgers', defaultLedger.toMap());
+    logger.info('Created default ledger for user: $userId', tag: 'App');
+  }
 }
 
 /// Root application widget with lifecycle observer

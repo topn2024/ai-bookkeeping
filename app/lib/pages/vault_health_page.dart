@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/budget_vault_provider.dart';
+import '../models/budget_vault.dart';
 import '../theme/app_theme.dart';
+import 'vault_detail_page.dart';
 
 /// 预算健康状态页面
 /// 原型设计 3.06：状态警告
@@ -35,6 +37,7 @@ class VaultHealthPage extends ConsumerWidget {
           : 100;
 
       final data = _VaultData(
+        vault: vault,
         name: vault.name,
         remaining: remaining,
         targetAmount: vault.targetAmount,
@@ -204,6 +207,7 @@ class VaultHealthPage extends ConsumerWidget {
           ...vaults.map((v) => _buildWarningItem(
             context,
             theme,
+            vault: v.vault,
             icon: _getVaultIcon(v.name),
             iconColor: Colors.white,
             iconBgColors: [const Color(0xFFFF6B6B), const Color(0xFFFF8E8E)],
@@ -248,6 +252,7 @@ class VaultHealthPage extends ConsumerWidget {
           ...vaults.map((v) => _buildWarningItem(
             context,
             theme,
+            vault: v.vault,
             icon: _getVaultIcon(v.name),
             iconColor: Colors.white,
             iconBgColors: [const Color(0xFFFFC107), const Color(0xFFFFD54F)],
@@ -275,6 +280,7 @@ class VaultHealthPage extends ConsumerWidget {
   Widget _buildWarningItem(
     BuildContext context,
     ThemeData theme, {
+    required BudgetVault vault,
     required IconData icon,
     required Color iconColor,
     required List<Color> iconBgColors,
@@ -284,33 +290,40 @@ class VaultHealthPage extends ConsumerWidget {
     required String amount,
     required String budget,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => VaultDetailPage(vault: vault),
+        ),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: iconBgColors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: iconBgColors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(10),
               ),
-              borderRadius: BorderRadius.circular(10),
+              child: Icon(icon, color: iconColor, size: 18),
             ),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 Text(
                   name,
                   style: const TextStyle(
@@ -346,6 +359,7 @@ class VaultHealthPage extends ConsumerWidget {
             ],
           ),
         ],
+      ),
       ),
     );
   }
@@ -490,6 +504,7 @@ class VaultHealthPage extends ConsumerWidget {
 }
 
 class _VaultData {
+  final BudgetVault vault;
   final String name;
   final double remaining;
   final double targetAmount;
@@ -497,6 +512,7 @@ class _VaultData {
   final int remainingPercent;
 
   _VaultData({
+    required this.vault,
     required this.name,
     required this.remaining,
     required this.targetAmount,
