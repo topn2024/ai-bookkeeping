@@ -26,9 +26,11 @@ class Account(Base):
     credit_limit: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 2), nullable=True)  # credit card limit
     bill_day: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # bill date
     repay_day: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # payment due date
+    currency: Mapped[str] = mapped_column(String(10), default='CNY')  # Account currency
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
 
     # Relationships
     user = relationship("User", back_populates="accounts")

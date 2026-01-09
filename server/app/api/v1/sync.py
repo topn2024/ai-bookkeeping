@@ -10,11 +10,13 @@ from sqlalchemy import select, func, or_
 
 from app.core.database import get_db
 from app.models.user import User
-from app.models.book import Book
+from app.models.book import Book, BookMember, FamilyBudget, MemberBudget, FamilySavingGoal, GoalContribution, TransactionSplit, SplitParticipant
 from app.models.account import Account
 from app.models.category import Category
 from app.models.transaction import Transaction
 from app.models.budget import Budget
+from app.models.money_age import ResourcePool, ConsumptionRecord, MoneyAgeSnapshot, MoneyAgeConfig
+from app.models.location import GeoFence, FrequentLocation, UserHomeLocation
 from app.schemas.sync import (
     SyncPushRequest, SyncPushResponse, EntitySyncResult, ConflictInfo,
     SyncPullRequest, SyncPullResponse, EntityData,
@@ -28,11 +30,29 @@ router = APIRouter(prefix="/sync", tags=["Sync"])
 
 # Entity type to model mapping
 ENTITY_MODELS = {
+    # Core entities
     "transaction": Transaction,
     "account": Account,
     "category": Category,
     "book": Book,
     "budget": Budget,
+    # Family book entities
+    "book_member": BookMember,
+    "family_budget": FamilyBudget,
+    "member_budget": MemberBudget,
+    "family_saving_goal": FamilySavingGoal,
+    "goal_contribution": GoalContribution,
+    "transaction_split": TransactionSplit,
+    "split_participant": SplitParticipant,
+    # Money age entities
+    "resource_pool": ResourcePool,
+    "consumption_record": ConsumptionRecord,
+    "money_age_snapshot": MoneyAgeSnapshot,
+    "money_age_config": MoneyAgeConfig,
+    # Location entities
+    "geo_fence": GeoFence,
+    "frequent_location": FrequentLocation,
+    "user_home_location": UserHomeLocation,
 }
 
 
@@ -51,7 +71,18 @@ async def push_changes(
     conflicts: List[ConflictInfo] = []
 
     # Process changes in dependency order
-    ordered_types = ["book", "account", "category", "budget", "transaction"]
+    ordered_types = [
+        # Core entities (in dependency order)
+        "book", "account", "category", "budget", "transaction",
+        # Family book entities
+        "book_member", "family_budget", "member_budget",
+        "family_saving_goal", "goal_contribution",
+        "transaction_split", "split_participant",
+        # Money age entities
+        "resource_pool", "consumption_record", "money_age_snapshot", "money_age_config",
+        # Location entities
+        "geo_fence", "frequent_location", "user_home_location",
+    ]
     changes_by_type: Dict[str, List[EntityChange]] = {}
 
     for change in request.changes:
@@ -287,6 +318,217 @@ async def _handle_create(
         )
         db.add(entity)
         await db.flush()
+
+    # ============== Family Book Entities ==============
+    elif entity_type == "book_member":
+        entity = BookMember(
+            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+            user_id=user.id,
+            role=data.get("role", 1),
+            nickname=data.get("nickname"),
+            invited_by=UUID(data["invited_by"]) if data.get("invited_by") else None,
+        )
+        db.add(entity)
+        await db.flush()
+
+    elif entity_type == "family_budget":
+        entity = FamilyBudget(
+            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+            period=data["period"],
+            strategy=data.get("strategy", 0),
+            total_budget=Decimal(str(data.get("total_budget", 0))),
+            rules=data.get("rules"),
+        )
+        db.add(entity)
+        await db.flush()
+
+    elif entity_type == "member_budget":
+        entity = MemberBudget(
+            family_budget_id=UUID(data["family_budget_id"]) if isinstance(data.get("family_budget_id"), str) else data["family_budget_id"],
+            user_id=user.id,
+            allocated=Decimal(str(data.get("allocated", 0))),
+            spent=Decimal(str(data.get("spent", 0))),
+            category_spent=data.get("category_spent"),
+        )
+        db.add(entity)
+        await db.flush()
+
+    elif entity_type == "family_saving_goal":
+        entity = FamilySavingGoal(
+            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+            name=data["name"],
+            description=data.get("description"),
+            icon=data.get("icon"),
+            target_amount=Decimal(str(data.get("target_amount", 0))),
+            current_amount=Decimal(str(data.get("current_amount", 0))),
+            deadline=datetime.fromisoformat(data["deadline"]) if data.get("deadline") else None,
+            status=data.get("status", 0),
+            created_by=user.id,
+        )
+        db.add(entity)
+        await db.flush()
+
+    elif entity_type == "goal_contribution":
+        entity = GoalContribution(
+            goal_id=UUID(data["goal_id"]) if isinstance(data.get("goal_id"), str) else data["goal_id"],
+            user_id=user.id,
+            amount=Decimal(str(data.get("amount", 0))),
+            note=data.get("note"),
+        )
+        db.add(entity)
+        await db.flush()
+
+    elif entity_type == "transaction_split":
+        entity = TransactionSplit(
+            transaction_id=UUID(data["transaction_id"]) if isinstance(data.get("transaction_id"), str) else data["transaction_id"],
+            split_type=data.get("split_type", 0),
+            status=data.get("status", 0),
+        )
+        db.add(entity)
+        await db.flush()
+
+    elif entity_type == "split_participant":
+        entity = SplitParticipant(
+            split_id=UUID(data["split_id"]) if isinstance(data.get("split_id"), str) else data["split_id"],
+            user_id=user.id,
+            amount=Decimal(str(data.get("amount", 0))),
+            percentage=Decimal(str(data["percentage"])) if data.get("percentage") else None,
+            shares=data.get("shares"),
+            is_payer=data.get("is_payer", False),
+            is_settled=data.get("is_settled", False),
+        )
+        db.add(entity)
+        await db.flush()
+
+    # ============== Money Age Entities ==============
+    elif entity_type == "resource_pool":
+        entity = ResourcePool(
+            user_id=user.id,
+            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+            income_transaction_id=UUID(data["income_transaction_id"]) if isinstance(data.get("income_transaction_id"), str) else data["income_transaction_id"],
+            original_amount=Decimal(str(data.get("original_amount", 0))),
+            remaining_amount=Decimal(str(data.get("remaining_amount", 0))),
+            consumed_amount=Decimal(str(data.get("consumed_amount", 0))),
+            income_date=date.fromisoformat(data["income_date"]) if isinstance(data.get("income_date"), str) else data.get("income_date", date.today()),
+            first_consumed_date=date.fromisoformat(data["first_consumed_date"]) if data.get("first_consumed_date") else None,
+            last_consumed_date=date.fromisoformat(data["last_consumed_date"]) if data.get("last_consumed_date") else None,
+            fully_consumed_date=date.fromisoformat(data["fully_consumed_date"]) if data.get("fully_consumed_date") else None,
+            is_fully_consumed=data.get("is_fully_consumed", False),
+            consumption_count=data.get("consumption_count", 0),
+            account_id=UUID(data["account_id"]) if isinstance(data.get("account_id"), str) else data["account_id"],
+            income_category_id=UUID(data["income_category_id"]) if isinstance(data.get("income_category_id"), str) else data["income_category_id"],
+        )
+        db.add(entity)
+        await db.flush()
+
+    elif entity_type == "consumption_record":
+        entity = ConsumptionRecord(
+            resource_pool_id=UUID(data["resource_pool_id"]) if isinstance(data.get("resource_pool_id"), str) else data["resource_pool_id"],
+            expense_transaction_id=UUID(data["expense_transaction_id"]) if isinstance(data.get("expense_transaction_id"), str) else data["expense_transaction_id"],
+            consumed_amount=Decimal(str(data.get("consumed_amount", 0))),
+            consumption_date=date.fromisoformat(data["consumption_date"]) if isinstance(data.get("consumption_date"), str) else data.get("consumption_date", date.today()),
+            money_age_days=data.get("money_age_days", 0),
+            user_id=user.id,
+            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+        )
+        db.add(entity)
+        await db.flush()
+
+    elif entity_type == "money_age_snapshot":
+        entity = MoneyAgeSnapshot(
+            user_id=user.id,
+            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+            snapshot_date=date.fromisoformat(data["snapshot_date"]) if isinstance(data.get("snapshot_date"), str) else data.get("snapshot_date", date.today()),
+            snapshot_type=data.get("snapshot_type", "daily"),
+            avg_money_age=Decimal(str(data.get("avg_money_age", 0))),
+            median_money_age=data.get("median_money_age"),
+            min_money_age=data.get("min_money_age"),
+            max_money_age=data.get("max_money_age"),
+            health_level=data.get("health_level", "health"),
+            health_count=data.get("health_count", 0),
+            warning_count=data.get("warning_count", 0),
+            danger_count=data.get("danger_count", 0),
+            total_resource_pools=data.get("total_resource_pools", 0),
+            active_resource_pools=data.get("active_resource_pools", 0),
+            total_remaining_amount=Decimal(str(data.get("total_remaining_amount", 0))),
+            total_transactions=data.get("total_transactions", 0),
+            expense_transactions=data.get("expense_transactions", 0),
+            income_transactions=data.get("income_transactions", 0),
+            category_breakdown=data.get("category_breakdown"),
+            monthly_trend=data.get("monthly_trend"),
+        )
+        db.add(entity)
+        await db.flush()
+
+    elif entity_type == "money_age_config":
+        entity = MoneyAgeConfig(
+            user_id=user.id,
+            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+            consumption_strategy=data.get("consumption_strategy", "fifo"),
+            health_threshold=data.get("health_threshold", 30),
+            warning_threshold=data.get("warning_threshold", 60),
+            enable_daily_snapshot=data.get("enable_daily_snapshot", True),
+            enable_weekly_snapshot=data.get("enable_weekly_snapshot", True),
+            enable_monthly_snapshot=data.get("enable_monthly_snapshot", True),
+            enable_notifications=data.get("enable_notifications", True),
+            notify_on_warning=data.get("notify_on_warning", True),
+            notify_on_danger=data.get("notify_on_danger", True),
+        )
+        db.add(entity)
+        await db.flush()
+
+    # ============== Location Entities ==============
+    elif entity_type == "geo_fence":
+        entity = GeoFence(
+            user_id=user.id,
+            name=data["name"],
+            center_latitude=Decimal(str(data["center_latitude"])),
+            center_longitude=Decimal(str(data["center_longitude"])),
+            radius_meters=data.get("radius_meters", 100.0),
+            place_name=data.get("place_name"),
+            action=data.get("action", 4),
+            linked_category_id=UUID(data["linked_category_id"]) if data.get("linked_category_id") else None,
+            linked_vault_id=data.get("linked_vault_id"),
+            budget_limit=Decimal(str(data["budget_limit"])) if data.get("budget_limit") else None,
+            is_enabled=data.get("is_enabled", True),
+        )
+        db.add(entity)
+        await db.flush()
+
+    elif entity_type == "frequent_location":
+        entity = FrequentLocation(
+            user_id=user.id,
+            latitude=Decimal(str(data["latitude"])),
+            longitude=Decimal(str(data["longitude"])),
+            place_name=data.get("place_name"),
+            address=data.get("address"),
+            city=data.get("city"),
+            district=data.get("district"),
+            location_type=data.get("location_type"),
+            poi_id=data.get("poi_id"),
+            visit_count=data.get("visit_count", 1),
+            total_spent=Decimal(str(data.get("total_spent", 0))),
+            default_category_id=UUID(data["default_category_id"]) if data.get("default_category_id") else None,
+            default_vault_id=data.get("default_vault_id"),
+        )
+        db.add(entity)
+        await db.flush()
+
+    elif entity_type == "user_home_location":
+        entity = UserHomeLocation(
+            user_id=user.id,
+            location_role=data.get("location_role", 0),
+            name=data["name"],
+            latitude=Decimal(str(data["latitude"])),
+            longitude=Decimal(str(data["longitude"])),
+            city=data.get("city"),
+            radius_meters=data.get("radius_meters", 5000.0),
+            is_primary=data.get("is_primary", False),
+            is_enabled=data.get("is_enabled", True),
+        )
+        db.add(entity)
+        await db.flush()
+
     else:
         raise ValueError(f"Unknown entity type: {entity_type}")
 
@@ -567,6 +809,172 @@ def _entity_to_dict(entity, entity_type: str) -> Dict[str, Any]:
             "year": entity.year if hasattr(entity, 'year') else datetime.now().year,
             "month": entity.month if hasattr(entity, 'month') else None,
             "is_active": entity.is_active if hasattr(entity, 'is_active') else True,
+        }
+
+    # ============== Family Book Entities ==============
+    elif entity_type == "book_member":
+        data = {
+            "book_id": str(entity.book_id),
+            "role": entity.role,
+            "nickname": entity.nickname,
+            "invited_by": str(entity.invited_by) if entity.invited_by else None,
+            "joined_at": entity.joined_at.isoformat() if entity.joined_at else None,
+            "settings": entity.settings,
+        }
+    elif entity_type == "family_budget":
+        data = {
+            "book_id": str(entity.book_id),
+            "period": entity.period,
+            "strategy": entity.strategy,
+            "total_budget": str(entity.total_budget),
+            "rules": entity.rules,
+        }
+    elif entity_type == "member_budget":
+        data = {
+            "family_budget_id": str(entity.family_budget_id),
+            "allocated": str(entity.allocated),
+            "spent": str(entity.spent),
+            "category_spent": entity.category_spent,
+        }
+    elif entity_type == "family_saving_goal":
+        data = {
+            "book_id": str(entity.book_id),
+            "name": entity.name,
+            "description": entity.description,
+            "icon": entity.icon,
+            "target_amount": str(entity.target_amount),
+            "current_amount": str(entity.current_amount),
+            "deadline": entity.deadline.isoformat() if entity.deadline else None,
+            "status": entity.status,
+            "created_by": str(entity.created_by),
+            "completed_at": entity.completed_at.isoformat() if entity.completed_at else None,
+        }
+    elif entity_type == "goal_contribution":
+        data = {
+            "goal_id": str(entity.goal_id),
+            "amount": str(entity.amount),
+            "note": entity.note,
+        }
+    elif entity_type == "transaction_split":
+        data = {
+            "transaction_id": str(entity.transaction_id),
+            "split_type": entity.split_type,
+            "status": entity.status,
+            "settled_at": entity.settled_at.isoformat() if entity.settled_at else None,
+        }
+    elif entity_type == "split_participant":
+        data = {
+            "split_id": str(entity.split_id),
+            "amount": str(entity.amount),
+            "percentage": str(entity.percentage) if entity.percentage else None,
+            "shares": entity.shares,
+            "is_payer": entity.is_payer,
+            "is_settled": entity.is_settled,
+            "settled_at": entity.settled_at.isoformat() if entity.settled_at else None,
+        }
+
+    # ============== Money Age Entities ==============
+    elif entity_type == "resource_pool":
+        data = {
+            "book_id": str(entity.book_id),
+            "income_transaction_id": str(entity.income_transaction_id),
+            "original_amount": str(entity.original_amount),
+            "remaining_amount": str(entity.remaining_amount),
+            "consumed_amount": str(entity.consumed_amount),
+            "income_date": entity.income_date.isoformat() if entity.income_date else None,
+            "first_consumed_date": entity.first_consumed_date.isoformat() if entity.first_consumed_date else None,
+            "last_consumed_date": entity.last_consumed_date.isoformat() if entity.last_consumed_date else None,
+            "fully_consumed_date": entity.fully_consumed_date.isoformat() if entity.fully_consumed_date else None,
+            "is_fully_consumed": entity.is_fully_consumed,
+            "consumption_count": entity.consumption_count,
+            "account_id": str(entity.account_id),
+            "income_category_id": str(entity.income_category_id),
+        }
+    elif entity_type == "consumption_record":
+        data = {
+            "resource_pool_id": str(entity.resource_pool_id),
+            "expense_transaction_id": str(entity.expense_transaction_id),
+            "consumed_amount": str(entity.consumed_amount),
+            "consumption_date": entity.consumption_date.isoformat() if entity.consumption_date else None,
+            "money_age_days": entity.money_age_days,
+            "book_id": str(entity.book_id),
+        }
+    elif entity_type == "money_age_snapshot":
+        data = {
+            "book_id": str(entity.book_id),
+            "snapshot_date": entity.snapshot_date.isoformat() if entity.snapshot_date else None,
+            "snapshot_type": entity.snapshot_type,
+            "avg_money_age": str(entity.avg_money_age),
+            "median_money_age": entity.median_money_age,
+            "min_money_age": entity.min_money_age,
+            "max_money_age": entity.max_money_age,
+            "health_level": entity.health_level,
+            "health_count": entity.health_count,
+            "warning_count": entity.warning_count,
+            "danger_count": entity.danger_count,
+            "total_resource_pools": entity.total_resource_pools,
+            "active_resource_pools": entity.active_resource_pools,
+            "total_remaining_amount": str(entity.total_remaining_amount),
+            "total_transactions": entity.total_transactions,
+            "expense_transactions": entity.expense_transactions,
+            "income_transactions": entity.income_transactions,
+            "category_breakdown": entity.category_breakdown,
+            "monthly_trend": entity.monthly_trend,
+        }
+    elif entity_type == "money_age_config":
+        data = {
+            "book_id": str(entity.book_id),
+            "consumption_strategy": entity.consumption_strategy,
+            "health_threshold": entity.health_threshold,
+            "warning_threshold": entity.warning_threshold,
+            "enable_daily_snapshot": entity.enable_daily_snapshot,
+            "enable_weekly_snapshot": entity.enable_weekly_snapshot,
+            "enable_monthly_snapshot": entity.enable_monthly_snapshot,
+            "enable_notifications": entity.enable_notifications,
+            "notify_on_warning": entity.notify_on_warning,
+            "notify_on_danger": entity.notify_on_danger,
+        }
+
+    # ============== Location Entities ==============
+    elif entity_type == "geo_fence":
+        data = {
+            "name": entity.name,
+            "center_latitude": str(entity.center_latitude),
+            "center_longitude": str(entity.center_longitude),
+            "radius_meters": entity.radius_meters,
+            "place_name": entity.place_name,
+            "action": entity.action,
+            "linked_category_id": str(entity.linked_category_id) if entity.linked_category_id else None,
+            "linked_vault_id": entity.linked_vault_id,
+            "budget_limit": str(entity.budget_limit) if entity.budget_limit else None,
+            "is_enabled": entity.is_enabled,
+        }
+    elif entity_type == "frequent_location":
+        data = {
+            "latitude": str(entity.latitude),
+            "longitude": str(entity.longitude),
+            "place_name": entity.place_name,
+            "address": entity.address,
+            "city": entity.city,
+            "district": entity.district,
+            "location_type": entity.location_type,
+            "poi_id": entity.poi_id,
+            "visit_count": entity.visit_count,
+            "total_spent": str(entity.total_spent),
+            "default_category_id": str(entity.default_category_id) if entity.default_category_id else None,
+            "default_vault_id": entity.default_vault_id,
+            "last_visit_at": entity.last_visit_at.isoformat() if entity.last_visit_at else None,
+        }
+    elif entity_type == "user_home_location":
+        data = {
+            "location_role": entity.location_role,
+            "name": entity.name,
+            "latitude": str(entity.latitude),
+            "longitude": str(entity.longitude),
+            "city": entity.city,
+            "radius_meters": entity.radius_meters,
+            "is_primary": entity.is_primary,
+            "is_enabled": entity.is_enabled,
         }
 
     return data
