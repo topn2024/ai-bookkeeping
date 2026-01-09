@@ -270,6 +270,94 @@ $_categoryPrompt
     }
   }
 
+  /// 批量图片识别 - 识别长图中的多条交易记录
+  /// 适用于账单截图、银行流水、支付记录等包含多条交易的长图
+  Future<List<QwenRecognitionResult>> recognizeReceiptBatch(File imageFile) async {
+    _ensureInitialized();
+
+    if (appConfig.qwenApiKey.isEmpty) {
+      _logger.error('Qwen API key is empty');
+      return [QwenRecognitionResult.error('图片识别服务未配置，请先登录账号')];
+    }
+
+    _logger.info('Batch recognizing receipt: ${imageFile.path}');
+
+    try {
+      final bytes = await imageFile.readAsBytes();
+      final base64Image = base64Encode(bytes);
+      _logger.debug('Image size: ${bytes.length} bytes');
+
+      final extension = imageFile.path.split('.').last.toLowerCase();
+      final mimeType = _getMimeType(extension);
+
+      final response = await _dio.post(
+        _visionApiUrl,
+        data: {
+          'model': _models.visionModel,
+          'input': {
+            'messages': [
+              {
+                'role': 'user',
+                'content': [
+                  {
+                    'image': 'data:$mimeType;base64,$base64Image',
+                  },
+                  {
+                    'text': '''请分析这张图片，这可能是一张包含多条交易记录的长图（如账单截图、银行流水、支付记录等）。
+
+请识别图片中的所有交易记录，对每条交易提取：
+1. 消费金额（数字）
+2. 商户名称或交易描述
+3. 消费类型
+4. 交易日期和时间
+5. 交易类型（支出/收入）
+
+$_categoryPrompt
+
+请以JSON数组格式返回所有交易：
+{
+  "transactions": [
+    {
+      "amount": 金额数字,
+      "merchant": "商户名称或描述",
+      "category": "分类ID",
+      "date": "YYYY-MM-DD",
+      "type": "expense或income",
+      "description": "备注说明"
+    },
+    ...
+  ],
+  "total_count": 交易总数
+}
+
+注意：
+- 如果只有一条交易，也返回数组格式
+- 按时间顺序排列（最新的在前）
+- 如果某项无法识别，设为null
+- 忽略余额、总计等非交易信息
+
+只返回JSON，不要其他文字。'''
+                  }
+                ]
+              }
+            ]
+          },
+          'parameters': {
+            'result_format': 'message',
+          }
+        },
+      );
+
+      return _parseBatchVisionResponse(response.data);
+    } on DioException catch (e) {
+      _logger.error('Batch receipt recognition failed', error: e);
+      return [QwenRecognitionResult.error(_handleDioError(e))];
+    } catch (e, stack) {
+      _logger.error('Batch receipt recognition failed', error: e, stack: stack);
+      return [QwenRecognitionResult.error('批量图片识别失败: $e')];
+    }
+  }
+
   /// 文本解析 - 从自然语言提取记账信息
   /// 使用 qwen-turbo 文本模型
   Future<QwenRecognitionResult> parseBookkeepingText(String text) async {
@@ -773,6 +861,58 @@ $_categoryPrompt
     } catch (e) {
       _logger.error('Parse vision response failed', error: e);
       return QwenRecognitionResult.error('解析响应失败: $e');
+    }
+  }
+
+  List<QwenRecognitionResult> _parseBatchVisionResponse(Map<String, dynamic> response) {
+    try {
+      _logger.debug('Batch vision API response: $response');
+
+      if (response['output'] != null && response['output']['choices'] != null) {
+        final choices = response['output']['choices'] as List;
+        if (choices.isNotEmpty) {
+          final message = choices[0]['message'];
+          var content = message['content'];
+
+          String textContent = '';
+          if (content is String) {
+            textContent = content;
+          } else if (content is List) {
+            for (final item in content) {
+              if (item is Map && item['text'] != null) {
+                textContent = item['text'];
+                break;
+              }
+            }
+          }
+
+          _logger.info('Batch vision response text: $textContent');
+
+          if (textContent.isNotEmpty) {
+            final jsonStr = _extractJsonString(textContent);
+            if (jsonStr != null) {
+              final decoded = jsonDecode(jsonStr);
+              if (decoded is Map && decoded['transactions'] is List) {
+                final txList = decoded['transactions'] as List;
+                return txList.map((tx) => QwenRecognitionResult(
+                  amount: (tx['amount'] as num?)?.toDouble(),
+                  merchant: tx['merchant'] as String?,
+                  category: tx['category'] as String?,
+                  date: tx['date'] as String?,
+                  description: tx['description'] as String?,
+                  type: tx['type'] as String? ?? 'expense',
+                  success: true,
+                  confidence: 0.85,
+                )).toList();
+              }
+            }
+          }
+        }
+      }
+      return [QwenRecognitionResult.error('无法解析批量识别响应')];
+    } catch (e) {
+      _logger.error('Parse batch vision response failed', error: e);
+      return [QwenRecognitionResult.error('解析批量识别响应失败: $e')];
     }
   }
 

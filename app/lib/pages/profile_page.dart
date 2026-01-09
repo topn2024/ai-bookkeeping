@@ -11,6 +11,7 @@ import 'export_page.dart';
 import 'backup_page.dart';
 import 'settings_page.dart';
 import 'help_page.dart';
+import 'login_page.dart';
 import 'financial_freedom_simulator_page.dart';
 import 'actionable_advice_page.dart';
 import 'smart_feature_recommendation_page.dart';
@@ -38,6 +39,17 @@ class ProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
+  /// 导航到需要登录的页面
+  /// 如果未登录，跳转到登录页面
+  void _navigateWithAuth(BuildContext context, Widget page) {
+    final authState = ref.read(authProvider);
+    if (authState.isAuthenticated) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    } else {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginPage()));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -71,11 +83,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     return InkWell(
       onTap: () {
-        // 跳转到用户画像页面
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const UserProfileVisualizationPage()),
-        );
+        // 跳转到用户画像页面（需要登录）
+        _navigateWithAuth(context, const UserProfileVisualizationPage());
       },
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -258,19 +267,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           icon: Icons.flag,
           title: '目标达成',
           subtitle: '追踪你的财务目标',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const GoalAchievementDashboardPage()),
-          ),
+          onTap: () => _navigateWithAuth(context, const GoalAchievementDashboardPage()),
         ),
         _SettingsItem(
           icon: Icons.person_search,
           title: '我的画像',
           subtitle: '了解你的消费性格',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const UserProfileVisualizationPage()),
-          ),
+          onTap: () => _navigateWithAuth(context, const UserProfileVisualizationPage()),
         ),
         _SettingsItem(
           icon: Icons.beach_access,
@@ -285,10 +288,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           icon: Icons.tips_and_updates,
           title: '智能建议',
           subtitle: '查看个性化理财建议',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ActionableAdvicePage()),
-          ),
+          onTap: () => _navigateWithAuth(context, const ActionableAdvicePage()),
         ),
         _SettingsItem(
           icon: Icons.auto_awesome,
@@ -324,19 +324,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           icon: Icons.share,
           title: '分享成就',
           subtitle: '炫耀你的理财成果',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AchievementSharePage()),
-          ),
+          onTap: () => _navigateWithAuth(context, const AchievementSharePage()),
         ),
         _SettingsItem(
           icon: Icons.person_add,
           title: '邀请好友',
           subtitle: '邀请奖励等你拿',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const InviteFriendPage()),
-          ),
+          onTap: () => _navigateWithAuth(context, const InviteFriendPage()),
         ),
         _SettingsItem(
           icon: Icons.campaign,
