@@ -68,6 +68,8 @@ API_LIMITS: Dict[str, RateLimitConfig] = {
     "POST:/api/v1/auth/login": RateLimitConfig(10, 60),
     "POST:/api/v1/auth/register": RateLimitConfig(5, 60),
     "POST:/api/v1/auth/sms-code": RateLimitConfig(3, 60),
+    "POST:/api/v1/auth/reset-password": RateLimitConfig(3, 3600),  # 3 per hour
+    "POST:/api/v1/auth/reset-password/confirm": RateLimitConfig(5, 3600),  # 5 per hour
 }
 
 
