@@ -137,7 +137,9 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
               title: const Text('编辑小金库'),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: 导航到编辑页
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('编辑功能开发中')),
+                );
               },
             ),
             ListTile(
@@ -145,7 +147,9 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
               title: const Text('查看全部记录'),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: 导航到记录页
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('记录查看功能开发中')),
+                );
               },
             ),
             ListTile(
@@ -153,7 +157,9 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
               title: const Text('转入其他小金库'),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: 导航到转账页
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('转账功能开发中')),
+                );
               },
             ),
             ListTile(

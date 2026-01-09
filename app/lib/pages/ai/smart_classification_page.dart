@@ -319,7 +319,11 @@ class _QuickActionsSection extends StatelessWidget {
             child: _QuickActionItem(
               icon: Icons.history,
               label: '学习历史',
-              onTap: () {},
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('学习历史功能开发中')),
+                );
+              },
             ),
           ),
           const SizedBox(width: 12),
@@ -327,7 +331,11 @@ class _QuickActionsSection extends StatelessWidget {
             child: _QuickActionItem(
               icon: Icons.tune,
               label: '规则配置',
-              onTap: () {},
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('规则配置功能开发中')),
+                );
+              },
             ),
           ),
           const SizedBox(width: 12),
@@ -335,7 +343,11 @@ class _QuickActionsSection extends StatelessWidget {
             child: _QuickActionItem(
               icon: Icons.refresh,
               label: '重新训练',
-              onTap: () {},
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('重新训练功能开发中')),
+                );
+              },
             ),
           ),
         ],

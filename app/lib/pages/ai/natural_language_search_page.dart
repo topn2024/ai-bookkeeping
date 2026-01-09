@@ -121,7 +121,11 @@ class _SearchHeader extends StatelessWidget {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () {},
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('语音输入功能开发中')),
+                      );
+                    },
                     child: Icon(
                       Icons.mic,
                       color: Theme.of(context).primaryColor,

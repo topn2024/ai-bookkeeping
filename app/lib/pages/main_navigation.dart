@@ -12,6 +12,7 @@ import 'budget_center_page.dart';
 import 'profile_page.dart';
 import 'add_transaction_page.dart';
 import 'enhanced_voice_assistant_page.dart';
+import 'image_recognition_page.dart';
 
 /// 主导航页面
 /// 原型设计 1.01-1.05：5个底部导航主页面
@@ -132,7 +133,12 @@ class _MainNavigationState extends State<MainNavigation> {
             label: '扫描票据',
             onTap: () {
               setState(() => _isFabExpanded = false);
-              // TODO: 导航到扫描页面
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ImageRecognitionPage(),
+                ),
+              );
             },
           ),
           _buildMiniFab(

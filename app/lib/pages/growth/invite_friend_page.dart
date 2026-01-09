@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../theme/app_theme.dart';
 import '../../theme/antigravity_shadows.dart';
@@ -64,7 +65,26 @@ class InviteFriendPage extends ConsumerWidget {
           ),
           const Spacer(),
           TextButton(
-            onPressed: () {},
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('邀请规则'),
+                  content: const Text(
+                    '1. 邀请好友注册并完成首次记账\n'
+                    '2. 双方各获得30天会员奖励\n'
+                    '3. 邀请越多，奖励越丰厚\n'
+                    '4. 奖励将在好友完成首次记账后发放',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('知道了'),
+                    ),
+                  ],
+                ),
+              );
+            },
             child: const Text('邀请规则'),
           ),
         ],
@@ -152,7 +172,14 @@ class InviteFriendPage extends ConsumerWidget {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    Share.share(
+                      '我在使用AI记账，邀请你一起来！\n'
+                      '使用我的邀请码 AIBOOK2026 注册，双方各得30天会员。\n'
+                      '立即下载：https://aibook.example.com',
+                      subject: '邀请你使用AI记账',
+                    );
+                  },
                   icon: const Icon(Icons.share),
                   label: const Text('分享邀请'),
                   style: ElevatedButton.styleFrom(
@@ -165,7 +192,12 @@ class InviteFriendPage extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    Clipboard.setData(const ClipboardData(text: 'AIBOOK2026'));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('邀请码已复制')),
+                    );
+                  },
                   icon: const Icon(Icons.qr_code),
                   label: const Text('邀请码'),
                   style: OutlinedButton.styleFrom(
