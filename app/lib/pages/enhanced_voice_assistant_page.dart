@@ -606,17 +606,17 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
     await coordinator.processVoiceCommand(randomCommand);
 
-    // 使用真实的语音服务结果 - 从状态中获取
-    await Future.delayed(const Duration(milliseconds: 1000));
+    // 获取语音服务的处理结果并添加到聊天
+    await Future.delayed(const Duration(milliseconds: 500));
 
-    // 使用coordinator的lastCommand作为响应
-    // 在实际应用中,应该监听状态变化来获取响应
-    final response = '已处理命令: $randomCommand';
-    _addMessage(ChatMessage(
-      type: MessageType.assistant,
-      content: response,
-      timestamp: DateTime.now(),
-    ));
+    final state = ref.read(voiceInteractionStateProvider);
+    if (state.feedback != null && state.feedback!.isNotEmpty) {
+      _addMessage(ChatMessage(
+        type: MessageType.assistant,
+        content: state.feedback!,
+        timestamp: DateTime.now(),
+      ));
+    }
   }
 
   String _generateMockResponse(String command) {

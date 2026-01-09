@@ -359,7 +359,7 @@ class EntityDisambiguationService extends ChangeNotifier {
     final scored = <ScoredCandidate>[];
 
     for (final candidate in candidates) {
-      double score = 0.5;
+      double score = 0.0; // 从0开始，只有匹配才加分
 
       for (final ref in references) {
         switch (ref.type) {
@@ -370,7 +370,7 @@ class EntityDisambiguationService extends ChangeNotifier {
             final categoryHint = _parseCategoryReference(ref);
             if (candidate.category?.contains(categoryHint ?? '') == true ||
                 candidate.description?.contains(ref.rawText) == true) {
-              score += 0.3;
+              score += 0.4; // 描述匹配很重要，提高权重
             }
             break;
           case ReferenceType.amount:
@@ -378,8 +378,8 @@ class EntityDisambiguationService extends ChangeNotifier {
             if (amountInfo.exactAmount != null) {
               final diff = (candidate.amount - amountInfo.exactAmount!).abs();
               if (diff < 1) {
-                score += 0.4;
-              } else if (diff < 5) score += 0.2;
+                score += 0.5; // 金额精确匹配很重要
+              } else if (diff < 5) score += 0.3;
             }
             break;
           case ReferenceType.merchant:
@@ -420,6 +420,12 @@ class EntityDisambiguationService extends ChangeNotifier {
     final best = candidates.first;
     final second = candidates.length > 1 ? candidates[1] : null;
 
+    // 如果最佳匹配的置信度太低（< 0.7），直接告诉用户没有找到
+    if (best.confidence < 0.7) {
+      return DisambiguationResult.noMatch(references);
+    }
+
+    // 高置信度且明显优于第二名，直接解析
     if (best.confidence >= 0.85 && (second == null || second.confidence < 0.5)) {
       return DisambiguationResult.resolved(
         record: best.record,
@@ -428,15 +434,18 @@ class EntityDisambiguationService extends ChangeNotifier {
       );
     }
 
-    if (second != null && second.confidence >= 0.5) {
+    // 有多个候选且第二名置信度也不错，需要澄清（只显示置信度 >= 0.7 的）
+    final qualifiedCandidates = candidates.where((c) => c.confidence >= 0.7).take(3).toList();
+    if (qualifiedCandidates.length > 1 && second != null && second.confidence >= 0.7) {
       return DisambiguationResult.needClarification(
-        candidates: candidates.take(3).toList(),
+        candidates: qualifiedCandidates,
         references: references,
-        clarificationPrompt: _generateClarificationPrompt(candidates.take(3).toList()),
+        clarificationPrompt: _generateClarificationPrompt(qualifiedCandidates),
       );
     }
 
-    if (best.confidence >= 0.6) {
+    // 中等置信度，需要确认
+    if (best.confidence >= 0.7) {
       return DisambiguationResult.resolved(
         record: best.record,
         confidence: best.confidence,
@@ -445,10 +454,8 @@ class EntityDisambiguationService extends ChangeNotifier {
       );
     }
 
-    return DisambiguationResult.needMoreInfo(
-      references: references,
-      prompt: '没有找到完全匹配的记录，请问大概是什么时候？金额大约多少？',
-    );
+    // 置信度不足，要求更多信息
+    return DisambiguationResult.noMatch(references);
   }
 
   /// 生成澄清提示
