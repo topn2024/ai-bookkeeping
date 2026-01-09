@@ -574,7 +574,12 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         ? '正在跳转到${result.pageName}'
         : result.errorMessage ?? '导航失败';
     await _ttsService.speak(message);
-    return VoiceSessionResult.success(message);
+
+    // Include navigation route in result data so UI can perform navigation
+    return VoiceSessionResult.success(
+      message,
+      result.success ? {'route': result.route, 'pageName': result.pageName} : null,
+    );
   }
 
   /// 处理未知意图
