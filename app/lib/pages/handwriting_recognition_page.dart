@@ -74,7 +74,11 @@ class _HandwritingRecognitionPageState
           ),
           const Spacer(),
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('帮助功能开发中')),
+              );
+            },
             icon: const Icon(Icons.help_outline),
             tooltip: '帮助',
           ),

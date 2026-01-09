@@ -82,12 +82,20 @@ class DiagnosticReportPage extends ConsumerWidget {
           ),
           const Spacer(),
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('分享报告功能开发中')),
+              );
+            },
             icon: const Icon(Icons.share),
             tooltip: '分享报告',
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('重新诊断功能开发中')),
+              );
+            },
             icon: const Icon(Icons.refresh),
             tooltip: '重新诊断',
           ),
@@ -428,7 +436,11 @@ class DiagnosticReportPage extends ConsumerWidget {
           width: double.infinity,
           height: 48,
           child: ElevatedButton.icon(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('一键修复功能开发中')),
+              );
+            },
             icon: const Icon(Icons.build),
             label: Text('一键修复 $issueCount 个问题'),
             style: ElevatedButton.styleFrom(

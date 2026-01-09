@@ -197,7 +197,11 @@ class _AllocationPageState extends ConsumerState<AllocationPage> {
           content: Text('有 ¥${result.unallocatedAmount.toStringAsFixed(2)} 未分配'),
           action: SnackBarAction(
             label: '查看',
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('查看详情功能开发中')),
+              );
+            },
           ),
         ),
       );

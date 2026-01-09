@@ -382,7 +382,11 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () {},
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('快捷提问功能开发中')),
+                    );
+                  },
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     padding: const EdgeInsets.symmetric(

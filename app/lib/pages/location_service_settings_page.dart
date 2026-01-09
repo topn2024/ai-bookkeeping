@@ -283,7 +283,11 @@ class _LocationServiceSettingsPageState
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('查看详情功能开发中')),
+                    );
+                  },
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 36),
                   ),

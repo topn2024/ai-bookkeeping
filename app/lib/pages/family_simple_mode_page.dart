@@ -382,7 +382,11 @@ class _FamilySimpleModePageState extends ConsumerState<FamilySimpleModePage> {
                 ),
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('查看全部功能开发中')),
+                  );
+                },
                 child: Text(
                   l10n.viewAll,
                   style: TextStyle(

@@ -72,12 +72,20 @@ class AlertHistoryPage extends ConsumerWidget {
           ),
           const Spacer(),
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('筛选功能开发中')),
+              );
+            },
             icon: const Icon(Icons.filter_list),
             tooltip: '筛选',
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('告警设置功能开发中')),
+              );
+            },
             icon: const Icon(Icons.settings),
             tooltip: '告警设置',
           ),

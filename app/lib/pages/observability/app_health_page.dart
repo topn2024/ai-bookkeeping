@@ -65,7 +65,11 @@ class AppHealthPage extends ConsumerWidget {
           ),
           const Spacer(),
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('刷新功能开发中')),
+              );
+            },
             icon: const Icon(Icons.refresh),
             tooltip: '刷新',
           ),
@@ -274,7 +278,11 @@ class AppHealthPage extends ConsumerWidget {
           width: double.infinity,
           height: 48,
           child: ElevatedButton.icon(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('一键诊断功能开发中')),
+              );
+            },
             icon: const Icon(Icons.search),
             label: const Text('一键诊断'),
             style: ElevatedButton.styleFrom(

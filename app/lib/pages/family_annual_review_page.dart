@@ -314,7 +314,11 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
         children: [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('保存图片功能开发中')),
+                );
+              },
               icon: const Icon(Icons.save_alt, size: 18),
               label: Text(l10n.saveImage),
               style: OutlinedButton.styleFrom(
@@ -328,7 +332,11 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('分享到家庭功能开发中')),
+                );
+              },
               icon: const Icon(Icons.share, size: 18),
               label: Text(l10n.shareToFamily),
               style: ElevatedButton.styleFrom(

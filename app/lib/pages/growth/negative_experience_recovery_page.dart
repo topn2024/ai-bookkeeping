@@ -354,7 +354,11 @@ class _NegativeExperienceRecoveryPageState
             ),
           ),
           TextButton(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('联系客服功能开发中')),
+              );
+            },
             child: const Text('联系客服'),
           ),
         ],

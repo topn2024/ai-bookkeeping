@@ -87,7 +87,11 @@ class VoiceEditRecordPage extends ConsumerWidget {
           ),
           const Spacer(),
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('清空记录功能开发中')),
+              );
+            },
             icon: const Icon(Icons.delete_sweep),
             tooltip: '清空记录',
           ),

@@ -198,7 +198,11 @@ class AchievementSharePage extends ConsumerWidget {
 
   Widget _buildQuickTag(BuildContext context, ThemeData theme, String text) {
     return GestureDetector(
-      onTap: () {},
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('快捷标签功能开发中')),
+        );
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(

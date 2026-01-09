@@ -105,7 +105,11 @@ class _VoiceUndoPageState extends ConsumerState<VoiceUndoPage> {
             )
           else
             TextButton(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('全选功能开发中')),
+                );
+              },
               child: const Text('全选'),
             ),
         ],

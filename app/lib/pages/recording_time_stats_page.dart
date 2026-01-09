@@ -66,7 +66,11 @@ class RecordingTimeStatsPage extends ConsumerWidget {
           ),
           const Spacer(),
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('选择日期范围功能开发中')),
+              );
+            },
             icon: const Icon(Icons.date_range),
             tooltip: '选择日期范围',
           ),

@@ -300,7 +300,11 @@ class ViralCampaignPage extends ConsumerWidget {
           ),
           if (reward.unlocked && !reward.claimed)
             ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('领取奖励功能开发中')),
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF6B6B),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -391,7 +395,11 @@ class ViralCampaignPage extends ConsumerWidget {
           width: double.infinity,
           height: 48,
           child: ElevatedButton.icon(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('邀请好友功能开发中')),
+              );
+            },
             icon: const Icon(Icons.share),
             label: const Text('立即邀请好友'),
             style: ElevatedButton.styleFrom(

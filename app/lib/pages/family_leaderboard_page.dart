@@ -139,7 +139,11 @@ class _FamilyLeaderboardPageState extends ConsumerState<FamilyLeaderboardPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.emoji_events, color: Color(0xFFFFD700)),
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('奖杯功能开发中')),
+              );
+            },
           ),
         ],
       ),
