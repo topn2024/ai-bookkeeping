@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 /// 新用户欢迎页
 ///
@@ -14,6 +15,8 @@ class OnboardingWelcomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -52,24 +55,24 @@ class OnboardingWelcomePage extends StatelessWidget {
               const Spacer(),
 
               // 欢迎文字
-              const Text(
-                '欢迎使用',
-                style: TextStyle(
+              Text(
+                l10n.onboardingWelcome,
+                style: const TextStyle(
                   fontSize: 16,
                   color: Colors.grey,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'AI 智能记账',
-                style: TextStyle(
+              Text(
+                l10n.onboardingAppName,
+                style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                '让记账变得简单有趣\n助你养成良好的理财习惯',
+                l10n.onboardingSubtitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
@@ -81,7 +84,7 @@ class OnboardingWelcomePage extends StatelessWidget {
               const Spacer(flex: 2),
 
               // 特性亮点
-              _FeatureHighlights(),
+              _FeatureHighlights(l10n: l10n),
 
               const Spacer(),
 
@@ -94,9 +97,9 @@ class OnboardingWelcomePage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(28),
                   ),
                 ),
-                child: const Text(
-                  '开始体验',
-                  style: TextStyle(fontSize: 16),
+                child: Text(
+                  l10n.onboardingStartExperience,
+                  style: const TextStyle(fontSize: 16),
                 ),
               ),
 
@@ -110,6 +113,10 @@ class OnboardingWelcomePage extends StatelessWidget {
 }
 
 class _FeatureHighlights extends StatelessWidget {
+  final AppLocalizations l10n;
+
+  const _FeatureHighlights({required this.l10n});
+
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -117,17 +124,17 @@ class _FeatureHighlights extends StatelessWidget {
       children: [
         _FeatureItem(
           icon: Icons.auto_awesome,
-          label: 'AI智能识别',
+          label: l10n.onboardingFeatureAI,
           color: Colors.orange,
         ),
         _FeatureItem(
           icon: Icons.insights,
-          label: '消费洞察',
+          label: l10n.onboardingFeatureInsights,
           color: Colors.blue,
         ),
         _FeatureItem(
           icon: Icons.savings,
-          label: '储蓄目标',
+          label: l10n.onboardingFeatureSavings,
           color: Colors.green,
         ),
       ],

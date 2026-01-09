@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 /// 功能介绍引导页
 ///
@@ -22,36 +23,38 @@ class _OnboardingFeaturesPageState extends State<OnboardingFeaturesPage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  final List<_FeatureData> _features = [
-    _FeatureData(
-      icon: Icons.camera_alt,
-      emoji: '📸',
-      title: '拍照记账',
-      description: 'AI自动识别小票、发票\n一拍即记，省时省力',
-      color: Colors.blue,
-    ),
-    _FeatureData(
-      icon: Icons.mic,
-      emoji: '🎤',
-      title: '语音记账',
-      description: '说一句话完成记账\n解放你的双手',
-      color: Colors.purple,
-    ),
-    _FeatureData(
-      icon: Icons.pie_chart,
-      emoji: '📊',
-      title: '消费分析',
-      description: '智能分类，自动生成报表\n了解你的消费习惯',
-      color: Colors.orange,
-    ),
-    _FeatureData(
-      icon: Icons.savings,
-      emoji: '🎯',
-      title: '储蓄目标',
-      description: '设定目标，追踪进度\n让存钱变得有动力',
-      color: Colors.green,
-    ),
-  ];
+  List<_FeatureData> _getFeatures(AppLocalizations l10n) {
+    return [
+      _FeatureData(
+        icon: Icons.camera_alt,
+        emoji: '📸',
+        title: l10n.onboardingFeaturePhotoTitle,
+        description: l10n.onboardingFeaturePhotoDesc,
+        color: Colors.blue,
+      ),
+      _FeatureData(
+        icon: Icons.mic,
+        emoji: '🎤',
+        title: l10n.onboardingFeatureVoiceTitle,
+        description: l10n.onboardingFeatureVoiceDesc,
+        color: Colors.purple,
+      ),
+      _FeatureData(
+        icon: Icons.pie_chart,
+        emoji: '📊',
+        title: l10n.onboardingFeatureAnalysisTitle,
+        description: l10n.onboardingFeatureAnalysisDesc,
+        color: Colors.orange,
+      ),
+      _FeatureData(
+        icon: Icons.savings,
+        emoji: '🎯',
+        title: l10n.onboardingFeatureSavingsTitle,
+        description: l10n.onboardingFeatureSavingsDesc,
+        color: Colors.green,
+      ),
+    ];
+  }
 
   @override
   void dispose() {
@@ -61,6 +64,9 @@ class _OnboardingFeaturesPageState extends State<OnboardingFeaturesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final features = _getFeatures(l10n);
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -70,7 +76,7 @@ class _OnboardingFeaturesPageState extends State<OnboardingFeaturesPage> {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: widget.onSkip,
-                child: const Text('跳过'),
+                child: Text(l10n.onboardingSkip),
               ),
             ),
 
@@ -78,12 +84,12 @@ class _OnboardingFeaturesPageState extends State<OnboardingFeaturesPage> {
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
-                itemCount: _features.length,
+                itemCount: features.length,
                 onPageChanged: (index) {
                   setState(() => _currentPage = index);
                 },
                 itemBuilder: (context, index) {
-                  return _FeaturePage(feature: _features[index]);
+                  return _FeaturePage(feature: features[index]);
                 },
               ),
             ),
@@ -92,14 +98,14 @@ class _OnboardingFeaturesPageState extends State<OnboardingFeaturesPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
-                _features.length,
+                features.length,
                 (index) => Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   width: _currentPage == index ? 24 : 8,
                   height: 8,
                   decoration: BoxDecoration(
                     color: _currentPage == index
-                        ? _features[index].color
+                        ? features[index].color
                         : Colors.grey[300],
                     borderRadius: BorderRadius.circular(4),
                   ),
@@ -114,7 +120,7 @@ class _OnboardingFeaturesPageState extends State<OnboardingFeaturesPage> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: ElevatedButton(
                 onPressed: () {
-                  if (_currentPage < _features.length - 1) {
+                  if (_currentPage < features.length - 1) {
                     _pageController.nextPage(
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeInOut,
@@ -125,13 +131,13 @@ class _OnboardingFeaturesPageState extends State<OnboardingFeaturesPage> {
                 },
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 56),
-                  backgroundColor: _features[_currentPage].color,
+                  backgroundColor: features[_currentPage].color,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(28),
                   ),
                 ),
                 child: Text(
-                  _currentPage < _features.length - 1 ? '下一步' : '开始使用',
+                  _currentPage < features.length - 1 ? l10n.onboardingNextStep : l10n.onboardingStartUsing,
                   style: const TextStyle(fontSize: 16),
                 ),
               ),

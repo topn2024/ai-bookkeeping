@@ -1287,5 +1287,37 @@
 
   "yearlyWarmMoments": "Yearly Warm Moments",
   "youCanAsk": "You Can Ask",
-  "yourFinancialFreedomJourney": "Your Financial Freedom Journey"
+  "yourFinancialFreedomJourney": "Your Financial Freedom Journey",
+
+  "onboardingWelcome": "Welcome",
+  "onboardingAppName": "AI Bookkeeping",
+  "onboardingSubtitle": "Make bookkeeping simple and fun\\nHelp you develop good financial habits",
+  "onboardingStartExperience": "Get Started",
+  "onboardingFeatureAI": "AI Recognition",
+  "onboardingFeatureInsights": "Spending Insights",
+  "onboardingFeatureSavings": "Savings Goals",
+
+  "onboardingSkip": "Skip",
+  "onboardingNextStep": "Next",
+  "onboardingStartUsing": "Start Using",
+
+  "onboardingFeaturePhotoTitle": "Photo Bookkeeping",
+  "onboardingFeaturePhotoDesc": "AI automatically recognizes receipts and invoices\\nSnap and record, save time and effort",
+  "onboardingFeatureVoiceTitle": "Voice Bookkeeping",
+  "onboardingFeatureVoiceDesc": "Complete bookkeeping with one sentence\\nFree your hands",
+  "onboardingFeatureAnalysisTitle": "Spending Analysis",
+  "onboardingFeatureAnalysisDesc": "Smart categorization, automatic reports\\nUnderstand your spending habits",
+  "onboardingFeatureSavingsTitle": "Savings Goals",
+  "onboardingFeatureSavingsDesc": "Set goals, track progress\\nMake saving money motivating",
+
+  "onboardingFirstTransactionTitle": "Try Your First Record",
+  "onboardingFirstTransactionDesc": "Let's record your first transaction together",
+  "onboardingFirstTransactionComplete": "Complete",
+
+  "onboardingCompleteTitle": "All Set!",
+  "onboardingCompleteDesc": "You're ready to start your smart bookkeeping journey",
+  "onboardingCompleteGoHome": "Go to Home",
+  "onboardingCompleteTryVoice": "Try Voice Assistant",
+  "onboardingCompleteSetBudget": "Set Budget",
+  "onboardingCompleteImportBills": "Import Bills"
 }

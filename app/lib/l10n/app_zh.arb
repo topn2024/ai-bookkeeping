@@ -1066,5 +1066,37 @@
 
   "yearlyWarmMoments": "年度温暖时刻",
   "youCanAsk": "你可以问",
-  "yourFinancialFreedomJourney": "你的财务自由之旅"
+  "yourFinancialFreedomJourney": "你的财务自由之旅",
+
+  "onboardingWelcome": "欢迎使用",
+  "onboardingAppName": "AI 智能记账",
+  "onboardingSubtitle": "让记账变得简单有趣\\n助你养成良好的理财习惯",
+  "onboardingStartExperience": "开始体验",
+  "onboardingFeatureAI": "AI智能识别",
+  "onboardingFeatureInsights": "消费洞察",
+  "onboardingFeatureSavings": "储蓄目标",
+
+  "onboardingSkip": "跳过",
+  "onboardingNextStep": "下一步",
+  "onboardingStartUsing": "开始使用",
+
+  "onboardingFeaturePhotoTitle": "拍照记账",
+  "onboardingFeaturePhotoDesc": "AI自动识别小票、发票\\n一拍即记，省时省力",
+  "onboardingFeatureVoiceTitle": "语音记账",
+  "onboardingFeatureVoiceDesc": "说一句话完成记账\\n解放你的双手",
+  "onboardingFeatureAnalysisTitle": "消费分析",
+  "onboardingFeatureAnalysisDesc": "智能分类，自动生成报表\\n了解你的消费习惯",
+  "onboardingFeatureSavingsTitle": "储蓄目标",
+  "onboardingFeatureSavingsDesc": "设定目标，追踪进度\\n让存钱变得有动力",
+
+  "onboardingFirstTransactionTitle": "尝试第一笔记录",
+  "onboardingFirstTransactionDesc": "让我们一起记录你的第一笔交易",
+  "onboardingFirstTransactionComplete": "完成",
+
+  "onboardingCompleteTitle": "一切就绪！",
+  "onboardingCompleteDesc": "你已准备好开始智能记账之旅",
+  "onboardingCompleteGoHome": "进入首页",
+  "onboardingCompleteTryVoice": "试试语音助手",
+  "onboardingCompleteSetBudget": "设置预算",
+  "onboardingCompleteImportBills": "导入账单"
 }
