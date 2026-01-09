@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/budget_provider.dart';
+
 /// 钱龄进阶页面
 ///
 /// 对应原型设计 10.06 钱龄进阶
@@ -10,10 +12,10 @@ class MoneyAgeProgressPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 模拟数据
-    const currentDays = 42;
-    const currentLevel = 3;
-    const nextLevelDays = 60;
+    final moneyAge = ref.watch(moneyAgeProvider);
+    final currentDays = moneyAge.days;
+    final currentLevel = _calculateLevel(currentDays);
+    final nextLevelDays = _getNextLevelDays(currentLevel);
 
     return Scaffold(
       appBar: AppBar(
@@ -492,4 +494,20 @@ class _TipItem extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 根据钱龄天数计算等级
+int _calculateLevel(int days) {
+  if (days >= 90) return 5;
+  if (days >= 60) return 4;
+  if (days >= 30) return 3;
+  if (days >= 14) return 2;
+  return 1;
+}
+
+/// 获取下一等级所需天数
+int _getNextLevelDays(int currentLevel) {
+  const levelDays = [14, 30, 60, 90, 120];
+  if (currentLevel >= levelDays.length) return levelDays.last;
+  return levelDays[currentLevel];
 }

@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/transaction_provider.dart';
+import '../models/category.dart';
+
+/// 必要支出分类ID列表
+const _needsCategoryIds = {
+  'food', 'transport', 'housing', 'medical', 'communication', 'education',
+  'utilities', 'insurance', 'childcare',
+};
+
 /// 消费分类洞察页面（想要vs需要）
 ///
 /// 对应原型设计 10.08 消费分类洞察
@@ -10,11 +19,34 @@ class WantsNeedsInsightPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 模拟数据
-    const needsAmount = 8500.0;
-    const wantsAmount = 4200.0;
-    const totalAmount = needsAmount + wantsAmount;
-    const needsRatio = needsAmount / totalAmount;
+    final expenseByCategory = ref.watch(monthlyExpenseByCategoryProvider);
+
+    // 分类为需要和想要
+    double needsAmount = 0.0;
+    double wantsAmount = 0.0;
+    final needsItems = <_CategoryItem>[];
+    final wantsItems = <_CategoryItem>[];
+
+    for (final entry in expenseByCategory.entries) {
+      final categoryId = entry.key;
+      final amount = entry.value;
+      final category = DefaultCategories.expenseCategories
+          .where((c) => c.id == categoryId)
+          .firstOrNull;
+      final emoji = _getCategoryEmoji(categoryId);
+      final name = category?.name ?? categoryId;
+
+      if (_needsCategoryIds.contains(categoryId)) {
+        needsAmount += amount;
+        needsItems.add(_CategoryItem(name: name, amount: amount, emoji: emoji));
+      } else {
+        wantsAmount += amount;
+        wantsItems.add(_CategoryItem(name: name, amount: amount, emoji: emoji));
+      }
+    }
+
+    final totalAmount = needsAmount + wantsAmount;
+    final needsRatio = totalAmount > 0 ? needsAmount / totalAmount : 0.5;
 
     return Scaffold(
       appBar: AppBar(
@@ -39,35 +71,38 @@ class WantsNeedsInsightPage extends ConsumerWidget {
           _HealthAssessmentCard(needsRatio: needsRatio),
 
           // 需要消费明细
-          _CategorySection(
-            title: '需要（必要支出）',
-            emoji: '✅',
-            amount: needsAmount,
-            color: Colors.green,
-            items: [
-              _CategoryItem(name: '房租', amount: 4000, emoji: '🏠'),
-              _CategoryItem(name: '水电燃气', amount: 350, emoji: '💡'),
-              _CategoryItem(name: '日常餐饮', amount: 2500, emoji: '🍚'),
-              _CategoryItem(name: '交通通勤', amount: 650, emoji: '🚇'),
-              _CategoryItem(name: '医疗保健', amount: 500, emoji: '💊'),
-              _CategoryItem(name: '通讯费用', amount: 500, emoji: '📱'),
-            ],
-          ),
+          if (needsItems.isNotEmpty)
+            _CategorySection(
+              title: '需要（必要支出）',
+              emoji: '✅',
+              amount: needsAmount,
+              color: Colors.green,
+              items: needsItems,
+            ),
 
           // 想要消费明细
-          _CategorySection(
-            title: '想要（非必要支出）',
-            emoji: '💭',
-            amount: wantsAmount,
-            color: Colors.orange,
-            items: [
-              _CategoryItem(name: '外出聚餐', amount: 1200, emoji: '🍽️'),
-              _CategoryItem(name: '咖啡奶茶', amount: 800, emoji: '☕'),
-              _CategoryItem(name: '娱乐休闲', amount: 600, emoji: '🎮'),
-              _CategoryItem(name: '购物', amount: 1000, emoji: '🛍️'),
-              _CategoryItem(name: '订阅服务', amount: 600, emoji: '📺'),
-            ],
-          ),
+          if (wantsItems.isNotEmpty)
+            _CategorySection(
+              title: '想要（非必要支出）',
+              emoji: '💭',
+              amount: wantsAmount,
+              color: Colors.orange,
+              items: wantsItems,
+            ),
+
+          // 无数据提示
+          if (needsItems.isEmpty && wantsItems.isEmpty)
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: Text('暂无本月消费数据', style: TextStyle(color: Colors.grey)),
+              ),
+            ),
 
           // 优化建议
           _OptimizationSuggestionCard(),
@@ -484,4 +519,28 @@ class _SuggestionItem extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 根据分类ID获取emoji
+String _getCategoryEmoji(String categoryId) {
+  const emojiMap = {
+    'food': '🍚',
+    'transport': '🚇',
+    'shopping': '🛍️',
+    'entertainment': '🎮',
+    'housing': '🏠',
+    'medical': '💊',
+    'communication': '📱',
+    'education': '📚',
+    'utilities': '💡',
+    'insurance': '🛡️',
+    'childcare': '👶',
+    'travel': '✈️',
+    'beauty': '💄',
+    'social': '🍽️',
+    'pets': '🐾',
+    'gifts': '🎁',
+    'subscription': '📺',
+  };
+  return emojiMap[categoryId] ?? '📦';
 }

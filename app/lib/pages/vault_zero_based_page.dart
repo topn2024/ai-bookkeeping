@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../theme/app_theme.dart';
+import '../providers/budget_vault_provider.dart';
+import '../providers/transaction_provider.dart';
+import '../models/budget_vault.dart';
 
 /// 零基预算分配页面
 /// 原型设计 3.09：零基预算分配
@@ -10,20 +13,18 @@ import '../theme/app_theme.dart';
 /// - 预算分配列表（储蓄优先、固定支出、生活消费、弹性支出）
 /// - 收入 - 支出 - 储蓄 = 0 验证
 class VaultZeroBasedPage extends ConsumerWidget {
-  final double totalIncome;
-  final double salary;
-  final double sideIncome;
-
-  const VaultZeroBasedPage({
-    super.key,
-    this.totalIncome = 15000,
-    this.salary = 12000,
-    this.sideIncome = 3000,
-  });
+  const VaultZeroBasedPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final vaultState = ref.watch(budgetVaultProvider);
+    final monthlyIncome = ref.watch(monthlyIncomeProvider);
+    final vaults = vaultState.vaults.where((v) => v.isEnabled).toList();
+
+    // Calculate total allocated
+    final totalAllocated = vaultState.totalAllocated;
+    final balance = monthlyIncome - totalAllocated;
 
     return Scaffold(
       body: SafeArea(
@@ -35,13 +36,13 @@ class VaultZeroBasedPage extends ConsumerWidget {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _buildIncomeCard(context, theme),
+                    _buildIncomeCard(context, theme, monthlyIncome),
                     const SizedBox(height: 16),
                     _buildPrincipleHint(context, theme),
                     const SizedBox(height: 16),
-                    _buildAllocationList(context, theme),
+                    _buildAllocationList(context, theme, vaults, monthlyIncome),
                     const SizedBox(height: 16),
-                    _buildBalanceCard(context, theme),
+                    _buildBalanceCard(context, theme, balance),
                   ],
                 ),
               ),
@@ -80,7 +81,7 @@ class VaultZeroBasedPage extends ConsumerWidget {
   }
 
   /// 收入卡片
-  Widget _buildIncomeCard(BuildContext context, ThemeData theme) {
+  Widget _buildIncomeCard(BuildContext context, ThemeData theme, double totalIncome) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -109,7 +110,7 @@ class VaultZeroBasedPage extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '= 工资¥${salary.toStringAsFixed(0)} + 副业¥${sideIncome.toStringAsFixed(0)}',
+            totalIncome > 0 ? '本月总收入' : '暂无收入记录',
             style: const TextStyle(fontSize: 12, color: Colors.white70),
           ),
         ],
@@ -155,46 +156,90 @@ class VaultZeroBasedPage extends ConsumerWidget {
   }
 
   /// 预算分配列表
-  Widget _buildAllocationList(BuildContext context, ThemeData theme) {
-    final allocations = [
-      _ZeroBasedItem(
+  Widget _buildAllocationList(
+    BuildContext context,
+    ThemeData theme,
+    List<BudgetVault> vaults,
+    double totalIncome,
+  ) {
+    // Group vaults by type
+    final savingsVaults = vaults.where((v) => v.type == VaultType.savings).toList();
+    final fixedVaults = vaults.where((v) => v.type == VaultType.fixed).toList();
+    final flexibleVaults = vaults.where((v) => v.type == VaultType.flexible).toList();
+    final debtVaults = vaults.where((v) => v.type == VaultType.debt).toList();
+
+    // Calculate totals by type
+    double savingsTotal = savingsVaults.fold(0.0, (sum, v) => sum + v.allocatedAmount);
+    double fixedTotal = fixedVaults.fold(0.0, (sum, v) => sum + v.allocatedAmount);
+    double flexibleTotal = flexibleVaults.fold(0.0, (sum, v) => sum + v.allocatedAmount);
+    double debtTotal = debtVaults.fold(0.0, (sum, v) => sum + v.allocatedAmount);
+
+    final allocations = <_ZeroBasedItem>[];
+
+    if (savingsTotal > 0 || savingsVaults.isNotEmpty) {
+      allocations.add(_ZeroBasedItem(
         icon: Icons.savings,
         iconColor: Colors.white,
         iconBgColor: const Color(0xFF66BB6A),
         name: '储蓄优先',
-        subtitle: '推荐20%',
-        amount: 3000,
-        percent: 20,
+        subtitle: savingsVaults.map((v) => v.name).join('、'),
+        amount: savingsTotal,
+        percent: totalIncome > 0 ? (savingsTotal / totalIncome * 100).round() : 0,
         isHighlighted: true,
-      ),
-      _ZeroBasedItem(
+      ));
+    }
+
+    if (fixedTotal > 0 || fixedVaults.isNotEmpty) {
+      allocations.add(_ZeroBasedItem(
         icon: Icons.home,
         iconColor: theme.colorScheme.primary,
         iconBgColor: theme.colorScheme.surfaceContainerHighest,
         name: '固定支出',
-        subtitle: '房租、水电、通讯',
-        amount: 5000,
-        percent: 33,
-      ),
-      _ZeroBasedItem(
+        subtitle: fixedVaults.map((v) => v.name).join('、'),
+        amount: fixedTotal,
+        percent: totalIncome > 0 ? (fixedTotal / totalIncome * 100).round() : 0,
+      ));
+    }
+
+    if (debtTotal > 0 || debtVaults.isNotEmpty) {
+      allocations.add(_ZeroBasedItem(
+        icon: Icons.credit_card,
+        iconColor: theme.colorScheme.primary,
+        iconBgColor: theme.colorScheme.surfaceContainerHighest,
+        name: '债务还款',
+        subtitle: debtVaults.map((v) => v.name).join('、'),
+        amount: debtTotal,
+        percent: totalIncome > 0 ? (debtTotal / totalIncome * 100).round() : 0,
+      ));
+    }
+
+    if (flexibleTotal > 0 || flexibleVaults.isNotEmpty) {
+      allocations.add(_ZeroBasedItem(
         icon: Icons.restaurant,
         iconColor: theme.colorScheme.primary,
         iconBgColor: theme.colorScheme.surfaceContainerHighest,
-        name: '生活消费',
-        subtitle: '餐饮、购物、交通',
-        amount: 4000,
-        percent: 27,
-      ),
-      _ZeroBasedItem(
-        icon: Icons.celebration,
-        iconColor: theme.colorScheme.primary,
-        iconBgColor: theme.colorScheme.surfaceContainerHighest,
         name: '弹性支出',
-        subtitle: '娱乐、社交',
-        amount: 3000,
-        percent: 20,
-      ),
-    ];
+        subtitle: flexibleVaults.map((v) => v.name).join('、'),
+        amount: flexibleTotal,
+        percent: totalIncome > 0 ? (flexibleTotal / totalIncome * 100).round() : 0,
+      ));
+    }
+
+    if (allocations.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(
+            '暂无预算分配，请先创建小金库',
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,11 +301,13 @@ class VaultZeroBasedPage extends ConsumerWidget {
                             ),
                           ),
                           Text(
-                            item.subtitle,
+                            item.subtitle.isNotEmpty ? item.subtitle : '暂无',
                             style: TextStyle(
                               fontSize: 12,
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -297,7 +344,10 @@ class VaultZeroBasedPage extends ConsumerWidget {
   }
 
   /// 结余卡片
-  Widget _buildBalanceCard(BuildContext context, ThemeData theme) {
+  Widget _buildBalanceCard(BuildContext context, ThemeData theme, double balance) {
+    final isBalanced = balance.abs() < 0.01;
+    final isPositive = balance > 0;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -315,22 +365,29 @@ class VaultZeroBasedPage extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '= ¥0',
+            '= ¥${balance.toStringAsFixed(0)}',
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.w700,
-              color: AppColors.success,
+              color: isBalanced ? AppColors.success : (isPositive ? AppColors.warning : AppColors.expense),
             ),
           ),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.check, size: 14, color: AppColors.success),
+              Icon(
+                isBalanced ? Icons.check : (isPositive ? Icons.info : Icons.warning),
+                size: 14,
+                color: isBalanced ? AppColors.success : (isPositive ? AppColors.warning : AppColors.expense),
+              ),
               const SizedBox(width: 4),
               Text(
-                '完美的零基预算',
-                style: TextStyle(fontSize: 12, color: AppColors.success),
+                isBalanced ? '完美的零基预算' : (isPositive ? '还有 ¥${balance.toStringAsFixed(0)} 待分配' : '超支 ¥${(-balance).toStringAsFixed(0)}'),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isBalanced ? AppColors.success : (isPositive ? AppColors.warning : AppColors.expense),
+                ),
               ),
             ],
           ),

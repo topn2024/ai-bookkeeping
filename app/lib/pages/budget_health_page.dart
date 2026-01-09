@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/budget_vault_provider.dart';
+
 /// 预算健康状态页面
 ///
 /// 对应原型设计 3.06 状态警告
@@ -10,6 +12,69 @@ class BudgetHealthPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final vaultState = ref.watch(budgetVaultProvider);
+    final vaults = vaultState.vaults.where((v) => v.isEnabled).toList();
+
+    // 分类小金库状态
+    final overspentVaults = <_VaultStatusItem>[];
+    final almostEmptyVaults = <_VaultStatusItem>[];
+    final healthyVaults = <_HealthyVault>[];
+
+    for (final vault in vaults) {
+      final remaining = vault.targetAmount - vault.allocatedAmount;
+      final progress = vault.targetAmount > 0
+          ? (vault.allocatedAmount / vault.targetAmount).clamp(0.0, 2.0)
+          : 0.0;
+      final remainingPercent = vault.targetAmount > 0
+          ? ((remaining / vault.targetAmount) * 100).round()
+          : 100;
+
+      if (remaining < 0) {
+        // 超支
+        overspentVaults.add(_VaultStatusItem(
+          name: vault.name,
+          icon: _getVaultIcon(vault.name),
+          iconColor: Colors.red,
+          status: '超支 ¥${(-remaining).toStringAsFixed(0)}',
+          statusColor: Colors.red,
+          amount: '-¥${(-remaining).toStringAsFixed(0)}',
+          budget: '预算 ¥${vault.targetAmount.toStringAsFixed(0)}',
+        ));
+      } else if (remainingPercent <= 20 && remainingPercent > 0) {
+        // 即将用完
+        almostEmptyVaults.add(_VaultStatusItem(
+          name: vault.name,
+          icon: _getVaultIcon(vault.name),
+          iconColor: Colors.orange,
+          status: '仅剩 $remainingPercent%',
+          statusColor: Colors.orange,
+          amount: '¥${remaining.toStringAsFixed(0)}',
+          budget: '预算 ¥${vault.targetAmount.toStringAsFixed(0)}',
+        ));
+      } else {
+        // 健康
+        healthyVaults.add(_HealthyVault(
+          name: vault.name,
+          progress: progress.clamp(0.0, 1.0),
+        ));
+      }
+    }
+
+    // 计算健康评分
+    final totalVaults = vaults.length;
+    final problemVaults = overspentVaults.length + almostEmptyVaults.length;
+    final healthScore = totalVaults > 0
+        ? ((totalVaults - problemVaults * 1.5) / totalVaults * 100).round().clamp(0, 100)
+        : 100;
+
+    // 生成建议
+    String suggestion = '您的预算状态良好，继续保持！';
+    if (overspentVaults.isNotEmpty) {
+      suggestion = '建议关注${overspentVaults.first.name}的支出，适当调整预算分配。';
+    } else if (almostEmptyVaults.isNotEmpty) {
+      suggestion = '${almostEmptyVaults.first.name}预算即将用完，请注意控制支出。';
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('预算健康状态'),
@@ -18,78 +83,67 @@ class BudgetHealthPage extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           // 整体健康评分
-          _HealthScoreCard(score: 72),
+          _HealthScoreCard(
+            score: healthScore,
+            problemCount: problemVaults,
+          ),
 
           const SizedBox(height: 16),
 
           // 超支状态
-          _StatusSection(
-            title: '超支警告',
-            icon: Icons.error,
-            color: Colors.red,
-            backgroundColor: Colors.red[50]!,
-            items: [
-              _VaultStatusItem(
-                name: '餐饮',
-                icon: Icons.restaurant,
-                iconColor: Colors.red,
-                status: '超支 ¥320',
-                statusColor: Colors.red,
-                amount: '-¥320',
-                budget: '预算 ¥2,000',
-              ),
-            ],
-          ),
+          if (overspentVaults.isNotEmpty)
+            _StatusSection(
+              title: '超支警告',
+              icon: Icons.error,
+              color: Colors.red,
+              backgroundColor: Colors.red[50]!,
+              items: overspentVaults,
+            ),
 
-          const SizedBox(height: 16),
+          if (overspentVaults.isNotEmpty) const SizedBox(height: 16),
 
           // 即将用完
-          _StatusSection(
-            title: '即将用完',
-            icon: Icons.warning,
-            color: Colors.orange,
-            backgroundColor: Colors.orange[50]!,
-            items: [
-              _VaultStatusItem(
-                name: '娱乐',
-                icon: Icons.local_cafe,
-                iconColor: Colors.orange,
-                status: '仅剩 8%',
-                statusColor: Colors.orange,
-                amount: '¥80',
-                budget: '预算 ¥1,000',
-              ),
-            ],
-          ),
+          if (almostEmptyVaults.isNotEmpty)
+            _StatusSection(
+              title: '即将用完',
+              icon: Icons.warning,
+              color: Colors.orange,
+              backgroundColor: Colors.orange[50]!,
+              items: almostEmptyVaults,
+            ),
 
-          const SizedBox(height: 16),
+          if (almostEmptyVaults.isNotEmpty) const SizedBox(height: 16),
 
           // 健康状态
-          _HealthySection(
-            vaults: [
-              _HealthyVault(name: '房租', progress: 1.0),
-              _HealthyVault(name: '交通', progress: 0.65),
-              _HealthyVault(name: '储蓄', progress: 0.50),
-            ],
-          ),
+          if (healthyVaults.isNotEmpty)
+            _HealthySection(vaults: healthyVaults),
 
-          const SizedBox(height: 16),
+          if (healthyVaults.isNotEmpty) const SizedBox(height: 16),
 
           // AI建议
-          _AISuggestionCard(
-            suggestion: '建议从"交通"小金库调拨¥200到"餐饮"，或减少本月餐饮外出次数。',
-          ),
+          _AISuggestionCard(suggestion: suggestion),
         ],
       ),
     );
   }
 }
 
+IconData _getVaultIcon(String name) {
+  if (name.contains('餐') || name.contains('食')) return Icons.restaurant;
+  if (name.contains('交通')) return Icons.directions_car;
+  if (name.contains('娱乐')) return Icons.local_cafe;
+  if (name.contains('购物')) return Icons.shopping_bag;
+  if (name.contains('房') || name.contains('租')) return Icons.home;
+  if (name.contains('储蓄') || name.contains('存')) return Icons.savings;
+  return Icons.account_balance_wallet;
+}
+
 /// 健康评分卡片
 class _HealthScoreCard extends StatelessWidget {
   final int score;
+  final int problemCount;
 
-  const _HealthScoreCard({required this.score});
+  const _HealthScoreCard({required this.score, required this.problemCount});
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +188,7 @@ class _HealthScoreCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '2个小金库需要关注',
+            problemCount > 0 ? '$problemCount个小金库需要关注' : '所有小金库状态良好',
             style: TextStyle(
               fontSize: 13,
               color: Colors.grey[600],
@@ -323,7 +377,7 @@ class _HealthySection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Row(
-            children: vaults.map((vault) {
+            children: vaults.take(3).map((vault) {
               return Expanded(
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -337,6 +391,7 @@ class _HealthySection extends StatelessWidget {
                       Text(
                         vault.name,
                         style: const TextStyle(fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Text(

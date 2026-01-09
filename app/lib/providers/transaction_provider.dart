@@ -290,6 +290,15 @@ final monthlyExpenseByCategoryProvider = Provider<Map<String, double>>((ref) {
   return ref.watch(transactionProvider).currentMonth.toList().expenseByCategory;
 });
 
+// 上月净余额Provider（收入-支出）
+final lastMonthBalanceProvider = Provider<double>((ref) {
+  final transactions = ref.watch(transactionProvider);
+  final lastMonthTxns = transactions.previousMonth.toList();
+  final income = lastMonthTxns.where((t) => t.type == TransactionType.income).fold(0.0, (sum, t) => sum + t.amount);
+  final expense = lastMonthTxns.where((t) => t.type == TransactionType.expense).fold(0.0, (sum, t) => sum + t.amount);
+  return income - expense;
+});
+
 // ============== 报销相关 Provider ==============
 
 /// 报销统计数据

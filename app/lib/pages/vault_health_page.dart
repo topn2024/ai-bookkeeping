@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/budget_vault_provider.dart';
 import '../theme/app_theme.dart';
 
 /// 预算健康状态页面
@@ -16,6 +17,54 @@ class VaultHealthPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final vaultState = ref.watch(budgetVaultProvider);
+    final vaults = vaultState.vaults.where((v) => v.isEnabled).toList();
+
+    // 分类小金库状态
+    final overspentVaults = <_VaultData>[];
+    final almostEmptyVaults = <_VaultData>[];
+    final healthyVaults = <_VaultData>[];
+
+    for (final vault in vaults) {
+      final remaining = vault.targetAmount - vault.allocatedAmount;
+      final progress = vault.targetAmount > 0
+          ? (vault.allocatedAmount / vault.targetAmount).clamp(0.0, 2.0)
+          : 0.0;
+      final remainingPercent = vault.targetAmount > 0
+          ? ((remaining / vault.targetAmount) * 100).round()
+          : 100;
+
+      final data = _VaultData(
+        name: vault.name,
+        remaining: remaining,
+        targetAmount: vault.targetAmount,
+        progress: progress,
+        remainingPercent: remainingPercent,
+      );
+
+      if (remaining < 0) {
+        overspentVaults.add(data);
+      } else if (remainingPercent <= 20 && remainingPercent > 0) {
+        almostEmptyVaults.add(data);
+      } else {
+        healthyVaults.add(data);
+      }
+    }
+
+    // 计算健康评分
+    final totalVaults = vaults.length;
+    final problemVaults = overspentVaults.length + almostEmptyVaults.length;
+    final healthScore = totalVaults > 0
+        ? ((totalVaults - problemVaults * 1.5) / totalVaults * 100).round().clamp(0, 100)
+        : 100;
+
+    // 生成建议
+    String suggestion = '您的预算状态良好，继续保持！';
+    if (overspentVaults.isNotEmpty) {
+      suggestion = '建议关注${overspentVaults.first.name}的支出，适当调整预算分配。';
+    } else if (almostEmptyVaults.isNotEmpty) {
+      suggestion = '${almostEmptyVaults.first.name}预算即将用完，请注意控制支出。';
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -26,11 +75,14 @@ class VaultHealthPage extends ConsumerWidget {
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    _buildHealthScore(context, theme),
-                    _buildOverspentSection(context, theme),
-                    _buildAlmostEmptySection(context, theme),
-                    _buildHealthySection(context, theme),
-                    _buildAISuggestion(context, theme),
+                    _buildHealthScore(context, theme, healthScore, problemVaults),
+                    if (overspentVaults.isNotEmpty)
+                      _buildOverspentSection(context, theme, overspentVaults),
+                    if (almostEmptyVaults.isNotEmpty)
+                      _buildAlmostEmptySection(context, theme, almostEmptyVaults),
+                    if (healthyVaults.isNotEmpty)
+                      _buildHealthySection(context, theme, healthyVaults),
+                    _buildAISuggestion(context, theme, suggestion),
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -70,7 +122,16 @@ class VaultHealthPage extends ConsumerWidget {
   }
 
   /// 健康评分卡片
-  Widget _buildHealthScore(BuildContext context, ThemeData theme) {
+  Widget _buildHealthScore(BuildContext context, ThemeData theme, int score, int problemCount) {
+    Color scoreColor;
+    if (score >= 80) {
+      scoreColor = AppColors.success;
+    } else if (score >= 60) {
+      scoreColor = AppColors.warning;
+    } else {
+      scoreColor = AppColors.error;
+    }
+
     return Container(
       margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(20),
@@ -85,11 +146,11 @@ class VaultHealthPage extends ConsumerWidget {
       child: Column(
         children: [
           Text(
-            '72',
+            '$score',
             style: TextStyle(
               fontSize: 48,
               fontWeight: FontWeight.w700,
-              color: AppColors.warning,
+              color: scoreColor,
             ),
           ),
           Text(
@@ -97,12 +158,12 @@ class VaultHealthPage extends ConsumerWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: AppColors.warning,
+              color: scoreColor,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            '2个小金库需要关注',
+            problemCount > 0 ? '$problemCount个小金库需要关注' : '所有小金库状态良好',
             style: TextStyle(
               fontSize: 12,
               color: theme.colorScheme.onSurfaceVariant,
@@ -114,7 +175,7 @@ class VaultHealthPage extends ConsumerWidget {
   }
 
   /// 超支警告
-  Widget _buildOverspentSection(BuildContext context, ThemeData theme) {
+  Widget _buildOverspentSection(BuildContext context, ThemeData theme, List<_VaultData> vaults) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.all(12),
@@ -140,25 +201,25 @@ class VaultHealthPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          _buildWarningItem(
+          ...vaults.map((v) => _buildWarningItem(
             context,
             theme,
-            icon: Icons.restaurant,
+            icon: _getVaultIcon(v.name),
             iconColor: Colors.white,
             iconBgColors: [const Color(0xFFFF6B6B), const Color(0xFFFF8E8E)],
-            name: '餐饮',
-            status: '超支 ¥320',
+            name: v.name,
+            status: '超支 ¥${(-v.remaining).toStringAsFixed(0)}',
             statusColor: AppColors.error,
-            amount: '-¥320',
-            budget: '预算 ¥2,000',
-          ),
+            amount: '-¥${(-v.remaining).toStringAsFixed(0)}',
+            budget: '预算 ¥${v.targetAmount.toStringAsFixed(0)}',
+          )),
         ],
       ),
     );
   }
 
   /// 即将用完
-  Widget _buildAlmostEmptySection(BuildContext context, ThemeData theme) {
+  Widget _buildAlmostEmptySection(BuildContext context, ThemeData theme, List<_VaultData> vaults) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.all(12),
@@ -169,11 +230,11 @@ class VaultHealthPage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.warning, color: Color(0xFFF9A825), size: 20),
-              const SizedBox(width: 8),
-              const Text(
+              Icon(Icons.warning, color: Color(0xFFF9A825), size: 20),
+              SizedBox(width: 8),
+              Text(
                 '即将用完',
                 style: TextStyle(
                   fontSize: 14,
@@ -184,21 +245,31 @@ class VaultHealthPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          _buildWarningItem(
+          ...vaults.map((v) => _buildWarningItem(
             context,
             theme,
-            icon: Icons.local_cafe,
+            icon: _getVaultIcon(v.name),
             iconColor: Colors.white,
             iconBgColors: [const Color(0xFFFFC107), const Color(0xFFFFD54F)],
-            name: '娱乐',
-            status: '仅剩 8%',
+            name: v.name,
+            status: '仅剩 ${v.remainingPercent}%',
             statusColor: const Color(0xFFF9A825),
-            amount: '¥80',
-            budget: '预算 ¥1,000',
-          ),
+            amount: '¥${v.remaining.toStringAsFixed(0)}',
+            budget: '预算 ¥${v.targetAmount.toStringAsFixed(0)}',
+          )),
         ],
       ),
     );
+  }
+
+  IconData _getVaultIcon(String name) {
+    if (name.contains('餐') || name.contains('食')) return Icons.restaurant;
+    if (name.contains('交通')) return Icons.directions_car;
+    if (name.contains('娱乐')) return Icons.local_cafe;
+    if (name.contains('购物')) return Icons.shopping_bag;
+    if (name.contains('房') || name.contains('租')) return Icons.home;
+    if (name.contains('储蓄') || name.contains('存')) return Icons.savings;
+    return Icons.account_balance_wallet;
   }
 
   Widget _buildWarningItem(
@@ -214,6 +285,7 @@ class VaultHealthPage extends ConsumerWidget {
     required String budget,
   }) {
     return Container(
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -279,7 +351,7 @@ class VaultHealthPage extends ConsumerWidget {
   }
 
   /// 健康状态
-  Widget _buildHealthySection(BuildContext context, ThemeData theme) {
+  Widget _buildHealthySection(BuildContext context, ThemeData theme, List<_VaultData> vaults) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.all(12),
@@ -304,7 +376,7 @@ class VaultHealthPage extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                '3个小金库',
+                '${vaults.length}个小金库',
                 style: TextStyle(
                   fontSize: 12,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -314,13 +386,9 @@ class VaultHealthPage extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           Row(
-            children: [
-              _buildHealthyChip(context, theme, '房租', '100%'),
-              const SizedBox(width: 8),
-              _buildHealthyChip(context, theme, '交通', '65%'),
-              const SizedBox(width: 8),
-              _buildHealthyChip(context, theme, '储蓄', '50%'),
-            ],
+            children: vaults.take(3).map((v) =>
+              _buildHealthyChip(context, theme, v.name, '${(v.progress * 100).toInt()}%')
+            ).toList(),
           ),
         ],
       ),
@@ -335,6 +403,7 @@ class VaultHealthPage extends ConsumerWidget {
   ) {
     return Expanded(
       child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -345,6 +414,7 @@ class VaultHealthPage extends ConsumerWidget {
             Text(
               name,
               style: const TextStyle(fontSize: 12),
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               percent,
@@ -360,7 +430,7 @@ class VaultHealthPage extends ConsumerWidget {
   }
 
   /// AI建议
-  Widget _buildAISuggestion(BuildContext context, ThemeData theme) {
+  Widget _buildAISuggestion(BuildContext context, ThemeData theme, String suggestion) {
     return Container(
       margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(12),
@@ -403,7 +473,7 @@ class VaultHealthPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '建议从"交通"小金库调拨¥200到"餐饮"，或减少本月餐饮外出次数。',
+                  suggestion,
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.colorScheme.onSurfaceVariant,
@@ -417,4 +487,20 @@ class VaultHealthPage extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _VaultData {
+  final String name;
+  final double remaining;
+  final double targetAmount;
+  final double progress;
+  final int remainingPercent;
+
+  _VaultData({
+    required this.name,
+    required this.remaining,
+    required this.targetAmount,
+    required this.progress,
+    required this.remainingPercent,
+  });
 }

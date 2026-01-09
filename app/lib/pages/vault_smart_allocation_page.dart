@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../theme/app_theme.dart';
+import '../providers/budget_vault_provider.dart';
+import '../models/budget_vault.dart';
+import '../services/allocation_service.dart';
 
 /// 智能分配建议页面
 /// 原型设计 3.05：智能分配建议
@@ -10,16 +13,30 @@ import '../theme/app_theme.dart';
 /// - 按优先级排列的分配建议（P1固定支出 → P2债务还款 → P3储蓄目标 → P4弹性支出）
 /// - 一键应用智能方案
 class VaultSmartAllocationPage extends ConsumerWidget {
-  final double amountToAllocate;
+  final double? amountToAllocate;
 
   const VaultSmartAllocationPage({
     super.key,
-    this.amountToAllocate = 15000,
+    this.amountToAllocate,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final vaultState = ref.watch(budgetVaultProvider);
+    final vaults = vaultState.vaults.where((v) => v.isEnabled).toList();
+    final unallocatedAmount = amountToAllocate ?? vaultState.unallocatedAmount;
+
+    // Generate smart allocation suggestions
+    final allocationService = AllocationService();
+    final suggestions = allocationService.getSuggestions(
+      unallocatedAmount: unallocatedAmount,
+      vaults: vaults,
+    );
+
+    // Calculate total suggested allocation
+    final totalSuggested = suggestions.fold(0.0, (sum, s) => sum + s.suggestedAmount);
+    final remaining = unallocatedAmount - totalSuggested;
 
     return Scaffold(
       body: SafeArea(
@@ -30,10 +47,10 @@ class VaultSmartAllocationPage extends ConsumerWidget {
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    _buildAmountCard(context, theme),
+                    _buildAmountCard(context, theme, unallocatedAmount),
                     _buildPriorityHint(context, theme),
-                    _buildAllocationList(context, theme),
-                    _buildUnallocatedCard(context, theme),
+                    _buildAllocationList(context, theme, suggestions, vaults),
+                    _buildUnallocatedCard(context, theme, remaining),
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -82,7 +99,7 @@ class VaultSmartAllocationPage extends ConsumerWidget {
   }
 
   /// 待分配金额卡片
-  Widget _buildAmountCard(BuildContext context, ThemeData theme) {
+  Widget _buildAmountCard(BuildContext context, ThemeData theme, double amount) {
     return Container(
       margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(16),
@@ -97,12 +114,12 @@ class VaultSmartAllocationPage extends ConsumerWidget {
       child: Column(
         children: [
           const Text(
-            '本月工资待分配',
+            '待分配金额',
             style: TextStyle(fontSize: 13, color: Colors.white70),
           ),
           const SizedBox(height: 8),
           Text(
-            '¥${amountToAllocate.toStringAsFixed(0)}',
+            '¥${amount.toStringAsFixed(0)}',
             style: const TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.w700,
@@ -110,9 +127,9 @@ class VaultSmartAllocationPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            '系统已为您智能规划分配方案',
-            style: TextStyle(fontSize: 12, color: Colors.white60),
+          Text(
+            amount > 0 ? '系统已为您智能规划分配方案' : '暂无待分配金额',
+            style: const TextStyle(fontSize: 12, color: Colors.white60),
           ),
         ],
       ),
@@ -144,50 +161,47 @@ class VaultSmartAllocationPage extends ConsumerWidget {
   }
 
   /// 分配建议列表
-  Widget _buildAllocationList(BuildContext context, ThemeData theme) {
-    final allocations = [
-      _SmartAllocation(
-        priority: 'P1',
-        priorityColor: const Color(0xFFF44336),
-        priorityBgColor: const Color(0xFFFFEBEE),
-        name: '房租',
-        amount: 4000,
-        icon: Icons.lock,
-        description: '固定支出 · 必须优先保障',
-      ),
-      _SmartAllocation(
-        priority: 'P2',
-        priorityColor: const Color(0xFFFF9800),
-        priorityBgColor: const Color(0xFFFFF3E0),
-        name: '信用卡还款',
-        amount: 2500,
-        icon: Icons.credit_card,
-        description: '债务还款 · 避免利息和信用影响',
-      ),
-      _SmartAllocation(
-        priority: 'P3',
-        priorityColor: AppColors.success,
-        priorityBgColor: const Color(0xFFE8F5E9),
-        name: '应急金储备',
-        amount: 3000,
-        icon: Icons.savings,
-        description: '储蓄目标 · 建议储蓄20%收入',
-      ),
-      _SmartAllocation(
-        priority: 'P4',
-        priorityColor: const Color(0xFF2196F3),
-        priorityBgColor: const Color(0xFFE3F2FD),
-        name: '餐饮 + 娱乐',
-        amount: 4500,
-        icon: Icons.tune,
-        description: '弹性支出 · 分配剩余金额',
-      ),
-    ];
+  Widget _buildAllocationList(
+    BuildContext context,
+    ThemeData theme,
+    List<AllocationSuggestion> suggestions,
+    List<BudgetVault> vaults,
+  ) {
+    if (suggestions.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(
+            '暂无分配建议，请先创建小金库',
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
-        children: allocations.map((allocation) {
+        children: suggestions.map((suggestion) {
+          final vault = vaults.where((v) => v.id == suggestion.vaultId).firstOrNull;
+          if (vault == null) return const SizedBox.shrink();
+
+          final priorityInfo = _getPriorityInfo(suggestion.priority);
+          final allocation = _SmartAllocation(
+            priority: 'P${suggestion.priority}',
+            priorityColor: priorityInfo.color,
+            priorityBgColor: priorityInfo.bgColor,
+            name: vault.name,
+            amount: suggestion.suggestedAmount,
+            icon: vault.icon,
+            description: suggestion.reason,
+          );
+
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: _buildAllocationCard(context, theme, allocation),
@@ -195,6 +209,19 @@ class VaultSmartAllocationPage extends ConsumerWidget {
         }).toList(),
       ),
     );
+  }
+
+  ({Color color, Color bgColor}) _getPriorityInfo(int priority) {
+    switch (priority) {
+      case 1:
+        return (color: const Color(0xFFF44336), bgColor: const Color(0xFFFFEBEE));
+      case 2:
+        return (color: const Color(0xFFFF9800), bgColor: const Color(0xFFFFF3E0));
+      case 3:
+        return (color: AppColors.success, bgColor: const Color(0xFFE8F5E9));
+      default:
+        return (color: const Color(0xFF2196F3), bgColor: const Color(0xFFE3F2FD));
+    }
   }
 
   Widget _buildAllocationCard(
@@ -272,7 +299,7 @@ class VaultSmartAllocationPage extends ConsumerWidget {
   }
 
   /// 未分配卡片
-  Widget _buildUnallocatedCard(BuildContext context, ThemeData theme) {
+  Widget _buildUnallocatedCard(BuildContext context, ThemeData theme, double remaining) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       padding: const EdgeInsets.all(12),
@@ -291,11 +318,11 @@ class VaultSmartAllocationPage extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '¥1,000',
+            '¥${remaining.toStringAsFixed(0)}',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: AppColors.success,
+              color: remaining > 0 ? AppColors.success : theme.colorScheme.onSurface,
             ),
           ),
         ],

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../providers/transaction_provider.dart';
+import '../providers/budget_vault_provider.dart';
+import '../providers/budget_provider.dart';
 
 /// 预算中心页面
 /// 原型设计 1.04：预算中心 Budget
@@ -21,17 +23,18 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final monthlyIncome = ref.watch(monthlyIncomeProvider);
-    final monthlyExpense = ref.watch(monthlyExpenseProvider);
+    final vaultState = ref.watch(budgetVaultProvider);
+    final budgetUsages = ref.watch(allBudgetUsagesProvider);
 
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildIncomePoolHeader(context, theme, monthlyIncome),
-            _buildVaultsSection(context, theme),
-            _buildComfortMessage(context, theme),
-            _buildBudgetCategories(context, theme, monthlyExpense),
+            _buildIncomePoolHeader(context, theme, monthlyIncome, vaultState),
+            _buildVaultsSection(context, theme, vaultState),
+            _buildComfortMessage(context, theme, budgetUsages),
+            _buildBudgetCategories(context, theme, budgetUsages),
             const SizedBox(height: 100), // 底部导航栏留白
           ],
         ),
@@ -45,10 +48,10 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
     BuildContext context,
     ThemeData theme,
     double monthlyIncome,
+    BudgetVaultState vaultState,
   ) {
-    // 模拟数据：已分配金额
-    final allocated = 15000.0;
-    final unallocated = monthlyIncome - allocated;
+    final allocated = vaultState.totalAllocated;
+    final unallocated = vaultState.unallocatedAmount;
     final allocatedPercent = monthlyIncome > 0 ? (allocated / monthlyIncome * 100) : 0;
 
     return Container(
@@ -166,7 +169,9 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
 
   /// 小金库区域
   /// 原型设计：小金库卡片列表
-  Widget _buildVaultsSection(BuildContext context, ThemeData theme) {
+  Widget _buildVaultsSection(BuildContext context, ThemeData theme, BudgetVaultState vaultState) {
+    final vaults = vaultState.vaults.where((v) => v.isEnabled).toList();
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -192,38 +197,39 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildVaultCard(
-            context,
-            theme,
-            name: '应急金储备',
-            balance: 25000,
-            target: 50000,
-            percent: 50,
-            gradient: const [Color(0xFFFF6B6B), Color(0xFFFF8E8E)],
-            icon: Icons.savings,
-          ),
-          const SizedBox(height: 12),
-          _buildVaultCard(
-            context,
-            theme,
-            name: '旅行基金',
-            balance: 8500,
-            target: 10000,
-            percent: 85,
-            gradient: const [Color(0xFF4CAF50), Color(0xFF81C784)],
-            icon: Icons.flight,
-          ),
-          const SizedBox(height: 12),
-          _buildVaultCard(
-            context,
-            theme,
-            name: '数码基金',
-            balance: 3200,
-            target: 10000,
-            percent: 32,
-            gradient: const [Color(0xFF2196F3), Color(0xFF64B5F6)],
-            icon: Icons.computer,
-          ),
+          if (vaults.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(
+                  '暂无小金库，点击新建开始规划',
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
+            )
+          else
+            ...vaults.map((vault) {
+              final percent = vault.targetAmount > 0
+                  ? (vault.allocatedAmount / vault.targetAmount * 100).round()
+                  : 0;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildVaultCard(
+                  context,
+                  theme,
+                  name: vault.name,
+                  balance: vault.allocatedAmount,
+                  target: vault.targetAmount,
+                  percent: percent,
+                  gradient: [vault.color, vault.color.withValues(alpha: 0.7)],
+                  icon: vault.icon,
+                ),
+              );
+            }),
         ],
       ),
     );
@@ -331,7 +337,20 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
 
   /// 伙伴化提醒
   /// 原型设计：预算即将超支时的温馨提醒
-  Widget _buildComfortMessage(BuildContext context, ThemeData theme) {
+  Widget _buildComfortMessage(BuildContext context, ThemeData theme, List<BudgetUsage> budgetUsages) {
+    // 找到使用率最高的预算
+    final nearLimitBudgets = budgetUsages.where((u) => u.isNearLimit).toList();
+    if (nearLimitBudgets.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final topBudget = nearLimitBudgets.reduce((a, b) => a.percentage > b.percentage ? a : b);
+    final remaining = topBudget.remaining;
+    final budgetName = topBudget.budget.name;
+    final now = DateTime.now();
+    final daysLeft = DateTime(now.year, now.month + 1, 0).day - now.day;
+    final dailyBudget = daysLeft > 0 ? (remaining / daysLeft) : 0;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -348,7 +367,7 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '餐饮预算还剩 ¥420',
+                  '$budgetName还剩 ¥${remaining.toStringAsFixed(0)}',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
@@ -357,7 +376,7 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '这10天平均每天可用 ¥42，您可以的！',
+                  '这$daysLeft天平均每天可用 ¥${dailyBudget.toStringAsFixed(0)}，您可以的！',
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.colorScheme.onSurfaceVariant,
@@ -375,8 +394,18 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
   Widget _buildBudgetCategories(
     BuildContext context,
     ThemeData theme,
-    double monthlyExpense,
+    List<BudgetUsage> budgetUsages,
   ) {
+    final now = DateTime.now();
+    final daysLeft = DateTime(now.year, now.month + 1, 0).day - now.day;
+
+    // 找到控制得好的预算（使用率低于50%）
+    final healthyBudgets = budgetUsages.where((u) => u.percentage < 0.5 && u.spent > 0).toList();
+    final bestBudget = healthyBudgets.isNotEmpty
+        ? healthyBudgets.reduce((a, b) => a.percentage < b.percentage ? a : b)
+        : null;
+    final savedAmount = bestBudget != null ? bestBudget.remaining : 0;
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -389,41 +418,60 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
             ),
           ),
           const SizedBox(height: 12),
-          _buildBudgetItem(
-            context,
-            theme,
-            name: '餐饮',
-            icon: Icons.restaurant,
-            iconColor: const Color(0xFFFF7043),
-            spent: 1580,
-            budget: 2000,
-            percent: 79,
-            daysLeft: 10,
-          ),
+          if (budgetUsages.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(
+                  '暂无预算，去设置中添加预算',
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
+            )
+          else
+            ...budgetUsages.map((usage) {
+              final percent = (usage.percentage * 100).round();
+              return _buildBudgetItem(
+                context,
+                theme,
+                name: usage.budget.name,
+                icon: Icons.category,
+                iconColor: const Color(0xFFFF7043),
+                spent: usage.spent,
+                budget: usage.budget.amount,
+                percent: percent,
+                daysLeft: daysLeft,
+              );
+            }),
           // 伙伴化设计：鼓励消息
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                const Text('👍', style: TextStyle(fontSize: 18)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '交通预算控制得很好，继续保持！已节省 ¥180',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: theme.colorScheme.onSurface,
+          if (bestBudget != null)
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Text('👍', style: TextStyle(fontSize: 18)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${bestBudget.budget.name}控制得很好，继续保持！已节省 ¥${savedAmount.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurface,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );

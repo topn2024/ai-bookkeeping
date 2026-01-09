@@ -4,9 +4,12 @@ import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../l10n/l10n.dart';
 import '../providers/transaction_provider.dart';
+import '../providers/auth_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../widgets/budget_alert_widget.dart';
+import '../services/gamification_service.dart';
+import '../services/database_service.dart';
 import 'transaction_list_page.dart';
 import 'add_transaction_page.dart';
 import 'goal_achievement_dashboard_page.dart';
@@ -66,10 +69,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     ThemeColors colors,
   ) {
     final greeting = _getGreeting();
-    final userName = '张三'; // TODO: 从用户配置获取
+    final authState = ref.watch(authProvider);
+    final userName = authState.user?.nickname ?? authState.user?.email?.split('@').first ?? '';
 
-    // 计算同比增长（模拟数据）
-    const lastMonthBalance = 11600.0;
+    // 计算同比增长
+    final lastMonthBalance = ref.watch(lastMonthBalanceProvider);
     final growth = balance > 0 && lastMonthBalance > 0
         ? ((balance - lastMonthBalance) / lastMonthBalance * 100)
         : 0.0;
@@ -266,60 +270,68 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// 成就庆祝卡片
   /// 原型设计：伙伴化设计 - 连续记账达成时显示
   Widget _buildCelebrationCard(BuildContext context, ThemeData theme) {
-    // TODO: 从用户数据获取连续记账天数
-    const consecutiveDays = 32;
-    const surpassPercent = 90;
+    return FutureBuilder<StreakStats>(
+      future: GamificationService(DatabaseService()).getStreakStats(),
+      builder: (context, snapshot) {
+        final consecutiveDays = snapshot.data?.currentStreak ?? 0;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFFFFF8E1),
-            const Color(0xFFFFECB3),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFFB74D).withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Text('🎉', style: TextStyle(fontSize: 32)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '太棒了！连续记账$consecutiveDays天！',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFE65100),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '你已超越$surpassPercent%的用户，继续保持！',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
+        // 如果没有连续记账，不显示卡片
+        if (consecutiveDays == 0) {
+          return const SizedBox.shrink();
+        }
+
+        return Container(
+          margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFFFFF8E1),
+                const Color(0xFFFFECB3),
               ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFFB74D).withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
+          child: Row(
+            children: [
+              const Text('🎉', style: TextStyle(fontSize: 32)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '太棒了！连续记账$consecutiveDays天！',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFE65100),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '继续保持！',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

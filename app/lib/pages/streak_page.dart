@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/transaction_provider.dart';
+
 /// 连续打卡页面
 ///
 /// 对应原型设计 10.07 连续打卡
@@ -10,10 +12,13 @@ class StreakPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 模拟数据
-    const currentStreak = 23;
-    const longestStreak = 45;
-    const totalDays = 156;
+    final transactions = ref.watch(transactionProvider);
+
+    // 计算连续记账天数
+    final streakData = _calculateStreak(transactions.map((t) => t.date).toList());
+    final currentStreak = streakData.currentStreak;
+    final longestStreak = streakData.longestStreak;
+    final totalDays = streakData.totalDays;
 
     return Scaffold(
       appBar: AppBar(
@@ -440,4 +445,82 @@ class _MotivationCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 连续记账数据
+class _StreakData {
+  final int currentStreak;
+  final int longestStreak;
+  final int totalDays;
+
+  _StreakData({
+    required this.currentStreak,
+    required this.longestStreak,
+    required this.totalDays,
+  });
+}
+
+/// 计算连续记账天数
+_StreakData _calculateStreak(List<DateTime> dates) {
+  if (dates.isEmpty) {
+    return _StreakData(currentStreak: 0, longestStreak: 0, totalDays: 0);
+  }
+
+  // 获取所有有记录的日期（去重）
+  final recordedDays = <DateTime>{};
+  for (final date in dates) {
+    recordedDays.add(DateTime(date.year, date.month, date.day));
+  }
+
+  final sortedDays = recordedDays.toList()..sort((a, b) => b.compareTo(a));
+  final totalDays = sortedDays.length;
+
+  // 计算当前连续天数
+  int currentStreak = 0;
+  final today = DateTime.now();
+  final todayDate = DateTime(today.year, today.month, today.day);
+
+  for (int i = 0; i < sortedDays.length; i++) {
+    final expectedDate = todayDate.subtract(Duration(days: i));
+    if (sortedDays.contains(expectedDate)) {
+      currentStreak++;
+    } else if (i == 0) {
+      // 今天没有记录，检查昨天
+      final yesterday = todayDate.subtract(const Duration(days: 1));
+      if (sortedDays.contains(yesterday)) {
+        currentStreak = 1;
+        for (int j = 1; j < sortedDays.length; j++) {
+          final expected = yesterday.subtract(Duration(days: j));
+          if (sortedDays.contains(expected)) {
+            currentStreak++;
+          } else {
+            break;
+          }
+        }
+      }
+      break;
+    } else {
+      break;
+    }
+  }
+
+  // 计算最长连续天数
+  int longestStreak = 0;
+  int tempStreak = 1;
+  for (int i = 1; i < sortedDays.length; i++) {
+    final diff = sortedDays[i - 1].difference(sortedDays[i]).inDays;
+    if (diff == 1) {
+      tempStreak++;
+    } else {
+      longestStreak = tempStreak > longestStreak ? tempStreak : longestStreak;
+      tempStreak = 1;
+    }
+  }
+  longestStreak = tempStreak > longestStreak ? tempStreak : longestStreak;
+
+  return _StreakData(
+    currentStreak: currentStreak,
+    longestStreak: longestStreak,
+    totalDays: totalDays,
+  );
 }

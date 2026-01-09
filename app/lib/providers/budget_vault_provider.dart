@@ -441,3 +441,16 @@ final singleVaultProvider = Provider.family<BudgetVault?, String>((ref, vaultId)
 final vaultSummaryProvider = Provider<VaultSummary?>((ref) {
   return ref.watch(budgetVaultProvider).summary;
 });
+
+/// 应急基金 Provider - 查找名为"应急基金"或"应急金"的储蓄小金库
+final emergencyFundVaultProvider = Provider<BudgetVault?>((ref) {
+  final vaults = ref.watch(budgetVaultProvider).vaults;
+  try {
+    return vaults.firstWhere(
+      (v) => v.isEnabled && v.type == VaultType.savings &&
+             (v.name.contains('应急') || v.name.toLowerCase().contains('emergency')),
+    );
+  } catch (_) {
+    return null;
+  }
+});

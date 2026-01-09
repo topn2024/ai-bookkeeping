@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/transaction_provider.dart';
+import '../models/transaction.dart';
+import '../models/category.dart';
+
 /// 拿铁因子分析页面
 ///
 /// 对应原型设计 10.03 拿铁因子分析
@@ -10,43 +14,57 @@ class LatteFactorPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 模拟数据
-    final weeklyTotal = 847.0;
-    final monthlyTotal = weeklyTotal * 4;
-    final yearlyTotal = monthlyTotal * 12;
+    final transactions = ref.watch(transactionProvider);
 
-    final topCategories = [
-      LatteFactorCategory(
-        emoji: '☕',
-        name: '咖啡饮品',
-        weeklyCount: 5,
-        averageAmount: 28,
-        monthlyTotal: 560,
-        yearlyTotal: 6720,
-        progress: 1.0,
-        color: Colors.orange,
-      ),
-      LatteFactorCategory(
-        emoji: '🥤',
-        name: '奶茶饮料',
-        weeklyCount: 3,
-        averageAmount: 18,
-        monthlyTotal: 216,
-        yearlyTotal: 2592,
-        progress: 0.6,
-        color: Colors.blue,
-      ),
-      LatteFactorCategory(
-        emoji: '🍿',
-        name: '零食小吃',
-        weeklyCount: 2,
-        averageAmount: 15,
-        monthlyTotal: 120,
-        yearlyTotal: 1440,
-        progress: 0.35,
-        color: Colors.green,
-      ),
-    ];
+    // 筛选本月小额消费（<50元）
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+    final smallExpenses = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.amount < 50 &&
+        t.date.isAfter(monthStart.subtract(const Duration(days: 1)))).toList();
+
+    // 按分类统计
+    final categoryTotals = <String, _CategoryStats>{};
+    for (final t in smallExpenses) {
+      final stats = categoryTotals.putIfAbsent(
+        t.category,
+        () => _CategoryStats(category: t.category),
+      );
+      stats.count++;
+      stats.total += t.amount;
+    }
+
+    // 计算周数
+    final daysInMonth = now.day;
+    final weeks = (daysInMonth / 7).ceil();
+
+    // 转换为显示数据
+    final topCategories = categoryTotals.values.toList()
+      ..sort((a, b) => b.total.compareTo(a.total));
+    final maxTotal = topCategories.isNotEmpty ? topCategories.first.total : 1.0;
+
+    final displayCategories = topCategories.take(3).map((stats) {
+      final category = DefaultCategories.expenseCategories
+          .where((c) => c.id == stats.category)
+          .firstOrNull;
+      final weeklyCount = weeks > 0 ? (stats.count / weeks).round() : stats.count;
+      final avgAmount = stats.count > 0 ? stats.total / stats.count : 0.0;
+      return LatteFactorCategory(
+        emoji: _getCategoryEmoji(stats.category),
+        name: category?.name ?? stats.category,
+        weeklyCount: weeklyCount,
+        averageAmount: avgAmount,
+        monthlyTotal: stats.total,
+        yearlyTotal: stats.total * 12,
+        progress: stats.total / maxTotal,
+        color: category?.color ?? Colors.grey,
+      );
+    }).toList();
+
+    final monthlyTotal = smallExpenses.fold(0.0, (sum, t) => sum + t.amount);
+    final weeklyTotal = weeks > 0 ? monthlyTotal / weeks : monthlyTotal;
+    final yearlyTotal = monthlyTotal * 12;
 
     return Scaffold(
       appBar: AppBar(
@@ -71,11 +89,12 @@ class LatteFactorPage extends ConsumerWidget {
                 ),
 
                 // 洞察建议
-                _InsightCard(
-                  category: '咖啡饮品',
-                  suggestion: '从每周5次减少到3次',
-                  yearlySaving: 3120,
-                ),
+                if (displayCategories.isNotEmpty)
+                  _InsightCard(
+                    category: displayCategories.first.name,
+                    suggestion: '减少高频小额消费可节省更多',
+                    yearlySaving: (displayCategories.first.yearlyTotal * 0.4).round().toDouble(),
+                  ),
 
                 // 高频消费TOP3
                 const Padding(
@@ -89,7 +108,20 @@ class LatteFactorPage extends ConsumerWidget {
                   ),
                 ),
 
-                ...topCategories.map((c) => _CategoryCard(category: c)),
+                if (displayCategories.isEmpty)
+                  Container(
+                    margin: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text('暂无小额消费数据', style: TextStyle(color: Colors.grey)),
+                    ),
+                  )
+                else
+                  ...displayCategories.map((c) => _CategoryCard(category: c)),
 
                 const SizedBox(height: 16),
               ],
@@ -414,7 +446,7 @@ class LatteFactorCategory {
   final String emoji;
   final String name;
   final int weeklyCount;
-  final int averageAmount;
+  final double averageAmount;
   final double monthlyTotal;
   final double yearlyTotal;
   final double progress;
@@ -430,4 +462,27 @@ class LatteFactorCategory {
     required this.progress,
     required this.color,
   });
+}
+
+/// 分类统计辅助类
+class _CategoryStats {
+  final String category;
+  int count = 0;
+  double total = 0.0;
+
+  _CategoryStats({required this.category});
+}
+
+/// 根据分类ID获取emoji
+String _getCategoryEmoji(String categoryId) {
+  const emojiMap = {
+    'food': '🍚',
+    'transport': '🚇',
+    'shopping': '🛍️',
+    'entertainment': '🎮',
+    'coffee': '☕',
+    'drinks': '🥤',
+    'snacks': '🍿',
+  };
+  return emojiMap[categoryId] ?? '📦';
 }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/budget_vault_provider.dart';
+import '../providers/transaction_provider.dart';
+
 /// 应急金目标页面
 ///
 /// 对应原型设计 10.05 应急金目标
@@ -10,12 +13,20 @@ class EmergencyFundPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 模拟数据
-    const currentAmount = 18000.0;
-    const targetAmount = 30000.0;
-    const monthlyExpense = 8000.0;
-    final monthsCovered = currentAmount / monthlyExpense;
-    final progress = currentAmount / targetAmount;
+    final emergencyVault = ref.watch(emergencyFundVaultProvider);
+    final monthlyExpense = ref.watch(monthlyExpenseProvider);
+
+    // 从应急基金小金库获取数据，如果没有则显示默认值
+    final currentAmount = emergencyVault?.allocatedAmount ?? 0.0;
+    final targetMonths = 3;
+    final targetAmount = monthlyExpense > 0 ? monthlyExpense * targetMonths : emergencyVault?.targetAmount ?? 0.0;
+    final monthsCovered = monthlyExpense > 0 ? currentAmount / monthlyExpense : 0.0;
+    final progress = targetAmount > 0 ? (currentAmount / targetAmount).clamp(0.0, 1.0) : 0.0;
+
+    // 计算存款建议
+    final remaining = targetAmount - currentAmount;
+    final monthlyTarget = remaining > 0 ? (remaining / 6).clamp(500.0, remaining) : 0.0;
+    final daysToGoal = monthlyTarget > 0 ? ((remaining / monthlyTarget) * 30).round() : 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -23,7 +34,7 @@ class EmergencyFundPage extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () => _showSettingsDialog(context),
+            onPressed: () => _showSettingsDialog(context, monthlyExpense),
           ),
         ],
       ),
@@ -48,8 +59,8 @@ class EmergencyFundPage extends ConsumerWidget {
 
           // 存款建议
           _SavingSuggestionCard(
-            monthlyTarget: 2000,
-            daysToGoal: 180,
+            monthlyTarget: monthlyTarget,
+            daysToGoal: daysToGoal,
           ),
 
           // 快速操作
@@ -61,7 +72,7 @@ class EmergencyFundPage extends ConsumerWidget {
     );
   }
 
-  void _showSettingsDialog(BuildContext context) {
+  void _showSettingsDialog(BuildContext context, double monthlyExpense) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -78,7 +89,7 @@ class EmergencyFundPage extends ConsumerWidget {
             ListTile(
               title: const Text('月均支出'),
               subtitle: const Text('用于计算目标金额'),
-              trailing: const Text('¥8,000'),
+              trailing: Text('¥${monthlyExpense.toStringAsFixed(0)}'),
               onTap: () {},
             ),
           ],

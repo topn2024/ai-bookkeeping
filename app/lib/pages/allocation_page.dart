@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/budget_vault.dart';
 import '../services/allocation_service.dart';
+import '../providers/budget_vault_provider.dart';
 
 /// 资金分配页面
 class AllocationPage extends ConsumerStatefulWidget {
@@ -20,9 +21,6 @@ class AllocationPage extends ConsumerStatefulWidget {
 class _AllocationPageState extends ConsumerState<AllocationPage> {
   final AllocationService _allocationService = AllocationService();
 
-  // 模拟数据
-  double _unallocatedAmount = 5000.0;
-  List<BudgetVault> _vaults = [];
   List<AllocationSuggestion> _suggestions = [];
   Map<String, double> _allocations = {};
   AllocationStrategy _selectedStrategy = AllocationStrategy.priority;
@@ -30,105 +28,58 @@ class _AllocationPageState extends ConsumerState<AllocationPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialAmount != null) {
-      _unallocatedAmount = widget.initialAmount!;
-    }
-    _loadMockData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateSuggestions();
+    });
   }
 
-  void _loadMockData() {
-    _vaults = [
-      BudgetVault(
-        id: '1',
-        name: '房租',
-        icon: Icons.home,
-        color: Colors.blue,
-        type: VaultType.fixed,
-        targetAmount: 3000,
-        allocatedAmount: 2500,
-        spentAmount: 0,
-        ledgerId: 'default',
-        allocationType: AllocationType.fixed,
-        targetAllocation: 3000,
-      ),
-      BudgetVault(
-        id: '2',
-        name: '餐饮',
-        icon: Icons.restaurant,
-        color: Colors.orange,
-        type: VaultType.flexible,
-        targetAmount: 2000,
-        allocatedAmount: 1500,
-        spentAmount: 800,
-        ledgerId: 'default',
-        allocationType: AllocationType.percentage,
-        targetPercentage: 0.20,
-      ),
-      BudgetVault(
-        id: '3',
-        name: '交通',
-        icon: Icons.directions_car,
-        color: Colors.green,
-        type: VaultType.flexible,
-        targetAmount: 500,
-        allocatedAmount: 300,
-        spentAmount: 200,
-        ledgerId: 'default',
-        allocationType: AllocationType.fixed,
-        targetAllocation: 500,
-      ),
-      BudgetVault(
-        id: '4',
-        name: '应急基金',
-        icon: Icons.savings,
-        color: Colors.teal,
-        type: VaultType.savings,
-        targetAmount: 10000,
-        allocatedAmount: 5000,
-        spentAmount: 0,
-        ledgerId: 'default',
-        allocationType: AllocationType.topUp,
-      ),
-      BudgetVault(
-        id: '5',
-        name: '信用卡还款',
-        icon: Icons.credit_card,
-        color: Colors.red,
-        type: VaultType.debt,
-        targetAmount: 5000,
-        allocatedAmount: 4000,
-        spentAmount: 0,
-        ledgerId: 'default',
-        allocationType: AllocationType.fixed,
-        targetAllocation: 5000,
-      ),
-      BudgetVault(
-        id: '6',
-        name: '机动资金',
-        icon: Icons.account_balance_wallet,
-        color: Colors.purple,
-        type: VaultType.flexible,
-        targetAmount: 1000,
-        allocatedAmount: 0,
-        spentAmount: 0,
-        ledgerId: 'default',
-        allocationType: AllocationType.remainder,
-      ),
-    ];
+  double get _unallocatedAmount {
+    if (widget.initialAmount != null) {
+      return widget.initialAmount!;
+    }
+    return ref.read(budgetVaultProvider).unallocatedAmount;
+  }
 
-    _updateSuggestions();
+  List<BudgetVault> get _vaults {
+    return ref.read(budgetVaultProvider).vaults.where((v) => v.isEnabled).toList();
   }
 
   void _updateSuggestions() {
-    _suggestions = _allocationService.getSuggestions(
-      unallocatedAmount: _unallocatedAmount,
-      vaults: _vaults,
-    );
+    final vaults = _vaults;
+    if (vaults.isEmpty) return;
+
+    setState(() {
+      _suggestions = _allocationService.getSuggestions(
+        unallocatedAmount: _unallocatedAmount,
+        vaults: vaults,
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    // Watch the provider to rebuild when data changes
+    final vaultState = ref.watch(budgetVaultProvider);
+    final vaults = vaultState.vaults.where((v) => v.isEnabled).toList();
+    final unallocatedAmount = widget.initialAmount ?? vaultState.unallocatedAmount;
+
+    if (vaults.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('分配资金')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.account_balance_wallet_outlined, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text('暂无小金库', style: TextStyle(color: Colors.grey[600])),
+              const SizedBox(height: 8),
+              Text('请先创建小金库再进行分配', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -145,7 +96,7 @@ class _AllocationPageState extends ConsumerState<AllocationPage> {
         children: [
           // 待分配金额卡片
           _UnallocatedAmountCard(
-            amount: _unallocatedAmount,
+            amount: unallocatedAmount,
             allocated: _allocations.values.fold(0.0, (a, b) => a + b),
           ),
 
@@ -162,27 +113,36 @@ class _AllocationPageState extends ConsumerState<AllocationPage> {
 
           // 分配建议列表
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: 120),
-              itemCount: _suggestions.length,
-              itemBuilder: (context, index) => _SuggestionTile(
-                suggestion: _suggestions[index],
-                vault: _vaults.firstWhere((v) => v.id == _suggestions[index].vaultId),
-                currentAllocation: _allocations[_suggestions[index].vaultId] ?? 0,
-                onAllocationChanged: (amount) {
-                  setState(() {
-                    _allocations[_suggestions[index].vaultId] = amount;
-                  });
-                },
-                maxAllocation: _getRemainingForVault(_suggestions[index].vaultId),
-              ),
-            ),
+            child: _suggestions.isEmpty
+                ? Center(
+                    child: Text('暂无分配建议', style: TextStyle(color: Colors.grey[600])),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 120),
+                    itemCount: _suggestions.length,
+                    itemBuilder: (context, index) {
+                      final suggestion = _suggestions[index];
+                      final vault = vaults.where((v) => v.id == suggestion.vaultId).firstOrNull;
+                      if (vault == null) return const SizedBox.shrink();
+                      return _SuggestionTile(
+                        suggestion: suggestion,
+                        vault: vault,
+                        currentAllocation: _allocations[suggestion.vaultId] ?? 0,
+                        onAllocationChanged: (amount) {
+                          setState(() {
+                            _allocations[suggestion.vaultId] = amount;
+                          });
+                        },
+                        maxAllocation: _getRemainingForVault(suggestion.vaultId),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
       bottomSheet: _AllocationActionBar(
         totalAllocated: _allocations.values.fold(0.0, (a, b) => a + b),
-        unallocatedAmount: _unallocatedAmount,
+        unallocatedAmount: unallocatedAmount,
         onAutoAllocate: _autoAllocate,
         onConfirm: _confirmAllocation,
         onSkip: () => Navigator.pop(context),
@@ -198,9 +158,12 @@ class _AllocationPageState extends ConsumerState<AllocationPage> {
   }
 
   void _previewAllocation() {
+    final vaults = _vaults;
+    if (vaults.isEmpty) return;
+
     final preview = _allocationService.previewAllocation(
       incomeAmount: _unallocatedAmount,
-      vaults: _vaults,
+      vaults: vaults,
       strategy: _selectedStrategy,
     );
 
@@ -213,9 +176,12 @@ class _AllocationPageState extends ConsumerState<AllocationPage> {
   }
 
   void _autoAllocate() {
+    final vaults = _vaults;
+    if (vaults.isEmpty) return;
+
     final result = _allocationService.autoAllocate(
       unallocatedAmount: _unallocatedAmount,
-      vaults: _vaults,
+      vaults: vaults,
     );
 
     setState(() {
@@ -246,6 +212,8 @@ class _AllocationPageState extends ConsumerState<AllocationPage> {
       return;
     }
 
+    final vaults = _vaults;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -257,8 +225,8 @@ class _AllocationPageState extends ConsumerState<AllocationPage> {
             Text('即将分配 ¥${_allocations.values.fold(0.0, (a, b) => a + b).toStringAsFixed(2)}'),
             const SizedBox(height: 8),
             ..._allocations.entries.map((e) {
-              final vault = _vaults.firstWhere((v) => v.id == e.key);
-              return Text('• ${vault.name}: ¥${e.value.toStringAsFixed(2)}');
+              final vault = vaults.where((v) => v.id == e.key).firstOrNull;
+              return Text('• ${vault?.name ?? "未知"}: ¥${e.value.toStringAsFixed(2)}');
             }),
           ],
         ),
