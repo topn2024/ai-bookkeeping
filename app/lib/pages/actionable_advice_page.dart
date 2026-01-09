@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/actionable_advice_provider.dart';
 import 'budget_center_page.dart';
-import 'budget_management_page.dart';
 import 'money_age_page.dart';
 
 /// 建议类型枚举
@@ -52,85 +52,12 @@ class ActionableAdvicePage extends ConsumerStatefulWidget {
 }
 
 class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
-  late List<ActionableAdvice> _adviceList;
-
-  @override
-  void initState() {
-    super.initState();
-    _initMockData();
-  }
-
-  void _initMockData() {
-    _adviceList = [
-      ActionableAdvice(
-        id: '1',
-        type: AdviceType.budgetWarning,
-        title: '餐饮预算预警',
-        description: '餐饮还剩 ¥80/5天，平均每天16元。这周少点2次外卖，改成自带午餐怎么样？',
-        icon: Icons.restaurant,
-        color: const Color(0xFFF57C00),
-        bgColor: const Color(0xFFFFF3E0),
-        primaryAction: '设置提醒',
-        secondaryAction: '忽略',
-        metadata: {
-          'remaining': 80,
-          'days': 5,
-          'daily_average': 16,
-        },
-      ),
-      ActionableAdvice(
-        id: '2',
-        type: AdviceType.overspending,
-        title: '超支处理方案',
-        description: '购物超支 ¥200，主要是双11购物。可以从娱乐预算（还剩¥300）调拨，要帮你设置吗？',
-        icon: Icons.trending_up,
-        color: const Color(0xFFE53935),
-        bgColor: const Color(0xFFFFEBEE),
-        primaryAction: '立即调拨',
-        secondaryAction: '下月补上',
-        metadata: {
-          'overspent': 200,
-          'source': '双11购物',
-          'available_from': '娱乐预算',
-          'available_amount': 300,
-        },
-      ),
-      ActionableAdvice(
-        id: '3',
-        type: AdviceType.moneyAge,
-        title: '钱龄提升机会',
-        description: '钱龄目前 12天，离目标差3天。把周末的¥299购物推迟到下周发工资后，钱龄可达 16天',
-        icon: Icons.schedule,
-        color: const Color(0xFF43A047),
-        bgColor: const Color(0xFFE8F5E9),
-        primaryAction: '添加到待办',
-        secondaryAction: '已知晓',
-        metadata: {
-          'current_age': 12,
-          'target_age': 15,
-          'potential_age': 16,
-          'postpone_amount': 299,
-        },
-      ),
-      ActionableAdvice(
-        id: '4',
-        type: AdviceType.achievement,
-        title: '连续记账7天！',
-        description: '本月预算执行率85%，月底就能看到完整的消费报告。继续保持这个好习惯！',
-        icon: Icons.emoji_events,
-        color: const Color(0xFF8E24AA),
-        bgColor: const Color(0xFFF3E5F5),
-        metadata: {
-          'streak_days': 7,
-          'budget_execution': 85,
-        },
-      ),
-    ];
-  }
+  final Set<String> _ignoredAdviceIds = {};
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final adviceAsync = ref.watch(actionableAdviceProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
@@ -148,32 +75,73 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
+      body: adviceAsync.when(
+        data: (adviceList) {
+          final filteredList = adviceList
+              .where((advice) => !_ignoredAdviceIds.contains(advice.id))
+              .toList();
+
+          if (filteredList.isEmpty) {
+            return Center(
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 今日建议摘要
-                  _buildTodaySummary(l10n),
-                  // 建议列表
-                  ...List.generate(_adviceList.length, (index) {
-                    return _buildAdviceCard(_adviceList[index], l10n);
-                  }),
+                  Icon(Icons.check_circle_outline,
+                      size: 64, color: AppTheme.textSecondaryColor),
                   const SizedBox(height: 16),
+                  Text(
+                    '暂无建议',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppTheme.textSecondaryColor,
+                    ),
+                  ),
                 ],
               ),
+            );
+          }
+
+          return Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildTodaySummary(l10n, filteredList),
+                      ...filteredList.map((advice) => _buildAdviceCard(advice, l10n)),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ),
+              _buildSettingsEntry(l10n),
+            ],
+          );
+        },
+        loading: () => Column(
+          children: [
+            Expanded(
+              child: const Center(child: CircularProgressIndicator()),
             ),
-          ),
-          // 底部设置入口
-          _buildSettingsEntry(l10n),
-        ],
+            _buildSettingsEntry(l10n),
+          ],
+        ),
+        error: (error, stack) => Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Text('加载失败: $error'),
+              ),
+            ),
+            _buildSettingsEntry(l10n),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildTodaySummary(AppLocalizations l10n) {
-    final actionableCount = _adviceList
+  Widget _buildTodaySummary(AppLocalizations l10n, List<ActionableAdvice> adviceList) {
+    final actionableCount = adviceList
         .where((a) => a.primaryAction != null)
         .length;
 
@@ -448,7 +416,7 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
 
   void _handleSecondaryAction(ActionableAdvice advice) {
     setState(() {
-      _adviceList.remove(advice);
+      _ignoredAdviceIds.add(advice.id);
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -457,7 +425,7 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
           label: '撤销',
           onPressed: () {
             setState(() {
-              _adviceList.insert(0, advice);
+              _ignoredAdviceIds.remove(advice.id);
             });
           },
         ),
@@ -532,7 +500,7 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
                 ),
               );
               setState(() {
-                _adviceList.remove(advice);
+                _ignoredAdviceIds.add(advice.id);
               });
             },
             style: ElevatedButton.styleFrom(
