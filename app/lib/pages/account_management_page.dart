@@ -366,7 +366,15 @@ class AccountManagementPage extends ConsumerWidget {
                       return;
                     }
 
-                    final balance = double.tryParse(balanceController.text) ?? 0;
+                    final balanceText = balanceController.text.trim();
+                    final balance = balanceText.isEmpty ? 0.0 : double.tryParse(balanceText);
+                    if (balance == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('请输入有效的余额')),
+                      );
+                      return;
+                    }
+
                     final newAccount = Account(
                       id: account?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
                       name: name,

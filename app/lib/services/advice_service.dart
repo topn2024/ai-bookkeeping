@@ -20,7 +20,7 @@ class AdviceService {
     // 1. 预算预警建议
     for (final budget in budgets) {
       if (budget.period == BudgetPeriod.monthly && daysRemaining > 0) {
-        final spent = _calculateSpent(transactions, budget.category, now.month);
+        final spent = _calculateSpent(transactions, budget.categoryId, now.month);
         final remaining = budget.amount - spent;
         final dailyAverage = remaining / daysRemaining;
 
@@ -28,9 +28,9 @@ class AdviceService {
           adviceList.add(ActionableAdvice(
             id: 'budget_${budget.id}',
             type: AdviceType.budgetWarning,
-            title: '${budget.category}预算预警',
-            description: '${budget.category}还剩 ¥${remaining.toStringAsFixed(0)}/$daysRemaining天，平均每天${dailyAverage.toStringAsFixed(0)}元。建议控制支出以避免超支。',
-            icon: _getCategoryIcon(budget.category),
+            title: '${budget.name}预算预警',
+            description: '${budget.name}还剩 ¥${remaining.toStringAsFixed(0)}/$daysRemaining天，平均每天${dailyAverage.toStringAsFixed(0)}元。建议控制支出以避免超支。',
+            icon: _getCategoryIcon(budget.name),
             color: const Color(0xFFF57C00),
             bgColor: const Color(0xFFFFF3E0),
             primaryAction: '设置提醒',
@@ -39,7 +39,7 @@ class AdviceService {
               'remaining': remaining,
               'days': daysRemaining,
               'daily_average': dailyAverage,
-              'category': budget.category,
+              'category': budget.name,
             },
           ));
         }
@@ -47,14 +47,14 @@ class AdviceService {
         // 超支建议
         if (remaining < 0) {
           final overspent = -remaining;
-          final otherBudget = _findAvailableBudget(budgets, transactions, budget.category, now.month);
+          final otherBudget = _findAvailableBudget(budgets, transactions, budget.categoryId, now.month);
 
           if (otherBudget != null) {
             adviceList.add(ActionableAdvice(
               id: 'overspend_${budget.id}',
               type: AdviceType.overspending,
               title: '超支处理方案',
-              description: '${budget.category}超支 ¥${overspent.toStringAsFixed(0)}。可以从${otherBudget.category}预算（还剩¥${otherBudget.remaining.toStringAsFixed(0)}）调拨，要帮你设置吗？',
+              description: '${budget.name}超支 ¥${overspent.toStringAsFixed(0)}。可以从${otherBudget.name}预算（还剩¥${otherBudget.remaining.toStringAsFixed(0)}）调拨，要帮你设置吗？',
               icon: Icons.trending_up,
               color: const Color(0xFFE53935),
               bgColor: const Color(0xFFFFEBEE),
@@ -62,8 +62,8 @@ class AdviceService {
               secondaryAction: '下月补上',
               metadata: {
                 'overspent': overspent,
-                'source': budget.category,
-                'available_from': otherBudget.category,
+                'source': budget.name,
+                'available_from': otherBudget.name,
                 'available_amount': otherBudget.remaining,
               },
             ));
@@ -120,10 +120,10 @@ class AdviceService {
     return adviceList;
   }
 
-  double _calculateSpent(List<Transaction> transactions, String category, int month) {
+  double _calculateSpent(List<Transaction> transactions, String? categoryId, int month) {
     return transactions
         .where((t) =>
-          t.category == category &&
+          t.categoryId == categoryId &&
           t.type == TransactionType.expense &&
           t.date.month == month
         )
@@ -133,12 +133,12 @@ class AdviceService {
   _BudgetWithRemaining? _findAvailableBudget(
     List<Budget> budgets,
     List<Transaction> transactions,
-    String excludeCategory,
+    String? excludeCategoryId,
     int month,
   ) {
     for (final budget in budgets) {
-      if (budget.category != excludeCategory && budget.period == BudgetPeriod.monthly) {
-        final spent = _calculateSpent(transactions, budget.category, month);
+      if (budget.categoryId != excludeCategoryId && budget.period == BudgetPeriod.monthly) {
+        final spent = _calculateSpent(transactions, budget.categoryId, month);
         final remaining = budget.amount - spent;
         if (remaining > 100) {
           return _BudgetWithRemaining(budget, remaining);
@@ -157,7 +157,7 @@ class AdviceService {
     for (final budget in budgets) {
       if (budget.period == BudgetPeriod.monthly) {
         totalBudget += budget.amount;
-        totalSpent += _calculateSpent(transactions, budget.category, month);
+        totalSpent += _calculateSpent(transactions, budget.categoryId, month);
       }
     }
 

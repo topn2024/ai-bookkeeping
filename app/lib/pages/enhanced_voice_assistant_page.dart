@@ -725,8 +725,15 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
         state.currentSessionData != null) {
       final navData = state.currentSessionData as Map<String, dynamic>;
       final route = navData['route'] as String?;
+      final pageName = navData['pageName'] as String?;
       if (route != null) {
         _navigateToRoute(route);
+        // 添加导航成功的聊天消息
+        _addMessage(ChatMessage(
+          type: MessageType.assistant,
+          content: '✓ 已为您打开${pageName ?? route}页面',
+          timestamp: DateTime.now(),
+        ));
         // 清除导航会话数据
         coordinator.clearSession();
       }

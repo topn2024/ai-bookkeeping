@@ -934,15 +934,28 @@ class _InvestmentDetailSheet extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              final newValue = double.tryParse(controller.text);
-              if (newValue != null) {
-                ref.read(investmentProvider.notifier).updateValue(
-                  investment.id,
-                  newValue,
+              final text = controller.text.trim();
+              if (text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请输入市值')),
                 );
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Close detail sheet
+                return;
               }
+
+              final newValue = double.tryParse(text);
+              if (newValue == null || newValue < 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请输入有效的市值')),
+                );
+                return;
+              }
+
+              ref.read(investmentProvider.notifier).updateValue(
+                investment.id,
+                newValue,
+              );
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Close detail sheet
             },
             child: const Text('确定'),
           ),

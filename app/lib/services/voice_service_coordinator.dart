@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../models/transaction.dart' as model;
 import '../services/database_service.dart';
 import '../services/database_voice_extension.dart';
+import '../services/duplicate_detection_service.dart';
 import 'voice/entity_disambiguation_service.dart';
 import 'voice/voice_delete_service.dart';
 import 'voice/voice_modify_service.dart';
@@ -364,6 +365,16 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         result = VoiceSessionResult.fromModifyResult(modifyResult);
         break;
 
+      case VoiceIntentType.addTransaction:
+        // 确认添加重复的交易
+        final sessionData = _currentSession!.sessionData as Map<String, dynamic>;
+        final transaction = sessionData['transaction'] as model.Transaction;
+        await _databaseService.insertTransaction(transaction);
+        final message = '已记录消费${transaction.amount.toStringAsFixed(2)}元';
+        await _ttsService.speak(message);
+        result = VoiceSessionResult.success(message);
+        break;
+
       default:
         const message = '无法确认此类型的操作';
         await _ttsService.speak(message);
@@ -492,6 +503,34 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         rawMerchant: merchant,
         source: model.TransactionSource.voice,
       );
+
+      // 检查重复交易
+      final existingTransactions = await _databaseService.getTransactions();
+      final duplicateCheck = DuplicateDetectionService.checkDuplicate(
+        transaction,
+        existingTransactions,
+      );
+
+      if (duplicateCheck.hasPotentialDuplicate) {
+        // 发现潜在重复，提示用户
+        final duplicateMessage = '检测到可能的重复记录：${duplicateCheck.duplicateReason}。是否仍要添加？请说"确认"或"取消"。';
+        await _ttsService.speak(duplicateMessage);
+
+        // 保存待确认的交易到会话
+        _currentSession = VoiceSessionContext(
+          intentType: VoiceIntentType.addTransaction,
+          sessionData: {'transaction': transaction, 'duplicateCheck': duplicateCheck},
+          needsContinuation: true,
+          createdAt: DateTime.now(),
+        );
+        _sessionState = VoiceSessionState.waitingForConfirmation;
+        notifyListeners();
+
+        return VoiceSessionResult.success(duplicateMessage, {
+          'needsConfirmation': true,
+          'duplicateCheck': duplicateCheck,
+        });
+      }
 
       await _databaseService.insertTransaction(transaction);
 

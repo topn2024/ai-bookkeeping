@@ -509,8 +509,30 @@ class _VaultCreatePageState extends ConsumerState<VaultCreatePage> {
 
     final monthlyText = _monthlyController.text.replaceAll(',', '').trim();
     final targetText = _targetController.text.replaceAll(',', '').trim();
-    final monthlyAmount = double.tryParse(monthlyText) ?? 0;
-    final targetAmount = double.tryParse(targetText) ?? 0;
+
+    double monthlyAmount = 0;
+    if (monthlyText.isNotEmpty) {
+      final parsed = double.tryParse(monthlyText);
+      if (parsed == null || parsed < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请输入有效的月度金额')),
+        );
+        return;
+      }
+      monthlyAmount = parsed;
+    }
+
+    double targetAmount = 0;
+    if (targetText.isNotEmpty) {
+      final parsed = double.tryParse(targetText);
+      if (parsed == null || parsed < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请输入有效的目标金额')),
+        );
+        return;
+      }
+      targetAmount = parsed;
+    }
 
     final vaultType = VaultType.values[_selectedTypeIndex];
     final allocationType = AllocationType.values[_selectedStrategyIndex];

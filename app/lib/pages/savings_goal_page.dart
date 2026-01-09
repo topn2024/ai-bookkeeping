@@ -952,18 +952,31 @@ class SavingsGoalPage extends ConsumerWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              final amount = double.tryParse(amountController.text);
-              if (amount != null && amount > 0) {
-                ref.read(savingsGoalProvider.notifier).addDeposit(
-                  goal.id,
-                  amount,
-                  note: noteController.text.isNotEmpty ? noteController.text : null,
-                );
-                Navigator.pop(context);
+              final text = amountController.text.trim();
+              if (text.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('成功存入 ¥${amount.toStringAsFixed(2)}')),
+                  const SnackBar(content: Text('请输入存入金额')),
                 );
+                return;
               }
+
+              final amount = double.tryParse(text);
+              if (amount == null || amount <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请输入有效的金额')),
+                );
+                return;
+              }
+
+              ref.read(savingsGoalProvider.notifier).addDeposit(
+                goal.id,
+                amount,
+                note: noteController.text.isNotEmpty ? noteController.text : null,
+              );
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('成功存入 ¥${amount.toStringAsFixed(2)}')),
+              );
             },
             child: const Text('确认存入'),
           ),

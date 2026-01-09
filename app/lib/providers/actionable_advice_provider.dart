@@ -20,8 +20,8 @@ final actionableAdviceProvider = FutureProvider<List<ActionableAdvice>>((ref) as
     return [];
   }
 
-  final budgets = await ref.watch(budgetProvider.future);
-  final transactions = await ref.watch(transactionProvider.future);
+  final budgets = ref.watch(budgetProvider);
+  final transactions = ref.watch(transactionProvider);
   final moneyAgeDashboard = await ref.watch(moneyAgeDashboardProvider(bookId).future);
 
   return service.generateAdvice(

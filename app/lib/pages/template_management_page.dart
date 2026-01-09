@@ -483,7 +483,16 @@ class _TemplateDialogState extends ConsumerState<_TemplateDialog> {
     }
 
     final amountText = _amountController.text.trim();
-    final amount = amountText.isNotEmpty ? double.tryParse(amountText) : null;
+    double? amount;
+    if (amountText.isNotEmpty) {
+      amount = double.tryParse(amountText);
+      if (amount == null || amount <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请输入有效的金额')),
+        );
+        return;
+      }
+    }
 
     final template = TransactionTemplate(
       id: widget.template?.id ?? const Uuid().v4(),
