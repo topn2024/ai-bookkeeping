@@ -2,72 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
-
-/// 家庭储蓄目标数据模型
-class FamilySavingsGoal {
-  final String id;
-  final String name;
-  final String emoji;
-  final double targetAmount;
-  final double currentAmount;
-  final DateTime? deadline;
-  final List<MemberContribution> contributions;
-  final bool isMain;
-
-  FamilySavingsGoal({
-    required this.id,
-    required this.name,
-    required this.emoji,
-    required this.targetAmount,
-    required this.currentAmount,
-    this.deadline,
-    required this.contributions,
-    this.isMain = false,
-  });
-
-  double get progress => currentAmount / targetAmount;
-  int get daysRemaining => deadline?.difference(DateTime.now()).inDays ?? 0;
-}
-
-class MemberContribution {
-  final String memberId;
-  final String memberName;
-  final String memberEmoji;
-  final Color memberColor;
-  final double quota;
-  final double contributed;
-  final double monthlyContribution;
-
-  MemberContribution({
-    required this.memberId,
-    required this.memberName,
-    required this.memberEmoji,
-    required this.memberColor,
-    required this.quota,
-    required this.contributed,
-    required this.monthlyContribution,
-  });
-
-  double get progress => contributed / quota;
-}
-
-class SavingsRecord {
-  final String id;
-  final String memberName;
-  final String memberEmoji;
-  final String goalName;
-  final double amount;
-  final DateTime time;
-
-  SavingsRecord({
-    required this.id,
-    required this.memberName,
-    required this.memberEmoji,
-    required this.goalName,
-    required this.amount,
-    required this.time,
-  });
-}
+import '../models/family_savings_goal.dart';
+import '../providers/family_goal_provider.dart';
+import '../providers/ledger_context_provider.dart';
 
 /// 15.09 家庭共同储蓄目标页面
 class FamilySavingsGoalPage extends ConsumerStatefulWidget {
@@ -78,106 +15,41 @@ class FamilySavingsGoalPage extends ConsumerStatefulWidget {
 }
 
 class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
-  // 模拟数据
-  late List<FamilySavingsGoal> _goals;
-  late List<SavingsRecord> _records;
-
   @override
   void initState() {
     super.initState();
-    _initMockData();
-  }
-
-  void _initMockData() {
-    _goals = [
-      FamilySavingsGoal(
-        id: '1',
-        name: '家庭日本旅行',
-        emoji: '🎯',
-        targetAmount: 30000,
-        currentAmount: 18500,
-        deadline: DateTime.now().add(const Duration(days: 45)),
-        isMain: true,
-        contributions: [
-          MemberContribution(
-            memberId: '1',
-            memberName: '爸爸',
-            memberEmoji: '爸',
-            memberColor: const Color(0xFFFF6B6B),
-            quota: 10000,
-            contributed: 8000,
-            monthlyContribution: 2000,
-          ),
-          MemberContribution(
-            memberId: '2',
-            memberName: '妈妈',
-            memberEmoji: '妈',
-            memberColor: const Color(0xFFA8E6CF),
-            quota: 10000,
-            contributed: 7500,
-            monthlyContribution: 1500,
-          ),
-          MemberContribution(
-            memberId: '3',
-            memberName: '女儿',
-            memberEmoji: '女',
-            memberColor: const Color(0xFFDDA0DD),
-            quota: 5000,
-            contributed: 3000,
-            monthlyContribution: 500,
-          ),
-        ],
-      ),
-      FamilySavingsGoal(
-        id: '2',
-        name: '换新车基金',
-        emoji: '🚗',
-        targetAmount: 150000,
-        currentAmount: 45000,
-        contributions: [],
-      ),
-      FamilySavingsGoal(
-        id: '3',
-        name: '教育储备金',
-        emoji: '🎓',
-        targetAmount: 100000,
-        currentAmount: 28000,
-        contributions: [],
-      ),
-    ];
-
-    _records = [
-      SavingsRecord(
-        id: '1',
-        memberName: '爸爸',
-        memberEmoji: '爸',
-        goalName: '日本旅行基金',
-        amount: 2000,
-        time: DateTime.now().subtract(const Duration(hours: 2)),
-      ),
-      SavingsRecord(
-        id: '2',
-        memberName: '妈妈',
-        memberEmoji: '妈',
-        goalName: '日本旅行基金',
-        amount: 1500,
-        time: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-      SavingsRecord(
-        id: '3',
-        memberName: '女儿',
-        memberEmoji: '女',
-        goalName: '日本旅行基金',
-        amount: 500,
-        time: DateTime.now().subtract(const Duration(days: 3)),
-      ),
-    ];
+    // 加载目标数据
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ledgerContext = ref.read(ledgerContextProvider);
+      if (ledgerContext.currentLedger?.id != null) {
+        ref.read(familyGoalListProvider.notifier).loadGoals(ledgerContext.currentLedger!.id);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final mainGoal = _goals.firstWhere((g) => g.isMain, orElse: () => _goals.first);
+    final goalState = ref.watch(familyGoalListProvider);
+
+    // 加载状态
+    if (goalState.isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.familySavingsGoal)),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // 错误状态
+    if (goalState.error != null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.familySavingsGoal)),
+        body: Center(child: Text('加载失败: ${goalState.error}')),
+      );
+    }
+
+    final goals = goalState.activeGoals;
+    final mainGoal = goals.isNotEmpty ? (goalState.pinnedGoals.isNotEmpty ? goalState.pinnedGoals.first : goals.first) : null;
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
@@ -208,19 +80,21 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 主目标卡片
-                _buildMainGoalCard(mainGoal),
-                // 成员贡献进度
-                _buildContributionsSection(mainGoal, l10n),
+                if (mainGoal != null) ...[
+                  // 主目标卡片
+                  _buildMainGoalCard(mainGoal),
+                  // 成员贡献进度
+                  _buildContributionsSection(mainGoal, l10n),
+                ],
                 // 其他目标列表
-                _buildOtherGoalsSection(l10n),
+                _buildOtherGoalsSection(l10n, goals, mainGoal),
                 // 存钱记录
-                _buildRecordsSection(l10n),
+                if (mainGoal != null) _buildRecordsSection(l10n, mainGoal.id),
               ],
             ),
           ),
           // 底部存钱按钮
-          _buildDepositButton(l10n),
+          if (mainGoal != null) _buildDepositButton(l10n, mainGoal),
         ],
       ),
     );
@@ -272,20 +146,21 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '还剩 ${goal.daysRemaining} 天',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.white,
+              if (goal.daysRemaining != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '还剩 ${goal.daysRemaining} 天',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -312,7 +187,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
           ClipRRect(
             borderRadius: BorderRadius.circular(5),
             child: LinearProgressIndicator(
-              value: goal.progress,
+              value: goal.progressPercentage / 100,
               backgroundColor: Colors.white.withValues(alpha: 0.3),
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
               minHeight: 10,
@@ -321,7 +196,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
           const SizedBox(height: 8),
           Center(
             child: Text(
-              '${(goal.progress * 100).toStringAsFixed(0)}%',
+              '${goal.progressPercentage.toStringAsFixed(0)}%',
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w700,
@@ -348,13 +223,13 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
             ),
           ),
           const SizedBox(height: 12),
-          ...goal.contributions.map((c) => _buildContributionCard(c)),
+          ...goal.contributors.map((c) => _buildContributionCard(c)),
         ],
       ),
     );
   }
 
-  Widget _buildContributionCard(MemberContribution contribution) {
+  Widget _buildContributionCard(FamilyGoalContributor contributor) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -375,19 +250,14 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  contribution.memberColor,
-                  contribution.memberColor.withValues(alpha: 0.7),
-                ],
-              ),
+              color: AppTheme.primaryColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(22),
             ),
             child: Center(
               child: Text(
-                contribution.memberEmoji,
-                style: const TextStyle(
-                  color: Colors.white,
+                contributor.memberName.isNotEmpty ? contributor.memberName[0] : '?',
+                style: TextStyle(
+                  color: AppTheme.primaryColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -402,11 +272,11 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      contribution.memberName,
+                      contributor.memberName,
                       style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                     Text(
-                      '¥${contribution.contributed.toStringAsFixed(0)}',
+                      '¥${contributor.contribution.toStringAsFixed(0)}',
                       style: TextStyle(
                         color: AppTheme.primaryColor,
                         fontWeight: FontWeight.w600,
@@ -421,16 +291,16 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(3),
                         child: LinearProgressIndicator(
-                          value: contribution.progress,
+                          value: contributor.percentage / 100,
                           backgroundColor: AppTheme.surfaceVariantColor,
-                          valueColor: AlwaysStoppedAnimation<Color>(contribution.memberColor),
+                          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                           minHeight: 6,
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '${(contribution.progress * 100).toStringAsFixed(0)}%',
+                      '${contributor.percentage.toStringAsFixed(0)}%',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondaryColor,
@@ -440,7 +310,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '配额 ¥${contribution.quota.toStringAsFixed(0)} · 本月已存 ¥${contribution.monthlyContribution.toStringAsFixed(0)}',
+                  '贡献次数: ${contributor.contributionCount}',
                   style: TextStyle(
                     fontSize: 11,
                     color: AppTheme.textSecondaryColor,
@@ -454,8 +324,8 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
     );
   }
 
-  Widget _buildOtherGoalsSection(AppLocalizations l10n) {
-    final otherGoals = _goals.where((g) => !g.isMain).toList();
+  Widget _buildOtherGoalsSection(AppLocalizations l10n, List<FamilySavingsGoal> goals, FamilySavingsGoal? mainGoal) {
+    final otherGoals = goals.where((g) => g.id != mainGoal?.id).toList();
     if (otherGoals.isEmpty) return const SizedBox.shrink();
 
     return Padding(
@@ -529,7 +399,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(2),
                   child: LinearProgressIndicator(
-                    value: goal.progress,
+                    value: goal.progressPercentage / 100,
                     backgroundColor: AppTheme.surfaceVariantColor,
                     valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                     minHeight: 4,
@@ -540,7 +410,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
           ),
           const SizedBox(width: 8),
           Text(
-            '${(goal.progress * 100).toStringAsFixed(0)}%',
+            '${goal.progressPercentage.toStringAsFixed(0)}%',
             style: TextStyle(
               fontSize: 14,
               color: AppTheme.primaryColor,
@@ -552,7 +422,9 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
     );
   }
 
-  Widget _buildRecordsSection(AppLocalizations l10n) {
+  Widget _buildRecordsSection(AppLocalizations l10n, String goalId) {
+    final contributionsAsync = ref.watch(goalContributionsProvider(goalId));
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -566,43 +438,64 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
             ),
           ),
           const SizedBox(height: 12),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              children: _records.asMap().entries.map((entry) {
-                final index = entry.key;
-                final record = entry.value;
-                return Column(
-                  children: [
-                    _buildRecordItem(record),
-                    if (index < _records.length - 1)
-                      Divider(
-                        height: 1,
-                        indent: 60,
-                        color: AppTheme.dividerColor,
-                      ),
-                  ],
+          contributionsAsync.when(
+            data: (contributions) {
+              if (contributions.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '暂无存入记录',
+                      style: TextStyle(color: AppTheme.textSecondaryColor),
+                    ),
+                  ),
                 );
-              }).toList(),
-            ),
+              }
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: contributions.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final record = entry.value;
+                    return Column(
+                      children: [
+                        _buildRecordItem(record),
+                        if (index < contributions.length - 1)
+                          Divider(
+                            height: 1,
+                            indent: 60,
+                            color: AppTheme.dividerColor,
+                          ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stack) => Text('加载失败: $error'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRecordItem(SavingsRecord record) {
-    final timeText = _formatTime(record.time);
+  Widget _buildRecordItem(FamilyGoalContribution record) {
+    final timeText = _formatTime(record.createdAt);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -616,7 +509,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
             ),
             child: Center(
               child: Text(
-                record.memberEmoji,
+                record.contributorName.isNotEmpty ? record.contributorName[0] : '?',
                 style: const TextStyle(fontSize: 14),
               ),
             ),
@@ -627,7 +520,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${record.memberName}存入${record.goalName}',
+                  '${record.contributorName}存入',
                   style: const TextStyle(fontSize: 14),
                 ),
                 Text(
@@ -652,14 +545,14 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
     );
   }
 
-  Widget _buildDepositButton(AppLocalizations l10n) {
+  Widget _buildDepositButton(AppLocalizations l10n, FamilySavingsGoal mainGoal) {
     return Positioned(
       bottom: 20,
       left: 16,
       right: 16,
       child: SafeArea(
         child: ElevatedButton.icon(
-          onPressed: _showDepositDialog,
+          onPressed: () => _showDepositDialog(mainGoal),
           icon: const Icon(Icons.savings, size: 20),
           label: Text(l10n.depositNow),
           style: ElevatedButton.styleFrom(
@@ -733,7 +626,10 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
     );
   }
 
-  void _showDepositDialog() {
+  void _showDepositDialog(FamilySavingsGoal mainGoal) {
+    final goalState = ref.read(familyGoalListProvider);
+    final goals = goalState.activeGoals;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -771,20 +667,21 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
               autofocus: true,
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: '选择目标',
-                border: OutlineInputBorder(),
+            if (goals.isNotEmpty)
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                  labelText: '选择目标',
+                  border: OutlineInputBorder(),
+                ),
+                initialValue: mainGoal.id,
+                items: goals
+                    .map((g) => DropdownMenuItem(
+                          value: g.id,
+                          child: Text('${g.emoji} ${g.name}'),
+                        ))
+                    .toList(),
+                onChanged: (value) {},
               ),
-              initialValue: _goals.first.name,
-              items: _goals
-                  .map((g) => DropdownMenuItem(
-                        value: g.name,
-                        child: Text('${g.emoji} ${g.name}'),
-                      ))
-                  .toList(),
-              onChanged: (value) {},
-            ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
