@@ -48,7 +48,7 @@ class Transaction(Base):
     # Money Age fields - for tracking financial health
     money_age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Age in days
     money_age_level: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # health/warning/danger
-    resource_pool_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)  # For income tracking
+    resource_pool_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("resource_pools.id"), nullable=True)  # For income tracking
 
     is_reimbursable: Mapped[bool] = mapped_column(Boolean, default=False)
     is_reimbursed: Mapped[bool] = mapped_column(Boolean, default=False)

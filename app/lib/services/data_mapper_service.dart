@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/transaction.dart';
+import '../models/transaction_location.dart';
 import '../models/account.dart';
 import '../models/category.dart';
 import '../models/ledger.dart';
@@ -48,34 +49,45 @@ class DataMapperService {
       'transaction_time': _formatTime(tx.date),
       'note': tx.note,
       'tags': tx.tags,
-      // Location fields (Chapter 14)
-      'location': tx.location,
-      'location_latitude': tx.locationLatitude?.toString(),
-      'location_longitude': tx.locationLongitude?.toString(),
-      'location_place_name': tx.locationPlaceName,
-      'location_address': tx.locationAddress,
-      'location_city': tx.locationCity,
-      'location_district': tx.locationDistrict,
-      'location_type': tx.locationType,
-      'location_poi_id': tx.locationPoiId,
-      'geofence_region': tx.geofenceRegion,
-      'is_cross_region': tx.isCrossRegion ?? false,
+      // Location fields (Chapter 14) - from TransactionLocation object
+      'location_latitude': tx.location?.latitude.toString(),
+      'location_longitude': tx.location?.longitude.toString(),
+      'location_place_name': tx.location?.placeName,
+      'location_address': tx.location?.address,
+      'location_city': tx.location?.city,
+      'location_district': tx.location?.district,
+      'location_type': tx.location?.locationType?.index,
+      'location_poi_id': tx.location?.poiId,
       // Money Age fields
       'money_age': tx.moneyAge,
-      'money_age_level': tx.moneyAgeLevel,
-      'resource_pool_id': tx.resourcePoolId,
       // Other fields
       'is_reimbursable': tx.isReimbursable,
       'is_reimbursed': tx.isReimbursed,
       'is_exclude_stats': false,
-      'source': tx.source ?? 0, // 0: manual, 1: image, 2: voice, 3: email
+      'source': tx.source.index, // 0: manual, 1: image, 2: voice, 3: email
       'ai_confidence': tx.aiConfidence?.toString(),
-      'visibility': tx.visibility ?? 1,
     };
   }
 
   /// Convert server transaction data to local Transaction
   Transaction transactionFromServer(Map<String, dynamic> data, String localId) {
+    // Build TransactionLocation from server data if location fields present
+    TransactionLocation? location;
+    if (data['location_latitude'] != null && data['location_longitude'] != null) {
+      location = TransactionLocation(
+        latitude: double.tryParse(data['location_latitude'].toString()) ?? 0,
+        longitude: double.tryParse(data['location_longitude'].toString()) ?? 0,
+        placeName: data['location_place_name'] as String?,
+        address: data['location_address'] as String?,
+        city: data['location_city'] as String?,
+        district: data['location_district'] as String?,
+        locationType: data['location_type'] != null
+            ? LocationType.values[data['location_type'] as int]
+            : null,
+        poiId: data['location_poi_id'] as String?,
+      );
+    }
+
     return Transaction(
       id: localId,
       type: TransactionType.values[(data['transaction_type'] as int) - 1],
@@ -89,32 +101,17 @@ class DataMapperService {
       isReimbursable: data['is_reimbursable'] as bool? ?? false,
       isReimbursed: data['is_reimbursed'] as bool? ?? false,
       tags: (data['tags'] as List<dynamic>?)?.cast<String>(),
-      // Location fields (Chapter 14)
-      location: data['location'] as String?,
-      locationLatitude: data['location_latitude'] != null
-          ? double.tryParse(data['location_latitude'].toString())
-          : null,
-      locationLongitude: data['location_longitude'] != null
-          ? double.tryParse(data['location_longitude'].toString())
-          : null,
-      locationPlaceName: data['location_place_name'] as String?,
-      locationAddress: data['location_address'] as String?,
-      locationCity: data['location_city'] as String?,
-      locationDistrict: data['location_district'] as String?,
-      locationType: data['location_type'] as int?,
-      locationPoiId: data['location_poi_id'] as String?,
-      geofenceRegion: data['geofence_region'] as String?,
-      isCrossRegion: data['is_cross_region'] as bool? ?? false,
-      // Money Age fields
+      // Location (Chapter 14)
+      location: location,
+      // Money Age
       moneyAge: data['money_age'] as int?,
-      moneyAgeLevel: data['money_age_level'] as String?,
-      resourcePoolId: data['resource_pool_id'] as String?,
       // Source and AI fields
-      source: data['source'] as int?,
+      source: data['source'] != null
+          ? TransactionSource.values[data['source'] as int]
+          : TransactionSource.manual,
       aiConfidence: data['ai_confidence'] != null
           ? double.tryParse(data['ai_confidence'].toString())
           : null,
-      visibility: data['visibility'] as int? ?? 1,
     );
   }
 
