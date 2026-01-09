@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../l10n/l10n.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/budget_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../widgets/budget_alert_widget.dart';
@@ -49,7 +50,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             const BudgetAlertBanner(),
             _buildTodayAllowanceCard(context, theme, monthlyIncome, monthlyExpense),
             _buildCelebrationCard(context, theme),
-            _buildMoneyAgeCard(context, theme),
+            _buildMoneyAgeCard(context, theme, ref),
             _buildQuickStats(context, theme, monthlyIncome, monthlyExpense, colors),
             _buildBudgetOverview(context, theme),
             _buildRecentTransactions(context, theme, transactions, colors),
@@ -337,11 +338,26 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   /// 钱龄卡片
   /// 原型设计：钱龄数值、等级、趋势
-  Widget _buildMoneyAgeCard(BuildContext context, ThemeData theme) {
-    // TODO: 从钱龄服务获取数据
-    const moneyAge = 42;
-    const level = '优秀';
-    const trendDays = 5;
+  Widget _buildMoneyAgeCard(BuildContext context, ThemeData theme, WidgetRef ref) {
+    final moneyAgeData = ref.watch(moneyAgeProvider);
+    final moneyAge = moneyAgeData.days;
+
+    // 根据钱龄天数确定等级
+    String level;
+    if (moneyAge >= 90) {
+      level = '卓越';
+    } else if (moneyAge >= 60) {
+      level = '优秀';
+    } else if (moneyAge >= 30) {
+      level = '良好';
+    } else if (moneyAge >= 14) {
+      level = '及格';
+    } else {
+      level = '需改善';
+    }
+
+    // 趋势（从moneyAgeData获取）
+    final trendDays = moneyAgeData.trend == 'up' ? 5 : (moneyAgeData.trend == 'down' ? -5 : 0);
 
     return InkWell(
       onTap: () {
