@@ -144,6 +144,11 @@ async def calculate_money_age(
     pools = pools_result.scalars().all()
 
     remaining_amount = float(transaction.amount)
+    if remaining_amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Transaction amount must be positive",
+        )
     total_weighted_age = 0.0
     consumption_breakdown = []
     pools_used = 0
@@ -155,6 +160,8 @@ async def calculate_money_age(
 
         consume_amount = min(float(pool.remaining_amount), remaining_amount)
         age_days = (tx_date - pool.income_date).days
+        if age_days < 0:
+            age_days = 0  # Treat future-dated income as 0 age
 
         # Create consumption record
         record = ConsumptionRecord(
@@ -515,7 +522,7 @@ async def rebuild_money_age(
                 )
             )
 
-        # Get income transactions to create resource pools
+        # Get income transactions to create resource pools (with limit for performance)
         income_query = select(Transaction).where(
             and_(
                 Transaction.user_id == current_user.id,
@@ -528,7 +535,7 @@ async def rebuild_money_age(
         if data.end_date:
             income_query = income_query.where(Transaction.transaction_date <= data.end_date)
 
-        income_result = await db.execute(income_query.order_by(Transaction.transaction_date.asc()))
+        income_result = await db.execute(income_query.order_by(Transaction.transaction_date.asc()).limit(10000))
         incomes = income_result.scalars().all()
 
         created_pools = 0
@@ -548,7 +555,7 @@ async def rebuild_money_age(
 
         await db.commit()
 
-        # Process expenses
+        # Process expenses (with limit for performance)
         expense_query = select(Transaction).where(
             and_(
                 Transaction.user_id == current_user.id,
@@ -561,7 +568,7 @@ async def rebuild_money_age(
         if data.end_date:
             expense_query = expense_query.where(Transaction.transaction_date <= data.end_date)
 
-        expense_result = await db.execute(expense_query.order_by(Transaction.transaction_date.asc()))
+        expense_result = await db.execute(expense_query.order_by(Transaction.transaction_date.asc()).limit(10000))
         expenses = expense_result.scalars().all()
 
         created_records = 0

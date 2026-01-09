@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 /// 小金库类型
@@ -442,7 +443,7 @@ class BudgetVault {
       'spentAmount': spentAmount,
       'dueDate': dueDate?.millisecondsSinceEpoch,
       'isRecurring': isRecurring ? 1 : 0,
-      'recurrenceJson': recurrence?.toMap().toString(),
+      'recurrenceJson': recurrence != null ? jsonEncode(recurrence!.toMap()) : null,
       'linkedCategoryId': linkedCategoryId,
       'linkedCategoryIds': linkedCategoryIds?.join(','),
       'ledgerId': ledgerId,
@@ -471,7 +472,9 @@ class BudgetVault {
           ? DateTime.fromMillisecondsSinceEpoch(map['dueDate'] as int)
           : null,
       isRecurring: map['isRecurring'] == 1,
-      recurrence: null, // TODO: Parse from recurrenceJson if needed
+      recurrence: map['recurrenceJson'] != null
+          ? RecurrenceRule.fromMap(jsonDecode(map['recurrenceJson'] as String))
+          : null,
       linkedCategoryId: map['linkedCategoryId'] as String?,
       linkedCategoryIds: map['linkedCategoryIds'] != null
           ? (map['linkedCategoryIds'] as String).split(',')

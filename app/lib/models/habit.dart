@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 /// 习惯活动类型
@@ -322,7 +323,7 @@ class HabitTask {
       'targetCount': targetCount,
       'currentCount': currentCount,
       'relatedFeature': relatedFeature,
-      'metadata': metadata?.toString(),
+      'metadata': metadata != null ? jsonEncode(metadata) : null,
       'createdAt': createdAt.millisecondsSinceEpoch,
     };
   }
@@ -348,7 +349,9 @@ class HabitTask {
       targetCount: map['targetCount'] as int? ?? 1,
       currentCount: map['currentCount'] as int? ?? 0,
       relatedFeature: map['relatedFeature'] as String?,
-      metadata: null, // TODO: Parse from string if needed
+      metadata: map['metadata'] != null
+          ? jsonDecode(map['metadata'] as String) as Map<String, dynamic>
+          : null,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
     );
   }
@@ -381,7 +384,7 @@ class HabitActivity {
       'timestamp': timestamp.millisecondsSinceEpoch,
       'pointsEarned': pointsEarned,
       'relatedTaskId': relatedTaskId,
-      'data': data?.toString(),
+      'data': data != null ? jsonEncode(data) : null,
     };
   }
 
@@ -392,7 +395,9 @@ class HabitActivity {
       timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int),
       pointsEarned: map['pointsEarned'] as int,
       relatedTaskId: map['relatedTaskId'] as String?,
-      data: null,
+      data: map['data'] != null
+          ? jsonDecode(map['data'] as String) as Map<String, dynamic>
+          : null,
     );
   }
 }

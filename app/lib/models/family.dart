@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'member.dart';
 import 'resource_pool.dart';
@@ -579,7 +580,7 @@ class SharedVault {
       'description': description,
       'targetAmount': targetAmount,
       'currentAmount': currentAmount,
-      'memberContributions': memberContributions.toString(),
+      'memberContributions': jsonEncode(memberContributions),
       'linkedGoalId': linkedGoalId,
       'isActive': isActive ? 1 : 0,
       'createdAt': createdAt.millisecondsSinceEpoch,
@@ -595,7 +596,11 @@ class SharedVault {
       description: map['description'] as String?,
       targetAmount: (map['targetAmount'] as num).toDouble(),
       currentAmount: (map['currentAmount'] as num?)?.toDouble() ?? 0,
-      memberContributions: {}, // TODO: Parse from string
+      memberContributions: map['memberContributions'] != null
+          ? Map<String, double>.from(
+              (jsonDecode(map['memberContributions'] as String) as Map)
+                  .map((k, v) => MapEntry(k as String, (v as num).toDouble())))
+          : {},
       linkedGoalId: map['linkedGoalId'] as String?,
       isActive: map['isActive'] == 1,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),

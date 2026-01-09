@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 /// NPS 调查类型
@@ -124,7 +125,7 @@ class NPSSurveyResponse {
       'feedback': feedback,
       'featureId': featureId,
       'appVersion': appVersion,
-      'context': context?.toString(),
+      'context': context != null ? jsonEncode(context) : null,
       'isAnonymous': isAnonymous ? 1 : 0,
       'submittedAt': submittedAt.millisecondsSinceEpoch,
       'createdAt': createdAt.millisecondsSinceEpoch,
@@ -139,7 +140,9 @@ class NPSSurveyResponse {
       feedback: map['feedback'] as String?,
       featureId: map['featureId'] as String?,
       appVersion: map['appVersion'] as String?,
-      context: null, // TODO: Parse from string if needed
+      context: map['context'] != null
+          ? jsonDecode(map['context'] as String) as Map<String, dynamic>
+          : null,
       isAnonymous: map['isAnonymous'] == 1,
       submittedAt: DateTime.fromMillisecondsSinceEpoch(map['submittedAt'] as int),
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
