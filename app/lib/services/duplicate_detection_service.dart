@@ -1,4 +1,5 @@
 import '../models/transaction.dart';
+import '../models/category.dart';
 
 /// 重复检测结果
 class DuplicateCheckResult {
@@ -33,10 +34,10 @@ class DuplicateCheckResult {
 /// 2. 只有同一天且时间非常接近的相似交易才可能是重复
 /// 3. 金额+分类+备注相似只是辅助判断条件
 class DuplicateDetectionService {
-  /// 检测配置
-  static const int _strictTimeMinutes = 10;    // 严格时间差阈值（分钟）- 极可能重复
-  static const int _looseTimeMinutes = 60;     // 宽松时间差阈值（分钟）- 可能重复
-  static const int _maxTimeMinutes = 120;      // 最大时间差（分钟）- 超过则不认为是重复
+  /// 检测配置（对齐设计规范）
+  static const int _strictTimeMinutes = 5;     // 严格时间差阈值（分钟）- 20分
+  static const int _looseTimeMinutes = 30;     // 宽松时间差阈值（分钟）- 15分
+  static const int _maxTimeMinutes = 120;      // 最大时间差（分钟）- 8分
   static const double _amountTolerance = 0.01; // 金额容差（用于浮点数比较）
 
   /// 检查新交易是否与现有交易重复
@@ -69,7 +70,7 @@ class DuplicateDetectionService {
     for (final existing in sameDayTransactions) {
       final result = _calculateSimilarity(newTransaction, existing);
 
-      if (result.score >= 70) { // 提高相似度阈值
+      if (result.score >= 60) { // 对齐设计规范阈值
         potentialDuplicates.add(existing);
         if (result.score > highestScore) {
           highestScore = result.score;
@@ -97,21 +98,32 @@ class DuplicateDetectionService {
     );
   }
 
-  /// 计算两笔交易的相似度
+  /// 计算两笔交易的相似度（对齐设计规范）
   ///
-  /// 评分标准（总分100分，阈值70分）：
-  /// - 时间接近：0-35分（核心条件，时间差>2小时直接返回0）
-  /// - 金额相同：25分
-  /// - 分类相同：15分
-  /// - 备注相似：15分
+  /// 评分标准（总分100分，阈值60分）：
+  /// - 外部ID匹配：100分（精确匹配）
+  /// - 金额相同：30分（必要条件）
+  /// - 时间接近：0-20分（≤5分钟20分，≤30分钟15分，≤2小时8分）
+  /// - 分类相同：15分（完全相同）或8分（同一级分类）
+  /// - 备注相似：20分
+  /// - 类型相同：10分
   /// - 账户相同：5分
-  /// - 类型相同：5分
   static _SimilarityResult _calculateSimilarity(
     Transaction newTx,
     Transaction existingTx,
   ) {
     int score = 0;
     final reasons = <String>[];
+
+    // 0. 外部ID精确匹配（100分）- 确定重复
+    if (newTx.externalId != null &&
+        newTx.externalId == existingTx.externalId &&
+        newTx.externalSource == existingTx.externalSource) {
+      return _SimilarityResult(
+        score: 100,
+        reason: '交易单号完全匹配',
+      );
+    }
 
     // 1. 时间接近是核心条件 - 时间差超过2小时不认为是重复
     final timeDiff = newTx.date.difference(existingTx.date).abs();
@@ -121,44 +133,53 @@ class DuplicateDetectionService {
       return _SimilarityResult(score: 0, reason: null);
     }
 
-    // 时间评分（核心权重）
-    if (timeDiff.inMinutes <= _strictTimeMinutes) {
-      score += 35;
-      reasons.add('时间非常接近(${timeDiff.inMinutes}分钟内)');
-    } else if (timeDiff.inMinutes <= _looseTimeMinutes) {
-      score += 25;
-      reasons.add('时间接近(${timeDiff.inMinutes}分钟内)');
-    } else {
-      score += 15;
-      reasons.add('同一天(相隔${timeDiff.inMinutes}分钟)');
-    }
-
-    // 2. 金额相同 (+25分)
+    // 2. 金额相同 (+30分) - 必要条件
     if ((newTx.amount - existingTx.amount).abs() < _amountTolerance) {
-      score += 25;
+      score += 30;
       reasons.add('金额相同');
     }
 
-    // 3. 分类相同 (+15分)
-    if (newTx.category == existingTx.category) {
-      score += 15;
-      reasons.add('分类相同');
+    // 3. 类型相同 (+10分)
+    if (newTx.type == existingTx.type) {
+      score += 10;
+      reasons.add('类型相同');
     }
 
-    // 4. 备注相似 (+15分) - 备注相同是强信号
+    // 4. 分类匹配 (+15分完全相同，+8分同一级分类)
+    final categoryScore = _calculateCategoryScore(newTx.category, existingTx.category);
+    if (categoryScore > 0) {
+      score += categoryScore;
+      if (categoryScore == 15) {
+        reasons.add('分类相同');
+      } else {
+        reasons.add('同属一级分类');
+      }
+    }
+
+    // 5. 时间接近度 (+20分)
+    int timeScore = 0;
+    if (timeDiff.inMinutes <= _strictTimeMinutes) {
+      timeScore = 20;
+      reasons.add('时间高度接近(≤5分钟)');
+    } else if (timeDiff.inMinutes <= _looseTimeMinutes) {
+      timeScore = 15;
+      reasons.add('时间接近(≤30分钟)');
+    } else {
+      timeScore = 8;
+      reasons.add('时间较近(≤2小时)');
+    }
+    score += timeScore;
+
+    // 6. 备注相似 (+20分) - 语义相似度
     if (_isNoteSimilar(newTx.note, existingTx.note)) {
-      score += 15;
+      score += 20;
       reasons.add('备注相似');
     }
 
-    // 5. 账户相同 (+5分)
+    // 7. 账户相同 (+5分)
     if (newTx.accountId == existingTx.accountId) {
       score += 5;
-    }
-
-    // 6. 类型相同 (+5分)
-    if (newTx.type == existingTx.type) {
-      score += 5;
+      reasons.add('账户相同');
     }
 
     // 判断重复等级
@@ -167,10 +188,15 @@ class DuplicateDetectionService {
         score: score,
         reason: '极可能重复: ${reasons.join(', ')}',
       );
-    } else if (score >= 70) {
+    } else if (score >= 60) {
       return _SimilarityResult(
         score: score,
         reason: '疑似重复: ${reasons.join(', ')}',
+      );
+    } else if (score >= 40) {
+      return _SimilarityResult(
+        score: score,
+        reason: '轻微相似: ${reasons.join(', ')}',
       );
     }
 
@@ -180,6 +206,47 @@ class DuplicateDetectionService {
   /// 检查是否是同一天
   static bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  /// 计算分类匹配分数
+  static int _calculateCategoryScore(String? category1, String category2) {
+    if (category1 == null) return 0;
+
+    // 完全相同
+    if (category1 == category2) {
+      return 15;
+    }
+
+    // 检查是否同属一级分类
+    final parent1 = _getParentCategory(category1);
+    final parent2 = _getParentCategory(category2);
+
+    if (parent1 != null && parent2 != null && parent1 == parent2) {
+      return 8;
+    }
+
+    // 检查是否一个是另一个的父分类
+    if (category1 == parent2 || parent1 == category2) {
+      return 8;
+    }
+
+    return 0;
+  }
+
+  /// 获取父分类ID
+  static String? _getParentCategory(String categoryId) {
+    // 使用DefaultCategories查找父分类
+    final category = DefaultCategories.findById(categoryId);
+    if (category != null) {
+      return category.parentId ?? categoryId;
+    }
+
+    // 降级：从ID格式解析（如 food_lunch -> food）
+    if (categoryId.contains('_')) {
+      return categoryId.split('_').first;
+    }
+
+    return null;
   }
 
   /// 检查备注是否相似

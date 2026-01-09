@@ -14,6 +14,7 @@ from app.models.companion_message import (
 )
 from app.services.companion_message_generator import CompanionMessageGenerator
 from app.services.llm_service import LLMService
+from app.api.deps import get_llm_service
 
 router = APIRouter(prefix="/api/v1/companion", tags=["companion"])
 
@@ -134,7 +135,7 @@ async def submit_feedback(
 async def trigger_refresh(
     request: RefreshRequest,
     db: AsyncSession = Depends(get_db),
-    llm_service: LLMService = Depends(),
+    llm_service: LLMService = Depends(get_llm_service),
 ):
     """手动触发消息库刷新（管理员功能）"""
     generator = CompanionMessageGenerator(llm_service)

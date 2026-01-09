@@ -10,6 +10,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.user import User
+from app.services.llm_service import LLMService
 
 
 security = HTTPBearer()
@@ -79,3 +80,9 @@ async def get_current_user_optional(
     user = result.scalar_one_or_none()
 
     return user if user and user.is_active else None
+
+
+def get_llm_service() -> LLMService:
+    """Get LLM service instance."""
+    return LLMService()
+

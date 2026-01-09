@@ -7,6 +7,8 @@ import '../services/voice_service_coordinator.dart';
 import '../theme/app_theme.dart';
 import '../theme/antigravity_shadows.dart';
 import '../l10n/app_localizations.dart';
+import 'settings_page.dart';
+import 'main_navigation.dart';
 
 /// 增强版语音助手页面 - 集成完整语音服务功能
 ///
@@ -617,6 +619,18 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
         timestamp: DateTime.now(),
       ));
     }
+
+    // 检查是否有导航数据，如果有则执行导航
+    if (state.currentSessionType == VoiceSessionType.navigation &&
+        state.currentSessionData != null) {
+      final navData = state.currentSessionData as Map<String, dynamic>;
+      final route = navData['route'] as String?;
+      if (route != null) {
+        _navigateToRoute(route);
+        // 清除导航会话数据
+        coordinator.clearSession();
+      }
+    }
   }
 
   String _generateMockResponse(String command) {
@@ -653,16 +667,33 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   }
 
   void _navigateToRoute(String route) {
-    // Navigate to the specified route
-    // Note: This is a simplified implementation. In a real app, you would use
-    // a proper routing system with named routes or a router package.
-    if (mounted) {
-      // For now, just show a snackbar indicating navigation would happen
-      // In production, implement actual navigation based on route
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导航到: $route')),
-      );
+    if (!mounted) return;
+
+    Widget targetPage;
+    switch (route) {
+      case '/home':
+        targetPage = const MainNavigation();
+        break;
+      case '/settings':
+        targetPage = const SettingsPage();
+        break;
+      case '/statistics':
+      case '/accounts':
+        // 这些页面暂时显示提示
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$route 页面开发中')),
+        );
+        return;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('未知路由: $route')),
+        );
+        return;
     }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => targetPage),
+    );
   }
 
   Future<void> _requestPermission() async {

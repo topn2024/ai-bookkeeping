@@ -336,19 +336,29 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
   /// 处理导航命令
   Future<void> _handleNavigationCommand(String command) async {
     String? targetPage;
+    String? route;
+
     if (command.contains('首页') || command.contains('主页')) {
       targetPage = '首页';
+      route = '/home';
     } else if (command.contains('统计') || command.contains('报表')) {
       targetPage = '统计页面';
+      route = '/statistics';
     } else if (command.contains('设置')) {
       targetPage = '设置页面';
+      route = '/settings';
     } else if (command.contains('账户')) {
       targetPage = '账户页面';
+      route = '/accounts';
     }
 
-    if (targetPage != null) {
+    if (targetPage != null && route != null) {
       await _provideFeedback('正在跳转到$targetPage');
-      // 实际导航由UI层处理
+      // 存储导航数据供UI层使用
+      state = state.copyWith(
+        currentSessionType: VoiceSessionType.navigation,
+        currentSessionData: {'route': route, 'pageName': targetPage},
+      );
     } else {
       await _provideFeedback('抱歉，我不知道要跳转到哪个页面');
     }

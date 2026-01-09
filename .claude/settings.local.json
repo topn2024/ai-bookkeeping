@@ -689,7 +689,8 @@
       "Bash(do if ! grep -q \"import.*app_theme\" \"$file\")",
       "Bash(then echo \"Missing import in: $file\" fi done)",
       "Bash(then sed -i '' \"1a\\\\ import ''''../theme/app_theme.dart'''';\n\" \"$file\" echo \"Added import to: $file\" fi done)",
-      "Bash(alembic revision:*)"
+      "Bash(alembic revision:*)",
+      "Bash(adb install:*)"
     ]
   }
 }

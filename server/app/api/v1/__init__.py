@@ -29,6 +29,9 @@ from app.api.v1.family_stats import router as family_stats_router
 from app.api.v1.locations import router as locations_router
 # Money Age
 from app.api.v1.money_age import router as money_age_router
+# AI Advice
+from app.api.v1.ai_advice import router as ai_advice_router
+from app.api.v1.companion import router as companion_router
 
 api_router = APIRouter()
 
@@ -61,3 +64,6 @@ api_router.include_router(family_stats_router)
 api_router.include_router(locations_router)
 # Money Age
 api_router.include_router(money_age_router)
+# AI Advice
+api_router.include_router(ai_advice_router)
+api_router.include_router(companion_router)
