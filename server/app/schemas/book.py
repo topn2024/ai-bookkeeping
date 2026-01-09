@@ -36,6 +36,7 @@ class BookUpdate(BaseModel):
     book_type: Optional[int] = Field(None, ge=0, le=5)
     currency: Optional[str] = Field(None, max_length=10)
     is_default: Optional[bool] = None
+    is_archived: Optional[bool] = None  # Archive status for soft delete
     settings: Optional[Dict[str, Any]] = None
 
 
@@ -50,6 +51,7 @@ class BookResponse(BaseModel):
     book_type: int
     currency: str = "CNY"
     is_default: bool
+    is_archived: bool = False  # Archive status for soft delete
     settings: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: Optional[datetime] = None

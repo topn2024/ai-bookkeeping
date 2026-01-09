@@ -249,11 +249,27 @@ async def _handle_create(
             location_district=data.get("location_district"),
             location_type=data.get("location_type"),
             location_poi_id=data.get("location_poi_id"),
+            geofence_region=data.get("geofence_region"),
+            is_cross_region=data.get("is_cross_region", False),
+            # Money Age fields
+            money_age=data.get("money_age"),
+            money_age_level=data.get("money_age_level"),
+            resource_pool_id=UUID(data["resource_pool_id"]) if data.get("resource_pool_id") else None,
+            # Reimbursement and stats
             is_reimbursable=data.get("is_reimbursable", False),
             is_reimbursed=data.get("is_reimbursed", False),
             is_exclude_stats=data.get("is_exclude_stats", False),
             source=data.get("source", 0),
             ai_confidence=Decimal(str(data["ai_confidence"])) if data.get("ai_confidence") else None,
+            # Source file fields
+            source_file_url=data.get("source_file_url"),
+            source_file_type=data.get("source_file_type"),
+            source_file_size=data.get("source_file_size"),
+            recognition_raw_response=data.get("recognition_raw_response"),
+            recognition_timestamp=datetime.fromisoformat(data["recognition_timestamp"]) if data.get("recognition_timestamp") else None,
+            source_file_expires_at=datetime.fromisoformat(data["source_file_expires_at"]) if data.get("source_file_expires_at") else None,
+            # Visibility
+            visibility=data.get("visibility", 1),
         )
         db.add(entity)
         await db.flush()
@@ -762,11 +778,27 @@ def _entity_to_dict(entity, entity_type: str) -> Dict[str, Any]:
             "location_district": entity.location_district if hasattr(entity, 'location_district') else None,
             "location_type": entity.location_type if hasattr(entity, 'location_type') else None,
             "location_poi_id": entity.location_poi_id if hasattr(entity, 'location_poi_id') else None,
+            "geofence_region": entity.geofence_region if hasattr(entity, 'geofence_region') else None,
+            "is_cross_region": entity.is_cross_region if hasattr(entity, 'is_cross_region') else False,
+            # Money Age fields
+            "money_age": entity.money_age if hasattr(entity, 'money_age') else None,
+            "money_age_level": entity.money_age_level if hasattr(entity, 'money_age_level') else None,
+            "resource_pool_id": str(entity.resource_pool_id) if hasattr(entity, 'resource_pool_id') and entity.resource_pool_id else None,
+            # Reimbursement and stats
             "is_reimbursable": entity.is_reimbursable,
             "is_reimbursed": entity.is_reimbursed,
             "is_exclude_stats": entity.is_exclude_stats,
             "source": entity.source,
             "ai_confidence": str(entity.ai_confidence) if entity.ai_confidence else None,
+            # Source file fields
+            "source_file_url": entity.source_file_url if hasattr(entity, 'source_file_url') else None,
+            "source_file_type": entity.source_file_type if hasattr(entity, 'source_file_type') else None,
+            "source_file_size": entity.source_file_size if hasattr(entity, 'source_file_size') else None,
+            "recognition_raw_response": entity.recognition_raw_response if hasattr(entity, 'recognition_raw_response') else None,
+            "recognition_timestamp": entity.recognition_timestamp.isoformat() if hasattr(entity, 'recognition_timestamp') and entity.recognition_timestamp else None,
+            "source_file_expires_at": entity.source_file_expires_at.isoformat() if hasattr(entity, 'source_file_expires_at') and entity.source_file_expires_at else None,
+            # Visibility
+            "visibility": entity.visibility if hasattr(entity, 'visibility') else 1,
         }
     elif entity_type == "account":
         data = {
