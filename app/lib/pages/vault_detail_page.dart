@@ -289,9 +289,25 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
           ),
           ElevatedButton(
             onPressed: () {
+              final text = controller.text.trim();
+              if (text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请输入存入金额')),
+                );
+                return;
+              }
+
+              final amount = double.tryParse(text);
+              if (amount == null || amount <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请输入有效的金额')),
+                );
+                return;
+              }
+
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('已存入 ¥${controller.text}')),
+                SnackBar(content: Text('已存入 ¥${amount.toStringAsFixed(2)}')),
               );
             },
             child: const Text('确认'),
@@ -330,9 +346,34 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
           ),
           ElevatedButton(
             onPressed: () {
+              final text = controller.text.trim();
+              if (text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请输入取出金额')),
+                );
+                return;
+              }
+
+              final amount = double.tryParse(text);
+              if (amount == null || amount <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请输入有效的金额')),
+                );
+                return;
+              }
+
+              if (amount > widget.vault.available) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('余额不足，当前可用余额: ¥${widget.vault.available.toStringAsFixed(2)}'),
+                  ),
+                );
+                return;
+              }
+
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('已取出 ¥${controller.text}')),
+                SnackBar(content: Text('已取出 ¥${amount.toStringAsFixed(2)}')),
               );
             },
             child: const Text('确认'),
