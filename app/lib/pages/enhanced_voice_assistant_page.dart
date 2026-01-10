@@ -6,6 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/voice_coordinator_provider.dart';
 import '../services/voice_service_coordinator.dart';
+import '../services/voice/multi_intent_models.dart';
+import '../widgets/multi_intent_confirm_widget.dart';
+import '../widgets/amount_supplement_widget.dart';
 import '../theme/app_theme.dart';
 import '../theme/antigravity_shadows.dart';
 import '../l10n/app_localizations.dart';
@@ -294,6 +297,18 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
     if (sessionState == VoiceSessionState.idle) return const SizedBox.shrink();
 
+    // 多意图确认状态显示专用组件
+    if (sessionState == VoiceSessionState.waitingForMultiIntentConfirmation &&
+        coordinator.hasPendingMultiIntent) {
+      return _buildMultiIntentConfirmation(context, coordinator);
+    }
+
+    // 金额补充状态显示专用组件
+    if (sessionState == VoiceSessionState.waitingForAmountSupplement &&
+        coordinator.hasPendingMultiIntent) {
+      return _buildAmountSupplement(context, coordinator);
+    }
+
     String title = '';
     IconData icon = Icons.chat;
     Color color = AppTheme.primaryColor;
@@ -308,6 +323,16 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
         title = '等待澄清';
         icon = Icons.help_outline;
         color = AppColors.primary;
+        break;
+      case VoiceSessionState.waitingForMultiIntentConfirmation:
+        title = '多意图确认';
+        icon = Icons.list_alt;
+        color = AppColors.primary;
+        break;
+      case VoiceSessionState.waitingForAmountSupplement:
+        title = '补充金额';
+        icon = Icons.edit;
+        color = AppColors.warning;
         break;
       case VoiceSessionState.processing:
         title = '处理中';
@@ -361,6 +386,106 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 构建多意图确认组件
+  Widget _buildMultiIntentConfirmation(
+    BuildContext context,
+    VoiceServiceCoordinator coordinator,
+  ) {
+    final multiIntent = coordinator.pendingMultiIntent;
+    if (multiIntent == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: MultiIntentConfirmWidget(
+        result: multiIntent,
+        onConfirmAll: () async {
+          final result = await coordinator.confirmMultiIntents();
+          _addMessage(ChatMessage(
+            type: MessageType.assistant,
+            content: result.message ?? '操作完成',
+            timestamp: DateTime.now(),
+          ));
+        },
+        onCancelAll: () async {
+          final result = await coordinator.cancelMultiIntents();
+          _addMessage(ChatMessage(
+            type: MessageType.system,
+            content: result.message ?? '已取消',
+            timestamp: DateTime.now(),
+          ));
+        },
+        onCancelItem: (index) async {
+          final result = await coordinator.cancelMultiIntentItem(index);
+          _addMessage(ChatMessage(
+            type: MessageType.system,
+            content: result.message ?? '已移除',
+            timestamp: DateTime.now(),
+          ));
+        },
+        onSupplementAmount: (index, amount) async {
+          final result = await coordinator.supplementAmount(index, amount);
+          _addMessage(ChatMessage(
+            type: MessageType.system,
+            content: result.message ?? '金额已补充',
+            timestamp: DateTime.now(),
+          ));
+        },
+        showNoise: true,
+      ),
+    );
+  }
+
+  /// 构建金额补充组件
+  Widget _buildAmountSupplement(
+    BuildContext context,
+    VoiceServiceCoordinator coordinator,
+  ) {
+    final multiIntent = coordinator.pendingMultiIntent;
+    if (multiIntent == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: AmountSupplementWidget(
+        incompleteIntents: multiIntent.incompleteIntents,
+        onSupplementAmount: (index, amount) async {
+          final result = await coordinator.supplementAmount(index, amount);
+          _addMessage(ChatMessage(
+            type: MessageType.system,
+            content: result.message ?? '金额已补充',
+            timestamp: DateTime.now(),
+          ));
+        },
+        onSkip: (index) async {
+          final result = await coordinator.cancelMultiIntentItem(
+            multiIntent.completeIntents.length + index,
+          );
+          _addMessage(ChatMessage(
+            type: MessageType.system,
+            content: result.message ?? '已跳过',
+            timestamp: DateTime.now(),
+          ));
+        },
+        onSkipAll: () async {
+          final result = await coordinator.cancelMultiIntents();
+          _addMessage(ChatMessage(
+            type: MessageType.system,
+            content: result.message ?? '已取消',
+            timestamp: DateTime.now(),
+          ));
+        },
+        onComplete: () async {
+          // 所有金额补充完成，执行确认
+          final result = await coordinator.confirmMultiIntents();
+          _addMessage(ChatMessage(
+            type: MessageType.assistant,
+            content: result.message ?? '记录完成',
+            timestamp: DateTime.now(),
+          ));
+        },
       ),
     );
   }

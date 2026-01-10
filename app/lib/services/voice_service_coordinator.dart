@@ -11,6 +11,7 @@ import 'voice/entity_disambiguation_service.dart';
 import 'voice/voice_delete_service.dart';
 import 'voice/voice_modify_service.dart';
 import 'voice/voice_intent_router.dart';
+import 'voice/multi_intent_models.dart';
 import 'voice_recognition_engine.dart';
 import 'tts_service.dart';
 import 'voice_navigation_service.dart';
@@ -49,6 +50,12 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 最后一次响应
   String? _lastResponse;
 
+  /// 待处理的多意图结果
+  MultiIntentResult? _pendingMultiIntent;
+
+  /// 多意图处理配置
+  MultiIntentConfig _multiIntentConfig = MultiIntentConfig.defaultConfig;
+
   /// 最大历史记录数
   static const int maxHistorySize = 50;
 
@@ -86,6 +93,21 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 最后一次响应
   String? get lastResponse => _lastResponse;
+
+  /// 待处理的多意图结果
+  MultiIntentResult? get pendingMultiIntent => _pendingMultiIntent;
+
+  /// 是否有待处理的多意图
+  bool get hasPendingMultiIntent => _pendingMultiIntent != null && !_pendingMultiIntent!.isEmpty;
+
+  /// 多意图处理配置
+  MultiIntentConfig get multiIntentConfig => _multiIntentConfig;
+
+  /// 设置多意图处理配置
+  set multiIntentConfig(MultiIntentConfig config) {
+    _multiIntentConfig = config;
+    notifyListeners();
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // 核心语音交互流程
@@ -239,6 +261,288 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       case VoiceIntentType.unknown:
       default:
         return await _handleUnknownIntent(intentResult, originalInput);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 多意图处理
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 处理可能包含多意图的语音输入
+  ///
+  /// 当检测到用户输入可能包含多个意图时，使用此方法进行处理。
+  /// 返回的结果包含所有识别到的意图，需要用户确认后批量执行。
+  Future<VoiceSessionResult> processMultiIntentCommand(String voiceInput) async {
+    try {
+      _sessionState = VoiceSessionState.processing;
+      notifyListeners();
+
+      // 记录命令历史
+      final command = VoiceCommand(
+        input: voiceInput,
+        timestamp: DateTime.now(),
+      );
+      _addToHistory(command);
+
+      // 使用多意图分析
+      final multiResult = await _intentRouter.analyzeMultipleIntents(
+        voiceInput,
+        context: _currentSession,
+        config: _multiIntentConfig,
+      );
+
+      // 如果是空结果或单意图，回退到普通处理
+      if (multiResult.isEmpty) {
+        return await processVoiceCommand(voiceInput);
+      }
+
+      if (multiResult.isSingleIntent) {
+        // 单意图回退到普通处理
+        return await processVoiceCommand(voiceInput);
+      }
+
+      // 保存多意图结果
+      _pendingMultiIntent = multiResult;
+      _sessionState = VoiceSessionState.waitingForMultiIntentConfirmation;
+
+      // 生成确认提示
+      final prompt = multiResult.generatePrompt();
+      await _ttsService.speak(prompt);
+
+      notifyListeners();
+
+      return VoiceSessionResult.success(prompt, {
+        'multiIntent': true,
+        'completeCount': multiResult.completeIntents.length,
+        'incompleteCount': multiResult.incompleteIntents.length,
+        'hasNavigation': multiResult.navigationIntent != null,
+        'filteredNoise': multiResult.filteredNoise,
+      });
+    } catch (e) {
+      _sessionState = VoiceSessionState.error;
+      notifyListeners();
+      return VoiceSessionResult.error('处理多意图命令失败: $e');
+    }
+  }
+
+  /// 确认并执行所有待处理的多意图
+  Future<VoiceSessionResult> confirmMultiIntents() async {
+    if (_pendingMultiIntent == null) {
+      return VoiceSessionResult.error('没有待确认的多意图');
+    }
+
+    try {
+      _sessionState = VoiceSessionState.processing;
+      notifyListeners();
+
+      final result = _pendingMultiIntent!;
+      final executedCount = await _executeCompleteIntents(result.completeIntents);
+
+      // 检查是否有不完整意图需要追问
+      if (result.needsFollowUp) {
+        _sessionState = VoiceSessionState.waitingForAmountSupplement;
+        notifyListeners();
+
+        final supplementPrompt = _generateAmountSupplementPrompt(result.incompleteIntents);
+        await _ttsService.speak(supplementPrompt);
+
+        return VoiceSessionResult.success(supplementPrompt, {
+          'executedCount': executedCount,
+          'pendingIncomplete': result.incompleteIntents.length,
+        });
+      }
+
+      // 处理导航意图
+      String? navigationMessage;
+      if (result.navigationIntent != null) {
+        navigationMessage = await _executeNavigationIntent(result.navigationIntent!);
+      }
+
+      // 清除待处理的多意图
+      _pendingMultiIntent = null;
+      _sessionState = VoiceSessionState.idle;
+      notifyListeners();
+
+      final message = '已记录${executedCount}笔交易${navigationMessage != null ? '，$navigationMessage' : ''}';
+      await _ttsService.speak(message);
+
+      return VoiceSessionResult.success(message, {
+        'executedCount': executedCount,
+        'navigation': result.navigationIntent?.targetPage,
+      });
+    } catch (e) {
+      _sessionState = VoiceSessionState.error;
+      notifyListeners();
+      return VoiceSessionResult.error('执行多意图失败: $e');
+    }
+  }
+
+  /// 取消多意图处理
+  Future<VoiceSessionResult> cancelMultiIntents() async {
+    _pendingMultiIntent = null;
+    _sessionState = VoiceSessionState.idle;
+    notifyListeners();
+
+    const message = '已取消所有待处理的记录';
+    await _ttsService.speak(message);
+
+    return VoiceSessionResult.success(message);
+  }
+
+  /// 取消多意图中的指定项
+  Future<VoiceSessionResult> cancelMultiIntentItem(int index) async {
+    if (_pendingMultiIntent == null) {
+      return VoiceSessionResult.error('没有待处理的多意图');
+    }
+
+    final result = _pendingMultiIntent!;
+    final totalCount = result.completeIntents.length + result.incompleteIntents.length;
+
+    if (index < 0 || index >= totalCount) {
+      return VoiceSessionResult.error('无效的序号');
+    }
+
+    // 创建新的列表，移除指定项
+    List<CompleteIntent> newComplete;
+    List<IncompleteIntent> newIncomplete;
+
+    if (index < result.completeIntents.length) {
+      newComplete = List.from(result.completeIntents)..removeAt(index);
+      newIncomplete = result.incompleteIntents;
+    } else {
+      newComplete = result.completeIntents;
+      newIncomplete = List.from(result.incompleteIntents)
+        ..removeAt(index - result.completeIntents.length);
+    }
+
+    _pendingMultiIntent = MultiIntentResult(
+      completeIntents: newComplete,
+      incompleteIntents: newIncomplete,
+      navigationIntent: result.navigationIntent,
+      filteredNoise: result.filteredNoise,
+      rawInput: result.rawInput,
+      segments: result.segments,
+    );
+
+    // 检查是否还有待处理的意图
+    if (_pendingMultiIntent!.isEmpty) {
+      return await cancelMultiIntents();
+    }
+
+    notifyListeners();
+
+    final message = '已移除第${index + 1}项，还有${_pendingMultiIntent!.totalIntentCount}项待处理';
+    await _ttsService.speak(message);
+
+    return VoiceSessionResult.success(message);
+  }
+
+  /// 补充不完整意图的金额
+  Future<VoiceSessionResult> supplementAmount(int index, double amount) async {
+    if (_pendingMultiIntent == null) {
+      return VoiceSessionResult.error('没有待处理的多意图');
+    }
+
+    final result = _pendingMultiIntent!;
+
+    if (index < 0 || index >= result.incompleteIntents.length) {
+      return VoiceSessionResult.error('无效的序号');
+    }
+
+    // 将不完整意图转换为完整意图
+    final incompleteIntent = result.incompleteIntents[index];
+    final completeIntent = incompleteIntent.completeWith(amount: amount);
+
+    // 更新列表
+    final newComplete = List<CompleteIntent>.from(result.completeIntents)
+      ..add(completeIntent);
+    final newIncomplete = List<IncompleteIntent>.from(result.incompleteIntents)
+      ..removeAt(index);
+
+    _pendingMultiIntent = MultiIntentResult(
+      completeIntents: newComplete,
+      incompleteIntents: newIncomplete,
+      navigationIntent: result.navigationIntent,
+      filteredNoise: result.filteredNoise,
+      rawInput: result.rawInput,
+      segments: result.segments,
+    );
+
+    notifyListeners();
+
+    if (newIncomplete.isEmpty) {
+      // 所有金额已补充，可以确认执行
+      final message = '金额已补充完成，共${newComplete.length}笔记录待确认';
+      await _ttsService.speak(message);
+      return VoiceSessionResult.success(message);
+    } else {
+      final message = '已补充第${index + 1}项金额${amount.toStringAsFixed(2)}元，还有${newIncomplete.length}项需要补充金额';
+      await _ttsService.speak(message);
+      return VoiceSessionResult.success(message);
+    }
+  }
+
+  /// 执行完整意图列表
+  Future<int> _executeCompleteIntents(List<CompleteIntent> intents) async {
+    var executedCount = 0;
+
+    for (final intent in intents) {
+      try {
+        final transaction = model.Transaction(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          type: _mapIntentTypeToTransactionType(intent.type),
+          amount: intent.amount,
+          category: intent.category ?? 'other_expense',
+          note: intent.description ?? intent.originalText,
+          date: intent.dateTime ?? DateTime.now(),
+          accountId: 'default',
+          rawMerchant: intent.merchant,
+          source: model.TransactionSource.voice,
+        );
+
+        await _databaseService.insertTransaction(transaction);
+        executedCount++;
+      } catch (e) {
+        debugPrint('执行意图失败: $e');
+      }
+    }
+
+    return executedCount;
+  }
+
+  /// 执行导航意图
+  Future<String> _executeNavigationIntent(NavigationIntent intent) async {
+    final result = _navigationService.parseNavigation(intent.originalText);
+    if (result.success) {
+      return '正在跳转到${result.pageName}';
+    }
+    return '';
+  }
+
+  /// 生成金额补充提示
+  String _generateAmountSupplementPrompt(List<IncompleteIntent> intents) {
+    final buffer = StringBuffer();
+    buffer.writeln('请补充以下记录的金额：');
+
+    for (var i = 0; i < intents.length; i++) {
+      final intent = intents[i];
+      buffer.writeln('  ${i + 1}. ${intent.category ?? intent.originalText}');
+    }
+
+    buffer.write('请说"第几个多少钱"来补充');
+    return buffer.toString();
+  }
+
+  /// 将意图类型映射到交易类型
+  model.TransactionType _mapIntentTypeToTransactionType(TransactionIntentType type) {
+    switch (type) {
+      case TransactionIntentType.income:
+        return model.TransactionType.income;
+      case TransactionIntentType.transfer:
+        return model.TransactionType.transfer;
+      case TransactionIntentType.expense:
+      default:
+        return model.TransactionType.expense;
     }
   }
 
@@ -721,6 +1025,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 清除当前会话
   void _clearSession() {
     _currentSession = null;
+    _pendingMultiIntent = null;
     _sessionState = VoiceSessionState.idle;
     _deleteService.cancelDelete();
     _modifyService.clearSession();
@@ -761,12 +1066,14 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
 /// 语音会话状态
 enum VoiceSessionState {
-  idle,                      // 空闲
-  listening,                 // 正在听取
-  processing,                // 正在处理
-  waitingForConfirmation,    // 等待确认
-  waitingForClarification,   // 等待澄清
-  error,                     // 错误状态
+  idle,                           // 空闲
+  listening,                      // 正在听取
+  processing,                     // 正在处理
+  waitingForConfirmation,         // 等待确认
+  waitingForClarification,        // 等待澄清
+  waitingForMultiIntentConfirmation, // 等待多意图确认
+  waitingForAmountSupplement,     // 等待金额补充
+  error,                          // 错误状态
 }
 
 /// 语音意图类型

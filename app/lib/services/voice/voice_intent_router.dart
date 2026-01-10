@@ -4,6 +4,10 @@ import 'dart:math' as math;
 import '../nlu_engine.dart';
 import '../voice_service_coordinator.dart' show VoiceIntentType, VoiceSessionContext;
 import '../../models/transaction.dart';
+import 'multi_intent_models.dart';
+import 'sentence_splitter.dart';
+import 'batch_intent_analyzer.dart';
+import 'intent_merger.dart';
 
 /// 语音意图路由器
 ///
@@ -122,6 +126,70 @@ class VoiceIntentRouter {
       candidateIntents: _getCandidateIntents(intentScores),
       contextBoosted: context != null,
     );
+  }
+
+  /// 分析多意图语音输入
+  ///
+  /// 将用户的连续语音输入分解为多个独立意图，支持：
+  /// - 多条记账指令的批量处理
+  /// - 混合意图（记账 + 导航）的分离处理
+  /// - 无关信息的过滤
+  ///
+  /// [input] 用户的语音输入文本
+  /// [context] 当前会话上下文
+  /// [config] 多意图处理配置
+  ///
+  /// Returns 包含所有识别意图的结构化结果
+  Future<MultiIntentResult> analyzeMultipleIntents(
+    String input, {
+    VoiceSessionContext? context,
+    MultiIntentConfig config = MultiIntentConfig.defaultConfig,
+  }) async {
+    if (input.isEmpty) {
+      return MultiIntentResult.empty(input);
+    }
+
+    // 如果禁用多意图处理，回退到单意图模式
+    if (!config.enabled) {
+      final singleResult = await analyzeIntent(input, context: context);
+      return MultiIntentResult.fromSingle(singleResult, input);
+    }
+
+    // 1. 分句
+    final splitter = SentenceSplitter();
+    final segments = splitter.split(input);
+
+    // 如果只有一个分句，回退到单意图处理
+    if (segments.length <= 1) {
+      final singleResult = await analyzeIntent(input, context: context);
+      return MultiIntentResult.fromSingle(singleResult, input);
+    }
+
+    // 2. 批量分析
+    final analyzer = BatchIntentAnalyzer();
+    final analysisResults = await analyzer.analyzeSegments(
+      segments,
+      context: context,
+    );
+
+    // 3. 合并意图
+    final merger = IntentMerger();
+    final result = merger.merge(analysisResults, input);
+
+    return result;
+  }
+
+  /// 快速检查输入是否可能包含多个意图
+  ///
+  /// 用于决定是否需要启动多意图处理流程
+  bool mightContainMultipleIntents(String input) {
+    if (input.length < 10) return false;
+
+    // 检查是否包含多个分句标志
+    final splitter = SentenceSplitter();
+    final segments = splitter.split(input);
+
+    return segments.length > 1;
   }
 
   /// 预处理用户输入
