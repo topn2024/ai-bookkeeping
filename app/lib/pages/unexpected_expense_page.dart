@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/budget_vault_provider.dart';
+import '../providers/budget_provider.dart';
+import '../models/budget_vault.dart';
+
 /// 突发支出处理页面
 ///
 /// 对应原型设计 10.10 突发支出处理
@@ -26,6 +30,24 @@ class _UnexpectedExpensePageState
 
   @override
   Widget build(BuildContext context) {
+    final vaultState = ref.watch(budgetVaultProvider);
+    final budgetState = ref.watch(budgetProvider);
+
+    // 获取应急金小金库
+    final emergencyVault = vaultState.vaults.where(
+      (v) => v.isEnabled && v.type == VaultType.savings &&
+             (v.name.contains('应急') || v.name.toLowerCase().contains('emergency'))
+    ).firstOrNull;
+
+    // 获取储蓄类小金库
+    final savingsVaults = vaultState.vaults.where(
+      (v) => v.isEnabled && v.type == VaultType.savings && v != emergencyVault
+    ).toList();
+    final firstSavingsVault = savingsVaults.isNotEmpty ? savingsVaults.first : null;
+
+    // 计算弹性预算剩余
+    final flexibleRemaining = budgetState.monthlyBudget - budgetState.monthlySpent;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('突发支出处理'),
@@ -53,31 +75,43 @@ class _UnexpectedExpensePageState
           _FundingSourceCard(
             source: FundingSource.emergency,
             title: '应急金',
-            subtitle: '可用余额 ¥18,000',
+            subtitle: emergencyVault != null
+                ? '可用余额 ¥${emergencyVault.available.toStringAsFixed(0)}'
+                : '未设置应急金',
             icon: Icons.shield,
             color: Colors.green,
             isSelected: _selectedSource == FundingSource.emergency,
-            onTap: () => setState(() => _selectedSource = FundingSource.emergency),
+            onTap: emergencyVault != null && emergencyVault.available > 0
+                ? () => setState(() => _selectedSource = FundingSource.emergency)
+                : null,
           ),
 
           _FundingSourceCard(
             source: FundingSource.flexible,
             title: '弹性预算',
-            subtitle: '本月剩余 ¥2,500',
+            subtitle: flexibleRemaining > 0
+                ? '本月剩余 ¥${flexibleRemaining.toStringAsFixed(0)}'
+                : '本月预算已用完',
             icon: Icons.account_balance_wallet,
             color: Colors.blue,
             isSelected: _selectedSource == FundingSource.flexible,
-            onTap: () => setState(() => _selectedSource = FundingSource.flexible),
+            onTap: flexibleRemaining > 0
+                ? () => setState(() => _selectedSource = FundingSource.flexible)
+                : null,
           ),
 
           _FundingSourceCard(
             source: FundingSource.savings,
             title: '储蓄目标',
-            subtitle: '旅行基金 ¥12,000',
+            subtitle: firstSavingsVault != null
+                ? '${firstSavingsVault.name} ¥${firstSavingsVault.available.toStringAsFixed(0)}'
+                : '未设置储蓄目标',
             icon: Icons.savings,
             color: Colors.orange,
             isSelected: _selectedSource == FundingSource.savings,
-            onTap: () => setState(() => _selectedSource = FundingSource.savings),
+            onTap: firstSavingsVault != null && firstSavingsVault.available > 0
+                ? () => setState(() => _selectedSource = FundingSource.savings)
+                : null,
           ),
 
           _FundingSourceCard(

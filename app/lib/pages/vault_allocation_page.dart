@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../theme/app_theme.dart';
+import '../providers/budget_vault_provider.dart';
+import '../models/budget_vault.dart';
 
 /// 资金分配页面
 /// 原型设计 3.03：资金分配
@@ -26,40 +28,100 @@ class VaultAllocationPage extends ConsumerStatefulWidget {
 
 class _VaultAllocationPageState extends ConsumerState<VaultAllocationPage> {
   final List<_AllocationItem> _allocations = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadMockAllocations();
+    _loadAllocationsFromVaults();
   }
 
-  void _loadMockAllocations() {
-    _allocations.addAll([
-      _AllocationItem(
-        name: '应急金储备',
-        icon: Icons.savings,
-        gradientColors: [const Color(0xFFFF6B6B), const Color(0xFFFF8E8E)],
-        strategy: '固定 ¥1,000/月',
-        amount: 1000,
-        percent: 28.6,
-      ),
-      _AllocationItem(
-        name: '旅行基金',
-        icon: Icons.flight,
-        gradientColors: [const Color(0xFF4CAF50), const Color(0xFF81C784)],
-        strategy: '补足到 ¥10,000',
-        amount: 1500,
-        percent: 42.9,
-      ),
-      _AllocationItem(
-        name: '数码基金',
-        icon: Icons.computer,
-        gradientColors: [const Color(0xFF2196F3), const Color(0xFF64B5F6)],
-        strategy: '剩余金额',
-        amount: 1000,
-        percent: 28.5,
-      ),
-    ]);
+  void _loadAllocationsFromVaults() {
+    // 延迟加载，等待provider初始化
+    Future.microtask(() {
+      final vaultState = ref.read(budgetVaultProvider);
+      final vaults = vaultState.vaults.where((v) => v.isEnabled).toList();
+
+      if (vaults.isEmpty) {
+        // 没有小金库时显示空状态
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // 根据实际小金库生成分配方案
+      double remaining = widget.amountToAllocate;
+      final allocations = <_AllocationItem>[];
+
+      for (final vault in vaults) {
+        if (remaining <= 0) break;
+
+        // 计算建议分配金额
+        double suggestedAmount;
+        String strategy;
+
+        if (vault.type == VaultType.savings && vault.targetAmount > 0) {
+          // 储蓄类：补足到目标
+          final needed = vault.targetAmount - vault.allocatedAmount;
+          suggestedAmount = needed.clamp(0, remaining);
+          strategy = '补足到 ¥${vault.targetAmount.toStringAsFixed(0)}';
+        } else if (vault.type == VaultType.fixed) {
+          // 固定支出：按比例分配
+          suggestedAmount = (widget.amountToAllocate * 0.3).clamp(0, remaining);
+          strategy = '固定支出';
+        } else {
+          // 其他：平均分配剩余
+          suggestedAmount = remaining / (vaults.length - allocations.length);
+          strategy = '剩余金额';
+        }
+
+        if (suggestedAmount > 0) {
+          allocations.add(_AllocationItem(
+            vaultId: vault.id,
+            name: vault.name,
+            icon: _getVaultIcon(vault.type),
+            gradientColors: _getVaultColors(vault.type),
+            strategy: strategy,
+            amount: suggestedAmount,
+            percent: (suggestedAmount / widget.amountToAllocate * 100),
+          ));
+          remaining -= suggestedAmount;
+        }
+      }
+
+      setState(() {
+        _allocations.clear();
+        _allocations.addAll(allocations);
+        _isLoading = false;
+      });
+    });
+  }
+
+  IconData _getVaultIcon(VaultType type) {
+    switch (type) {
+      case VaultType.savings:
+        return Icons.savings;
+      case VaultType.fixed:
+        return Icons.home;
+      case VaultType.flexible:
+        return Icons.restaurant;
+      case VaultType.debt:
+        return Icons.credit_card;
+    }
+  }
+
+  List<Color> _getVaultColors(VaultType type) {
+    switch (type) {
+      case VaultType.savings:
+        return [const Color(0xFF4CAF50), const Color(0xFF81C784)];
+      case VaultType.fixed:
+        return [const Color(0xFFFF6B6B), const Color(0xFFFF8E8E)];
+      case VaultType.flexible:
+        return [const Color(0xFF2196F3), const Color(0xFF64B5F6)];
+      case VaultType.debt:
+        return [const Color(0xFFFF9800), const Color(0xFFFFB74D)];
+    }
   }
 
   double get _totalAllocated =>
@@ -76,18 +138,22 @@ class _VaultAllocationPageState extends ConsumerState<VaultAllocationPage> {
           children: [
             _buildPageHeader(context, theme),
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _buildAmountCard(context, theme),
-                    _buildAllocationList(context, theme),
-                    _buildSummaryCard(context, theme),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          _buildAmountCard(context, theme),
+                          _buildAllocationList(context, theme),
+                          if (_allocations.isNotEmpty)
+                            _buildSummaryCard(context, theme),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
             ),
-            _buildConfirmButton(context, theme),
+            if (!_isLoading && _allocations.isNotEmpty)
+              _buildConfirmButton(context, theme),
           ],
         ),
       ),
@@ -193,22 +259,57 @@ class _VaultAllocationPageState extends ConsumerState<VaultAllocationPage> {
                 '分配方案',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
-              Text(
-                '智能推荐',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.primary,
+              if (_allocations.isNotEmpty)
+                Text(
+                  '智能推荐',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 12),
-          ..._allocations.map((allocation) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _buildAllocationItemCard(context, theme, allocation),
-            );
-          }),
+          if (_allocations.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.inbox_outlined,
+                    size: 48,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '暂无小金库',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '请先创建小金库后再进行分配',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ..._allocations.map((allocation) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildAllocationItemCard(context, theme, allocation),
+              );
+            }),
         ],
       ),
     );
@@ -389,6 +490,7 @@ class _VaultAllocationPageState extends ConsumerState<VaultAllocationPage> {
 }
 
 class _AllocationItem {
+  final String? vaultId;
   final String name;
   final IconData icon;
   final List<Color> gradientColors;
@@ -397,6 +499,7 @@ class _AllocationItem {
   final double percent;
 
   _AllocationItem({
+    this.vaultId,
     required this.name,
     required this.icon,
     required this.gradientColors,

@@ -20,39 +20,13 @@ class _FinancialCommitmentPageState
   @override
   void initState() {
     super.initState();
-    _loadCommitments();
+    // 不再加载mock数据，显示空状态让用户自己添加承诺
   }
 
-  void _loadCommitments() {
-    _commitments.addAll([
-      Commitment(
-        id: '1',
-        title: '每月存款 ¥2,000',
-        description: '为应急金储备',
-        icon: '💰',
-        startDate: DateTime.now().subtract(const Duration(days: 60)),
-        progress: 0.75,
-        isActive: true,
-      ),
-      Commitment(
-        id: '2',
-        title: '控制外卖支出',
-        description: '每周不超过3次外卖',
-        icon: '🍽️',
-        startDate: DateTime.now().subtract(const Duration(days: 30)),
-        progress: 0.9,
-        isActive: true,
-      ),
-      Commitment(
-        id: '3',
-        title: '每日记账',
-        description: '保持记账习惯',
-        icon: '📝',
-        startDate: DateTime.now().subtract(const Duration(days: 23)),
-        progress: 1.0,
-        isActive: true,
-      ),
-    ]);
+  void _addCommitment(Commitment commitment) {
+    setState(() {
+      _commitments.add(commitment);
+    });
   }
 
   @override

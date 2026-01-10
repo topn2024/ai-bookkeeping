@@ -35,16 +35,8 @@ class _GeofenceManagementPageState extends ConsumerState<GeofenceManagementPage>
     ),
   ];
 
-  final List<_GeofenceItem> _customFences = [
-    _GeofenceItem(
-      id: 'custom1',
-      name: '高消费区域',
-      description: '月均消费¥1,200+',
-      icon: Icons.warning,
-      gradientColors: [const Color(0xFFFF9800), const Color(0xFFFF9800)],
-      enabled: true,
-    ),
-  ];
+  // 用户自定义围栏（初始为空，用户自行添加）
+  final List<_GeofenceItem> _customFences = [];
 
   @override
   Widget build(BuildContext context) {
