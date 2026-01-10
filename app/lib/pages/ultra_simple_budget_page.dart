@@ -3,20 +3,46 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../widgets/simple_mode_scaffold.dart';
 import '../services/tts_service.dart';
+import '../services/simple_budget_service.dart';
 
 /// 超简易预算页面
 ///
-/// 只显示本月预算和已花费，用超大进度条和数字
+/// 智能默认预算，无需复杂配置
+/// 只问一个问题："一个月能花多少钱？"
 class UltraSimpleBudgetPage extends ConsumerWidget {
   const UltraSimpleBudgetPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // TODO: 从实际数据源获取
-    final monthlyBudget = 5000.0;
-    final spent = 2350.0;
-    final remaining = monthlyBudget - spent;
-    final progress = spent / monthlyBudget;
+    final budgetService = ref.watch(simpleBudgetServiceProvider);
+
+    return FutureBuilder<SimpleBudgetStatus>(
+      future: budgetService.getBudgetStatus(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SimpleModeScaffold(
+            title: '预算',
+            body: Center(
+              child: CircularProgressIndicator(strokeWidth: 8),
+            ),
+          );
+        }
+
+        final status = snapshot.data!;
+        return _buildBudgetPage(context, ref, status);
+      },
+    );
+  }
+
+  Widget _buildBudgetPage(
+    BuildContext context,
+    WidgetRef ref,
+    SimpleBudgetStatus status,
+  ) {
+    final monthlyBudget = status.budget;
+    final spent = status.spent;
+    final remaining = status.remaining;
+    final progress = status.progress;
 
     final tts = TTSService();
 
@@ -112,7 +138,7 @@ class UltraSimpleBudgetPage extends ConsumerWidget {
                 onPressed: () {
                   HapticFeedback.heavyImpact();
                   tts.speak('设置预算');
-                  _showSetBudgetDialog(context);
+                  _showSetBudgetDialog(context, ref, status.budget);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
@@ -175,17 +201,32 @@ class UltraSimpleBudgetPage extends ConsumerWidget {
     );
   }
 
-  void _showSetBudgetDialog(BuildContext context) {
+  void _showSetBudgetDialog(BuildContext context, WidgetRef ref, double currentBudget) {
     showDialog(
       context: context,
-      builder: (context) => const _SetBudgetDialog(),
+      builder: (context) => _SetBudgetDialog(
+        currentBudget: currentBudget,
+        onSave: (amount) async {
+          final service = ref.read(simpleBudgetServiceProvider);
+          await service.setSimpleBudget(amount);
+        },
+      ),
     );
   }
 }
 
 /// 设置预算对话框
+///
+/// 只问一个问题："一个月能花多少钱？"
+/// 提供智能建议值
 class _SetBudgetDialog extends StatefulWidget {
-  const _SetBudgetDialog();
+  final double currentBudget;
+  final Function(double) onSave;
+
+  const _SetBudgetDialog({
+    required this.currentBudget,
+    required this.onSave,
+  });
 
   @override
   State<_SetBudgetDialog> createState() => _SetBudgetDialogState();
@@ -198,7 +239,9 @@ class _SetBudgetDialogState extends State<_SetBudgetDialog> {
   @override
   void initState() {
     super.initState();
-    _tts.speak('设置本月预算');
+    // 预填充当前预算
+    _amount = widget.currentBudget.toInt().toString();
+    _tts.speak('一个月能花多少钱？');
   }
 
   @override
@@ -210,8 +253,13 @@ class _SetBudgetDialogState extends State<_SetBudgetDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              '设置本月预算',
+              '一个月能花多少钱？',
               style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '建议：${widget.currentBudget.toInt()}元',
+              style: const TextStyle(fontSize: 20, color: Colors.grey),
             ),
             const SizedBox(height: 24),
 
@@ -287,12 +335,14 @@ class _SetBudgetDialogState extends State<_SetBudgetDialog> {
                   child: SizedBox(
                     height: 80,
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         final amount = double.tryParse(_amount);
                         if (amount != null && amount > 0) {
-                          // TODO: 保存预算
-                          _tts.speak('预算已设置为$amount元');
-                          Navigator.pop(context);
+                          await widget.onSave(amount);
+                          _tts.speak('预算已设置为${amount.toInt()}元');
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                          }
                         }
                       },
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.green),

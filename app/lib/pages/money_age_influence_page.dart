@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../theme/app_theme.dart';
+import '../providers/transaction_provider.dart';
+import '../models/transaction.dart';
 
 /// 钱龄影响因素分析页面
 /// 原型设计 2.04：影响因素分析
@@ -15,6 +17,28 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final transactions = ref.watch(transactionProvider);
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+
+    // 获取本月收入（正面因素）
+    final monthlyIncomes = transactions
+        .where((t) => t.type == TransactionType.income && t.date.isAfter(monthStart))
+        .toList()
+      ..sort((a, b) => b.amount.compareTo(a.amount));
+
+    // 获取本月大额支出（负面因素）
+    final monthlyExpenses = transactions
+        .where((t) => t.type == TransactionType.expense && t.date.isAfter(monthStart))
+        .toList()
+      ..sort((a, b) => b.amount.compareTo(a.amount));
+
+    // 计算本月收入总额和支出总额
+    final totalIncome = monthlyIncomes.fold(0.0, (sum, t) => sum + t.amount);
+    final totalExpense = monthlyExpenses.fold(0.0, (sum, t) => sum + t.amount);
+
+    // 简化的钱龄变化估算（收入增加钱龄，支出减少钱龄）
+    final netChange = ((totalIncome - totalExpense) / 1000).round(); // 每1000元约1天
 
     return Scaffold(
       body: SafeArea(
@@ -25,10 +49,10 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    _buildMonthlyChangeCard(context, theme),
-                    _buildPositiveFactors(context, theme),
-                    _buildNegativeFactors(context, theme),
-                    _buildAIInsight(context, theme),
+                    _buildMonthlyChangeCard(context, theme, netChange),
+                    _buildPositiveFactors(context, theme, monthlyIncomes.take(3).toList()),
+                    _buildNegativeFactors(context, theme, monthlyExpenses.take(3).toList()),
+                    _buildAIInsight(context, theme, totalIncome, totalExpense),
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -76,7 +100,13 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
   }
 
   /// 本月钱龄变化
-  Widget _buildMonthlyChangeCard(BuildContext context, ThemeData theme) {
+  Widget _buildMonthlyChangeCard(BuildContext context, ThemeData theme, int netChange) {
+    final isPositive = netChange >= 0;
+    final changeText = isPositive ? '+$netChange天' : '$netChange天';
+    final baseAge = 30; // 基准钱龄
+    final currentAge = baseAge + netChange;
+    final progress = (currentAge / 60).clamp(0.0, 1.0); // 60天为满分
+
     return Container(
       margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(16),
@@ -101,11 +131,11 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
               ),
               Text(
-                '+5天',
+                changeText,
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.success,
+                  color: isPositive ? AppColors.success : AppColors.error,
                 ),
               ),
             ],
@@ -120,7 +150,7 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
             ),
             child: FractionallySizedBox(
               alignment: Alignment.centerLeft,
-              widthFactor: 0.6,
+              widthFactor: progress,
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -136,14 +166,14 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '月初 37天',
+                '月初 $baseAge天',
                 style: TextStyle(
                   fontSize: 11,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               Text(
-                '当前 42天',
+                '当前 $currentAge天',
                 style: TextStyle(
                   fontSize: 11,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -157,7 +187,7 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
   }
 
   /// 正面影响因素
-  Widget _buildPositiveFactors(BuildContext context, ThemeData theme) {
+  Widget _buildPositiveFactors(BuildContext context, ThemeData theme, List<Transaction> incomes) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.all(12),
@@ -183,30 +213,40 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          _buildFactorItem(
-            theme,
-            emoji: '💰',
-            title: '1月工资入账',
-            subtitle: '1月5日 ¥15,000',
-            effect: '+12天',
-            isPositive: true,
-          ),
-          const SizedBox(height: 8),
-          _buildFactorItem(
-            theme,
-            emoji: '📈',
-            title: '理财收益',
-            subtitle: '1月10日 ¥320',
-            effect: '+2天',
-            isPositive: true,
-          ),
+          if (incomes.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                '本月暂无收入记录',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            ...incomes.map((t) {
+              final effect = '+${(t.amount / 1000).round()}天';
+              final dateStr = '${t.date.month}月${t.date.day}日';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildFactorItem(
+                  theme,
+                  emoji: '💰',
+                  title: t.category ?? '收入',
+                  subtitle: '$dateStr ¥${t.amount.toStringAsFixed(0)}',
+                  effect: effect,
+                  isPositive: true,
+                ),
+              );
+            }),
         ],
       ),
     );
   }
 
   /// 负面影响因素
-  Widget _buildNegativeFactors(BuildContext context, ThemeData theme) {
+  Widget _buildNegativeFactors(BuildContext context, ThemeData theme, List<Transaction> expenses) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.all(12),
@@ -232,26 +272,54 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          _buildFactorItem(
-            theme,
-            emoji: '🛒',
-            title: '数码产品购买',
-            subtitle: '1月15日 ¥2,999',
-            effect: '-5天',
-            isPositive: false,
-          ),
-          const SizedBox(height: 8),
-          _buildFactorItem(
-            theme,
-            emoji: '🍜',
-            title: '餐饮消费偏高',
-            subtitle: '累计 ¥1,580',
-            effect: '-4天',
-            isPositive: false,
-          ),
+          if (expenses.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                '本月暂无大额支出',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            ...expenses.map((t) {
+              final effect = '-${(t.amount / 1000).round()}天';
+              final dateStr = '${t.date.month}月${t.date.day}日';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildFactorItem(
+                  theme,
+                  emoji: _getCategoryEmoji(t.category),
+                  title: t.category ?? '支出',
+                  subtitle: '$dateStr ¥${t.amount.toStringAsFixed(0)}',
+                  effect: effect,
+                  isPositive: false,
+                ),
+              );
+            }),
         ],
       ),
     );
+  }
+
+  String _getCategoryEmoji(String? category) {
+    switch (category) {
+      case '餐饮':
+      case '吃饭':
+        return '🍜';
+      case '购物':
+        return '🛒';
+      case '交通':
+        return '🚗';
+      case '娱乐':
+        return '🎮';
+      case '数码':
+        return '📱';
+      default:
+        return '💸';
+    }
   }
 
   Widget _buildFactorItem(
@@ -316,7 +384,19 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
   }
 
   /// AI洞察
-  Widget _buildAIInsight(BuildContext context, ThemeData theme) {
+  Widget _buildAIInsight(BuildContext context, ThemeData theme, double totalIncome, double totalExpense) {
+    String insightText;
+    if (totalIncome == 0 && totalExpense == 0) {
+      insightText = '开始记录收支后，AI将为您分析钱龄影响因素并提供优化建议。';
+    } else if (totalExpense > totalIncome) {
+      final overspend = totalExpense - totalIncome;
+      insightText = '本月支出超过收入¥${overspend.toStringAsFixed(0)}，建议控制非必要支出以提升钱龄。';
+    } else if (totalExpense > totalIncome * 0.8) {
+      insightText = '本月支出占收入${(totalExpense / totalIncome * 100).toStringAsFixed(0)}%，建议适当控制支出以保持健康的钱龄。';
+    } else {
+      insightText = '本月收支比例健康，继续保持良好的消费习惯，钱龄将稳步提升。';
+    }
+
     return Container(
       margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(12),
@@ -359,7 +439,7 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '本月餐饮支出占比较高，消耗了较多老资金。建议每周设置¥400的餐饮预算上限，预计可提升钱龄3-5天。',
+                  insightText,
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.colorScheme.onSurfaceVariant,

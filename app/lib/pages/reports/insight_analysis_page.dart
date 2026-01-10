@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../latte_factor_page.dart';
 import '../budget_management_page.dart';
-import 'budget_report_page.dart';
 import '../trends_page.dart';
+import '../../providers/transaction_provider.dart';
+import '../../providers/budget_provider.dart';
 
 /// 洞察分析页面
 /// 原型设计 7.02：洞察分析
@@ -18,6 +19,32 @@ class InsightAnalysisPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final categoryExpenses = ref.watch(monthlyExpenseByCategoryProvider);
+    final monthlyExpense = ref.watch(monthlyExpenseProvider);
+    final budgets = ref.watch(budgetProvider);
+    final totalMonthlyBudget = ref.watch(monthlyBudgetProvider);
+
+    // 计算拿铁因子（小额高频消费，如咖啡、奶茶等）
+    final latteCategories = ['咖啡', '奶茶', '饮料', '零食'];
+    double latteExpense = 0;
+    for (final cat in latteCategories) {
+      latteExpense += categoryExpenses[cat] ?? 0;
+    }
+    final now = DateTime.now();
+    final daysInMonth = now.day;
+    final dailyLatte = daysInMonth > 0 ? latteExpense / daysInMonth : 0.0;
+
+    // 计算餐饮预算使用情况
+    final foodExpense = categoryExpenses['餐饮'] ?? categoryExpenses['吃饭'] ?? 0;
+    // 从预算列表中查找餐饮类预算
+    final foodBudgetItem = budgets.where((b) =>
+        b.categoryId == '餐饮' || b.categoryId == '吃饭').firstOrNull;
+    final foodBudget = foodBudgetItem?.amount ??
+        (totalMonthlyBudget > 0 ? totalMonthlyBudget * 0.3 : 0); // 默认30%
+    final foodUsagePercent = foodBudget > 0 ? (foodExpense / foodBudget * 100) : 0.0;
+    final projectedOverspend = foodBudget > 0 && now.day > 0
+        ? (foodExpense / now.day * DateTime(now.year, now.month + 1, 0).day - foodBudget)
+        : 0.0;
 
     return Scaffold(
       body: SafeArea(
@@ -29,13 +56,13 @@ class InsightAnalysisPage extends ConsumerWidget {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _buildLatteFactorCard(theme),
+                    _buildLatteFactorCard(theme, latteExpense, dailyLatte),
                     const SizedBox(height: 12),
                     _buildSubscriptionAlert(theme),
                     const SizedBox(height: 12),
-                    _buildSpendingPatternCard(theme),
+                    _buildSpendingPatternCard(theme, monthlyExpense),
                     const SizedBox(height: 12),
-                    _buildBudgetInsightCard(theme),
+                    _buildBudgetInsightCard(theme, foodUsagePercent, projectedOverspend),
                   ],
                 ),
               ),
@@ -74,7 +101,11 @@ class InsightAnalysisPage extends ConsumerWidget {
   }
 
   /// 拿铁因子卡片
-  Widget _buildLatteFactorCard(ThemeData theme) {
+  Widget _buildLatteFactorCard(ThemeData theme, double latteExpense, double dailyLatte) {
+    final hasLatteData = latteExpense > 0;
+    final badgeText = dailyLatte > 20 ? '可优化' : (dailyLatte > 10 ? '适中' : '良好');
+    final badgeColor = dailyLatte > 20 ? Colors.orange : (dailyLatte > 10 ? Colors.blue : Colors.green);
+
     return _InsightCard(
       gradient: const LinearGradient(
         colors: [Color(0xFFFFF8E1), Color(0xFFFFECB3)],
@@ -84,8 +115,10 @@ class InsightAnalysisPage extends ConsumerWidget {
       icon: Icons.coffee,
       iconColor: const Color(0xFF8D6E63),
       title: '拿铁因子',
-      badge: _InsightBadge(text: '可优化', color: Colors.orange),
-      content: '本月咖啡支出 ¥456，日均 ¥15.2',
+      badge: hasLatteData ? _InsightBadge(text: badgeText, color: badgeColor) : null,
+      content: hasLatteData
+          ? '本月小额消费 ¥${latteExpense.toStringAsFixed(0)}，日均 ¥${dailyLatte.toStringAsFixed(1)}'
+          : '暂无小额高频消费数据',
       actionText: '查看详情 →',
       actionColor: theme.colorScheme.primary,
       onAction: (context) => Navigator.push(
@@ -97,6 +130,8 @@ class InsightAnalysisPage extends ConsumerWidget {
 
   /// 闲置订阅提醒
   Widget _buildSubscriptionAlert(ThemeData theme) {
+    // TODO: 从实际订阅数据中计算闲置订阅
+    // 暂时显示空状态提示
     return _InsightCard(
       gradient: const LinearGradient(
         colors: [Color(0xFFFFEBEE), Color(0xFFFFCDD2)],
@@ -106,16 +141,21 @@ class InsightAnalysisPage extends ConsumerWidget {
       icon: Icons.subscriptions,
       iconColor: Colors.red,
       title: '闲置订阅',
-      badge: _InsightBadge(text: '需关注', color: Colors.red),
-      content: '发现2个超过30天未使用的订阅，月支出 ¥58',
-      actionText: '立即处理 →',
-      actionColor: Colors.red,
-      onAction: () {},
+      badge: null,
+      content: '暂无订阅数据，添加订阅后可自动检测闲置情况',
+      actionText: null,
+      actionColor: null,
+      onAction: null,
     );
   }
 
   /// 消费习惯卡片
-  Widget _buildSpendingPatternCard(ThemeData theme) {
+  Widget _buildSpendingPatternCard(ThemeData theme, double monthlyExpense) {
+    final now = DateTime.now();
+    final daysElapsed = now.day;
+    final dailyAvg = daysElapsed > 0 ? monthlyExpense / daysElapsed : 0;
+    final hasData = monthlyExpense > 0;
+
     return _InsightCard(
       gradient: const LinearGradient(
         colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
@@ -125,8 +165,10 @@ class InsightAnalysisPage extends ConsumerWidget {
       icon: Icons.trending_up,
       iconColor: Colors.green,
       title: '消费习惯',
-      badge: _InsightBadge(text: '良好', color: Colors.green),
-      content: '周末消费占比下降至28%，较上月减少12%',
+      badge: hasData ? _InsightBadge(text: '分析中', color: Colors.green) : null,
+      content: hasData
+          ? '本月已支出 ¥${monthlyExpense.toStringAsFixed(0)}，日均 ¥${dailyAvg.toStringAsFixed(0)}'
+          : '暂无消费数据，开始记账后可查看分析',
       actionText: '查看趋势 →',
       actionColor: Colors.green,
       onAction: (context) => Navigator.push(
@@ -137,7 +179,21 @@ class InsightAnalysisPage extends ConsumerWidget {
   }
 
   /// 预算执行洞察
-  Widget _buildBudgetInsightCard(ThemeData theme) {
+  Widget _buildBudgetInsightCard(ThemeData theme, double usagePercent, double projectedOverspend) {
+    final usageInt = usagePercent.toInt();
+    final isOverBudget = projectedOverspend > 0;
+    final badgeText = usageInt >= 90 ? '需关注' : (usageInt >= 70 ? '适中' : '良好');
+    final badgeColor = usageInt >= 90 ? Colors.red : (usageInt >= 70 ? Colors.orange : Colors.green);
+
+    String content;
+    if (usagePercent == 0) {
+      content = '暂未设置预算，设置后可查看执行情况';
+    } else if (isOverBudget) {
+      content = '餐饮类目已使用${usageInt}%，按当前速度月底将超支¥${projectedOverspend.toStringAsFixed(0)}';
+    } else {
+      content = '餐饮类目已使用${usageInt}%，预算执行良好';
+    }
+
     return _InsightCard(
       gradient: const LinearGradient(
         colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB)],
@@ -147,8 +203,8 @@ class InsightAnalysisPage extends ConsumerWidget {
       icon: Icons.account_balance_wallet,
       iconColor: Colors.blue,
       title: '预算执行',
-      badge: null,
-      content: '餐饮类目已使用79%，按当前速度月底将超支¥180',
+      badge: usagePercent > 0 ? _InsightBadge(text: badgeText, color: badgeColor) : null,
+      content: content,
       actionText: '调整预算 →',
       actionColor: Colors.blue,
       onAction: (context) => Navigator.push(

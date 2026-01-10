@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/budget_vault.dart';
+import '../services/database_service.dart';
 import 'vault_create_page.dart';
 import 'transaction_list_page.dart';
 
@@ -22,39 +23,67 @@ class VaultDetailPage extends ConsumerStatefulWidget {
 }
 
 class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
-  // 模拟动态数据
   final List<VaultTransaction> _transactions = [];
+  double _monthlyDeposit = 0;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadMockTransactions();
+    _loadRealTransactions();
   }
 
-  void _loadMockTransactions() {
-    _transactions.addAll([
-      VaultTransaction(
-        id: '1',
+  Future<void> _loadRealTransactions() async {
+    final db = DatabaseService();
+    final allocations = await db.getVaultAllocations(widget.vault.id);
+    final transfers = await db.getVaultTransfers(widget.vault.id);
+
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+
+    // 转换分配记录为交易
+    final txList = <VaultTransaction>[];
+    double monthDeposit = 0;
+
+    for (final alloc in allocations) {
+      txList.add(VaultTransaction(
+        id: alloc.id,
         type: VaultTransactionType.deposit,
-        amount: 500,
-        date: DateTime.now(),
+        amount: alloc.amount,
+        date: alloc.allocatedAt,
         description: '存入',
-      ),
-      VaultTransaction(
-        id: '2',
-        type: VaultTransactionType.deposit,
-        amount: 1000,
-        date: DateTime.now().subtract(const Duration(days: 1)),
-        description: '自动存入',
-      ),
-      VaultTransaction(
-        id: '3',
-        type: VaultTransactionType.withdraw,
-        amount: 200,
-        date: DateTime.now().subtract(const Duration(days: 3)),
-        description: '紧急支出',
-      ),
-    ]);
+      ));
+      // 计算本月存入
+      if (alloc.allocatedAt.isAfter(monthStart)) {
+        monthDeposit += alloc.amount;
+      }
+    }
+
+    // 转换调拨记录为交易
+    for (final transfer in transfers) {
+      final isIncoming = transfer.toVaultId == widget.vault.id;
+      txList.add(VaultTransaction(
+        id: transfer.id,
+        type: isIncoming ? VaultTransactionType.deposit : VaultTransactionType.withdraw,
+        amount: transfer.amount,
+        date: transfer.transferredAt,
+        description: isIncoming ? '从其他小金库转入' : '转出到其他小金库',
+      ));
+      // 计算本月存入（仅统计转入）
+      if (isIncoming && transfer.transferredAt.isAfter(monthStart)) {
+        monthDeposit += transfer.amount;
+      }
+    }
+
+    // 按日期降序排序
+    txList.sort((a, b) => b.date.compareTo(a.date));
+
+    setState(() {
+      _transactions.clear();
+      _transactions.addAll(txList.take(10)); // 只显示最近10条
+      _monthlyDeposit = monthDeposit;
+      _isLoading = false;
+    });
   }
 
   @override
@@ -97,7 +126,10 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
           _MilestoneSection(progress: progress),
 
           // 统计数据行
-          _StatsSection(vault: vault),
+          _StatsSection(
+            vault: vault,
+            monthlyDeposit: _monthlyDeposit,
+          ),
 
           // 最近动态
           Expanded(
@@ -517,8 +549,32 @@ class _MilestoneSection extends StatelessWidget {
 /// 统计数据区域
 class _StatsSection extends StatelessWidget {
   final BudgetVault vault;
+  final double monthlyDeposit;
 
-  const _StatsSection({required this.vault});
+  const _StatsSection({
+    required this.vault,
+    required this.monthlyDeposit,
+  });
+
+  /// 计算预计达成时间
+  String _calculateEstimatedCompletion() {
+    final remaining = vault.targetAmount - vault.allocatedAmount;
+    if (remaining <= 0) {
+      return '已达成';
+    }
+    if (monthlyDeposit <= 0) {
+      return '未知';
+    }
+
+    final monthsNeeded = (remaining / monthlyDeposit).ceil();
+    if (monthsNeeded <= 0) {
+      return '本月';
+    }
+
+    final now = DateTime.now();
+    final targetDate = DateTime(now.year, now.month + monthsNeeded, 1);
+    return '${targetDate.month}月';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -528,7 +584,9 @@ class _StatsSection extends StatelessWidget {
         children: [
           _StatCard(
             label: '本月存入',
-            value: '+¥1,500',
+            value: monthlyDeposit > 0
+                ? '+¥${monthlyDeposit.toStringAsFixed(0)}'
+                : '¥0',
             color: Colors.green,
           ),
           const SizedBox(width: 8),
@@ -540,7 +598,7 @@ class _StatsSection extends StatelessWidget {
           const SizedBox(width: 8),
           _StatCard(
             label: '预计达成',
-            value: '2月',
+            value: _calculateEstimatedCompletion(),
             color: Colors.purple,
           ),
         ],
