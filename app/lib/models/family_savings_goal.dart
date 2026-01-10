@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'common_types.dart';
+
 /// 家庭目标状态
 enum FamilyGoalStatus {
   /// 进行中
@@ -122,9 +124,7 @@ class FamilyGoalContributor {
       contribution: (map['contribution'] as num).toDouble(),
       percentage: (map['percentage'] as num).toDouble(),
       contributionCount: map['contributionCount'] as int? ?? 0,
-      lastContributionAt: map['lastContributionAt'] != null
-          ? DateTime.parse(map['lastContributionAt'] as String)
-          : null,
+      lastContributionAt: parseDateTimeOrNull(map['lastContributionAt']),
     );
   }
 }
@@ -169,7 +169,7 @@ class FamilyGoalContribution {
       contributorName: map['contributorName'] as String,
       amount: (map['amount'] as num).toDouble(),
       note: map['note'] as String?,
-      createdAt: DateTime.parse(map['createdAt'] as String),
+      createdAt: parseDateTime(map['createdAt']),
     );
   }
 }
@@ -261,6 +261,7 @@ class FamilySavingsGoal {
     List<FamilyGoalContributor>? contributors,
     FamilyGoalStatus? status,
     String? createdBy,
+    DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? achievedAt,
     String? coverImage,
@@ -279,7 +280,7 @@ class FamilySavingsGoal {
       contributors: contributors ?? this.contributors,
       status: status ?? this.status,
       createdBy: createdBy ?? this.createdBy,
-      createdAt: createdAt,
+      createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       achievedAt: achievedAt ?? this.achievedAt,
       coverImage: coverImage ?? this.coverImage,
@@ -299,7 +300,7 @@ class FamilySavingsGoal {
       'currentAmount': currentAmount,
       'deadline': deadline?.toIso8601String(),
       'contributors': contributors.map((c) => c.toMap()).toList(),
-      'status': status.index,
+      'status': status.name,
       'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
@@ -326,15 +327,11 @@ class FamilySavingsGoal {
               ?.map((c) => FamilyGoalContributor.fromMap(c as Map<String, dynamic>))
               .toList() ??
           [],
-      status: FamilyGoalStatus.values[map['status'] as int? ?? 0],
+      status: parseEnum(map['status'], FamilyGoalStatus.values, FamilyGoalStatus.active),
       createdBy: map['createdBy'] as String,
-      createdAt: DateTime.parse(map['createdAt'] as String),
-      updatedAt: map['updatedAt'] != null
-          ? DateTime.parse(map['updatedAt'] as String)
-          : null,
-      achievedAt: map['achievedAt'] != null
-          ? DateTime.parse(map['achievedAt'] as String)
-          : null,
+      createdAt: parseDateTime(map['createdAt']),
+      updatedAt: parseDateTimeOrNull(map['updatedAt']),
+      achievedAt: parseDateTimeOrNull(map['achievedAt']),
       coverImage: map['coverImage'] as String?,
       isPinned: map['isPinned'] as bool? ?? false,
       enableNotifications: map['enableNotifications'] as bool? ?? true,

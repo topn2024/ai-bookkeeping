@@ -1,6 +1,21 @@
 import 'dart:math' show max;
 import 'dart:convert';
 
+/// 时钟比较结果
+enum ClockComparison {
+  /// 两个时钟相等
+  equal,
+
+  /// 当前时钟在另一个时钟之前
+  before,
+
+  /// 当前时钟在另一个时钟之后
+  after,
+
+  /// 并发（无法确定因果顺序）
+  concurrent,
+}
+
 /// 向量时钟实现 - 用于CRDT冲突解决
 ///
 /// 向量时钟是一种分布式系统中用于捕获因果关系的逻辑时钟。
@@ -20,6 +35,9 @@ class VectorClock {
 
   /// 转换为JSON
   Map<String, int> toJson() => Map.from(_clock);
+
+  /// 转换为Map（toJson的别名）
+  Map<String, int> toMap() => toJson();
 
   /// 获取某个节点的时间戳
   int operator [](String nodeId) => _clock[nodeId] ?? 0;
@@ -77,7 +95,7 @@ class VectorClock {
     return VectorClock(newClock);
   }
 
-  /// 比较两个向量时钟
+  /// 比较两个向量时钟（返回int）
   ///
   /// 返回:
   /// - -1: this happens-before other
@@ -87,6 +105,14 @@ class VectorClock {
     if (happensBefore(other)) return -1;
     if (other.happensBefore(this)) return 1;
     return 0;
+  }
+
+  /// 比较两个向量时钟（返回ClockComparison枚举）
+  ClockComparison compare(VectorClock other) {
+    if (this == other) return ClockComparison.equal;
+    if (happensBefore(other)) return ClockComparison.before;
+    if (other.happensBefore(this)) return ClockComparison.after;
+    return ClockComparison.concurrent;
   }
 
   @override

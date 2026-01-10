@@ -78,7 +78,7 @@ class DataLinkageService extends ChangeNotifier {
 
     // 监听筛选变化
     _subscriptions.add(
-      filterService.stateStream.listen(_onFilterStateChanged),
+      filterService.stateStream.listen((change) => _onFilterStateChanged(change.newState)),
     );
 
     // 监听面包屑点击

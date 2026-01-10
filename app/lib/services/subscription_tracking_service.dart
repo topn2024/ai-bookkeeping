@@ -325,15 +325,15 @@ class SubscriptionTrackingService {
 
   Future<List<Transaction>> _getRecentTransactions(int months, String? ledgerId) async {
     final since = DateTime.now().subtract(Duration(days: months * 30));
-    final transactions = await _db.getTransactions(
-      startDate: since,
-      endDate: DateTime.now(),
-      ledgerId: ledgerId,
-    );
+    final now = DateTime.now();
+    final allTransactions = await _db.getTransactions();
 
-    // 只保留支出类型
-    return transactions
-        .where((tx) => tx.type == TransactionType.expense)
+    // 过滤日期范围和支出类型
+    return allTransactions
+        .where((tx) =>
+            tx.type == TransactionType.expense &&
+            tx.date.isAfter(since) &&
+            tx.date.isBefore(now))
         .toList()
       ..sort((a, b) => a.date.compareTo(b.date));
   }
@@ -344,7 +344,8 @@ class SubscriptionTrackingService {
     final grouped = <_MerchantAmountKey, List<Transaction>>{};
 
     for (final tx in transactions) {
-      final merchant = tx.description.isNotEmpty ? tx.description : tx.categoryName;
+      final desc = tx.description;
+      final merchant = (desc != null && desc.isNotEmpty) ? desc : tx.categoryName;
       final key = _MerchantAmountKey(merchant, tx.amount);
 
       grouped.putIfAbsent(key, () => []).add(tx);

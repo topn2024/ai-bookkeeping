@@ -553,7 +553,7 @@ class VaultOverviewPage extends ConsumerWidget {
   }
 
   void _showDepositDialog(BuildContext context, WidgetRef ref) {
-    final vaults = ref.read(budgetVaultProvider).vaults;
+    final vaults = ref.read(budgetVaultProvider).vaults.where((v) => v.isEnabled).toList();
     if (vaults.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请先创建小金库')),
@@ -561,24 +561,238 @@ class VaultOverviewPage extends ConsumerWidget {
       return;
     }
 
-    // TODO: 显示存入对话框
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('存入功能开发中')),
+    _showTransferDialog(
+      context: context,
+      ref: ref,
+      title: '存入小金库',
+      actionLabel: '存入',
+      vaults: vaults,
+      onConfirm: (vault, amount) async {
+        await ref.read(budgetVaultProvider.notifier).allocateToVault(vault.id, amount);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('已向「${vault.name}」存入 ¥${amount.toStringAsFixed(2)}')),
+          );
+        }
+      },
     );
   }
 
   void _showWithdrawDialog(BuildContext context, WidgetRef ref) {
-    final vaults = ref.read(budgetVaultProvider).vaults;
+    final vaults = ref.read(budgetVaultProvider).vaults
+        .where((v) => v.isEnabled && v.available > 0)
+        .toList();
     if (vaults.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先创建小金库')),
+        const SnackBar(content: Text('没有可取出的小金库')),
       );
       return;
     }
 
-    // TODO: 显示取出对话框
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('取出功能开发中')),
+    _showTransferDialog(
+      context: context,
+      ref: ref,
+      title: '从小金库取出',
+      actionLabel: '取出',
+      vaults: vaults,
+      isWithdraw: true,
+      onConfirm: (vault, amount) async {
+        await ref.read(budgetVaultProvider.notifier).recordExpense(vault.id, amount);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('已从「${vault.name}」取出 ¥${amount.toStringAsFixed(2)}')),
+          );
+        }
+      },
+    );
+  }
+
+  void _showTransferDialog({
+    required BuildContext context,
+    required WidgetRef ref,
+    required String title,
+    required String actionLabel,
+    required List<BudgetVault> vaults,
+    required Future<void> Function(BudgetVault vault, double amount) onConfirm,
+    bool isWithdraw = false,
+  }) {
+    BudgetVault selectedVault = vaults.first;
+    final amountController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // 小金库选择
+                const Text('选择小金库', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<BudgetVault>(
+                      value: selectedVault,
+                      isExpanded: true,
+                      items: vaults.map((vault) {
+                        return DropdownMenuItem<BudgetVault>(
+                          value: vault,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: vault.color.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(vault.icon, color: vault.color, size: 18),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(vault.name),
+                                    Text(
+                                      '可用 ¥${vault.available.toStringAsFixed(0)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (vault) {
+                        if (vault != null) {
+                          setState(() => selectedVault = vault);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // 金额输入
+                Text(
+                  isWithdraw
+                      ? '取出金额（可用 ¥${selectedVault.available.toStringAsFixed(2)}）'
+                      : '存入金额',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: amountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    prefixText: '¥ ',
+                    hintText: '0.00',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return '请输入金额';
+                    }
+                    final amount = double.tryParse(value);
+                    if (amount == null || amount <= 0) {
+                      return '请输入有效金额';
+                    }
+                    if (isWithdraw && amount > selectedVault.available) {
+                      return '金额超出可用余额';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                // 操作按钮
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('取消'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          if (formKey.currentState?.validate() == true) {
+                            final amount = double.parse(amountController.text);
+                            Navigator.pop(context);
+                            await onConfirm(selectedVault, amount);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(actionLabel),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

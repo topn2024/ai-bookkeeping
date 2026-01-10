@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -23,6 +24,7 @@ class SourceFileSyncService {
   final HttpService _http = HttpService();
 
   bool _isSyncing = false;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   /// Check if currently on WiFi
   Future<bool> isOnWifi() async {
@@ -177,7 +179,8 @@ class SourceFileSyncService {
 
   /// Start background sync when WiFi is connected
   void startBackgroundSync(Future<List<Transaction>> Function() getTransactions) {
-    _connectivity.onConnectivityChanged.listen((results) async {
+    _connectivitySubscription?.cancel();
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((results) async {
       if (results.contains(ConnectivityResult.wifi)) {
         // WiFi connected, start sync
         final transactions = await getTransactions();
@@ -194,6 +197,11 @@ class SourceFileSyncService {
   /// Cancel ongoing sync (if any)
   void cancelSync() {
     _isSyncing = false;
+  }
+
+  /// Dispose resources
+  void dispose() {
+    _connectivitySubscription?.cancel();
   }
 
   /// Check if sync is in progress

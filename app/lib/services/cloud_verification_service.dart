@@ -22,6 +22,7 @@ class CloudVerificationService {
   final OfflineCapabilityService _offlineService = OfflineCapabilityService();
 
   final _verificationController = StreamController<VerificationResult>.broadcast();
+  StreamSubscription<NetworkStatusInfo>? _statusSubscription;
 
   /// 校验结果流
   Stream<VerificationResult> get verificationStream => _verificationController.stream;
@@ -32,7 +33,7 @@ class CloudVerificationService {
   /// 初始化服务
   Future<void> initialize() async {
     // 监听网络状态变化
-    _offlineService.statusStream.listen((status) {
+    _statusSubscription = _offlineService.statusStream.listen((status) {
       if (status.isOnline) {
         // 网络恢复时，处理待校验记录
         processPendingVerifications();
@@ -412,6 +413,7 @@ class CloudVerificationService {
 
   /// 释放资源
   void dispose() {
+    _statusSubscription?.cancel();
     _verificationController.close();
   }
 }

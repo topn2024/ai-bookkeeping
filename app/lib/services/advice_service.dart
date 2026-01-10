@@ -54,7 +54,7 @@ class AdviceService {
               id: 'overspend_${budget.id}',
               type: AdviceType.overspending,
               title: '超支处理方案',
-              description: '${budget.name}超支 ¥${overspent.toStringAsFixed(0)}。可以从${otherBudget.name}预算（还剩¥${otherBudget.remaining.toStringAsFixed(0)}）调拨，要帮你设置吗？',
+              description: '${budget.name}超支 ¥${overspent.toStringAsFixed(0)}。可以从${otherBudget.budget.name}预算（还剩¥${otherBudget.remaining.toStringAsFixed(0)}）调拨，要帮你设置吗？',
               icon: Icons.trending_up,
               color: const Color(0xFFE53935),
               bgColor: const Color(0xFFFFEBEE),
@@ -63,7 +63,7 @@ class AdviceService {
               metadata: {
                 'overspent': overspent,
                 'source': budget.name,
-                'available_from': otherBudget.name,
+                'available_from': otherBudget.budget.name,
                 'available_amount': otherBudget.remaining,
               },
             ));
@@ -123,7 +123,7 @@ class AdviceService {
   double _calculateSpent(List<Transaction> transactions, String? categoryId, int month) {
     return transactions
         .where((t) =>
-          t.categoryId == categoryId &&
+          t.category == categoryId &&
           t.type == TransactionType.expense &&
           t.date.month == month
         )
@@ -190,5 +190,5 @@ class _BudgetWithRemaining {
 
   _BudgetWithRemaining(this.budget, this.remaining);
 
-  String get category => budget.category;
+  String? get categoryId => budget.categoryId;
 }

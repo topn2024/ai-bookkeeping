@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'common_types.dart';
+
 /// 成就分类
 enum AchievementCategory {
   /// 记账相关成就
@@ -283,10 +285,10 @@ class AchievementProgress {
       'currentValue': currentValue,
       'targetValue': targetValue,
       'isUnlocked': isUnlocked ? 1 : 0,
-      'unlockedAt': unlockedAt?.millisecondsSinceEpoch,
+      'unlockedAt': unlockedAt?.toIso8601String(),
       'rewardClaimed': rewardClaimed ? 1 : 0,
-      'rewardClaimedAt': rewardClaimedAt?.millisecondsSinceEpoch,
-      'updatedAt': updatedAt.millisecondsSinceEpoch,
+      'rewardClaimedAt': rewardClaimedAt?.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
@@ -298,14 +300,10 @@ class AchievementProgress {
       currentValue: map['currentValue'] as int,
       targetValue: map['targetValue'] as int,
       isUnlocked: map['isUnlocked'] == 1,
-      unlockedAt: map['unlockedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['unlockedAt'] as int)
-          : null,
+      unlockedAt: parseDateTimeOrNull(map['unlockedAt']),
       rewardClaimed: map['rewardClaimed'] == 1,
-      rewardClaimedAt: map['rewardClaimedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['rewardClaimedAt'] as int)
-          : null,
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int),
+      rewardClaimedAt: parseDateTimeOrNull(map['rewardClaimedAt']),
+      updatedAt: parseDateTime(map['updatedAt']),
     );
   }
 

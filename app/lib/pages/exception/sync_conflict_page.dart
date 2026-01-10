@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/app_theme.dart';
+
 /// 同步冲突解决页面
 /// 原型设计 11.02：同步冲突解决
 /// - 冲突说明卡片

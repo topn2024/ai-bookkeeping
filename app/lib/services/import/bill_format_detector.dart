@@ -57,6 +57,21 @@ class BillFormatResult {
   bool get isSuccess => errorMessage == null;
   bool get isRecognized => sourceType != BillSourceType.unknown;
 
+  /// 识别置信度 (0.0-1.0)
+  double get confidence {
+    if (!isSuccess) return 0.0;
+    if (!isRecognized) return 0.0;
+    // 基础置信度
+    var score = 0.5;
+    // 有头部信息加分
+    if (headers != null && headers!.isNotEmpty) score += 0.2;
+    // 有预览行加分
+    if (previewRows != null && previewRows!.isNotEmpty) score += 0.2;
+    // 有日期范围加分
+    if (dateRange != null) score += 0.1;
+    return score.clamp(0.0, 1.0);
+  }
+
   /// Alias for estimatedRecordCount
   int? get recordCount => estimatedRecordCount;
 

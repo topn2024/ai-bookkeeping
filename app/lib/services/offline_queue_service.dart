@@ -46,22 +46,23 @@ class OfflineQueueService {
   final HttpService _http = HttpService();
   final DataMapperService _mapper = DataMapperService();
   final Connectivity _connectivity = Connectivity();
-  final RetryConfig _retryConfig;
+  RetryConfig _retryConfig = const RetryConfig();
   final _uuid = const Uuid();
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isProcessing = false;
   bool _isOnline = true;
 
-  factory OfflineQueueService({RetryConfig? retryConfig}) {
-    if (retryConfig != null) {
-      return OfflineQueueService._withConfig(retryConfig);
-    }
-    return _instance;
-  }
+  factory OfflineQueueService() => _instance;
 
-  OfflineQueueService._internal() : _retryConfig = const RetryConfig();
-  OfflineQueueService._withConfig(this._retryConfig);
+  OfflineQueueService._internal();
+
+  /// Configure retry settings (must be called before initialize)
+  void configure({RetryConfig? retryConfig}) {
+    if (retryConfig != null) {
+      _retryConfig = retryConfig;
+    }
+  }
 
   /// Initialize and start listening for connectivity changes
   Future<void> initialize() async {
@@ -81,13 +82,15 @@ class OfflineQueueService {
   }
 
   /// Handle connectivity changes
-  void _onConnectivityChanged(List<ConnectivityResult> results) async {
+  void _onConnectivityChanged(List<ConnectivityResult> results) {
     final wasOnline = _isOnline;
     _isOnline = !results.contains(ConnectivityResult.none);
 
     // If we just came online, process the queue
     if (_isOnline && !wasOnline) {
-      await processQueue();
+      unawaited(processQueue().catchError((e) {
+        // 网络恢复后队列处理失败，静默处理（队列会在下次机会重试）
+      }));
     }
   }
 

@@ -175,12 +175,13 @@ class LatteFactorAnalyzer {
     final period = months ?? analysisMonths;
     final since = DateTime.now().subtract(Duration(days: period * 30));
 
-    final transactions = await _db.getTransactions(
-      startDate: since,
-      endDate: DateTime.now(),
-      categoryId: category,
-      ledgerId: ledgerId,
-    );
+    final allTransactions = await _db.getTransactions();
+    final transactions = allTransactions.where((tx) {
+      if (tx.date.isBefore(since)) return false;
+      if (tx.category != category) return false;
+      // Note: ledgerId filtering not supported in current Transaction model
+      return true;
+    }).toList();
 
     final expenses = transactions
         .where((tx) => tx.type == TransactionType.expense)
@@ -243,18 +244,17 @@ class LatteFactorAnalyzer {
     String? ledgerId,
   ) async {
     final since = DateTime.now().subtract(Duration(days: months * 30));
+    final now = DateTime.now();
 
-    final transactions = await _db.getTransactions(
-      startDate: since,
-      endDate: DateTime.now(),
-      ledgerId: ledgerId,
-    );
+    final allTransactions = await _db.getTransactions();
 
-    return transactions
+    return allTransactions
         .where((tx) =>
             tx.type == TransactionType.expense &&
             tx.amount < threshold &&
-            tx.amount > 0)
+            tx.amount > 0 &&
+            tx.date.isAfter(since) &&
+            tx.date.isBefore(now))
         .toList();
   }
 
@@ -264,7 +264,7 @@ class LatteFactorAnalyzer {
 
     for (final tx in transactions) {
       // 生成聚类键：类别 + 简化的描述
-      final key = '${tx.categoryId}:${_simplifyDescription(tx.description)}';
+      final key = '${tx.categoryId}:${_simplifyDescription(tx.description ?? '')}';
       grouped.putIfAbsent(key, () => []).add(tx);
     }
 
@@ -290,12 +290,12 @@ class LatteFactorAnalyzer {
 
   String _findCommonDescription(List<Transaction> transactions) {
     if (transactions.isEmpty) return '';
-    if (transactions.length == 1) return transactions.first.description;
+    if (transactions.length == 1) return transactions.first.description ?? '';
 
     // 找出最常见的描述词
     final descCounts = <String, int>{};
     for (final tx in transactions) {
-      final simplified = _simplifyDescription(tx.description);
+      final simplified = _simplifyDescription(tx.description ?? '');
       if (simplified.isNotEmpty) {
         descCounts[simplified] = (descCounts[simplified] ?? 0) + 1;
       }
@@ -315,9 +315,9 @@ class LatteFactorAnalyzer {
     final merchantCounts = <String, int>{};
 
     for (final tx in transactions) {
-      if (tx.description.isNotEmpty) {
-        merchantCounts[tx.description] =
-            (merchantCounts[tx.description] ?? 0) + 1;
+      final desc = tx.description;
+      if (desc != null && desc.isNotEmpty) {
+        merchantCounts[desc] = (merchantCounts[desc] ?? 0) + 1;
       }
     }
 

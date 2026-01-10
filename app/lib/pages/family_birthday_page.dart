@@ -50,7 +50,7 @@ class FamilyBirthdayPage extends ConsumerWidget {
               _buildWarmMessage(),
               const Spacer(),
               // 操作按钮
-              _buildActionButton(l10n),
+              _buildActionButton(context, l10n),
               const SizedBox(height: 24),
             ],
           ),
@@ -233,7 +233,7 @@ class FamilyBirthdayPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildActionButton(AppLocalizations l10n) {
+  Widget _buildActionButton(BuildContext context, AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: SizedBox(

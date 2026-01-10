@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/budget_vault_provider.dart';
 import '../providers/budget_provider.dart';
+import '../providers/transaction_provider.dart';
 import '../models/budget_vault.dart';
 
 /// 突发支出处理页面
@@ -31,7 +32,8 @@ class _UnexpectedExpensePageState
   @override
   Widget build(BuildContext context) {
     final vaultState = ref.watch(budgetVaultProvider);
-    final budgetState = ref.watch(budgetProvider);
+    final monthlyBudget = ref.watch(monthlyBudgetProvider);
+    final monthlyExpense = ref.watch(monthlyExpenseProvider);
 
     // 获取应急金小金库
     final emergencyVault = vaultState.vaults.where(
@@ -46,7 +48,7 @@ class _UnexpectedExpensePageState
     final firstSavingsVault = savingsVaults.isNotEmpty ? savingsVaults.first : null;
 
     // 计算弹性预算剩余
-    final flexibleRemaining = budgetState.monthlyBudget - budgetState.monthlySpent;
+    final flexibleRemaining = monthlyBudget - monthlyExpense;
 
     return Scaffold(
       appBar: AppBar(
@@ -270,7 +272,7 @@ class _FundingSourceCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _FundingSourceCard({
     required this.source,
@@ -279,11 +281,12 @@ class _FundingSourceCard extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.isSelected,
-    required this.onTap,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isEnabled = onTap != null;
     return GestureDetector(
       onTap: onTap,
       child: Container(

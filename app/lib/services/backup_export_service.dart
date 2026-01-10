@@ -146,33 +146,33 @@ class BackupExportService {
 
     // 交易数据
     final transactions = await _db.getAllTransactions();
-    data['transactions'] = transactions.map((t) => t.toJson()).toList();
+    data['transactions'] = transactions.map((t) => t.toMap()).toList();
     stats['transactions'] = transactions.length;
 
     // 账户数据
     final accounts = await _db.getAllAccounts();
-    data['accounts'] = accounts.map((a) => a.toJson()).toList();
+    data['accounts'] = accounts.map((a) => a.toMap()).toList();
     stats['accounts'] = accounts.length;
 
     // 预算数据
     final budgets = await _db.getAllBudgets();
-    data['budgets'] = budgets.map((b) => b.toJson()).toList();
+    data['budgets'] = budgets.map((b) => b.toMap()).toList();
     stats['budgets'] = budgets.length;
 
     // 储蓄目标
     final savingsGoals = await _db.getAllSavingsGoals();
-    data['savingsGoals'] = savingsGoals.map((s) => s.toJson()).toList();
+    data['savingsGoals'] = savingsGoals.map((s) => s.toMap()).toList();
     stats['savingsGoals'] = savingsGoals.length;
 
     // 周期性交易
     final recurringTransactions = await _db.getAllRecurringTransactions();
     data['recurringTransactions'] =
-        recurringTransactions.map((r) => r.toJson()).toList();
+        recurringTransactions.map((r) => r.toMap()).toList();
     stats['recurringTransactions'] = recurringTransactions.length;
 
     // 模板
     final templates = await _db.getAllTemplates();
-    data['templates'] = templates.map((t) => t.toJson()).toList();
+    data['templates'] = templates.map((t) => t.toMap()).toList();
     stats['templates'] = templates.length;
 
     // 自定义分类
@@ -182,7 +182,7 @@ class BackupExportService {
 
     // 导入历史
     final importBatches = await _db.getImportBatches();
-    data['importBatches'] = importBatches.map((b) => b.toJson()).toList();
+    data['importBatches'] = importBatches.map((b) => b.toMap()).toList();
     stats['importBatches'] = importBatches.length;
 
     // 钱龄资源池数据
@@ -448,7 +448,7 @@ class BackupExportService {
     // 恢复交易
     if (data['transactions'] != null) {
       for (final t in data['transactions'] as List) {
-        final transaction = Transaction.fromJson(t as Map<String, dynamic>);
+        final transaction = Transaction.fromMap(t as Map<String, dynamic>);
         await _db.insertTransaction(transaction);
       }
     }
@@ -456,7 +456,7 @@ class BackupExportService {
     // 恢复账户
     if (data['accounts'] != null) {
       for (final a in data['accounts'] as List) {
-        final account = Account.fromJson(a as Map<String, dynamic>);
+        final account = Account.fromMap(a as Map<String, dynamic>);
         await _db.insertAccount(account);
       }
     }
@@ -464,7 +464,7 @@ class BackupExportService {
     // 恢复预算
     if (data['budgets'] != null) {
       for (final b in data['budgets'] as List) {
-        final budget = Budget.fromJson(b as Map<String, dynamic>);
+        final budget = Budget.fromMap(b as Map<String, dynamic>);
         await _db.insertBudget(budget);
       }
     }
@@ -472,7 +472,7 @@ class BackupExportService {
     // 恢复储蓄目标
     if (data['savingsGoals'] != null) {
       for (final s in data['savingsGoals'] as List) {
-        final goal = SavingsGoal.fromJson(s as Map<String, dynamic>);
+        final goal = SavingsGoal.fromMap(s as Map<String, dynamic>);
         await _db.insertSavingsGoal(goal);
       }
     }
@@ -481,7 +481,7 @@ class BackupExportService {
     if (data['recurringTransactions'] != null) {
       for (final r in data['recurringTransactions'] as List) {
         final recurring =
-            RecurringTransaction.fromJson(r as Map<String, dynamic>);
+            RecurringTransaction.fromMap(r as Map<String, dynamic>);
         await _db.insertRecurringTransaction(recurring);
       }
     }
@@ -489,7 +489,7 @@ class BackupExportService {
     // 恢复模板
     if (data['templates'] != null) {
       for (final t in data['templates'] as List) {
-        final template = Template.fromJson(t as Map<String, dynamic>);
+        final template = TransactionTemplate.fromMap(t as Map<String, dynamic>);
         await _db.insertTemplate(template);
       }
     }

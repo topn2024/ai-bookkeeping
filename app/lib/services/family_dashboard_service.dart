@@ -82,7 +82,7 @@ class FamilyDashboardService {
       }
 
       final netSavings = totalIncome - totalExpense;
-      final savingsRate = totalIncome > 0 ? (netSavings / totalIncome * 100) : 0;
+      final savingsRate = totalIncome > 0 ? (netSavings / totalIncome * 100) : 0.0;
 
       // 计算本期天数
       final daysInPeriod = endOfMonth.day;
@@ -253,7 +253,7 @@ class FamilyDashboardService {
       for (var entry in categoryMap.entries) {
         final amount = entry.value['amount'] as double;
         final count = entry.value['count'] as int;
-        final percentage = totalExpense > 0 ? (amount / totalExpense * 100) : 0;
+        final percentage = totalExpense > 0 ? (amount / totalExpense * 100) : 0.0;
 
         breakdowns.add(CategoryBreakdown(
           categoryId: entry.key,

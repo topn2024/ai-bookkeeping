@@ -222,6 +222,11 @@ class WantsVsNeedsClassifier {
     'lottery': SpendingNecessity.waste,
   };
 
+  /// 简单的静态分类方法，基于类别ID
+  static SpendingNecessity classifyByCategory(String categoryId) {
+    return _categoryDefaults[categoryId] ?? SpendingNecessity.maybeNeed;
+  }
+
   /// 商户模式映射
   static const Map<String, SpendingNecessity> _merchantPatterns = {
     '医院': SpendingNecessity.need,

@@ -2,6 +2,20 @@ import 'package:flutter/material.dart';
 import 'currency.dart';
 import '../services/account_localization_service.dart';
 
+/// Color扩展：支持十六进制颜色转换
+extension HexColor on Color {
+  /// 转换为十六进制字符串
+  String toHex() => '#${toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}';
+
+  /// 从十六进制字符串创建Color
+  static Color fromHex(String hexString) {
+    final buffer = StringBuffer();
+    if (hexString.length == 6 || hexString.length == 7) buffer.write('ff');
+    buffer.write(hexString.replaceFirst('#', ''));
+    return Color(int.parse(buffer.toString(), radix: 16));
+  }
+}
+
 enum AccountType {
   cash,
   bankCard,
@@ -78,6 +92,43 @@ class Account {
 
   /// 格式化账户余额
   String get formattedBalance => currencyInfo.format(balance);
+
+  /// 转换为Map用于序列化
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'type': type.index,
+      'balance': balance,
+      'icon': icon.codePoint,
+      'color': color.toHex(),
+      'isDefault': isDefault ? 1 : 0,
+      'isActive': isActive ? 1 : 0,
+      'createdAt': createdAt.toIso8601String(),
+      'currency': currency.name,
+      'isCustom': isCustom ? 1 : 0,
+    };
+  }
+
+  /// 从Map创建Account
+  factory Account.fromMap(Map<String, dynamic> map) {
+    return Account(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      type: AccountType.values[map['type'] as int],
+      balance: (map['balance'] as num).toDouble(),
+      icon: IconData(map['icon'] as int, fontFamily: 'MaterialIcons'),
+      color: HexColor.fromHex(map['color'] as String),
+      isDefault: map['isDefault'] == 1,
+      isActive: map['isActive'] == 1,
+      createdAt: DateTime.parse(map['createdAt'] as String),
+      currency: CurrencyType.values.firstWhere(
+        (e) => e.name == map['currency'],
+        orElse: () => CurrencyType.cny,
+      ),
+      isCustom: map['isCustom'] == 1,
+    );
+  }
 }
 
 // Default accounts

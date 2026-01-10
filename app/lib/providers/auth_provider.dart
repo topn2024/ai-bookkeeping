@@ -48,7 +48,12 @@ class AuthNotifier extends Notifier<AuthState> {
 
   @override
   AuthState build() {
-    Future.microtask(() => _loadUser());
+    Future.microtask(() => _loadUser().catchError((e) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        error: '初始化失败: $e',
+      );
+    }));
     return const AuthState(status: AuthStatus.loading);
   }
 

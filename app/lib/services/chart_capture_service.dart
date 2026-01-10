@@ -905,7 +905,7 @@ class ChartExportService {
         // 斑马纹效果
         if (rowIndex % 2 == 1) {
           dataCell.cellStyle = excel_pkg.CellStyle(
-            backgroundColorHex: excel_pkg.ExcelColor.gray100,
+            backgroundColorHex: excel_pkg.ExcelColor.fromHexString('#F5F5F5'),
           );
         }
       }
@@ -921,7 +921,7 @@ class ChartExportService {
     );
     footerCell.cellStyle = excel_pkg.CellStyle(
       fontSize: 10,
-      fontColorHex: excel_pkg.ExcelColor.gray,
+      fontColorHex: excel_pkg.ExcelColor.fromHexString('#808080'),
       italic: true,
     );
 
@@ -1004,7 +1004,7 @@ class ChartExportService {
           // 斑马纹效果
           if (rowIndex % 2 == 1) {
             dataCell.cellStyle = excel_pkg.CellStyle(
-              backgroundColorHex: excel_pkg.ExcelColor.gray100,
+              backgroundColorHex: excel_pkg.ExcelColor.fromHexString('#F5F5F5'),
             );
           }
         }

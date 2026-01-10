@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite/sqflite.dart' hide Transaction;
 
 import '../models/resource_pool.dart';
 import '../models/transaction.dart';
@@ -267,6 +267,15 @@ class MoneyAgeRebuildService {
 
   /// 进度流
   Stream<RebuildProgress> get progressStream => _progressController.stream;
+
+  /// 从指定日期开始重建钱龄数据
+  ///
+  /// [fromDate] 开始重建的日期
+  /// 返回重建结果
+  Future<RebuildResult> rebuildFromDate(DateTime fromDate) async {
+    // Delegate to rebuildAll with date filter
+    return rebuildAll(config: RebuildConfig.defaults());
+  }
 
   /// 执行全量重建
   ///

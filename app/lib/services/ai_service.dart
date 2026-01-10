@@ -393,6 +393,17 @@ class AIService {
     }
   }
 
+  /// 通用对话接口
+  /// 用于需要AI辅助但不适合其他特定方法的场景
+  Future<String> chat(String prompt) async {
+    try {
+      final result = await _qwenService.chat(prompt);
+      return result ?? '';
+    } catch (e) {
+      return '';
+    }
+  }
+
   /// 本地智能分类（离线模式）
   /// 使用关键词匹配进行分类推荐，优先返回二级分类
   String localSuggestCategory(String description) {

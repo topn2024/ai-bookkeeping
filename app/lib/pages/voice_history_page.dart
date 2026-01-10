@@ -613,7 +613,7 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
               title: const Text('重新识别'),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: 重新识别逻辑
+                _reRecognize(record);
               },
             ),
             ListTile(
@@ -687,5 +687,27 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
   /// 开始语音记账
   void _startVoiceRecording() {
     Navigator.pushNamed(context, '/voice-recognition');
+  }
+
+  /// 重新识别记录
+  void _reRecognize(VoiceRecord record) {
+    // 根据记录类型导航到对应的识别页面
+    if (record.type == VoiceRecordType.voice) {
+      // 语音记录：跳转到语音识别页面，带上原始内容供参考
+      Navigator.pushNamed(
+        context,
+        '/voice-recognition',
+        arguments: {'originalContent': record.content},
+      );
+    } else if (record.type == VoiceRecordType.image) {
+      // 图片记录：提示用户重新拍照
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('请重新拍照或选择图片进行识别'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.pushNamed(context, '/image-recognition');
+    }
   }
 }

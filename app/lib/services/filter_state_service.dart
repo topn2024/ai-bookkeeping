@@ -344,8 +344,70 @@ class FilterStateService {
   /// 状态变化流
   Stream<FilterStateChange> get stateChanges => _stateController.stream;
 
+  /// 状态变化流（别名，用于兼容）
+  Stream<FilterStateChange> get stateStream => _stateController.stream;
+
   /// 获取全局筛选状态
   FilterState get globalState => _globalState;
+
+  /// 获取当前状态（返回全局状态）
+  FilterState get currentState => _globalState;
+
+  /// 直接添加条件到全局状态
+  void addCondition(FilterCondition condition) {
+    _globalState = _globalState.addCondition(condition);
+    _emitChange(FilterStateChange(
+      pageId: 'global',
+      changeType: FilterChangeType.add,
+      condition: condition,
+      newState: _globalState,
+    ));
+  }
+
+  /// 直接从全局状态移除条件
+  void removeCondition(String key) {
+    _globalState = _globalState.removeCondition(key);
+    _emitChange(FilterStateChange(
+      pageId: 'global',
+      changeType: FilterChangeType.remove,
+      conditionKey: key,
+      newState: _globalState,
+    ));
+  }
+
+  /// 切换全局状态中的条件
+  void toggleCondition(String key) {
+    _globalState = _globalState.toggleCondition(key);
+    _emitChange(FilterStateChange(
+      pageId: 'global',
+      changeType: FilterChangeType.toggle,
+      conditionKey: key,
+      newState: _globalState,
+    ));
+  }
+
+  /// 清除全局状态所有条件
+  void clearAll() {
+    _globalState = FilterState();
+    _emitChange(FilterStateChange(
+      pageId: 'global',
+      changeType: FilterChangeType.clear,
+      newState: _globalState,
+    ));
+  }
+
+  /// 设置全局状态条件
+  void setConditions(List<FilterCondition> conditions) {
+    _globalState = FilterState();
+    for (final condition in conditions) {
+      _globalState = _globalState.addCondition(condition);
+    }
+    _emitChange(FilterStateChange(
+      pageId: 'global',
+      changeType: FilterChangeType.sync,
+      newState: _globalState,
+    ));
+  }
 
   /// 配置页面
   void configurePage(PageFilterConfig config) {

@@ -1,9 +1,11 @@
 import 'dart:async';
 
-import 'location_service.dart';
-import 'location_data_services.dart';
+import '../models/common_types.dart';
+import 'location_service.dart' hide CityTier, CityTierExtension, CityInfo, CityLocation,
+  CityLocationService, UserHomeLocationService, CrossRegionSpendingService, CrossRegionResult;
+import 'location_data_services.dart' hide CityTier, CityTierExtension, CityInfo, CityLocation;
 import 'location_business_services.dart';
-import 'localized_budget_service.dart';
+import 'localized_budget_service.dart' hide CityTier, CityTierExtension, LocalizedBudgetService;
 import 'geofence_background_service.dart';
 
 /// 位置增强预算服务
@@ -90,6 +92,71 @@ enum BudgetAlertType {
   overBudget,         // 超预算
   temporarySpending,  // 临时消费
   crossRegion,        // 跨区域
+}
+
+// ========== 本地化预算服务 ==========
+
+/// 本地化类目信息
+class LocalizedCategory {
+  final String categoryId;
+  final String name;
+  final double suggestedPercentage;
+  final int priority;
+
+  const LocalizedCategory({
+    required this.categoryId,
+    required this.name,
+    required this.suggestedPercentage,
+    required this.priority,
+  });
+}
+
+/// 本地化预算服务
+class LocalizedBudgetService {
+  Future<List<LocalizedCategory>> getLocalizedCategories({
+    required CityTier cityTier,
+  }) async {
+    // 基于城市级别返回本地化类目建议
+    switch (cityTier) {
+      case CityTier.tier1:
+      case CityTier.newTier1:
+        return _getTier1Categories();
+      case CityTier.tier2:
+        return _getTier2Categories();
+      default:
+        return _getDefaultCategories();
+    }
+  }
+
+  List<LocalizedCategory> _getTier1Categories() => const [
+    LocalizedCategory(categoryId: 'food', name: '餐饮', suggestedPercentage: 0.20, priority: 1),
+    LocalizedCategory(categoryId: 'transport', name: '交通', suggestedPercentage: 0.15, priority: 2),
+    LocalizedCategory(categoryId: 'housing', name: '住房', suggestedPercentage: 0.30, priority: 3),
+    LocalizedCategory(categoryId: 'entertainment', name: '娱乐', suggestedPercentage: 0.10, priority: 4),
+    LocalizedCategory(categoryId: 'shopping', name: '购物', suggestedPercentage: 0.10, priority: 5),
+    LocalizedCategory(categoryId: 'utilities', name: '生活缴费', suggestedPercentage: 0.05, priority: 6),
+    LocalizedCategory(categoryId: 'other', name: '其他', suggestedPercentage: 0.10, priority: 7),
+  ];
+
+  List<LocalizedCategory> _getTier2Categories() => const [
+    LocalizedCategory(categoryId: 'food', name: '餐饮', suggestedPercentage: 0.25, priority: 1),
+    LocalizedCategory(categoryId: 'housing', name: '住房', suggestedPercentage: 0.25, priority: 2),
+    LocalizedCategory(categoryId: 'transport', name: '交通', suggestedPercentage: 0.10, priority: 3),
+    LocalizedCategory(categoryId: 'entertainment', name: '娱乐', suggestedPercentage: 0.10, priority: 4),
+    LocalizedCategory(categoryId: 'shopping', name: '购物', suggestedPercentage: 0.10, priority: 5),
+    LocalizedCategory(categoryId: 'utilities', name: '生活缴费', suggestedPercentage: 0.05, priority: 6),
+    LocalizedCategory(categoryId: 'other', name: '其他', suggestedPercentage: 0.15, priority: 7),
+  ];
+
+  List<LocalizedCategory> _getDefaultCategories() => const [
+    LocalizedCategory(categoryId: 'food', name: '餐饮', suggestedPercentage: 0.30, priority: 1),
+    LocalizedCategory(categoryId: 'housing', name: '住房', suggestedPercentage: 0.20, priority: 2),
+    LocalizedCategory(categoryId: 'transport', name: '交通', suggestedPercentage: 0.08, priority: 3),
+    LocalizedCategory(categoryId: 'entertainment', name: '娱乐', suggestedPercentage: 0.10, priority: 4),
+    LocalizedCategory(categoryId: 'shopping', name: '购物', suggestedPercentage: 0.10, priority: 5),
+    LocalizedCategory(categoryId: 'utilities', name: '生活缴费', suggestedPercentage: 0.05, priority: 6),
+    LocalizedCategory(categoryId: 'other', name: '其他', suggestedPercentage: 0.17, priority: 7),
+  ];
 }
 
 // ========== 位置增强预算服务 ==========
@@ -287,10 +354,15 @@ class LocationEnhancedBudgetService {
 
     // 1. 检查地理围栏警报
     if (_geofenceService != null) {
-      final geofences = await _geofenceService!.getActiveGeofences();
+      final geofences = _geofenceService!.activeGeofences;
 
       for (final geofence in geofences) {
-        final distance = currentPosition.distanceTo(geofence.center);
+        final centerPosition = Position(
+          latitude: geofence.center.latitude,
+          longitude: geofence.center.longitude,
+          timestamp: DateTime.now(),
+        );
+        final distance = currentPosition.distanceTo(centerPosition);
 
         if (distance <= geofence.radius) {
           // 在围栏内，检查相关类目预算
@@ -375,7 +447,7 @@ class LocationEnhancedBudgetService {
 
     // 4. 地理围栏建议
     if (_geofenceService != null) {
-      final geofences = await _geofenceService!.getActiveGeofences();
+      final geofences = _geofenceService!.activeGeofences;
       if (geofences.isEmpty) {
         suggestions.add('建议设置地理围栏，在进入高消费区域时自动提醒');
       }
@@ -466,12 +538,18 @@ class LocationEnhancedBudgetService {
       case CityTier.tier1:
         tips.add('一线城市消费水平较高，建议精打细算');
         break;
+      case CityTier.newTier1:
+        tips.add('新一线城市消费水平较高，注意预算控制');
+        break;
       case CityTier.tier2:
         tips.add('二线城市性价比较好，可适当享受');
         break;
       case CityTier.tier3:
       case CityTier.tier4Plus:
         tips.add('当地消费水平适中，预算较为充裕');
+        break;
+      case CityTier.overseas:
+        tips.add('海外消费需注意汇率和额外费用');
         break;
       case CityTier.unknown:
         break;

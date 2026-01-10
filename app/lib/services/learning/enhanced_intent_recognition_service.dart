@@ -155,7 +155,7 @@ class ExpressionHabits {
   ExpressionHabits merge(ExpressionHabits other) {
     return ExpressionHabits(
       synonymMappings: {...synonymMappings, ...other.synonymMappings},
-      frequentPhrases: <dynamic>{...frequentPhrases, ...other.frequentPhrases}.toList(),
+      frequentPhrases: <String>{...frequentPhrases, ...other.frequentPhrases}.toList(),
       averageInputLength: (averageInputLength + other.averageInputLength) / 2,
     );
   }

@@ -4,6 +4,9 @@ import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/common_types.dart';
+export '../models/common_types.dart' show CityTier, CityTierExtension, CityInfo, CityLocation;
+
 /// 位置服务抽象接口
 abstract class LocationService {
   /// 获取当前位置
@@ -266,14 +269,6 @@ class PreciseLocation {
   }
 }
 
-/// 城市等级
-enum CityTier {
-  tier1,  // 一线城市
-  tier2,  // 二线城市
-  tier3,  // 三线及以下
-  overseas, // 海外
-}
-
 /// 用户常驻地点管理服务
 class UserHomeLocationService {
   final PreciseLocationService _locationService;
@@ -457,6 +452,12 @@ class CityLocationService {
     if (currentCity == null) return false;
 
     return homeCity.city != currentCity.city;
+  }
+
+  /// 根据精确位置识别城市信息
+  Future<CityLocation?> identifyCity(PreciseLocation? position) async {
+    if (position == null) return null;
+    return extractCityFromLocation(position);
   }
 }
 

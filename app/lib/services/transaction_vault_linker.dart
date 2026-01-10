@@ -1,4 +1,4 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite/sqflite.dart' hide Transaction;
 
 import '../models/budget_vault.dart';
 import '../models/transaction.dart';

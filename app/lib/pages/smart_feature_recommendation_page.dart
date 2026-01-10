@@ -58,10 +58,8 @@ class SmartFeatureRecommendationPage extends ConsumerWidget {
           ),
         ),
       ),
-      body: recommendationsAsync.when(
-        data: (recommendations) {
-          if (recommendations.isEmpty) {
-            return Center(
+      body: recommendationsAsync.isEmpty
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -85,23 +83,8 @@ class SmartFeatureRecommendationPage extends ConsumerWidget {
                   ),
                 ],
               ),
-            );
-          }
-
-          return _RecommendationPageView(recommendations: recommendations, l10n: l10n);
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: AppTheme.textSecondaryColor),
-              const SizedBox(height: 16),
-              Text('加载失败: $error'),
-            ],
-          ),
-        ),
-      ),
+            )
+          : _RecommendationPageView(recommendations: recommendationsAsync, l10n: l10n),
     );
   }
 }
@@ -389,35 +372,34 @@ class _RecommendationPageViewState extends State<_RecommendationPageView> {
     );
   }
 
-  Widget _buildPageIndicator() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(_recommendations.length, (index) {
-        final isActive = index == _currentIndex;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isActive ? 24 : 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: isActive
-                ? _recommendations[_currentIndex].color
-                : AppTheme.dividerColor,
-            borderRadius: BorderRadius.circular(4),
+  void _enableFeature(FeatureRecommendation recommendation) {
+    // 根据功能ID导航到相应页面
+    Navigator.pop(context);
+
+    switch (recommendation.id) {
+      case 'budget':
+        Navigator.pushNamed(context, '/budget');
+        break;
+      case 'savings_goal':
+        Navigator.pushNamed(context, '/savings-goal');
+        break;
+      case 'money_age':
+        Navigator.pushNamed(context, '/money-age');
+        break;
+      case 'bill_reminder':
+        Navigator.pushNamed(context, '/bill-reminder');
+        break;
+      case 'recurring':
+        Navigator.pushNamed(context, '/recurring');
+        break;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已启用${recommendation.title}'),
+            behavior: SnackBarBehavior.floating,
           ),
         );
-      }),
-    );
-  }
-
-  void _enableFeature(FeatureRecommendation recommendation) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${recommendation.title}已启用'),
-        backgroundColor: AppTheme.successColor,
-      ),
-    );
-    Navigator.pop(context);
+    }
   }
 }
 

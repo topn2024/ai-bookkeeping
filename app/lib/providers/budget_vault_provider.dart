@@ -98,8 +98,13 @@ class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
     _db = DatabaseService();
     _allocationService = AllocationService();
 
-    // 初始加载
-    Future.microtask(() => refresh());
+    // 初始加载（带错误处理）
+    Future.microtask(() => refresh().catchError((e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: '初始化失败: $e',
+      );
+    }));
 
     return const BudgetVaultState(isLoading: true);
   }

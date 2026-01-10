@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'common_types.dart';
+
 /// 家庭财务看板数据
 class FamilyDashboardData {
   /// 账本ID
@@ -479,7 +481,7 @@ class FamilyActivity {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'type': type.index,
+      'type': type.name,
       'description': description,
       'memberId': memberId,
       'memberName': memberName,
@@ -492,13 +494,13 @@ class FamilyActivity {
   factory FamilyActivity.fromMap(Map<String, dynamic> map) {
     return FamilyActivity(
       id: map['id'] as String,
-      type: FamilyActivityType.values[map['type'] as int],
+      type: parseEnum(map['type'], FamilyActivityType.values, FamilyActivityType.transaction),
       description: map['description'] as String,
       memberId: map['memberId'] as String,
       memberName: map['memberName'] as String,
       avatarUrl: map['avatarUrl'] as String?,
       amount: (map['amount'] as num?)?.toDouble(),
-      createdAt: DateTime.parse(map['createdAt'] as String),
+      createdAt: parseDateTime(map['createdAt']),
     );
   }
 }

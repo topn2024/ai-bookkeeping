@@ -492,27 +492,6 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
       child: SafeArea(
         child: Column(
           children: [
-            // 反馈文本
-            if (null != null)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  null!,
-                  style: TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
             // 语音按钮和状态
             Row(
               children: [
@@ -808,10 +787,184 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   }
 
   void _showCommandHistory() {
-    // TODO: 实现命令历史显示
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('命令历史功能正在开发中')),
+    // 过滤出用户发送的命令
+    final userCommands = _messages
+        .where((msg) => msg.type == MessageType.user)
+        .toList()
+        .reversed
+        .toList();
+
+    if (userCommands.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('暂无命令历史')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            // 拖拽指示器
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // 标题栏
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '命令历史',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _confirmClearHistory();
+                        },
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('清空'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.expense,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // 命令列表
+            Expanded(
+              child: ListView.separated(
+                controller: scrollController,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: userCommands.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final command = userCommands[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.primary.withAlpha(30),
+                      radius: 16,
+                      child: Icon(
+                        Icons.mic,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    title: Text(
+                      command.content,
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                    subtitle: Text(
+                      _formatTime(command.timestamp),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.play_circle_outline),
+                      color: AppColors.primary,
+                      tooltip: '重新执行',
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _replayCommand(command.content);
+                      },
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _replayCommand(command.content);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
+  }
+
+  /// 确认清空历史记录
+  void _confirmClearHistory() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('清空命令历史'),
+        content: const Text('确定要清空所有聊天记录吗？此操作不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _clearChatHistory();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('聊天记录已清空')),
+              );
+            },
+            style: TextButton.styleFrom(foregroundColor: AppColors.expense),
+            child: const Text('清空'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 重新执行命令
+  Future<void> _replayCommand(String command) async {
+    final coordinator = ref.read(voiceServiceCoordinatorProvider);
+
+    // 添加用户消息
+    _addMessage(ChatMessage(
+      type: MessageType.user,
+      content: command,
+      timestamp: DateTime.now(),
+    ));
+
+    // 执行命令
+    await coordinator.processVoiceCommand(command);
+
+    // 获取处理结果并添加到聊天
+    await Future.delayed(const Duration(milliseconds: 500));
+    final state = ref.read(voiceServiceCoordinatorProvider);
+    if (state.lastResponse != null && state.lastResponse!.isNotEmpty) {
+      _addMessage(ChatMessage(
+        type: MessageType.assistant,
+        content: state.lastResponse!,
+        timestamp: DateTime.now(),
+      ));
+    }
   }
 
   void _showOptions() {

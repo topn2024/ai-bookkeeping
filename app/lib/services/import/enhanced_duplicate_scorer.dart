@@ -47,7 +47,6 @@ class EnhancedDuplicateScorer {
             reason: '交易单号完全匹配',
             matchedTransaction: existing,
             scoreBreakdown: {'精确匹配': 100},
-            matchLayer: DuplicateMatchLayer.exact,
           );
           candidate.applyDefaultAction();
           continue;
@@ -220,7 +219,6 @@ class EnhancedDuplicateScorer {
       reason: reasons.join('、'),
       matchedTransaction: existing,
       scoreBreakdown: scoreBreakdown,
-      matchLayer: matchLayer,
     );
   }
 
@@ -388,7 +386,6 @@ class EnhancedDuplicateScorer {
         ledgerId: familyLedgerId,
         date: candidate.date,
         amount: candidate.amount,
-        excludeTransactionId: existing.id,
       );
 
       if (familyTransactions.isNotEmpty) {

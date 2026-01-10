@@ -231,7 +231,7 @@ class MoneyAgeTrendService {
       );
 
       final change = recentAvg - previousAvg;
-      final changePercent = previousAvg > 0 ? (change / previousAvg) * 100 : 0;
+      final changePercent = previousAvg > 0 ? (change / previousAvg) * 100 : 0.0;
 
       // 计算趋势强度（基于回归斜率）
       final slope = _calculateLinearRegressionSlope(dailyAges);

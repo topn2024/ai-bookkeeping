@@ -137,8 +137,11 @@ enum AchievementType {
   inviteMember,
 }
 
-/// 成就
-class Achievement {
+/// 排行榜成就（用于家庭排行榜功能）
+///
+/// 注意：与 achievement.dart 中的 Achievement 类不同，
+/// 此类专门用于家庭排行榜的成就展示
+class LeaderboardAchievement {
   final String id;
   final AchievementType type;
   final String title;
@@ -147,7 +150,7 @@ class Achievement {
   final DateTime unlockedAt;
   final String memberId;
 
-  const Achievement({
+  const LeaderboardAchievement({
     required this.id,
     required this.type,
     required this.title,

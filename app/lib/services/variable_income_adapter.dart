@@ -496,7 +496,7 @@ class VariableIncomeAdapter {
 
       // 置信区间基于标准差
       final margin = analysis.standardDeviation * 1.96; // 95%置信区间
-      final lowerBound = math.max(0, predicted - margin);
+      final lowerBound = math.max(0.0, predicted - margin);
       final upperBound = predicted + margin;
 
       // 置信度基于稳定性

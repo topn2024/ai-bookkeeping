@@ -4,7 +4,9 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'location_service.dart';
+import '../models/common_types.dart';
+export '../models/common_types.dart' show CityTier, CityTierExtension, CityInfo, CityLocation, AmountRange;
+import 'location_service.dart' hide CityTier, CityTierExtension, CityInfo, CityLocation;
 import 'location_privacy_guard.dart';
 
 /// 位置数据服务集合
@@ -297,67 +299,6 @@ class UserHomeLocationService {
 }
 
 // ========== 2. 城市识别服务 ==========
-
-/// 城市级别
-enum CityTier {
-  tier1,     // 一线城市
-  tier2,     // 二线城市
-  tier3,     // 三线城市
-  tier4Plus, // 四线及以下
-  unknown,   // 未知
-}
-
-extension CityTierExtension on CityTier {
-  String get displayName {
-    switch (this) {
-      case CityTier.tier1:
-        return '一线城市';
-      case CityTier.tier2:
-        return '二线城市';
-      case CityTier.tier3:
-        return '三线城市';
-      case CityTier.tier4Plus:
-        return '四线及以下';
-      case CityTier.unknown:
-        return '未知';
-    }
-  }
-
-  // 消费水平系数
-  double get costOfLivingMultiplier {
-    switch (this) {
-      case CityTier.tier1:
-        return 1.5;
-      case CityTier.tier2:
-        return 1.2;
-      case CityTier.tier3:
-        return 1.0;
-      case CityTier.tier4Plus:
-        return 0.8;
-      case CityTier.unknown:
-        return 1.0;
-    }
-  }
-}
-
-/// 城市信息
-class CityInfo {
-  final String code;
-  final String name;
-  final String province;
-  final CityTier tier;
-  final double latitude;
-  final double longitude;
-
-  const CityInfo({
-    required this.code,
-    required this.name,
-    required this.province,
-    required this.tier,
-    required this.latitude,
-    required this.longitude,
-  });
-}
 
 /// 城市识别服务
 class CityLocationService {

@@ -295,7 +295,7 @@ class MoneyAgeCalculator {
         dailySpending > 0 ? totalBalance / dailySpending : 30;
 
     return MoneyAge(
-      days: moneyAgeDays.clamp(0, 365),
+      days: moneyAgeDays.clamp(0, 365).toDouble(),
       totalBalance: totalBalance,
       totalSpending: totalSpending,
       dailySpending: dailySpending,

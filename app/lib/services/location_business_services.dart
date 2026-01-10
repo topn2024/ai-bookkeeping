@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-import 'location_service.dart';
-import 'location_data_services.dart';
+import '../models/common_types.dart';
+import 'location_service.dart' hide CityTier, CityTierExtension, CityInfo, CityLocation,
+  CityLocationService, UserHomeLocationService;
+import 'location_data_services.dart' hide CityTier, CityTierExtension, CityInfo, CityLocation;
 
 /// 位置业务分析服务集合
 /// 对应设计文档第14.2节 - 第3层：业务分析服务

@@ -401,13 +401,13 @@ class FinancialBufferService {
     }
 
     final targetAmount = goal.targetAmount;
-    final progress = targetAmount > 0 ? balance / targetAmount : 0;
+    final progress = targetAmount > 0 ? balance / targetAmount : 0.0;
     final monthsCovered = goal.monthlyExpense > 0
         ? balance / goal.monthlyExpense
-        : 0;
+        : 0.0;
 
     // 计算建议月供（假设12个月达成目标）
-    final remaining = (targetAmount - balance).clamp(0, double.infinity);
+    final remaining = (targetAmount - balance).clamp(0.0, double.infinity);
     final monthlyContribution = remaining / 12;
 
     // 预计达成时间
@@ -419,7 +419,7 @@ class FinancialBufferService {
       goal: goal,
       currentBalance: balance,
       targetAmount: targetAmount,
-      progress: progress.clamp(0, 1),
+      progress: progress.clamp(0.0, 1.0),
       health: _calculateHealth(monthsCovered, goal.monthlyExpense),
       monthsCovered: monthsCovered,
       monthlyContribution: monthlyContribution,

@@ -92,6 +92,8 @@ class _Now implements DateTime {
   @override
   int compareTo(DateTime other) => _now.compareTo(other);
   @override
+  Duration difference(DateTime other) => _now.difference(other);
+  @override
   DateTime toLocal() => _now.toLocal();
   @override
   DateTime toUtc() => _now.toUtc();

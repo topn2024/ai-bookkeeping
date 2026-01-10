@@ -649,7 +649,7 @@ class AdaptiveBudgetService {
     final cv = avg > 0 ? stdDev / avg : 1;
 
     // 变异系数越小，置信度越高
-    double confidence = 1 - cv.clamp(0, 1);
+    double confidence = 1 - cv.clamp(0.0, 1.0).toDouble();
 
     // 如果建议值接近历史平均，置信度更高
     final deviation = (suggested - avg).abs() / avg;

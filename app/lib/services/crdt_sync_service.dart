@@ -21,6 +21,10 @@ class CrdtSyncService {
   final Map<String, VectorClock> _pendingOperations = {};
   bool _isSyncing = false;
 
+  // StreamSubscription 引用，用于在 dispose 时取消
+  StreamSubscription<dynamic>? _messageSubscription;
+  StreamSubscription<WebSocketConnectionState>? _stateSubscription;
+
   CrdtSyncService({
     required WebSocketService wsService,
     required DatabaseService db,
@@ -41,11 +45,11 @@ class CrdtSyncService {
   bool get isSyncing => _isSyncing;
 
   void _setupListeners() {
-    // 监听WebSocket��息
-    _wsService.onMessage.listen(_handleRemoteMessage);
+    // 监听WebSocket消息
+    _messageSubscription = _wsService.onMessage.listen(_handleRemoteMessage);
 
     // 监听连接状态变化
-    _wsService.onStateChange.listen((state) {
+    _stateSubscription = _wsService.onStateChange.listen((state) {
       if (state == WebSocketConnectionState.connected) {
         _onConnected();
       } else if (state == WebSocketConnectionState.disconnected) {
@@ -417,6 +421,8 @@ class CrdtSyncService {
 
   /// 释放资源
   void dispose() {
+    _messageSubscription?.cancel();
+    _stateSubscription?.cancel();
     _syncEvents.close();
     _pendingOperations.clear();
   }

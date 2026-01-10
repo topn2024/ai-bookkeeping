@@ -46,6 +46,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 语音命令历史
   final List<VoiceCommand> _commandHistory = [];
 
+  /// 最后一次响应
+  String? _lastResponse;
+
   /// 最大历史记录数
   static const int maxHistorySize = 50;
 
@@ -80,6 +83,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 命令历史
   List<VoiceCommand> get commandHistory => List.unmodifiable(_commandHistory);
+
+  /// 最后一次响应
+  String? get lastResponse => _lastResponse;
 
   // ═══════════════════════════════════════════════════════════════
   // 核心语音交互流程

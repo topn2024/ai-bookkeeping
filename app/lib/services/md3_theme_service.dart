@@ -87,7 +87,7 @@ class MD3ThemeService {
       textTheme: _buildTextTheme(colorScheme),
 
       // 卡片
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -226,7 +226,7 @@ class MD3ThemeService {
       ),
 
       // 对话框
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         elevation: 6,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(28),

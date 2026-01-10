@@ -3,6 +3,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'bill_format_detector.dart';
 
+/// 扫描进度回调
+typedef ScanProgressCallback = void Function(
+  ScanStage stage,
+  int current,
+  int total,
+  String? currentPath,
+);
+
 /// 智能目录扫描服务
 /// 设计文档第11.1.1节：智能账单发现交互流程
 /// - 扫描微信、支付宝、各银行的默认导出目录
@@ -10,14 +18,6 @@ import 'bill_format_detector.dart';
 /// - 支持多平台（Android/iOS）
 class SmartDirectoryScannerService {
   final BillFormatDetector _formatDetector = BillFormatDetector();
-
-  /// 扫描进度回调
-  typedef ScanProgressCallback = void Function(
-    ScanStage stage,
-    int current,
-    int total,
-    String? currentPath,
-  );
 
   /// 默认扫描目录配置
   static const Map<String, List<String>> _defaultDirectories = {

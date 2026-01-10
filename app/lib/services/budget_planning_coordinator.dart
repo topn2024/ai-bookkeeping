@@ -1,7 +1,8 @@
+import '../models/budget_vault.dart';
 import '../models/transaction.dart';
 import 'allocation_service.dart';
 import 'localized_budget_service.dart';
-import 'smart_budget_service.dart';
+import 'smart_budget_service.dart' hide AmountRange;
 
 /// 位置感知预算分配建议
 class LocationBasedBudgetSuggestion {
@@ -111,22 +112,27 @@ class CompleteBudgetPlan {
       final categoryName = entry.key;
       final amount = entry.value;
 
-      // 确定优先级
+      // 确定优先级和类型
       int priority;
       String reason;
+      VaultType vaultType;
 
       if (categoryName.contains('房租') || categoryName.contains('房贷')) {
         priority = 1;
         reason = '固定支出需要优先保障';
+        vaultType = VaultType.fixed;
       } else if (categoryName.contains('储蓄') || categoryName.contains('投资')) {
         priority = 2;
         reason = '先储蓄后消费，提升钱龄';
+        vaultType = VaultType.savings;
       } else if (categoryName.contains('餐饮') || categoryName.contains('日用')) {
         priority = 3;
         reason = '日常必需开支';
+        vaultType = VaultType.flexible;
       } else {
         priority = 4;
         reason = '弹性支出';
+        vaultType = VaultType.flexible;
       }
 
       suggestions.add(AllocationSuggestion(
@@ -135,6 +141,7 @@ class CompleteBudgetPlan {
         suggestedAmount: amount,
         reason: reason,
         priority: priority,
+        vaultType: vaultType,
       ));
     }
 
@@ -345,8 +352,12 @@ class BudgetPlanningCoordinator {
         tips.add('二线城市生活压力较小，可以适当增加储蓄比例');
         break;
       case CityTier.tier3:
+      case CityTier.tier4Plus:
       case CityTier.unknown:
         tips.add('生活成本较低，建议多储蓄为未来做准备');
+        break;
+      case CityTier.overseas:
+        tips.add('海外生活成本因地区差异较大，建议根据当地实际情况调整');
         break;
     }
 
@@ -423,7 +434,7 @@ class LocationAwareZeroBudgetService {
     final patterns = <String, double>{};
 
     for (final tx in transactions) {
-      final location = tx.location ?? '未知';
+      final location = tx.location?.placeName ?? tx.location?.address ?? '未知';
       patterns[location] = (patterns[location] ?? 0) + tx.amount;
     }
 
@@ -473,7 +484,7 @@ class LocationAwareZeroBudgetService {
     required List<Transaction> historicalTransactions,
   }) async {
     final locationTx = historicalTransactions
-        .where((tx) => tx.location == location)
+        .where((tx) => tx.location?.placeName == location || tx.location?.address == location)
         .toList();
 
     if (locationTx.isEmpty) return 0;

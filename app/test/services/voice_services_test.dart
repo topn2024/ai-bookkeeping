@@ -4,10 +4,11 @@ import 'package:mockito/annotations.dart';
 
 import 'package:ai_bookkeeping/services/voice/voice_intent_router.dart';
 import 'package:ai_bookkeeping/services/voice_feedback_system.dart';
-import 'package:ai_bookkeeping/services/tts_service.dart';
+import 'package:ai_bookkeeping/services/tts_service.dart' show TTSService;
+import 'package:ai_bookkeeping/services/voice_service_coordinator.dart' show VoiceIntentType, VoiceSessionContext;
 
 // Generate mocks
-@GenerateNiceMocks([MockSpec<TtsService>()])
+@GenerateNiceMocks([MockSpec<TTSService>()])
 import 'voice_services_test.mocks.dart';
 
 void main() {
@@ -199,7 +200,8 @@ void main() {
       test('在删除上下文中应该增强确认意图', () async {
         final context = VoiceSessionContext(
           intentType: VoiceIntentType.deleteTransaction,
-          data: {},
+          sessionData: {},
+          needsContinuation: false,
           createdAt: DateTime.now(),
         );
 
@@ -213,7 +215,8 @@ void main() {
       test('在修改上下文中应该增强澄清意图', () async {
         final context = VoiceSessionContext(
           intentType: VoiceIntentType.modifyTransaction,
-          data: {},
+          sessionData: {},
+          needsContinuation: false,
           createdAt: DateTime.now(),
         );
 
@@ -268,10 +271,10 @@ void main() {
 
   group('VoiceFeedbackSystem Tests', () {
     late VoiceFeedbackSystem feedbackSystem;
-    late MockTtsService mockTtsService;
+    late MockTTSService mockTtsService;
 
     setUp(() {
-      mockTtsService = MockTtsService();
+      mockTtsService = MockTTSService();
       feedbackSystem = VoiceFeedbackSystem(ttsService: mockTtsService);
     });
 
@@ -504,7 +507,7 @@ void main() {
   group('集成测试', () {
     test('语音意图路由器和反馈系统应该协同工作', () async {
       final router = VoiceIntentRouter();
-      final mockTtsService = MockTtsService();
+      final mockTtsService = MockTTSService();
       final feedbackSystem = VoiceFeedbackSystem(ttsService: mockTtsService);
 
       // 分析意图
@@ -524,7 +527,7 @@ void main() {
 
     test('应该处理复杂的语音交互流程', () async {
       final router = VoiceIntentRouter();
-      final mockTtsService = MockTtsService();
+      final mockTtsService = MockTTSService();
       final feedbackSystem = VoiceFeedbackSystem(ttsService: mockTtsService);
 
       // 1. 用户发出模糊命令

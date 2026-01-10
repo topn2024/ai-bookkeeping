@@ -39,7 +39,7 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
                 // 主要数据卡片
                 _buildMainDataCard(l10n),
                 // 分享按钮
-                _buildShareButtons(l10n),
+                _buildShareButtons(context, l10n),
                 const SizedBox(height: 24),
               ],
             ),
@@ -307,7 +307,7 @@ class FamilyAnnualReviewPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildShareButtons(AppLocalizations l10n) {
+  Widget _buildShareButtons(BuildContext context, AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(

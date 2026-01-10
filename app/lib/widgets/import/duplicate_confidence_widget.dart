@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/import_candidate.dart';
+import '../../models/transaction.dart' show TransactionType;
 
 /// Duplicate confidence visualization widget (第11.3节 去重置信度可视化)
 class DuplicateConfidenceWidget extends StatelessWidget {

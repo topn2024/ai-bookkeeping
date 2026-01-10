@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:uuid/uuid.dart';
 
+import '../../models/import_batch.dart';
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
 import '../voice_recognition_engine.dart';
@@ -164,7 +165,6 @@ class VoiceBatchImportService {
           category: item['category'] as String? ?? '其他',
           note: item['note'] as String?,
           rawMerchant: item['merchant'] as String?,
-          source: 'voice',
           action: ImportAction.import_,
         );
         candidates.add(candidate);
@@ -260,7 +260,6 @@ class VoiceBatchImportService {
         type: type,
         category: category,
         note: sentence.trim(),
-        source: 'voice',
         action: ImportAction.import_,
       );
       candidates.add(candidate);
@@ -365,7 +364,7 @@ class VoiceBatchImportService {
         final transaction = candidate.toTransaction(
           id: _uuid.v4(),
           batchId: batchId,
-          externalSource: ExternalSource.voice,
+          externalSource: ExternalSource.generic,
         ).copyWith(
           accountId: candidate.accountId ??
               defaultAccountId ??
@@ -540,43 +539,3 @@ class VoiceImportResult {
   });
 }
 
-/// 导入批次（简化版）
-class ImportBatch {
-  final String id;
-  final String fileName;
-  final String fileFormat;
-  final int totalCount;
-  final int importedCount;
-  final int skippedCount;
-  final int failedCount;
-  final double totalExpense;
-  final double totalIncome;
-
-  ImportBatch({
-    required this.id,
-    required this.fileName,
-    required this.fileFormat,
-    required this.totalCount,
-    required this.importedCount,
-    required this.skippedCount,
-    this.failedCount = 0,
-    this.totalExpense = 0,
-    this.totalIncome = 0,
-  });
-
-  static String generateId() {
-    return DateTime.now().millisecondsSinceEpoch.toString();
-  }
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'fileName': fileName,
-        'fileFormat': fileFormat,
-        'totalCount': totalCount,
-        'importedCount': importedCount,
-        'skippedCount': skippedCount,
-        'failedCount': failedCount,
-        'totalExpense': totalExpense,
-        'totalIncome': totalIncome,
-      };
-}

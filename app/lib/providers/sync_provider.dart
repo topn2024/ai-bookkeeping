@@ -121,6 +121,11 @@ class SyncNotifier extends Notifier<SyncState> {
 
   @override
   SyncState build() {
+    ref.onDispose(() {
+      _progressSubscription?.cancel();
+      _connectivitySubscription?.cancel();
+      _offlineQueue.dispose();
+    });
     _initialize();
     return const SyncState();
   }

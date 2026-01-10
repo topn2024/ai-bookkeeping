@@ -220,4 +220,56 @@ class RecurringTransaction {
       toAccountId: toAccountId,
     );
   }
+
+  /// 转换为Map用于序列化
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'type': type.index,
+      'amount': amount,
+      'category': category,
+      'note': note,
+      'accountId': accountId,
+      'toAccountId': toAccountId,
+      'frequency': frequency.index,
+      'dayOfWeek': dayOfWeek,
+      'dayOfMonth': dayOfMonth,
+      'monthOfYear': monthOfYear,
+      'startDate': startDate.toIso8601String(),
+      'endDate': endDate?.toIso8601String(),
+      'isEnabled': isEnabled ? 1 : 0,
+      'lastExecutedAt': lastExecutedAt?.toIso8601String(),
+      'nextExecuteAt': nextExecuteAt?.toIso8601String(),
+      'icon': icon.codePoint,
+      'color': color.toARGB32(),
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  /// 从Map创建RecurringTransaction
+  factory RecurringTransaction.fromMap(Map<String, dynamic> map) {
+    return RecurringTransaction(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      type: TransactionType.values[map['type'] as int],
+      amount: (map['amount'] as num).toDouble(),
+      category: map['category'] as String,
+      note: map['note'] as String?,
+      accountId: map['accountId'] as String,
+      toAccountId: map['toAccountId'] as String?,
+      frequency: RecurringFrequency.values[map['frequency'] as int],
+      dayOfWeek: map['dayOfWeek'] as int? ?? 1,
+      dayOfMonth: map['dayOfMonth'] as int? ?? 1,
+      monthOfYear: map['monthOfYear'] as int? ?? 1,
+      startDate: DateTime.parse(map['startDate'] as String),
+      endDate: map['endDate'] != null ? DateTime.parse(map['endDate'] as String) : null,
+      isEnabled: map['isEnabled'] == 1,
+      lastExecutedAt: map['lastExecutedAt'] != null ? DateTime.parse(map['lastExecutedAt'] as String) : null,
+      nextExecuteAt: map['nextExecuteAt'] != null ? DateTime.parse(map['nextExecuteAt'] as String) : null,
+      icon: IconData(map['icon'] as int, fontFamily: 'MaterialIcons'),
+      color: Color(map['color'] as int),
+      createdAt: DateTime.parse(map['createdAt'] as String),
+    );
+  }
 }

@@ -1,6 +1,23 @@
 import '../../models/import_candidate.dart';
 import '../database_service.dart';
 
+/// Simple Member class for family import assignment
+class Member {
+  final String id;
+  final String name;
+  final String ledgerId;
+
+  Member({required this.id, required this.name, required this.ledgerId});
+
+  factory Member.fromMap(Map<String, dynamic> map) {
+    return Member(
+      id: map['id'] as String? ?? '',
+      name: map['name'] as String? ?? '',
+      ledgerId: map['ledgerId'] as String? ?? '',
+    );
+  }
+}
+
 /// Service for assigning imported transactions to family members (第11章家庭成员导入分配)
 class FamilyImportAssignmentService {
   final DatabaseService _databaseService;
@@ -11,7 +28,8 @@ class FamilyImportAssignmentService {
 
   /// Get family members for assignment
   Future<List<Member>> getFamilyMembers(String ledgerId) async {
-    return await _databaseService.getMembersByLedgerId(ledgerId);
+    final maps = await _databaseService.getMembersByLedgerId(ledgerId);
+    return maps.map((m) => Member.fromMap(m)).toList();
   }
 
   /// Assign candidate to family member
@@ -57,11 +75,13 @@ class FamilyImportAssignmentService {
     String ledgerId,
   ) async {
     try {
-      final transactions = await _databaseService.getTransactionsByMember(
+      var transactions = await _databaseService.getTransactionsByMember(
         memberId,
-        ledgerId,
-        limit: 100,
       );
+      // Limit to 100 records locally
+      if (transactions.length > 100) {
+        transactions = transactions.take(100).toList();
+      }
 
       final categoryFrequency = <String, int>{};
       final merchantFrequency = <String, int>{};

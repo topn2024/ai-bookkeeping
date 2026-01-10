@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/common_types.dart' show CityTier, CityTierExtension;
+
 /// 本地化预算推荐页面
 ///
 /// 对应原型设计 3.12 本地化预算推荐
@@ -277,7 +279,13 @@ class _LocationCard extends StatelessWidget {
       case CityTier.tier2:
         return '二线城市';
       case CityTier.tier3:
-        return '三线及以下';
+        return '三线城市';
+      case CityTier.tier4Plus:
+        return '四线及以下';
+      case CityTier.overseas:
+        return '海外';
+      case CityTier.unknown:
+        return '未知';
     }
   }
 
@@ -291,6 +299,12 @@ class _LocationCard extends StatelessWidget {
         return '0.95';
       case CityTier.tier3:
         return '0.75';
+      case CityTier.tier4Plus:
+        return '0.65';
+      case CityTier.overseas:
+        return '1.80';
+      case CityTier.unknown:
+        return '1.00';
     }
   }
 }
@@ -354,16 +368,7 @@ class _CityCharacteristicsCard extends StatelessWidget {
   }
 
   String _getTierLabel(CityTier tier) {
-    switch (tier) {
-      case CityTier.tier1:
-        return '一线城市';
-      case CityTier.newTier1:
-        return '新一线城市';
-      case CityTier.tier2:
-        return '二线城市';
-      case CityTier.tier3:
-        return '三线及以下';
-    }
+    return tier.displayName;
   }
 
   List<Map<String, String>> _getCharacteristics(CityTier tier) {
@@ -390,11 +395,23 @@ class _CityCharacteristicsCard extends StatelessWidget {
           {'emoji': '😊', 'label': '生活舒适', 'color': '0xFFE8F5E9'},
         ];
       case CityTier.tier3:
+      case CityTier.tier4Plus:
         return [
           {'emoji': '🏠', 'label': '房租低廉', 'color': '0xFFE3F2FD'},
           {'emoji': '🚶', 'label': '出行简单', 'color': '0xFFFFF3E0'},
           {'emoji': '🍚', 'label': '餐饮便宜', 'color': '0xFFF3E5F5'},
           {'emoji': '🌿', 'label': '生活节奏慢', 'color': '0xFFE8F5E9'},
+        ];
+      case CityTier.overseas:
+        return [
+          {'emoji': '✈️', 'label': '汇率波动', 'color': '0xFFE3F2FD'},
+          {'emoji': '🌍', 'label': '消费习惯不同', 'color': '0xFFFFF3E0'},
+          {'emoji': '💳', 'label': '支付方式多样', 'color': '0xFFF3E5F5'},
+          {'emoji': '🏨', 'label': '住宿成本高', 'color': '0xFFE8F5E9'},
+        ];
+      case CityTier.unknown:
+        return [
+          {'emoji': '❓', 'label': '未知城市', 'color': '0xFFE3F2FD'},
         ];
     }
   }
@@ -617,6 +634,78 @@ class _RecommendedBudgetSection extends StatelessWidget {
             amount: 600,
             description: '日常消费',
             gradientColors: [const Color(0xFFA855F7), const Color(0xFF7C3AED)],
+          ),
+        ];
+      case CityTier.tier4Plus:
+        return [
+          BudgetRecommendation(
+            emoji: '🏠',
+            name: '房租/房贷',
+            amount: 800,
+            description: '四线及以下城市平均租房 ¥500-1,000/月',
+            gradientColors: [const Color(0xFFFF6B6B), const Color(0xFFFF8E53)],
+          ),
+          BudgetRecommendation(
+            emoji: '🚶',
+            name: '交通通勤',
+            amount: 100,
+            description: '步行/电动车为主',
+            gradientColors: [const Color(0xFF4ECDC4), const Color(0xFF44A08D)],
+          ),
+          BudgetRecommendation(
+            emoji: '🍽️',
+            name: '餐饮',
+            amount: 800,
+            description: '餐饮消费较低',
+            gradientColors: [const Color(0xFFFFD93D), const Color(0xFFFF9500)],
+          ),
+          BudgetRecommendation(
+            emoji: '🛍️',
+            name: '购物娱乐',
+            amount: 400,
+            description: '日常消费',
+            gradientColors: [const Color(0xFFA855F7), const Color(0xFF7C3AED)],
+          ),
+        ];
+      case CityTier.overseas:
+        return [
+          BudgetRecommendation(
+            emoji: '🏨',
+            name: '住宿',
+            amount: 6000,
+            description: '海外住宿成本较高',
+            gradientColors: [const Color(0xFFFF6B6B), const Color(0xFFFF8E53)],
+          ),
+          BudgetRecommendation(
+            emoji: '✈️',
+            name: '交通',
+            amount: 1500,
+            description: '公共交通/出租车',
+            gradientColors: [const Color(0xFF4ECDC4), const Color(0xFF44A08D)],
+          ),
+          BudgetRecommendation(
+            emoji: '🍽️',
+            name: '餐饮',
+            amount: 3000,
+            description: '海外餐饮消费',
+            gradientColors: [const Color(0xFFFFD93D), const Color(0xFFFF9500)],
+          ),
+          BudgetRecommendation(
+            emoji: '🛍️',
+            name: '购物娱乐',
+            amount: 2000,
+            description: '日常消费',
+            gradientColors: [const Color(0xFFA855F7), const Color(0xFF7C3AED)],
+          ),
+        ];
+      case CityTier.unknown:
+        return [
+          BudgetRecommendation(
+            emoji: '💰',
+            name: '综合预算',
+            amount: 5000,
+            description: '根据实际情况调整',
+            gradientColors: [const Color(0xFF4ECDC4), const Color(0xFF44A08D)],
           ),
         ];
     }
@@ -940,10 +1029,3 @@ class BudgetRecommendation {
   });
 }
 
-/// 城市级别枚举
-enum CityTier {
-  tier1,     // 一线城市
-  newTier1,  // 新一线城市
-  tier2,     // 二线城市
-  tier3,     // 三线及以下
-}

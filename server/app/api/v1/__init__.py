@@ -32,6 +32,8 @@ from app.api.v1.money_age import router as money_age_router
 # AI Advice
 from app.api.v1.ai_advice import router as ai_advice_router
 from app.api.v1.companion import router as companion_router
+# Voice Token
+from app.api.v1.voice_token import router as voice_token_router
 
 api_router = APIRouter()
 
@@ -67,3 +69,5 @@ api_router.include_router(money_age_router)
 # AI Advice
 api_router.include_router(ai_advice_router)
 api_router.include_router(companion_router)
+# Voice Token
+api_router.include_router(voice_token_router)

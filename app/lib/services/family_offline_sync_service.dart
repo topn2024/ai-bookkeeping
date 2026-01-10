@@ -19,6 +19,7 @@ class FamilyOfflineStorageService {
 
   final DatabaseService _db = DatabaseService();
   final OfflineCapabilityService _offlineService = OfflineCapabilityService();
+  StreamSubscription<NetworkStatusInfo>? _statusSubscription;
 
   /// 暂存键前缀
   static const String _storagePrefix = 'family_offline_';
@@ -26,11 +27,16 @@ class FamilyOfflineStorageService {
   /// 初始化服务
   Future<void> initialize() async {
     // 监听网络恢复
-    _offlineService.statusStream.listen((status) {
+    _statusSubscription = _offlineService.statusStream.listen((status) {
       if (status.isOnline) {
         syncPendingFamilyTransactions();
       }
     });
+  }
+
+  /// 释放资源
+  void dispose() {
+    _statusSubscription?.cancel();
   }
 
   /// 暂存家庭账本交易

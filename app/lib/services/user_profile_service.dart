@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../models/common_types.dart' show CityTier;
+
 /// 用户画像数据模型
 class UserProfile {
   final String userId;
@@ -288,9 +290,6 @@ enum FamilyStatus { single, married, withChildren, emptyNest }
 
 /// 职业类型
 enum CareerType { employed, freelance, entrepreneur, retired }
-
-/// 城市等级
-enum CityTier { tier1, tier2, tier3, other }
 
 // ==================== 用户画像分析引擎 ====================
 

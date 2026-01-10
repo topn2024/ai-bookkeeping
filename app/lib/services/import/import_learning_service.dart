@@ -337,9 +337,8 @@ class ImportLearningService {
     for (int i = 0; i < candidates.length; i++) {
       final candidate = candidates[i];
 
-      // 如果已经有高置信度分类，跳过
-      if (candidate.categoryConfidence != null &&
-          candidate.categoryConfidence! >= 0.8) {
+      // 如果已经有分类，跳过
+      if (candidate.category != null && candidate.category!.isNotEmpty) {
         continue;
       }
 
@@ -350,13 +349,9 @@ class ImportLearningService {
         type: candidate.type,
       );
 
-      if (prediction != null &&
-          prediction.confidence >
-              (candidate.categoryConfidence ?? 0)) {
+      if (prediction != null && prediction.confidence > 0.5) {
         candidates[i] = candidate.copyWith(
           category: prediction.category,
-          categoryConfidence: prediction.confidence,
-          isLearningApplied: true,
         );
       }
     }

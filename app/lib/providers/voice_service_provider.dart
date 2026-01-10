@@ -303,9 +303,18 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
     print('VoiceProvider: 重复检测结果: hasPotentialDuplicate=${duplicateCheck.hasPotentialDuplicate}, score=${duplicateCheck.similarityScore}');
 
     if (duplicateCheck.hasPotentialDuplicate) {
-      // 发现潜在重复，提示用户
-      await _provideFeedback('检测到可能的重复记录：${duplicateCheck.duplicateReason}。是否仍要添加？');
-      // TODO: 实现确认流程
+      // 发现潜在重复，提示用户并进入确认流程
+      await _provideFeedback('检测到可能的重复记录：${duplicateCheck.duplicateReason}。请说"确认"继续添加，或说"取消"放弃');
+
+      // 设置确认状态，等待用户响应
+      state = state.copyWith(
+        currentSessionType: VoiceSessionType.add,
+        currentSessionData: {
+          'pendingTransaction': transaction,
+          'awaitingConfirmation': true,
+          'duplicateReason': duplicateCheck.duplicateReason,
+        },
+      );
       return;
     }
 
@@ -409,6 +418,22 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
         _modifyService.cancelModification();
         state = state.copyWith(clearSessionData: true);
         await _provideFeedback('已取消修改');
+      }
+    } else if (state.currentSessionType == VoiceSessionType.add) {
+      // 处理添加交易的确认流程（重复交易确认）
+      final sessionData = state.currentSessionData as Map<String, dynamic>?;
+      if (sessionData != null && sessionData['awaitingConfirmation'] == true) {
+        if (_isConfirmation(response)) {
+          // 用户确认添加
+          final pendingTransaction = sessionData['pendingTransaction'] as Transaction;
+          await _databaseService.insertTransaction(pendingTransaction);
+          await _provideFeedback('已记录消费${pendingTransaction.amount.toStringAsFixed(2)}元');
+          state = state.copyWith(clearSessionData: true);
+        } else {
+          // 用户取消添加
+          await _provideFeedback('已取消添加');
+          state = state.copyWith(clearSessionData: true);
+        }
       }
     }
   }

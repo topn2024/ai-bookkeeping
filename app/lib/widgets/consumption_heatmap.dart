@@ -108,7 +108,7 @@ class HeatmapConfig {
     Color maxColor = const Color(0xFF2E7D32),
   }) {
     return HeatmapConfig(
-      cellSize = 14,
+      cellSize: 14,
       cellGap: 3,
       cellRadius: 2,
       minColor: minColor,

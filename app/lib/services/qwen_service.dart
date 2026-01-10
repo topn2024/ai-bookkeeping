@@ -1293,6 +1293,36 @@ $_categoryPrompt
     }
   }
 
+  /// 通用对话接口
+  Future<String?> chat(String prompt) async {
+    _ensureInitialized();
+
+    if (appConfig.qwenApiKey.isEmpty) {
+      return null;
+    }
+
+    try {
+      final response = await _dio.post(
+        _textApiUrl,
+        data: {
+          'model': _models.textModel,
+          'input': {
+            'messages': [
+              {'role': 'user', 'content': prompt}
+            ]
+          },
+          'parameters': {'result_format': 'message'}
+        },
+      );
+
+      final content = response.data?['output']?['choices']?[0]?['message']?['content'];
+      return content as String?;
+    } catch (e) {
+      _logger.error('Chat failed', error: e);
+      return null;
+    }
+  }
+
   String _handleDioError(DioException e) {
     if (e.response != null) {
       final data = e.response?.data;

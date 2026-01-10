@@ -9,7 +9,7 @@ import 'package:ai_bookkeeping/services/voice/entity_disambiguation_service.dart
 import 'package:ai_bookkeeping/services/voice/voice_delete_service.dart';
 import 'package:ai_bookkeeping/services/voice/voice_modify_service.dart';
 import 'package:ai_bookkeeping/services/voice_recognition_engine.dart';
-import 'package:ai_bookkeeping/services/tts_service.dart';
+import 'package:ai_bookkeeping/services/tts_service.dart' show TTSService;
 import 'package:ai_bookkeeping/services/voice_navigation_service.dart';
 import 'package:ai_bookkeeping/services/database_service.dart';
 
@@ -21,7 +21,7 @@ import 'package:ai_bookkeeping/services/database_service.dart';
   MockSpec<VoiceDeleteService>(),
   MockSpec<VoiceModifyService>(),
   MockSpec<VoiceRecognitionEngine>(),
-  MockSpec<TtsService>(),
+  MockSpec<TTSService>(),
   MockSpec<VoiceNavigationService>(),
   MockSpec<DatabaseService>(),
 ])
@@ -36,7 +36,7 @@ void main() {
     late MockVoiceDeleteService mockDeleteService;
     late MockVoiceModifyService mockModifyService;
     late MockVoiceRecognitionEngine mockRecognitionEngine;
-    late MockTtsService mockTtsService;
+    late MockTTSService mockTtsService;
     late MockVoiceNavigationService mockNavigationService;
     late MockDatabaseService mockDatabaseService;
 
@@ -48,7 +48,7 @@ void main() {
       mockDeleteService = MockVoiceDeleteService();
       mockModifyService = MockVoiceModifyService();
       mockRecognitionEngine = MockVoiceRecognitionEngine();
-      mockTtsService = MockTtsService();
+      mockTtsService = MockTTSService();
       mockNavigationService = MockVoiceNavigationService();
       mockDatabaseService = MockDatabaseService();
 

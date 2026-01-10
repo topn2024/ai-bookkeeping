@@ -48,6 +48,9 @@ class MultimodalWakeUpService {
       StreamController<MultimodalWakeUpEvent>.broadcast();
   Stream<MultimodalWakeUpEvent> get onWakeUp => _wakeUpController.stream;
 
+  StreamSubscription<WakeUpEvent>? _voiceWakeSubscription;
+  StreamSubscription<GestureWakeType>? _gestureWakeSubscription;
+
   /// 初始化所有唤醒入口
   Future<void> initialize() async {
     debugPrint('Initializing multimodal wake-up service...');
@@ -57,7 +60,7 @@ class MultimodalWakeUpService {
     await _gestureWakeService.initialize();
 
     // 监听语音唤醒
-    _voiceWakeService.onWakeUp.listen((event) {
+    _voiceWakeSubscription = _voiceWakeService.onWakeUp.listen((event) {
       _wakeUpController.add(MultimodalWakeUpEvent(
         entryType: WakeUpEntryType.voiceWakeWord,
         timestamp: event.timestamp,
@@ -70,7 +73,7 @@ class MultimodalWakeUpService {
     });
 
     // 监听手势唤醒
-    _gestureWakeService.onGestureWake.listen((gestureType) {
+    _gestureWakeSubscription = _gestureWakeService.onGestureWake.listen((gestureType) {
       _wakeUpController.add(MultimodalWakeUpEvent(
         entryType: WakeUpEntryType.gesture,
         timestamp: DateTime.now(),
@@ -125,6 +128,8 @@ class MultimodalWakeUpService {
   GestureWakeService get gestureWakeService => _gestureWakeService;
 
   void dispose() {
+    _voiceWakeSubscription?.cancel();
+    _gestureWakeSubscription?.cancel();
     _voiceWakeService.dispose();
     _gestureWakeService.dispose();
     _wakeUpController.close();

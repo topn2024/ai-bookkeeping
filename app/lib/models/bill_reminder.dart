@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'common_types.dart';
+
 /// 账单提醒类型
 enum BillReminderType {
   creditCard,     // 信用卡还款
@@ -192,12 +194,12 @@ class BillReminder {
     return {
       'id': id,
       'name': name,
-      'type': type.index,
+      'type': type.name,
       'amount': amount,
-      'frequency': frequency.index,
+      'frequency': frequency.name,
       'dayOfMonth': dayOfMonth,
       'dayOfWeek': dayOfWeek,
-      'specificDate': specificDate?.millisecondsSinceEpoch,
+      'specificDate': specificDate?.toIso8601String(),
       'reminderDaysBefore': reminderDaysBefore,
       'reminderTimeHour': reminderTime.hour,
       'reminderTimeMinute': reminderTime.minute,
@@ -206,9 +208,9 @@ class BillReminder {
       'iconCode': icon.codePoint,
       'colorValue': color.toARGB32(),
       'isEnabled': isEnabled ? 1 : 0,
-      'lastRemindedAt': lastRemindedAt?.millisecondsSinceEpoch,
-      'nextReminderDate': nextReminderDate?.millisecondsSinceEpoch,
-      'createdAt': createdAt.millisecondsSinceEpoch,
+      'lastRemindedAt': lastRemindedAt?.toIso8601String(),
+      'nextReminderDate': nextReminderDate?.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
@@ -216,14 +218,12 @@ class BillReminder {
     return BillReminder(
       id: map['id'],
       name: map['name'],
-      type: BillReminderType.values[map['type']],
+      type: parseEnum(map['type'], BillReminderType.values, BillReminderType.other),
       amount: (map['amount'] as num).toDouble(),
-      frequency: ReminderFrequency.values[map['frequency']],
+      frequency: parseEnum(map['frequency'], ReminderFrequency.values, ReminderFrequency.monthly),
       dayOfMonth: map['dayOfMonth'],
       dayOfWeek: map['dayOfWeek'],
-      specificDate: map['specificDate'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['specificDate'])
-          : null,
+      specificDate: parseDateTimeOrNull(map['specificDate']),
       reminderDaysBefore: map['reminderDaysBefore'],
       reminderTime: TimeOfDay(
         hour: map['reminderTimeHour'],
@@ -234,13 +234,9 @@ class BillReminder {
       icon: IconData(map['iconCode'], fontFamily: 'MaterialIcons'),
       color: Color(map['colorValue']),
       isEnabled: map['isEnabled'] == 1,
-      lastRemindedAt: map['lastRemindedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['lastRemindedAt'])
-          : null,
-      nextReminderDate: map['nextReminderDate'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['nextReminderDate'])
-          : null,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt']),
+      lastRemindedAt: parseDateTimeOrNull(map['lastRemindedAt']),
+      nextReminderDate: parseDateTimeOrNull(map['nextReminderDate']),
+      createdAt: parseDateTime(map['createdAt']),
     );
   }
 }

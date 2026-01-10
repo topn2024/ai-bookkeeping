@@ -1,41 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// 城市级别
-enum CityTier {
-  /// 一线城市（北上广深）
-  tier1,
+import '../models/common_types.dart' show CityTier, CityTierExtension;
+export '../models/common_types.dart' show CityTier, CityTierExtension, AmountRange;
 
-  /// 新一线城市（杭州、成都、武汉等）
-  newTier1,
-
-  /// 二线城市
-  tier2,
-
-  /// 三四线城市
-  tier3,
-
-  /// 未知
-  unknown,
-}
-
-extension CityTierExtension on CityTier {
-  String get displayName {
-    switch (this) {
-      case CityTier.tier1:
-        return '一线城市';
-      case CityTier.newTier1:
-        return '新一线城市';
-      case CityTier.tier2:
-        return '二线城市';
-      case CityTier.tier3:
-        return '三四线城市';
-      case CityTier.unknown:
-        return '未知';
-    }
-  }
-}
-
-/// 城市位置信息
+/// 城市位置信息（本地化预算专用）
 class CityLocation {
   final String city;
   final String? province;
@@ -129,6 +97,8 @@ class LocalizedBudgetCategoryService {
       case CityTier.tier2:
         return _getTier2Categories();
       case CityTier.tier3:
+      case CityTier.tier4Plus:
+      case CityTier.overseas:
       case CityTier.unknown:
         return _getTier3Categories();
     }

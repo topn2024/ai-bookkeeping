@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 
+import 'common_types.dart';
+
 /// 小金库类型
 enum VaultType {
   /// 固定支出 - 每月必须支付（房租、水电、保险）
@@ -205,29 +207,25 @@ class RecurrenceRule {
 
   Map<String, dynamic> toMap() {
     return {
-      'frequency': frequency.index,
+      'frequency': frequency.name,
       'interval': interval,
       'dayOfWeek': dayOfWeek,
       'dayOfMonth': dayOfMonth,
       'monthOfYear': monthOfYear,
-      'startDate': startDate?.millisecondsSinceEpoch,
-      'endDate': endDate?.millisecondsSinceEpoch,
+      'startDate': startDate?.toIso8601String(),
+      'endDate': endDate?.toIso8601String(),
     };
   }
 
   factory RecurrenceRule.fromMap(Map<String, dynamic> map) {
     return RecurrenceRule(
-      frequency: RecurrenceFrequency.values[map['frequency'] as int],
+      frequency: parseEnum(map['frequency'], RecurrenceFrequency.values, RecurrenceFrequency.monthly),
       interval: map['interval'] as int? ?? 1,
       dayOfWeek: map['dayOfWeek'] as int?,
       dayOfMonth: map['dayOfMonth'] as int?,
       monthOfYear: map['monthOfYear'] as int?,
-      startDate: map['startDate'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['startDate'] as int)
-          : null,
-      endDate: map['endDate'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['endDate'] as int)
-          : null,
+      startDate: parseDateTimeOrNull(map['startDate']),
+      endDate: parseDateTimeOrNull(map['endDate']),
     );
   }
 
@@ -336,6 +334,12 @@ class BudgetVault {
   /// 剩余可用金额（别名）
   double get available => currentAmount;
 
+  /// 剩余金额（available的别名）
+  double get remainingAmount => available;
+
+  /// 分类ID（linkedCategoryId的别名）
+  String? get categoryId => linkedCategoryId;
+
   /// 完成度（用于储蓄目标）
   double get progress =>
       targetAmount > 0 ? (allocatedAmount / targetAmount).clamp(0.0, 1.0) : 0;
@@ -437,11 +441,11 @@ class BudgetVault {
       'description': description,
       'iconCode': icon.codePoint,
       'colorValue': color.toARGB32(),
-      'type': type.index,
+      'type': type.name,
       'targetAmount': targetAmount,
       'allocatedAmount': allocatedAmount,
       'spentAmount': spentAmount,
-      'dueDate': dueDate?.millisecondsSinceEpoch,
+      'dueDate': dueDate?.toIso8601String(),
       'isRecurring': isRecurring ? 1 : 0,
       'recurrenceJson': recurrence != null ? jsonEncode(recurrence!.toMap()) : null,
       'linkedCategoryId': linkedCategoryId,
@@ -449,9 +453,9 @@ class BudgetVault {
       'ledgerId': ledgerId,
       'isEnabled': isEnabled ? 1 : 0,
       'sortOrder': sortOrder,
-      'createdAt': createdAt.millisecondsSinceEpoch,
-      'updatedAt': updatedAt.millisecondsSinceEpoch,
-      'allocationType': allocationType.index,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
+      'allocationType': allocationType.name,
       'targetAllocation': targetAllocation,
       'targetPercentage': targetPercentage,
     };
@@ -464,13 +468,11 @@ class BudgetVault {
       description: map['description'] as String?,
       icon: IconData(map['iconCode'] as int, fontFamily: 'MaterialIcons'),
       color: Color(map['colorValue'] as int),
-      type: VaultType.values[map['type'] as int],
+      type: parseEnum(map['type'], VaultType.values, VaultType.savings),
       targetAmount: (map['targetAmount'] as num).toDouble(),
       allocatedAmount: (map['allocatedAmount'] as num?)?.toDouble() ?? 0,
       spentAmount: (map['spentAmount'] as num?)?.toDouble() ?? 0,
-      dueDate: map['dueDate'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['dueDate'] as int)
-          : null,
+      dueDate: parseDateTimeOrNull(map['dueDate']),
       isRecurring: map['isRecurring'] == 1,
       recurrence: map['recurrenceJson'] != null
           ? RecurrenceRule.fromMap(jsonDecode(map['recurrenceJson'] as String))
@@ -482,11 +484,9 @@ class BudgetVault {
       ledgerId: map['ledgerId'] as String,
       isEnabled: map['isEnabled'] != 0,
       sortOrder: map['sortOrder'] as int? ?? 0,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
-      updatedAt: map['updatedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int)
-          : null,
-      allocationType: AllocationType.values[map['allocationType'] as int? ?? 0],
+      createdAt: parseDateTime(map['createdAt']),
+      updatedAt: parseDateTimeOrNull(map['updatedAt']),
+      allocationType: parseEnum(map['allocationType'], AllocationType.values, AllocationType.fixed),
       targetAllocation: (map['targetAllocation'] as num?)?.toDouble(),
       targetPercentage: (map['targetPercentage'] as num?)?.toDouble(),
     );
@@ -520,7 +520,7 @@ class VaultAllocation {
       'incomeTransactionId': incomeTransactionId,
       'amount': amount,
       'note': note,
-      'allocatedAt': allocatedAt.millisecondsSinceEpoch,
+      'allocatedAt': allocatedAt.toIso8601String(),
     };
   }
 
@@ -531,7 +531,7 @@ class VaultAllocation {
       incomeTransactionId: map['incomeTransactionId'] as String?,
       amount: (map['amount'] as num).toDouble(),
       note: map['note'] as String?,
-      allocatedAt: DateTime.fromMillisecondsSinceEpoch(map['allocatedAt'] as int),
+      allocatedAt: parseDateTime(map['allocatedAt']),
     );
   }
 }
@@ -563,7 +563,7 @@ class VaultTransfer {
       'toVaultId': toVaultId,
       'amount': amount,
       'note': note,
-      'transferredAt': transferredAt.millisecondsSinceEpoch,
+      'transferredAt': transferredAt.toIso8601String(),
     };
   }
 
@@ -574,7 +574,7 @@ class VaultTransfer {
       toVaultId: map['toVaultId'] as String,
       amount: (map['amount'] as num).toDouble(),
       note: map['note'] as String?,
-      transferredAt: DateTime.fromMillisecondsSinceEpoch(map['transferredAt'] as int),
+      transferredAt: parseDateTime(map['transferredAt']),
     );
   }
 }

@@ -60,6 +60,25 @@ class EncryptionService {
     return utf8.decode(bytes);
   }
 
+  /// 加密数据（简易实现，使用Base64编码）
+  /// TODO: 在生产环境中应使用AES或其他安全加密算法
+  Future<String> encrypt(String data) async {
+    // 添加简单的混淆前缀
+    final obfuscated = '${_saltPrefix}enc_$data';
+    return encodeBase64(obfuscated);
+  }
+
+  /// 解密数据
+  Future<String> decrypt(String encryptedData) async {
+    final decoded = decodeBase64(encryptedData);
+    // 移除混淆前缀
+    final prefix = '${_saltPrefix}enc_';
+    if (decoded.startsWith(prefix)) {
+      return decoded.substring(prefix.length);
+    }
+    return decoded;
+  }
+
   /// 生成用于API请求的签名
   /// 用于验证请求的完整性
   String generateApiSignature({

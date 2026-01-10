@@ -251,6 +251,46 @@ class Budget {
         return '零基预算';
     }
   }
+
+  /// 转换为Map用于序列化
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'amount': amount,
+      'period': period.index,
+      'categoryId': categoryId,
+      'ledgerId': ledgerId,
+      'icon': icon.codePoint,
+      'color': color.toARGB32(),
+      'isEnabled': isEnabled ? 1 : 0,
+      'createdAt': createdAt.toIso8601String(),
+      'budgetType': budgetType.index,
+      'enableCarryover': enableCarryover ? 1 : 0,
+      'carryoverSurplusOnly': carryoverSurplusOnly ? 1 : 0,
+    };
+  }
+
+  /// 从Map创建Budget
+  factory Budget.fromMap(Map<String, dynamic> map) {
+    return Budget(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      amount: (map['amount'] as num).toDouble(),
+      period: BudgetPeriod.values[map['period'] as int],
+      categoryId: map['categoryId'] as String?,
+      ledgerId: map['ledgerId'] as String,
+      icon: IconData(map['icon'] as int, fontFamily: 'MaterialIcons'),
+      color: Color(map['color'] as int),
+      isEnabled: map['isEnabled'] == 1,
+      createdAt: DateTime.parse(map['createdAt'] as String),
+      budgetType: map['budgetType'] != null
+          ? BudgetType.values[map['budgetType'] as int]
+          : BudgetType.traditional,
+      enableCarryover: map['enableCarryover'] == 1,
+      carryoverSurplusOnly: map['carryoverSurplusOnly'] != 0,
+    );
+  }
 }
 
 /// 钱龄数据模型

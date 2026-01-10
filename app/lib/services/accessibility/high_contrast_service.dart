@@ -309,7 +309,7 @@ class HighContrastService {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: themeConfig.backgroundColor,
         elevation: 0,
         shape: RoundedRectangleBorder(

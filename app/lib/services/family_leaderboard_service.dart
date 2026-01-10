@@ -13,7 +13,7 @@ class FamilyLeaderboardService {
   // 排行榜缓存
   final Map<String, FamilyLeaderboard> _leaderboardCache = {};
   // 成就缓存
-  final Map<String, List<Achievement>> _achievementCache = {};
+  final Map<String, List<LeaderboardAchievement>> _achievementCache = {};
 
   /// 获取排行榜
   Future<FamilyLeaderboard> getLeaderboard({
@@ -101,13 +101,13 @@ class FamilyLeaderboardService {
       final now = DateTime.now();
       DateTime startDate;
       switch (period) {
-        case LeaderboardPeriod.week:
+        case LeaderboardPeriod.weekly:
           startDate = now.subtract(const Duration(days: 7));
           break;
-        case LeaderboardPeriod.month:
+        case LeaderboardPeriod.monthly:
           startDate = DateTime(now.year, now.month, 1);
           break;
-        case LeaderboardPeriod.year:
+        case LeaderboardPeriod.yearly:
           startDate = DateTime(now.year, 1, 1);
           break;
         case LeaderboardPeriod.allTime:
@@ -166,7 +166,7 @@ class FamilyLeaderboardService {
   }
 
   /// 获取成员成就
-  Future<List<Achievement>> getMemberAchievements(String memberId) async {
+  Future<List<LeaderboardAchievement>> getMemberAchievements(String memberId) async {
     if (_achievementCache.containsKey(memberId)) {
       return _achievementCache[memberId]!;
     }
@@ -174,14 +174,14 @@ class FamilyLeaderboardService {
   }
 
   /// 解锁成就
-  Future<Achievement?> unlockAchievement({
+  Future<LeaderboardAchievement?> unlockAchievement({
     required String memberId,
     required AchievementType type,
     required String title,
     required String description,
     required String emoji,
   }) async {
-    final achievement = Achievement(
+    final achievement = LeaderboardAchievement(
       id: '${memberId}_${type.name}_${DateTime.now().millisecondsSinceEpoch}',
       type: type,
       title: title,

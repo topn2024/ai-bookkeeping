@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import '../theme/app_theme.dart';
 import '../providers/ai_provider.dart';
@@ -143,11 +144,138 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
 
   Future<void> _checkPermission() async {
     try {
+      final status = await Permission.microphone.status;
+
+      if (status.isGranted) {
+        _hasPermission = true;
+        setState(() {});
+        return;
+      }
+
+      if (status.isDenied) {
+        // 首次请求，显示说明对话框
+        final shouldRequest = await _showPermissionExplanationDialog();
+        if (shouldRequest) {
+          final result = await Permission.microphone.request();
+          _hasPermission = result.isGranted;
+          setState(() {});
+
+          if (!result.isGranted) {
+            _showPermissionDeniedSnackBar();
+          }
+        }
+        return;
+      }
+
+      if (status.isPermanentlyDenied) {
+        // 永久拒绝，引导用户去设置
+        _hasPermission = false;
+        setState(() {});
+        _showPermanentlyDeniedDialog();
+        return;
+      }
+
+      // 其他情况，尝试请求权限
       _hasPermission = await _audioRecorder.hasPermission();
       setState(() {});
     } catch (e) {
       _showError('检查麦克风权限失败: $e');
     }
+  }
+
+  /// 显示权限说明对话框
+  Future<bool> _showPermissionExplanationDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.mic, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('麦克风权限'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('语音记账需要使用麦克风来：'),
+            SizedBox(height: 12),
+            _PermissionFeatureItem(
+              icon: Icons.record_voice_over,
+              text: '录制您的语音指令',
+            ),
+            _PermissionFeatureItem(
+              icon: Icons.psychology,
+              text: '识别语音内容进行记账',
+            ),
+            _PermissionFeatureItem(
+              icon: Icons.graphic_eq,
+              text: '支持唤醒词语音唤醒',
+            ),
+            SizedBox(height: 12),
+            Text(
+              '您的录音仅用于本地识别，不会上传到服务器。',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('暂不开启'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('允许使用'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  /// 显示权限被拒绝的提示
+  void _showPermissionDeniedSnackBar() {
+    if (!mounted) return;
+    _scaffoldMessenger?.showSnackBar(
+      SnackBar(
+        content: const Text('未获得麦克风权限，语音功能无法使用'),
+        action: SnackBarAction(
+          label: '重试',
+          onPressed: _checkPermission,
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  /// 显示永久拒绝权限的对话框
+  void _showPermanentlyDeniedDialog() {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('需要麦克风权限'),
+        content: const Text(
+          '您之前拒绝了麦克风权限。要使用语音记账功能，请在系统设置中手动开启麦克风权限。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              openAppSettings();
+            },
+            child: const Text('前往设置'),
+          ),
+        ],
+      ),
+    );
   }
 
   // 开始录音
@@ -1879,6 +2007,33 @@ class _EditTransactionPanelState extends State<_EditTransactionPanel> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 权限功能说明项
+class _PermissionFeatureItem extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _PermissionFeatureItem({
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(text, style: const TextStyle(fontSize: 14)),
+          ),
+        ],
       ),
     );
   }

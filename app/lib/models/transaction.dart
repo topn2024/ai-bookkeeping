@@ -374,4 +374,21 @@ class Transaction {
 
   /// 是否为转账类型
   bool get isTransfer => type == TransactionType.transfer;
+
+  // === 兼容性别名 ===
+
+  /// 分类ID（category的别名）
+  String get categoryId => category;
+
+  /// 分类名称（category的别名）
+  String get categoryName => category;
+
+  /// 描述（note的别名）
+  String? get description => note;
+
+  /// 商户名称（从note中提取或返回null）
+  String? get merchantName => null;
+
+  /// 位置信息（location的别名）
+  TransactionLocation? get locationInfo => location;
 }

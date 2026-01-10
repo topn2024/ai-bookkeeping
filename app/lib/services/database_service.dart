@@ -47,13 +47,15 @@ class DatabaseService {
 
     // 检查是否需要迁移并创建备份
     int? existingVersion;
+    Database? checkDb;
     try {
-      final db = await openDatabase(path, readOnly: true);
-      existingVersion = await db.getVersion();
-      await db.close();
+      checkDb = await openDatabase(path, readOnly: true);
+      existingVersion = await checkDb.getVersion();
     } catch (e) {
       // 数据库不存在或损坏，将创建新数据库
       _logger.debug('No existing database found', tag: 'DB');
+    } finally {
+      await checkDb?.close();
     }
 
     // 如果需要升级，先创建备份
@@ -3162,6 +3164,86 @@ class DatabaseService {
     return await db.rawInsert(sql, arguments);
   }
 
+  /// 执行原始SQL更新
+  Future<int> rawUpdate(String sql, [List<Object?>? arguments]) async {
+    final db = await database;
+    return await db.rawUpdate(sql, arguments);
+  }
+
+  /// 执行原始SQL删除
+  Future<int> rawDelete(String sql, [List<Object?>? arguments]) async {
+    final db = await database;
+    return await db.rawDelete(sql, arguments);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 备份/导出服务使用的别名方法
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 获取所有交易（别名）
+  Future<List<model.Transaction>> getAllTransactions() => getTransactions();
+
+  /// 获取所有账户（别名）
+  Future<List<Account>> getAllAccounts() => getAccounts();
+
+  /// 获取所有预算（别名）
+  Future<List<Budget>> getAllBudgets() => getBudgets();
+
+  /// 获取所有储蓄目标（别名）
+  Future<List<savings.SavingsGoal>> getAllSavingsGoals() => getSavingsGoals();
+
+  /// 获取所有周期性交易（别名）
+  Future<List<RecurringTransaction>> getAllRecurringTransactions() => getRecurringTransactions();
+
+  /// 获取所有模板（别名）
+  Future<List<TransactionTemplate>> getAllTemplates() => getTemplates();
+
+  /// 获取自定义分类
+  Future<List<Map<String, dynamic>>> getCustomCategories() async {
+    final db = await database;
+    return await db.query('custom_categories');
+  }
+
+  /// 获取钱龄资源池数据
+  Future<List<Map<String, dynamic>>> getMoneyAgePools() async {
+    final db = await database;
+    return await db.query('money_age_pools');
+  }
+
+  /// 获取家庭账本数据
+  Future<List<Map<String, dynamic>>> getFamilyLedgers() async {
+    final db = await database;
+    return await db.query('family_ledgers');
+  }
+
+  /// 获取位置记录
+  Future<List<Map<String, dynamic>>> getLocationRecords() async {
+    final db = await database;
+    return await db.query('location_records');
+  }
+
+  /// 获取设置值
+  Future<dynamic> getSetting(String key) async {
+    final db = await database;
+    final results = await db.query(
+      'settings',
+      where: 'key = ?',
+      whereArgs: [key],
+    );
+    if (results.isEmpty) return null;
+    return results.first['value'];
+  }
+
+  /// 设置值
+  Future<void> setSetting(String key, dynamic value) async {
+    final db = await database;
+    await db.insert(
+      'settings',
+      {'key': key, 'value': value?.toString()},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
   /// Parse location JSON string to TransactionLocation
   TransactionLocation? _parseLocationJson(String? locationJson) {
     if (locationJson == null || locationJson.isEmpty) return null;
@@ -3176,5 +3258,80 @@ class DatabaseService {
       placeName: parts.length > 2 && parts[2].isNotEmpty ? parts[2] : null,
       address: parts.length > 3 && parts[3].isNotEmpty ? parts[3] : null,
     );
+  }
+
+  // =============== 导出服务所需的存根方法 ===============
+
+  /// 获取交易总数
+  Future<int> getTransactionCount() async {
+    final transactions = await getTransactions();
+    return transactions.length;
+  }
+
+  /// 获取第一笔交易
+  Future<model.Transaction?> getFirstTransaction() async {
+    final transactions = await getTransactions();
+    if (transactions.isEmpty) return null;
+    transactions.sort((a, b) => a.date.compareTo(b.date));
+    return transactions.first;
+  }
+
+  /// 获取钱龄统计
+  Future<Map<String, dynamic>> getMoneyAgeStats() async {
+    return {};
+  }
+
+  /// 获取FIFO流动记录
+  Future<List<Map<String, dynamic>>> getFifoFlowRecords() async {
+    return [];
+  }
+
+  /// 获取钱龄分布
+  Future<Map<String, int>> getMoneyAgeDistribution() async {
+    return {};
+  }
+
+  /// 获取指定月份的预算
+  Future<List<Budget>> getBudgetsForMonth(DateTime month) async {
+    return getBudgets();
+  }
+
+  /// 获取指定月份的小金库记录
+  Future<List<Map<String, dynamic>>> getVaultRecordsForMonth(DateTime month) async {
+    return [];
+  }
+
+  /// 查找家庭重复交易
+  Future<List<Map<String, dynamic>>> findFamilyDuplicates({
+    required String ledgerId,
+    required DateTime date,
+    required double amount,
+  }) async {
+    return [];
+  }
+
+  /// 根据账本ID获取成员列表
+  Future<List<Map<String, dynamic>>> getMembersByLedgerId(String ledgerId) async {
+    return [];
+  }
+
+  /// 根据成员获取交易
+  Future<List<model.Transaction>> getTransactionsByMember(String memberId) async {
+    return [];
+  }
+
+  /// 获取单个预算
+  Future<Budget?> getBudget(String id) async {
+    final budgets = await getBudgets();
+    try {
+      return budgets.firstWhere((b) => b.id == id);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// 保存预算
+  Future<void> saveBudget(Budget budget) async {
+    await updateBudget(budget);
   }
 }

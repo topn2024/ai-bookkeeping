@@ -47,7 +47,7 @@ class TrendPredictionService {
 
     // 计算置信区间
     final stdDev = _calculateStdDev(monthlyData);
-    final lowerBound = max(0, predicted - 1.96 * stdDev);
+    final lowerBound = max(0.0, predicted - 1.96 * stdDev);
     final upperBound = predicted + 1.96 * stdDev;
 
     // 分类预测
@@ -145,7 +145,7 @@ class TrendPredictionService {
     final cv = mean > 0 ? stdDev / mean : 0;
 
     // 变异系数转换为置信度
-    return (1 - cv).clamp(0.5, 0.95);
+    return (1 - cv).clamp(0.5, 0.95).toDouble();
   }
 
   /// 按分类预测

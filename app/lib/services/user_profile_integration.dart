@@ -176,6 +176,44 @@ final transactionDataSourceProvider = Provider<TransactionDataSource>((ref) {
   return DatabaseTransactionDataSource(db);
 });
 
+/// 用户画像服务 Provider
+final userProfileServiceProvider = Provider<UserProfileService>((ref) {
+  final db = ref.watch(_databaseServiceProvider);
+  final transactionSource = ref.watch(transactionDataSourceProvider);
+  return UserProfileService(
+    analyzer: UserProfileAnalyzer(
+      transactions: transactionSource,
+      budgets: _StubBudgetDataSource(),
+      activityLogger: _StubUserActivityDataSource(),
+    ),
+    repository: _StubUserProfileRepository(db),
+  );
+});
+
+/// 存根实现：预算数据源
+class _StubBudgetDataSource implements BudgetDataSource {
+  @override
+  Future<List<BudgetData>> getAll(String userId) async => [];
+}
+
+/// 存根实现：用户活动数据源
+class _StubUserActivityDataSource implements UserActivityDataSource {
+  @override
+  Future<List<UserActivity>> getActivities(String userId) async => [];
+}
+
+/// 存根实现：用户画像仓储
+class _StubUserProfileRepository implements UserProfileRepository {
+  final DatabaseService _db;
+  _StubUserProfileRepository(this._db);
+
+  @override
+  Future<UserProfile?> get(String userId) async => null;
+
+  @override
+  Future<void> save(UserProfile profile) async {}
+}
+
 /// 用户画像集成服务 Provider
 final userProfileIntegrationProvider = Provider<UserProfileIntegration>((ref) {
   final profileService = ref.watch(userProfileServiceProvider);
