@@ -10,6 +10,7 @@ import '../services/voice/voice_intent_router.dart';
 import '../services/voice_recognition_engine.dart';
 import '../services/tts_service.dart';
 import '../services/voice_feedback_system.dart';
+import '../services/duplicate_detection_service.dart';
 
 /// 实体消歧服务Provider
 final entityDisambiguationServiceProvider = Provider<EntityDisambiguationService>((ref) {
@@ -290,6 +291,23 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
       accountId: 'default',
       source: TransactionSource.voice,
     );
+
+    // 检查重复交易
+    print('VoiceProvider: 开始检查重复交易，金额=${transaction.amount}');
+    final existingTransactions = await _databaseService.getTransactions();
+    print('VoiceProvider: 获取到${existingTransactions.length}条现有交易');
+    final duplicateCheck = DuplicateDetectionService.checkDuplicate(
+      transaction,
+      existingTransactions,
+    );
+    print('VoiceProvider: 重复检测结果: hasPotentialDuplicate=${duplicateCheck.hasPotentialDuplicate}, score=${duplicateCheck.similarityScore}');
+
+    if (duplicateCheck.hasPotentialDuplicate) {
+      // 发现潜在重复，提示用户
+      await _provideFeedback('检测到可能的重复记录：${duplicateCheck.duplicateReason}。是否仍要添加？');
+      // TODO: 实现确认流程
+      return;
+    }
 
     await _databaseService.insertTransaction(transaction);
     await _provideFeedback('已记录消费${amount.toStringAsFixed(2)}元');

@@ -6,11 +6,10 @@ import '../l10n/l10n.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/budget_provider.dart';
+import '../providers/gamification_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../widgets/budget_alert_widget.dart';
-import '../services/gamification_service.dart';
-import '../services/database_service.dart';
 import 'transaction_list_page.dart';
 import 'add_transaction_page.dart';
 import 'goal_achievement_dashboard_page.dart';
@@ -272,17 +271,15 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// 成就庆祝卡片
   /// 原型设计：伙伴化设计 - 连续记账达成时显示
   Widget _buildCelebrationCard(BuildContext context, ThemeData theme) {
-    return FutureBuilder<StreakStats>(
-      future: GamificationService(DatabaseService()).getStreakStats(),
-      builder: (context, snapshot) {
-        final consecutiveDays = snapshot.data?.currentStreak ?? 0;
+    final streakStats = ref.watch(gamificationProvider);
+    final consecutiveDays = streakStats.currentStreak;
 
-        // 如果没有连续记账，不显示卡片
-        if (consecutiveDays == 0) {
-          return const SizedBox.shrink();
-        }
+    // 如果没有连续记账，不显示卡片
+    if (consecutiveDays == 0) {
+      return const SizedBox.shrink();
+    }
 
-        return Container(
+    return Container(
           margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -333,8 +330,6 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
         );
-      },
-    );
   }
 
   /// 钱龄卡片

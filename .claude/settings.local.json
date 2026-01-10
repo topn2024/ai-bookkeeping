@@ -694,7 +694,9 @@
       "Bash(adb -s emulator-5554 install:*)",
       "Bash(adb -s emulator-5554 logcat -d)",
       "Bash(brew install:*)",
-      "Bash(dot:*)"
+      "Bash(dot:*)",
+      "Bash(adb logcat:*)",
+      "Bash(adb shell:*)"
     ]
   }
 }

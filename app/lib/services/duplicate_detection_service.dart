@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 
@@ -70,7 +71,7 @@ class DuplicateDetectionService {
     for (final existing in sameDayTransactions) {
       final result = _calculateSimilarity(newTransaction, existing);
 
-      if (result.score >= 60) { // 对齐设计规范阈值
+      if (result.score >= 55) { // 对齐设计规范阈值
         potentialDuplicates.add(existing);
         if (result.score > highestScore) {
           highestScore = result.score;
@@ -100,10 +101,10 @@ class DuplicateDetectionService {
 
   /// 计算两笔交易的相似度（对齐设计规范）
   ///
-  /// 评分标准（总分100分，阈值60分）：
+  /// 评分标准（总分100分，阈值55分）：
   /// - 外部ID匹配：100分（精确匹配）
-  /// - 金额相同：30分（必要条件）
-  /// - 时间接近：0-20分（≤5分钟20分，≤30分钟15分，≤2小时8分）
+  /// - 金额相同：35分（必要条件，提高权重）
+  /// - 时间接近：10-20分（≤5分钟20分，≤30分钟15分，≤2小时10分）
   /// - 分类相同：15分（完全相同）或8分（同一级分类）
   /// - 备注相似：20分
   /// - 类型相同：10分
@@ -133,10 +134,13 @@ class DuplicateDetectionService {
       return _SimilarityResult(score: 0, reason: null);
     }
 
-    // 2. 金额相同 (+30分) - 必要条件
+    // 2. 金额相同 (+35分) - 必要条件，提高权重
     if ((newTx.amount - existingTx.amount).abs() < _amountTolerance) {
-      score += 30;
+      score += 35;
       reasons.add('金额相同');
+    } else {
+      // 金额不同，记录差异
+      print('DuplicateDetection: 金额不同 ${newTx.amount} vs ${existingTx.amount}');
     }
 
     // 3. 类型相同 (+10分)
@@ -147,6 +151,7 @@ class DuplicateDetectionService {
 
     // 4. 分类匹配 (+15分完全相同，+8分同一级分类)
     final categoryScore = _calculateCategoryScore(newTx.category, existingTx.category);
+    print('DuplicateDetection: 分类比对 "${newTx.category}" vs "${existingTx.category}" = $categoryScore分');
     if (categoryScore > 0) {
       score += categoryScore;
       if (categoryScore == 15) {
@@ -165,7 +170,7 @@ class DuplicateDetectionService {
       timeScore = 15;
       reasons.add('时间接近(≤30分钟)');
     } else {
-      timeScore = 8;
+      timeScore = 10;
       reasons.add('时间较近(≤2小时)');
     }
     score += timeScore;
@@ -182,13 +187,15 @@ class DuplicateDetectionService {
       reasons.add('账户相同');
     }
 
+    print('DuplicateDetection: 总分=$score, 原因=${reasons.join(", ")}');
+
     // 判断重复等级
     if (score >= 85) {
       return _SimilarityResult(
         score: score,
         reason: '极可能重复: ${reasons.join(', ')}',
       );
-    } else if (score >= 60) {
+    } else if (score >= 55) {
       return _SimilarityResult(
         score: score,
         reason: '疑似重复: ${reasons.join(', ')}',

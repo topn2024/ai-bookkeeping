@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 import '../providers/account_provider.dart';
-import '../services/gamification_service.dart';
-import '../services/database_service.dart';
+import '../providers/gamification_provider.dart';
 import '../l10n/l10n.dart';
 import 'account_management_page.dart';
 import 'credit_card_page.dart';
@@ -68,7 +67,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildUserHeader(context, theme),
-              _buildAchievementCards(context, theme),
+              _buildAchievementCards(context, theme, ref),
               _buildAccountGroup(context, theme),
               _buildBudgetGroup(context, theme),
               _buildFinancialToolsGroup(context, theme),
@@ -131,10 +130,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  FutureBuilder<StreakStats>(
-                    future: GamificationService(DatabaseService()).getStreakStats(),
-                    builder: (context, snapshot) {
-                      final totalDays = snapshot.data?.totalDaysRecorded ?? 0;
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final streakStats = ref.watch(gamificationProvider);
+                      final totalDays = streakStats.totalDaysRecorded;
                       return Text(
                         totalDays > 0 ? '已记账 $totalDays 天' : '开始记账吧',
                         style: TextStyle(
@@ -158,32 +157,28 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   /// 成就卡片横向滚动
-  Widget _buildAchievementCards(BuildContext context, ThemeData theme) {
-    return FutureBuilder<StreakStats>(
-      future: GamificationService(DatabaseService()).getStreakStats(),
-      builder: (context, snapshot) {
-        final streakDays = snapshot.data?.currentStreak ?? 0;
+  Widget _buildAchievementCards(BuildContext context, ThemeData theme, WidgetRef ref) {
+    final streakStats = ref.watch(gamificationProvider);
+    final streakDays = streakStats.currentStreak;
 
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              if (streakDays > 0) ...[
-                _buildAchievementCard(
-                  context,
-                  theme,
-                  emoji: '🔥',
-                  title: '连续记账',
-                  subtitle: '$streakDays天',
-                  gradientColors: const [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
-                ),
-                const SizedBox(width: 16),
-              ],
-            ],
-          ),
-        );
-      },
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          if (streakDays > 0) ...[
+            _buildAchievementCard(
+              context,
+              theme,
+              emoji: '🔥',
+              title: '连续记账',
+              subtitle: '$streakDays天',
+              gradientColors: const [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
+            ),
+            const SizedBox(width: 16),
+          ],
+        ],
+      ),
     );
   }
 

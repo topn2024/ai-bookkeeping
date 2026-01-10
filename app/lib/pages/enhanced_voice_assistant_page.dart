@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../providers/voice_service_provider.dart';
+import '../providers/voice_coordinator_provider.dart';
 import '../services/voice_service_coordinator.dart';
 import '../theme/app_theme.dart';
 import '../theme/antigravity_shadows.dart';
@@ -150,17 +150,18 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final voiceState = ref.watch(voiceInteractionStateProvider);
-    final coordinator = ref.read(voiceInteractionStateProvider.notifier);
+    final coordinator = ref.watch(voiceServiceCoordinatorProvider);
+    final sessionState = coordinator.sessionState;
+    final hasActiveSession = coordinator.hasActiveSession;
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
-      appBar: _buildAppBar(context, l10n, voiceState),
+      appBar: _buildAppBar(context, l10n, coordinator),
       body: Column(
         children: [
           // 会话状态指示器
-          if (voiceState.currentSessionType != null)
-            _buildSessionIndicator(context, voiceState),
+          if (hasActiveSession)
+            _buildSessionIndicator(context, coordinator),
 
           // 消息列表
           Expanded(
@@ -168,7 +169,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
           ),
 
           // 语音交互区域
-          _buildVoiceInteractionArea(context, voiceState, coordinator),
+          _buildVoiceInteractionArea(context, sessionState, coordinator),
         ],
       ),
     );
@@ -177,8 +178,9 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
     AppLocalizations l10n,
-    VoiceInteractionState voiceState,
+    VoiceServiceCoordinator coordinator,
   ) {
+    final sessionState = coordinator.sessionState;
     return AppBar(
       elevation: 0,
       leading: IconButton(
@@ -217,10 +219,10 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
                 ),
               ),
               Text(
-                _getStatusText(voiceState),
+                _getStatusText(sessionState),
                 style: TextStyle(
                   fontSize: 12,
-                  color: _getStatusColor(voiceState),
+                  color: _getStatusColor(sessionState),
                 ),
               ),
             ],
@@ -256,12 +258,12 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
           tooltip: '清除聊天记录',
         ),
         // 会话控制按钮
-        if (voiceState.currentSessionType != null)
+        if (sessionState != VoiceSessionState.idle)
           IconButton(
             icon: const Icon(Icons.cancel_outlined),
-            onPressed: () {
-              final coordinator = ref.read(voiceInteractionStateProvider.notifier);
-              coordinator.clearSession();
+            onPressed: () async {
+              final coordinator = ref.read(voiceServiceCoordinatorProvider);
+              await coordinator.stopVoiceSession();
               _addMessage(ChatMessage(
                 type: MessageType.system,
                 content: '会话已取消',
@@ -285,35 +287,42 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
   Widget _buildSessionIndicator(
     BuildContext context,
-    VoiceInteractionState voiceState,
+    VoiceServiceCoordinator coordinator,
   ) {
-    final sessionType = voiceState.currentSessionType;
-    if (sessionType == null) return const SizedBox.shrink();
+    final sessionState = coordinator.sessionState;
+    final intentType = coordinator.currentIntentType;
+
+    if (sessionState == VoiceSessionState.idle) return const SizedBox.shrink();
 
     String title = '';
     IconData icon = Icons.chat;
     Color color = AppTheme.primaryColor;
 
-    switch (sessionType) {
-      case VoiceSessionType.delete:
-        title = '删除会话';
-        icon = Icons.delete_outline;
+    switch (sessionState) {
+      case VoiceSessionState.waitingForConfirmation:
+        title = '等待确认';
+        icon = Icons.check_circle_outline;
+        color = AppColors.warning;
+        break;
+      case VoiceSessionState.waitingForClarification:
+        title = '等待澄清';
+        icon = Icons.help_outline;
+        color = AppColors.primary;
+        break;
+      case VoiceSessionState.processing:
+        title = '处理中';
+        icon = Icons.sync;
+        color = AppColors.primary;
+        break;
+      case VoiceSessionState.listening:
+        title = '正在聆听';
+        icon = Icons.mic;
         color = AppColors.expense;
         break;
-      case VoiceSessionType.modify:
-        title = '修改会话';
-        icon = Icons.edit_outlined;
-        color = AppColors.primary;
-        break;
-      case VoiceSessionType.add:
-        title = '添加会话';
-        icon = Icons.add_circle_outline;
-        color = AppColors.income;
-        break;
-      case VoiceSessionType.query:
-        title = '查询会话';
-        icon = Icons.search;
-        color = AppColors.primary;
+      case VoiceSessionState.error:
+        title = '出错了';
+        icon = Icons.error_outline;
+        color = Colors.red;
         break;
       default:
         title = '活跃会话';
@@ -471,8 +480,8 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
   Widget _buildVoiceInteractionArea(
     BuildContext context,
-    VoiceInteractionState voiceState,
-    VoiceInteractionNotifier coordinator,
+    VoiceSessionState sessionState,
+    VoiceServiceCoordinator coordinator,
   ) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -484,7 +493,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
         child: Column(
           children: [
             // 反馈文本
-            if (voiceState.feedback != null)
+            if (null != null)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
@@ -494,7 +503,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  voiceState.feedback!,
+                  null!,
                   style: TextStyle(
                     color: AppTheme.primaryColor,
                     fontSize: 14,
@@ -520,12 +529,12 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
                         height: 64,
                         decoration: BoxDecoration(
                           color: _hasPermission
-                              ? (voiceState.isListening
+                              ? (sessionState == VoiceSessionState.listening
                                   ? AppColors.expense
                                   : AppTheme.primaryColor)
                               : Colors.grey,
                           shape: BoxShape.circle,
-                          boxShadow: voiceState.isListening
+                          boxShadow: sessionState == VoiceSessionState.listening
                               ? [
                                   BoxShadow(
                                     color: AppColors.expense.withValues(alpha: 0.3),
@@ -537,7 +546,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
                         ),
                         child: Icon(
                           _hasPermission
-                              ? (voiceState.isListening ? Icons.mic : Icons.mic_none)
+                              ? (sessionState == VoiceSessionState.listening ? Icons.mic : Icons.mic_none)
                               : Icons.mic_off,
                           color: Colors.white,
                           size: 28,
@@ -555,7 +564,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _getActionText(voiceState),
+                        _getActionText(sessionState),
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
@@ -563,7 +572,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _getActionHint(voiceState),
+                        _getActionHint(sessionState),
                         style: TextStyle(
                           color: Colors.grey[600],
                           fontSize: 14,
@@ -574,9 +583,9 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
                 ),
 
                 // 快捷操作按钮
-                if (voiceState.currentSessionType != null) ...[
+                if (sessionState != VoiceSessionState.idle) ...[
                   const SizedBox(width: 8),
-                  _buildQuickActionButtons(context, voiceState, coordinator),
+                  _buildQuickActionButtons(context, sessionState, coordinator),
                 ],
               ],
             ),
@@ -622,15 +631,15 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
   Widget _buildQuickActionButtons(
     BuildContext context,
-    VoiceInteractionState voiceState,
-    VoiceInteractionNotifier coordinator,
+    VoiceSessionState sessionState,
+    VoiceServiceCoordinator coordinator,
   ) {
     return Row(
       children: [
         // 确认按钮
         IconButton(
-          onPressed: () {
-            coordinator.handleConfirmation('确认');
+          onPressed: () async {
+            await coordinator.processVoiceCommand('确认');
             _addMessage(ChatMessage(
               type: MessageType.user,
               content: '确认',
@@ -645,8 +654,8 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
         // 取消按钮
         IconButton(
-          onPressed: () {
-            coordinator.handleConfirmation('取消');
+          onPressed: () async {
+            await coordinator.processVoiceCommand('取消');
             _addMessage(ChatMessage(
               type: MessageType.user,
               content: '取消',
@@ -663,10 +672,10 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   }
 
   // 事件处理方法
-  void _startListening(VoiceInteractionNotifier coordinator) {
+  Future<void> _startListening(VoiceServiceCoordinator coordinator) async {
     if (!_hasPermission) return;
 
-    coordinator.startListening();
+    await coordinator.startVoiceSession();
     _pulseController.repeat();
 
     _addMessage(ChatMessage(
@@ -676,8 +685,8 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     ));
   }
 
-  void _stopListening(VoiceInteractionNotifier coordinator) {
-    coordinator.stopListening();
+  Future<void> _stopListening(VoiceServiceCoordinator coordinator) async {
+    await coordinator.stopVoiceSession();
     _pulseController.stop();
     _pulseController.reset();
 
@@ -686,7 +695,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   }
 
   // 模拟语音处理（在实际应用中这里应该连接真实的语音识别）
-  Future<void> _simulateVoiceProcessing(VoiceInteractionNotifier coordinator) async {
+  Future<void> _simulateVoiceProcessing(VoiceServiceCoordinator coordinator) async {
     const testCommands = [
       '删除昨天的午餐',
       '把咖啡的金额改成25元',
@@ -711,33 +720,8 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     // 获取语音服务的处理结果并添加到聊天
     await Future.delayed(const Duration(milliseconds: 500));
 
-    final state = ref.read(voiceInteractionStateProvider);
-    if (state.feedback != null && state.feedback!.isNotEmpty) {
-      _addMessage(ChatMessage(
-        type: MessageType.assistant,
-        content: state.feedback!,
-        timestamp: DateTime.now(),
-      ));
-    }
-
-    // 检查是否有导航数据，如果有则执行导航
-    if (state.currentSessionType == VoiceSessionType.navigation &&
-        state.currentSessionData != null) {
-      final navData = state.currentSessionData as Map<String, dynamic>;
-      final route = navData['route'] as String?;
-      final pageName = navData['pageName'] as String?;
-      if (route != null) {
-        _navigateToRoute(route);
-        // 添加导航成功的聊天消息
-        _addMessage(ChatMessage(
-          type: MessageType.assistant,
-          content: '✓ 已为您打开${pageName ?? route}页面',
-          timestamp: DateTime.now(),
-        ));
-        // 清除导航会话数据
-        coordinator.clearSession();
-      }
-    }
+    // Note: VoiceServiceCoordinator handles feedback internally through VoiceFeedbackSystem
+    // The coordinator will manage session state and navigation automatically
   }
 
   String _generateMockResponse(String command) {
@@ -896,33 +880,33 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   }
 
   // 辅助方法
-  String _getStatusText(VoiceInteractionState voiceState) {
-    if (voiceState.isListening) return '正在聆听...';
-    if (voiceState.isProcessing) return '正在处理...';
-    if (voiceState.currentSessionType != null) return '会话进行中';
+  String _getStatusText(VoiceSessionState sessionState) {
+    if (sessionState == VoiceSessionState.listening) return '正在聆听...';
+    if (sessionState == VoiceSessionState.processing) return '正在处理...';
+    if (sessionState != VoiceSessionState.idle) return '会话进行中';
     return '在线';
   }
 
-  Color _getStatusColor(VoiceInteractionState voiceState) {
-    if (voiceState.isListening) return AppColors.expense;
-    if (voiceState.isProcessing) return AppColors.warning;
-    if (voiceState.currentSessionType != null) return AppColors.primary;
+  Color _getStatusColor(VoiceSessionState sessionState) {
+    if (sessionState == VoiceSessionState.listening) return AppColors.expense;
+    if (sessionState == VoiceSessionState.processing) return AppColors.warning;
+    if (sessionState != VoiceSessionState.idle) return AppColors.primary;
     return AppColors.income;
   }
 
-  String _getActionText(VoiceInteractionState voiceState) {
+  String _getActionText(VoiceSessionState sessionState) {
     if (!_hasPermission) return '需要权限';
-    if (voiceState.isListening) return '正在聆听';
-    if (voiceState.isProcessing) return '正在处理';
-    if (voiceState.currentSessionType != null) return '等待回应';
+    if (sessionState == VoiceSessionState.listening) return '正在聆听';
+    if (sessionState == VoiceSessionState.processing) return '正在处理';
+    if (sessionState != VoiceSessionState.idle) return '等待回应';
     return '按住说话';
   }
 
-  String _getActionHint(VoiceInteractionState voiceState) {
+  String _getActionHint(VoiceSessionState sessionState) {
     if (!_hasPermission) return '点击申请麦克风权限';
-    if (voiceState.isListening) return '松开结束录音';
-    if (voiceState.isProcessing) return '正在理解您的指令...';
-    if (voiceState.currentSessionType != null) return '请说"确认"或"取消"';
+    if (sessionState == VoiceSessionState.listening) return '松开结束录音';
+    if (sessionState == VoiceSessionState.processing) return '正在理解您的指令...';
+    if (sessionState != VoiceSessionState.idle) return '请说"确认"或"取消"';
     return '长按麦克风开始语音交互';
   }
 

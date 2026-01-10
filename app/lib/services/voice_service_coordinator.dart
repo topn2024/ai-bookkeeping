@@ -505,11 +505,14 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       );
 
       // 检查重复交易
+      print('VoiceCoordinator: 开始检查重复交易，金额=${transaction.amount}，分类=${transaction.category}');
       final existingTransactions = await _databaseService.getTransactions();
+      print('VoiceCoordinator: 获取到${existingTransactions.length}条现有交易');
       final duplicateCheck = DuplicateDetectionService.checkDuplicate(
         transaction,
         existingTransactions,
       );
+      print('VoiceCoordinator: 重复检测结果: hasPotentialDuplicate=${duplicateCheck.hasPotentialDuplicate}, score=${duplicateCheck.similarityScore}');
 
       if (duplicateCheck.hasPotentialDuplicate) {
         // 发现潜在重复，提示用户
