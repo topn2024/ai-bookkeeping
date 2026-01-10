@@ -72,7 +72,12 @@ class VoiceNavigationService extends ChangeNotifier {
       route: '/camera-input',
       name: '拍照记账',
       module: '首页与快速记账',
-      aliases: ['拍照记账', '拍一下', '扫描票据', '拍照'],
+      aliases: [
+        '拍照记账', '拍一下', '扫描票据', '拍照',
+        '扫描小票', '识别小票', '扫描发票', '识别发票',
+        '扫描账单', '识别账单', '拍照识别', '识别图片',
+        '截图识别', '识别截图', '导入截图',
+      ],
       voiceAdaptation: VoiceAdaptation.high,
     ),
     '/transaction-list': PageConfig(

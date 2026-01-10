@@ -28,6 +28,7 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
   final SourceFileService _sourceFileService = SourceFileService();
   File? _selectedImage;
   AIRecognitionResult? _recognitionResult;
+  MultiAIRecognitionResult? _multiRecognitionResult;  // 多笔交易结果
   bool _isProcessing = false;
   DateTime? _recognitionTimestamp;
   // 缓存 ScaffoldMessenger 用于安全清除 SnackBar
@@ -61,6 +62,7 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
         setState(() {
           _selectedImage = File(image.path);
           _recognitionResult = null;
+          _multiRecognitionResult = null;
         });
         await _recognizeImage();
       }
@@ -80,17 +82,21 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
       // Record recognition timestamp
       _recognitionTimestamp = DateTime.now();
 
-      final result = await ref
+      // 使用智能识别（自动检测单笔/多笔）
+      await ref
           .read(aiBookkeepingProvider.notifier)
-          .recognizeImage(_selectedImage!);
+          .recognizeImageSmart(_selectedImage!);
+
+      final state = ref.read(aiBookkeepingProvider);
 
       setState(() {
-        _recognitionResult = result;
+        _recognitionResult = state.result;
+        _multiRecognitionResult = state.multiResult;
         _isProcessing = false;
       });
 
-      if (!result.success) {
-        _showError(result.errorMessage ?? '识别失败');
+      if (!state.isSuccess) {
+        _showError(state.errorMessage ?? '识别失败');
       }
     } catch (e) {
       setState(() {
@@ -99,6 +105,10 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
       _showError('识别失败: $e');
     }
   }
+
+  /// 是否为多笔交易
+  bool get _isMultiTransaction =>
+      _multiRecognitionResult != null && _multiRecognitionResult!.isMultiple;
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -202,6 +212,146 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
     Navigator.pop(context, _recognitionResult);
   }
 
+  /// 确认并创建多笔交易
+  Future<void> _confirmAndCreateMultipleTransactions() async {
+    if (_multiRecognitionResult == null || !_multiRecognitionResult!.success) return;
+
+    final transactions = _multiRecognitionResult!.transactions;
+    if (transactions.isEmpty) return;
+
+    final createdCount = await _showMultiConfirmDialog(transactions);
+
+    if (createdCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已记录$createdCount笔交易'),
+          backgroundColor: AppColors.income,
+        ),
+      );
+      Navigator.pop(context, _multiRecognitionResult);
+    }
+  }
+
+  /// 显示多笔交易确认对话框
+  Future<int> _showMultiConfirmDialog(List<AIRecognitionResult> transactions) async {
+    int createdCount = 0;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('确认记录${transactions.length}笔交易'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '总金额: ¥${_multiRecognitionResult!.totalAmount.toStringAsFixed(2)}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 300),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: transactions.length,
+                  itemBuilder: (context, index) {
+                    final tx = transactions[index];
+                    return ListTile(
+                      dense: true,
+                      leading: CircleAvatar(
+                        radius: 16,
+                        child: Text('${index + 1}'),
+                      ),
+                      title: Text(tx.merchant ?? '未知商户'),
+                      subtitle: Text(_getCategoryName(tx.category)),
+                      trailing: Text(
+                        '¥${tx.amount?.toStringAsFixed(2) ?? '0.00'}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: tx.type == 'income'
+                              ? AppColors.income
+                              : AppColors.expense,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('全部记录'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      for (var i = 0; i < transactions.length; i++) {
+        final tx = transactions[i];
+        final transactionId = '${DateTime.now().millisecondsSinceEpoch}_$i';
+
+        // 保存源文件（仅第一笔）
+        String? sourceFileLocalPath;
+        String? sourceFileType;
+        int? sourceFileSize;
+
+        if (i == 0 && _selectedImage != null) {
+          sourceFileLocalPath = await _sourceFileService.saveImageFile(
+            _selectedImage!,
+            transactionId,
+          );
+          if (sourceFileLocalPath != null) {
+            final file = File(sourceFileLocalPath);
+            if (await file.exists()) {
+              sourceFileSize = await file.length();
+              final ext = sourceFileLocalPath.split('.').last.toLowerCase();
+              sourceFileType = _getMimeType(ext);
+            }
+          }
+        }
+
+        final expiryDate = await _sourceFileService.calculateExpiryDate();
+        final transactionDate = _parseDate(tx.date);
+
+        final transaction = Transaction(
+          id: transactionId,
+          type: tx.type == 'income'
+              ? TransactionType.income
+              : TransactionType.expense,
+          amount: tx.amount ?? 0,
+          category: tx.category ?? 'other_expense',
+          note: tx.description ?? tx.merchant,
+          date: transactionDate,
+          accountId: 'cash',
+          source: TransactionSource.image,
+          aiConfidence: tx.confidence,
+          sourceFileLocalPath: i == 0 ? sourceFileLocalPath : null,
+          sourceFileType: i == 0 ? sourceFileType : null,
+          sourceFileSize: i == 0 ? sourceFileSize : null,
+          sourceFileExpiresAt: i == 0 ? expiryDate : null,
+        );
+
+        try {
+          await ref.read(transactionProvider.notifier).addTransaction(transaction);
+          createdCount++;
+        } catch (e) {
+          debugPrint('创建交易失败: $e');
+        }
+      }
+    }
+
+    return createdCount;
+  }
+
   /// Get MIME type from file extension
   String _getMimeType(String extension) {
     switch (extension.toLowerCase()) {
@@ -225,16 +375,23 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final hasValidResult = (_recognitionResult != null && _recognitionResult!.success) ||
+        (_multiRecognitionResult != null && _multiRecognitionResult!.success);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('拍照记账'),
         actions: [
-          if (_recognitionResult != null && _recognitionResult!.success)
+          if (hasValidResult)
             TextButton(
-              onPressed: _confirmAndCreateTransaction,
-              child: const Text(
-                '确认',
-                style: TextStyle(color: Colors.white, fontSize: 16),
+              onPressed: _isMultiTransaction
+                  ? _confirmAndCreateMultipleTransactions
+                  : _confirmAndCreateTransaction,
+              child: Text(
+                _isMultiTransaction
+                    ? '确认${_multiRecognitionResult!.count}笔'
+                    : '确认',
+                style: const TextStyle(color: Colors.white, fontSize: 16),
               ),
             ),
         ],
@@ -323,7 +480,9 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
   }
 
   Widget _buildRecognitionResult() {
-    if (_recognitionResult == null) {
+    final hasResult = _recognitionResult != null || _multiRecognitionResult != null;
+
+    if (!hasResult) {
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.all(16),
@@ -340,7 +499,9 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
       );
     }
 
-    if (!_recognitionResult!.success) {
+    // 检查是否有错误
+    final hasError = _recognitionResult != null && !_recognitionResult!.success;
+    if (hasError) {
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.all(16),
@@ -369,6 +530,12 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
       );
     }
 
+    // 多笔交易显示
+    if (_isMultiTransaction) {
+      return _buildMultiRecognitionResult();
+    }
+
+    // 单笔交易显示
     return GestureDetector(
       onTap: () => _showDetailDialog(),
       child: Container(
@@ -425,6 +592,96 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 构建多笔交易识别结果UI
+  Widget _buildMultiRecognitionResult() {
+    final transactions = _multiRecognitionResult!.transactions;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.check_circle, color: AppColors.income, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                '识别到${transactions.length}笔交易',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.income,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '总计: ¥${_multiRecognitionResult!.totalAmount.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.expense,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+          Expanded(
+            child: ListView.separated(
+              itemCount: transactions.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final tx = transactions[index];
+                return ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    radius: 14,
+                    backgroundColor: tx.type == 'income'
+                        ? AppColors.income.withValues(alpha: 0.2)
+                        : AppColors.expense.withValues(alpha: 0.2),
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: tx.type == 'income' ? AppColors.income : AppColors.expense,
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    tx.merchant ?? '未知商户',
+                    style: const TextStyle(fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    _getCategoryName(tx.category),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  trailing: Text(
+                    '${tx.type == 'income' ? '+' : '-'}¥${tx.amount?.toStringAsFixed(2) ?? '0.00'}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: tx.type == 'income' ? AppColors.income : AppColors.expense,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

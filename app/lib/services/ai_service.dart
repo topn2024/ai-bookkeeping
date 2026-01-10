@@ -313,6 +313,41 @@ class AIService {
     }
   }
 
+  /// 批量图片识别记账
+  /// 从长截图（如账单列表、银行流水）中识别多笔交易
+  Future<MultiAIRecognitionResult> recognizeImageBatch(File imageFile) async {
+    try {
+      final qwenResults = await _qwenService.recognizeReceiptBatch(imageFile);
+
+      if (qwenResults.isEmpty) {
+        return MultiAIRecognitionResult.error('未识别到交易记录');
+      }
+
+      // 检查是否有错误结果
+      if (qwenResults.length == 1 && !qwenResults.first.success) {
+        return MultiAIRecognitionResult.error(
+          qwenResults.first.errorMessage ?? '图片识别失败'
+        );
+      }
+
+      final aiResults = qwenResults
+          .where((r) => r.success)
+          .map((r) => AIRecognitionResult.fromQwenResult(r))
+          .toList();
+
+      if (aiResults.isEmpty) {
+        return MultiAIRecognitionResult.error('未识别到有效的交易记录');
+      }
+
+      return MultiAIRecognitionResult(
+        transactions: aiResults,
+        success: true,
+      );
+    } catch (e) {
+      return MultiAIRecognitionResult.error('批量图片识别失败: $e');
+    }
+  }
+
   /// 语音识别记账（文本方式）
   /// 解析语音转文本结果，使用千问模型提取交易信息
   Future<AIRecognitionResult> recognizeVoice(String transcribedText) async {

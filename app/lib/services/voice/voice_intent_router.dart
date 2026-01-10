@@ -87,6 +87,15 @@ class VoiceIntentRouter {
     RegExp(r'[一二三四五六七八九十]|[1-9]', caseSensitive: false),
   ];
 
+  /// 屏幕识别意图的关键词模式
+  static final _screenRecognitionPatterns = [
+    RegExp(r'识别.*屏幕|读取.*屏幕|屏幕.*识别', caseSensitive: false),
+    RegExp(r'识别.*这个|读.*这个|记.*这笔', caseSensitive: false),
+    RegExp(r'帮我.*记|自动.*记账', caseSensitive: false),
+    RegExp(r'识别.*账单|读取.*账单|这.*账单', caseSensitive: false),
+    RegExp(r'微信.*记账|支付宝.*记账|读.*微信|读.*支付宝', caseSensitive: false),
+  ];
+
   /// 分析语音输入并识别意图
   ///
   /// [input] 用户的语音输入文本
@@ -217,6 +226,7 @@ class VoiceIntentRouter {
     scores[VoiceIntentType.confirmAction] = _calculatePatternScore(input, _confirmPatterns);
     scores[VoiceIntentType.cancelAction] = _calculatePatternScore(input, _cancelPatterns);
     scores[VoiceIntentType.clarifySelection] = _calculatePatternScore(input, _clarifyPatterns);
+    scores[VoiceIntentType.screenRecognition] = _calculatePatternScore(input, _screenRecognitionPatterns);
 
     // 上下文增强
     if (context != null) {
@@ -482,6 +492,11 @@ class VoiceIntentRouter {
       'budget': ['预算', '预算中心', '预算页面'],
       'analysis': ['分析', '统计', '报表', '趋势'],
       'account': ['账户', '账号', '个人中心'],
+      'camera-input': [
+        '拍照', '拍一下', '扫描', '识别',
+        '小票', '发票', '账单', '截图',
+        '拍照记账', '扫描小票', '识别发票',
+      ],
     };
 
     for (final entry in pageKeywords.entries) {

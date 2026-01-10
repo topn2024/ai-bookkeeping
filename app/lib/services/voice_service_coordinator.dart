@@ -17,6 +17,7 @@ import 'tts_service.dart';
 import 'voice_navigation_service.dart';
 import 'voice_feedback_system.dart';
 import 'nlu_engine.dart';
+import 'screen_reader_service.dart';
 
 /// 语音服务协调器
 ///
@@ -37,6 +38,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   final VoiceIntentRouter _intentRouter;
   final VoiceFeedbackSystem _feedbackSystem;
   final DatabaseService _databaseService;
+  final ScreenReaderService _screenReaderService;
 
   /// 当前会话状态
   VoiceSessionState _sessionState = VoiceSessionState.idle;
@@ -69,6 +71,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     VoiceIntentRouter? intentRouter,
     VoiceFeedbackSystem? feedbackSystem,
     DatabaseService? databaseService,
+    ScreenReaderService? screenReaderService,
   }) : _recognitionEngine = recognitionEngine ?? VoiceRecognitionEngine(),
        _ttsService = ttsService ?? TTSService(),
        _disambiguationService = disambiguationService ?? EntityDisambiguationService(),
@@ -77,7 +80,8 @@ class VoiceServiceCoordinator extends ChangeNotifier {
        _navigationService = navigationService ?? VoiceNavigationService(),
        _intentRouter = intentRouter ?? VoiceIntentRouter(),
        _feedbackSystem = feedbackSystem ?? VoiceFeedbackSystem(),
-       _databaseService = databaseService ?? DatabaseService();
+       _databaseService = databaseService ?? DatabaseService(),
+       _screenReaderService = screenReaderService ?? ScreenReaderService();
 
   /// 当前会话状态
   VoiceSessionState get sessionState => _sessionState;
@@ -257,6 +261,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       case VoiceIntentType.clarifySelection:
         return await _handleClarificationIntent(intentResult, originalInput);
+
+      case VoiceIntentType.screenRecognition:
+        return await _handleScreenRecognitionIntent(intentResult, originalInput);
 
       case VoiceIntentType.unknown:
       default:
@@ -685,6 +692,11 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         result = VoiceSessionResult.success(message);
         break;
 
+      case VoiceIntentType.screenRecognition:
+        // 确认屏幕识别的账单
+        result = await confirmScreenRecognition();
+        break;
+
       default:
         const message = '无法确认此类型的操作';
         await _ttsService.speak(message);
@@ -724,6 +736,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       case VoiceIntentType.confirmAction:
       case VoiceIntentType.cancelAction:
       case VoiceIntentType.clarifySelection:
+      case VoiceIntentType.screenRecognition:
         // No specific cleanup needed for these types
         break;
     }
@@ -934,6 +947,160 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     );
   }
 
+  /// 处理屏幕识别意图
+  ///
+  /// 读取当前屏幕内容，识别账单信息并创建交易记录
+  /// 支持单笔和多笔交易识别
+  Future<VoiceSessionResult> _handleScreenRecognitionIntent(
+    IntentAnalysisResult intentResult,
+    String originalInput,
+  ) async {
+    // 执行屏幕识别
+    final result = await _screenReaderService.recognizeFromScreen();
+
+    // 播放语音反馈
+    final feedback = result.hasMultipleBills
+        ? result.getDetailedVoiceFeedback()
+        : result.getVoiceFeedback();
+    await _ttsService.speak(feedback);
+
+    // 根据结果状态处理
+    if (result.isSuccess || result.status == VoiceScreenRecognitionStatus.lowConfidence) {
+      // 设置会话状态，等待用户确认
+      // 存储完整的 VoiceScreenRecognitionResult 以支持多笔处理
+      _currentSession = VoiceSessionContext(
+        intentType: VoiceIntentType.screenRecognition,
+        sessionData: result,
+        needsContinuation: true,
+        createdAt: DateTime.now(),
+      );
+      _sessionState = VoiceSessionState.waitingForConfirmation;
+      notifyListeners();
+
+      return VoiceSessionResult.success(feedback, {
+        'screenRecognition': true,
+        'hasMultipleBills': result.hasMultipleBills,
+        'billCount': result.billCount,
+        'totalAmount': result.totalAmount,
+        'billInfo': {
+          'amount': result.billInfo?.amount,
+          'merchant': result.billInfo?.merchant,
+          'type': result.billInfo?.type,
+          'appName': result.billInfo?.appName,
+          'confidence': result.billInfo?.confidence,
+        },
+        'allBills': result.allBills.map((b) => {
+          'amount': b.amount,
+          'merchant': b.merchant,
+          'type': b.type,
+          'appName': b.appName,
+          'confidence': b.confidence,
+        }).toList(),
+        'needsConfirmation': true,
+      });
+    } else if (result.needsServiceEnabled) {
+      // 需要启用无障碍服务
+      return VoiceSessionResult.success(feedback, {
+        'screenRecognition': true,
+        'needsAccessibilitySettings': true,
+      });
+    } else {
+      // 识别失败
+      return VoiceSessionResult.error(feedback);
+    }
+  }
+
+  /// 确认屏幕识别的账单并记账
+  ///
+  /// 支持单笔和多笔交易批量记账
+  Future<VoiceSessionResult> confirmScreenRecognition() async {
+    if (_currentSession?.intentType != VoiceIntentType.screenRecognition) {
+      return VoiceSessionResult.error('没有待确认的屏幕识别结果');
+    }
+
+    // 获取识别结果（支持新旧格式）
+    final sessionData = _currentSession?.sessionData;
+    List<BillInfo> billsToRecord;
+
+    if (sessionData is VoiceScreenRecognitionResult) {
+      // 新格式：包含多笔账单
+      billsToRecord = sessionData.allBills;
+    } else if (sessionData is BillInfo) {
+      // 旧格式：单笔账单
+      billsToRecord = [sessionData];
+    } else {
+      _clearSession();
+      return VoiceSessionResult.error('账单信息格式不正确');
+    }
+
+    // 过滤有效账单
+    final validBills = billsToRecord.where((b) => b.amount != null && b.amount! > 0).toList();
+    if (validBills.isEmpty) {
+      _clearSession();
+      return VoiceSessionResult.error('没有有效的账单信息');
+    }
+
+    try {
+      final recordedIds = <String>[];
+      var totalAmount = 0.0;
+
+      for (final billInfo in validBills) {
+        // 创建交易记录
+        final transaction = model.Transaction(
+          id: DateTime.now().millisecondsSinceEpoch.toString() + '_${recordedIds.length}',
+          type: _mapBillTypeToTransactionType(billInfo.type),
+          amount: billInfo.amount!,
+          category: 'other_expense', // TODO: 根据商户智能分类
+          note: billInfo.description,
+          date: DateTime.now(),
+          accountId: 'default',
+          rawMerchant: billInfo.merchant,
+          source: model.TransactionSource.voice,
+        );
+
+        await _databaseService.insertTransaction(transaction);
+        recordedIds.add(transaction.id);
+        totalAmount += billInfo.amount!;
+      }
+
+      _clearSession();
+
+      String message;
+      if (validBills.length == 1) {
+        final billInfo = validBills.first;
+        message = '已记录${billInfo.typeDisplayName}${billInfo.amount!.toStringAsFixed(2)}元';
+      } else {
+        message = '已批量记录${validBills.length}笔交易，总金额${totalAmount.toStringAsFixed(2)}元';
+      }
+      await _ttsService.speak(message);
+
+      return VoiceSessionResult.success(message, {
+        'recorded': true,
+        'recordedCount': validBills.length,
+        'totalAmount': totalAmount,
+        'transactionIds': recordedIds,
+      });
+    } catch (e) {
+      _clearSession();
+      final message = '记录失败：$e';
+      await _ttsService.speak(message);
+      return VoiceSessionResult.error(message);
+    }
+  }
+
+  /// 将账单类型映射到交易类型
+  model.TransactionType _mapBillTypeToTransactionType(String billType) {
+    switch (billType) {
+      case 'income':
+        return model.TransactionType.income;
+      case 'transfer':
+        return model.TransactionType.transfer;
+      case 'expense':
+      default:
+        return model.TransactionType.expense;
+    }
+  }
+
   /// 处理未知意图
   Future<VoiceSessionResult> _handleUnknownIntent(
     IntentAnalysisResult intentResult,
@@ -978,8 +1145,8 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   Future<bool> _deleteTransactions(List<TransactionRecord> records) async {
     try {
       for (final record in records) {
-        final success = await _databaseService.softDeleteTransaction(record.id);
-        if (!success) return false;
+        final rowsAffected = await _databaseService.softDeleteTransaction(record.id);
+        if (rowsAffected <= 0) return false;
       }
       return true;
     } catch (e) {
@@ -1087,6 +1254,7 @@ enum VoiceIntentType {
   confirmAction,             // 确认操作
   cancelAction,              // 取消操作
   clarifySelection,          // 澄清选择
+  screenRecognition,         // 屏幕识别记账
 }
 
 /// 语音会话结果状态
