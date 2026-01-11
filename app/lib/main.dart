@@ -22,7 +22,10 @@ import 'services/multimodal_wakeup_service.dart';
 import 'services/secure_storage_service.dart';
 import 'services/database_service.dart';
 import 'services/global_voice_assistant_manager.dart';
+import 'services/voice_token_service.dart';
 import 'services/voice_context_route_observer.dart';
+import 'services/voice_service_coordinator.dart' show VoiceSessionResult;
+import 'providers/voice_coordinator_provider.dart';
 import 'widgets/global_floating_ball.dart';
 import 'models/ledger.dart';
 
@@ -92,6 +95,19 @@ void main() async {
     logger.info('Auto-sync service initialized', tag: 'App');
   } catch (e) {
     logger.warning('Failed to initialize auto-sync service: $e', tag: 'App');
+  }
+
+  // Configure voice token service with Alibaba Cloud credentials
+  // IMPORTANT: This must be done BEFORE multimodal wake-up service and voice assistant
+  // Note: For production, these should be obtained from backend
+  try {
+    VoiceTokenService().configureDirectMode(
+      token: 'fc1cd8fba41b4dae95b5c88d7290e0a4',
+      appKey: 'C8F0dz0ihFmvKH8G',
+    );
+    logger.info('Voice token service configured with direct mode', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to configure voice token service: $e', tag: 'App');
   }
 
   // Initialize multimodal wake-up service
@@ -178,10 +194,52 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // 在第一帧之后设置命令处理器
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupCommandProcessor();
+    });
+  }
+
+  /// 设置命令处理器，将 GlobalVoiceAssistantManager 与 VoiceServiceCoordinator 集成
+  void _setupCommandProcessor() {
+    final coordinator = ref.read(voiceServiceCoordinatorProvider);
+
+    GlobalVoiceAssistantManager.instance.setCommandProcessor((command) async {
+      debugPrint('[App] 处理语音命令: $command');
+      try {
+        // 检查是否可能包含多个意图（多条记账指令）
+        final intentRouter = coordinator.intentRouter;
+        final mightBeMultiple = intentRouter.mightContainMultipleIntents(command);
+        debugPrint('[App] 是否可能包含多意图: $mightBeMultiple');
+
+        VoiceSessionResult result;
+        if (mightBeMultiple) {
+          // 使用多意图处理
+          debugPrint('[App] 使用多意图处理模式');
+          result = await coordinator.processMultiIntentCommand(command);
+        } else {
+          // 使用单意图处理
+          result = await coordinator.processVoiceCommand(command);
+        }
+
+        // 优先使用 message，如果为空则使用 errorMessage
+        final response = result.message ?? result.errorMessage ?? '处理完成';
+        debugPrint('[App] 命令处理结果: $response (status: ${result.status})');
+        return response;
+      } catch (e) {
+        debugPrint('[App] 命令处理失败: $e');
+        return '处理命令时出错: $e';
+      }
+    });
+
+    logger.info('Command processor setup completed', tag: 'App');
   }
 
   @override
   void dispose() {
+    // 清除命令处理器
+    GlobalVoiceAssistantManager.instance.setCommandProcessor(null);
     WidgetsBinding.instance.removeObserver(this);
     logger.dispose();
     super.dispose();

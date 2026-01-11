@@ -30,6 +30,10 @@ class VoiceTokenService {
   // 防止并发请求的锁
   Completer<VoiceTokenInfo>? _fetchingCompleter;
 
+  // 直接配置模式（用于测试或无后端场景）
+  VoiceTokenInfo? _directToken;
+  bool _useDirectMode = false;
+
   // 重试配置
   static const int _maxRetries = 3;
   static const Duration _baseRetryDelay = Duration(seconds: 1);
@@ -63,12 +67,58 @@ class VoiceTokenService {
     _dio.options.headers['Authorization'] = 'Bearer $authToken';
   }
 
+  /// 配置直接Token模式（用于测试或无后端场景）
+  ///
+  /// 直接使用阿里云凭证，绕过后端Token服务
+  /// [token] 阿里云NLS Token
+  /// [appKey] 阿里云项目AppKey
+  /// [expiresAt] Token过期时间（可选，默认24小时后）
+  void configureDirectMode({
+    required String token,
+    required String appKey,
+    DateTime? expiresAt,
+    String? asrUrl,
+    String? asrRestUrl,
+    String? ttsUrl,
+    String? picovoiceAccessKey,
+  }) {
+    _directToken = VoiceTokenInfo(
+      token: token,
+      expiresAt: expiresAt ?? DateTime.now().add(const Duration(hours: 24)),
+      appKey: appKey,
+      asrUrl: asrUrl ?? 'wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1',
+      asrRestUrl: asrRestUrl ?? 'https://nls-gateway-cn-shanghai.aliyuncs.com/stream/v1/asr',
+      ttsUrl: ttsUrl ?? 'wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1',
+      picovoiceAccessKey: picovoiceAccessKey,
+    );
+    _useDirectMode = true;
+    debugPrint('VoiceTokenService: 已配置直接Token模式');
+  }
+
+  /// 禁用直接Token模式，恢复使用后端服务
+  void disableDirectMode() {
+    _useDirectMode = false;
+    _directToken = null;
+    debugPrint('VoiceTokenService: 已禁用直接Token模式');
+  }
+
+  /// 是否使用直接Token模式
+  bool get isDirectMode => _useDirectMode;
+
   /// 获取语音服务Token
   ///
   /// 如果缓存有效则返回缓存，否则从服务器获取新Token。
   /// 自动处理Token刷新。
   /// 使用锁机制防止并发请求，支持自动重试。
   Future<VoiceTokenInfo> getToken() async {
+    // 直接Token模式
+    if (_useDirectMode && _directToken != null) {
+      if (!_directToken!.isExpired) {
+        return _directToken!;
+      }
+      throw VoiceTokenException('直接Token已过期，请重新配置');
+    }
+
     // 检查缓存是否有效
     if (_cachedToken != null && !_cachedToken!.isExpiringSoon) {
       return _cachedToken!;

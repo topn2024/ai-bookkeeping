@@ -148,6 +148,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 是否启用流式TTS
   bool get isStreamingTTSEnabled => _streamingTTSEnabled;
 
+  /// 获取意图路由器（用于外部访问多意图检测等功能）
+  VoiceIntentRouter get intentRouter => _intentRouter;
+
   /// 当前会话状态
   VoiceSessionState get sessionState => _sessionState;
 

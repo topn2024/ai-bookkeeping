@@ -101,12 +101,14 @@ class BatchIntentAnalyzer {
   }
 
   /// 提取金额
+  ///
+  /// 使用 VoiceIntentRouter.extractAmount 支持中文数字和阿拉伯数字
   double? _extractAmount(
     String text,
     IntentAnalysisResult intentResult,
     NLUResult nluResult,
   ) {
-    // 优先使用意图结果中的金额
+    // 优先使用意图结果中的金额（已由 VoiceIntentRouter 提取，支持中文数字）
     if (intentResult.entities.containsKey('amount')) {
       final amount = intentResult.entities['amount'];
       if (amount is double && amount > 0) {
@@ -127,27 +129,8 @@ class BatchIntentAnalyzer {
       }
     }
 
-    // 使用正则表达式匹配
-    final patterns = [
-      // 匹配 "35块钱"、"35元"、"35块"
-      RegExp(r'(\d+(?:\.\d+)?)\s*(?:块钱|块|元|毛|分)'),
-      // 匹配 "花了35"、"付了35"
-      RegExp(r'(?:花了?|付了?|给了?|收了?)\s*(\d+(?:\.\d+)?)'),
-      // 匹配单独的数字（在记账上下文中）
-      RegExp(r'(\d+(?:\.\d+)?)'),
-    ];
-
-    for (final pattern in patterns) {
-      final match = pattern.firstMatch(text);
-      if (match != null) {
-        final value = double.tryParse(match.group(1) ?? '');
-        if (value != null && value > 0) {
-          return value;
-        }
-      }
-    }
-
-    return null;
+    // 使用 VoiceIntentRouter 的共享方法（支持中文数字）
+    return VoiceIntentRouter.extractAmount(text);
   }
 
   /// 提取分类

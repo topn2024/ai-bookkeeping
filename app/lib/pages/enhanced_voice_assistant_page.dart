@@ -1,11 +1,12 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/voice_coordinator_provider.dart';
+import '../providers/global_voice_assistant_provider.dart';
 import '../services/voice_service_coordinator.dart';
+import '../services/global_voice_assistant_manager.dart';
 import '../widgets/multi_intent_confirm_widget.dart';
 import '../widgets/amount_supplement_widget.dart';
 import '../theme/app_theme.dart';
@@ -36,22 +37,19 @@ class EnhancedVoiceAssistantPage extends ConsumerStatefulWidget {
 
 class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssistantPage>
     with TickerProviderStateMixin {
-  static const String _chatHistoryKey = 'voice_assistant_chat_history';
-  static const int _maxHistoryDays = 30; // 保留30天的聊天记录
-
   final ScrollController _scrollController = ScrollController();
-  final List<ChatMessage> _messages = [];
   late AnimationController _pulseController;
   late AnimationController _waveController;
   bool _hasPermission = false;
-  // ignore: unused_field
-  bool _isLoadingHistory = true;
+
+  // 使用 GlobalVoiceAssistantManager 进行录音和聊天记录管理
+  GlobalVoiceAssistantManager get _voiceManager => ref.read(globalVoiceAssistantProvider);
+  bool get _isRecording => _voiceManager.ballState == FloatingBallState.recording;
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
-    _loadChatHistory();
     _checkPermissions();
   }
 
@@ -66,79 +64,9 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     );
   }
 
-  /// 加载聊天历史记录
-  Future<void> _loadChatHistory() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final historyJson = prefs.getString(_chatHistoryKey);
-
-      if (historyJson != null) {
-        final List<dynamic> historyList = json.decode(historyJson);
-        final loadedMessages = historyList
-            .map((item) => ChatMessage.fromJson(item))
-            .toList();
-
-        // 清理超过30天的旧记录
-        final cutoffDate = DateTime.now().subtract(Duration(days: _maxHistoryDays));
-        final recentMessages = loadedMessages
-            .where((msg) => msg.timestamp.isAfter(cutoffDate))
-            .toList();
-
-        setState(() {
-          _messages.clear();
-          _messages.addAll(recentMessages);
-          _isLoadingHistory = false;
-        });
-
-        // 如果清理了旧记录，保存更新后的历史
-        if (recentMessages.length < loadedMessages.length) {
-          await _saveChatHistory();
-        }
-      } else {
-        // 首次使用，添加欢迎消息
-        setState(() {
-          _isLoadingHistory = false;
-        });
-        _addWelcomeMessage();
-      }
-    } catch (e) {
-      setState(() {
-        _isLoadingHistory = false;
-      });
-      _addWelcomeMessage();
-    }
-  }
-
-  /// 添加欢迎消息
-  void _addWelcomeMessage() {
-    _addMessage(ChatMessage(
-      type: MessageType.assistant,
-      content: '您好！我是您的智能语音助手 🤖\n\n我可以帮您：\n• 语音记账和管理\n• 删除和修改记录\n• 查询财务信息\n• 导航到各个页面\n\n请点击麦克风开始语音交互！',
-      timestamp: DateTime.now(),
-    ));
-  }
-
-  /// 保存聊天历史记录
-  Future<void> _saveChatHistory() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final historyJson = json.encode(
-        _messages.map((msg) => msg.toJson()).toList(),
-      );
-      await prefs.setString(_chatHistoryKey, historyJson);
-    } catch (e) {
-      // 保存失败，静默处理
-    }
-  }
-
   /// 清除所有聊天记录
   Future<void> _clearChatHistory() async {
-    setState(() {
-      _messages.clear();
-    });
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_chatHistoryKey);
-    _addWelcomeMessage();
+    _voiceManager.clearHistory();
   }
 
   Future<void> _checkPermissions() async {
@@ -162,6 +90,23 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     final sessionState = coordinator.sessionState;
     final hasActiveSession = coordinator.hasActiveSession;
 
+    // 监听 GlobalVoiceAssistantManager 的状态变化
+    final voiceManager = ref.watch(globalVoiceAssistantProvider);
+    final messages = voiceManager.conversationHistory;
+    final isRecording = voiceManager.ballState == FloatingBallState.recording;
+    final isProcessing = voiceManager.ballState == FloatingBallState.processing;
+
+    // 根据录音状态控制动画
+    if (isRecording && !_pulseController.isAnimating) {
+      _pulseController.repeat();
+      _waveController.repeat();
+    } else if (!isRecording && _pulseController.isAnimating) {
+      _pulseController.stop();
+      _pulseController.reset();
+      _waveController.stop();
+      _waveController.reset();
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: _buildAppBar(context, l10n, coordinator),
@@ -173,11 +118,11 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
           // 消息列表
           Expanded(
-            child: _buildMessageList(context),
+            child: _buildMessageList(context, messages),
           ),
 
           // 语音交互区域
-          _buildVoiceInteractionArea(context, sessionState, coordinator),
+          _buildVoiceInteractionArea(context, sessionState, coordinator, isRecording, isProcessing),
         ],
       ),
     );
@@ -278,11 +223,6 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
             onPressed: () async {
               final coordinator = ref.read(voiceServiceCoordinatorProvider);
               await coordinator.stopVoiceSession();
-              _addMessage(ChatMessage(
-                type: MessageType.system,
-                content: '会话已取消',
-                timestamp: DateTime.now(),
-              ));
             },
             tooltip: '取消当前会话',
           ),
@@ -409,41 +349,27 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     final multiIntent = coordinator.pendingMultiIntent;
     if (multiIntent == null) return const SizedBox.shrink();
 
+    final voiceManager = ref.read(globalVoiceAssistantProvider);
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: MultiIntentConfirmWidget(
         result: multiIntent,
         onConfirmAll: () async {
           final result = await coordinator.confirmMultiIntents();
-          _addMessage(ChatMessage(
-            type: MessageType.assistant,
-            content: result.message ?? '操作完成',
-            timestamp: DateTime.now(),
-          ));
+          voiceManager.sendTextMessage(result.message ?? '操作完成');
         },
         onCancelAll: () async {
           final result = await coordinator.cancelMultiIntents();
-          _addMessage(ChatMessage(
-            type: MessageType.system,
-            content: result.message ?? '已取消',
-            timestamp: DateTime.now(),
-          ));
+          voiceManager.sendTextMessage(result.message ?? '已取消');
         },
         onCancelItem: (index) async {
           final result = await coordinator.cancelMultiIntentItem(index);
-          _addMessage(ChatMessage(
-            type: MessageType.system,
-            content: result.message ?? '已移除',
-            timestamp: DateTime.now(),
-          ));
+          voiceManager.sendTextMessage(result.message ?? '已移除');
         },
         onSupplementAmount: (index, amount) async {
           final result = await coordinator.supplementAmount(index, amount);
-          _addMessage(ChatMessage(
-            type: MessageType.system,
-            content: result.message ?? '金额已补充',
-            timestamp: DateTime.now(),
-          ));
+          voiceManager.sendTextMessage(result.message ?? '金额已补充');
         },
         showNoise: true,
       ),
@@ -458,64 +384,78 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     final multiIntent = coordinator.pendingMultiIntent;
     if (multiIntent == null) return const SizedBox.shrink();
 
+    final voiceManager = ref.read(globalVoiceAssistantProvider);
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: AmountSupplementWidget(
         incompleteIntents: multiIntent.incompleteIntents,
         onSupplementAmount: (index, amount) async {
           final result = await coordinator.supplementAmount(index, amount);
-          _addMessage(ChatMessage(
-            type: MessageType.system,
-            content: result.message ?? '金额已补充',
-            timestamp: DateTime.now(),
-          ));
+          voiceManager.sendTextMessage(result.message ?? '金额已补充');
         },
         onSkip: (index) async {
           final result = await coordinator.cancelMultiIntentItem(
             multiIntent.completeIntents.length + index,
           );
-          _addMessage(ChatMessage(
-            type: MessageType.system,
-            content: result.message ?? '已跳过',
-            timestamp: DateTime.now(),
-          ));
+          voiceManager.sendTextMessage(result.message ?? '已跳过');
         },
         onSkipAll: () async {
           final result = await coordinator.cancelMultiIntents();
-          _addMessage(ChatMessage(
-            type: MessageType.system,
-            content: result.message ?? '已取消',
-            timestamp: DateTime.now(),
-          ));
+          voiceManager.sendTextMessage(result.message ?? '已取消');
         },
         onComplete: () async {
           // 所有金额补充完成，执行确认
           final result = await coordinator.confirmMultiIntents();
-          _addMessage(ChatMessage(
-            type: MessageType.assistant,
-            content: result.message ?? '记录完成',
-            timestamp: DateTime.now(),
-          ));
+          voiceManager.sendTextMessage(result.message ?? '记录完成');
         },
       ),
     );
   }
 
-  Widget _buildMessageList(BuildContext context) {
+  Widget _buildMessageList(BuildContext context, List<ChatMessage> messages) {
+    // 自动滚动到底部
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients && messages.isNotEmpty) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+
+    if (messages.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              '点击麦克风开始语音交互',
+              style: TextStyle(color: Colors.grey[500], fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: _messages.length,
+      itemCount: messages.length,
       itemBuilder: (context, index) {
-        final message = _messages[index];
-        return _buildMessageBubble(context, message);
+        final message = messages[index];
+        return _buildMessageBubbleFromGlobal(context, message);
       },
     );
   }
 
-  Widget _buildMessageBubble(BuildContext context, ChatMessage message) {
-    final isUser = message.type == MessageType.user;
-    final isSystem = message.type == MessageType.system;
+  /// 从 GlobalVoiceAssistantManager.ChatMessage 构建消息气泡
+  Widget _buildMessageBubbleFromGlobal(BuildContext context, ChatMessage message) {
+    final isUser = message.type == ChatMessageType.user;
+    final isSystem = message.type == ChatMessageType.system;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -524,7 +464,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isUser && !isSystem) ...[
-            _buildAvatar(message.type),
+            _buildAvatarFromType(message.type),
             const SizedBox(width: 8),
           ],
           Flexible(
@@ -547,18 +487,41 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message.content,
-                    style: TextStyle(
-                      color: isSystem
-                          ? Colors.grey[600]
-                          : isUser
-                              ? Colors.white
-                              : Colors.black87,
-                      fontSize: 14,
-                      height: 1.4,
+                  if (message.isLoading)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: isUser ? Colors.white : AppTheme.primaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '处理中...',
+                          style: TextStyle(
+                            color: isUser ? Colors.white70 : Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Text(
+                      message.content,
+                      style: TextStyle(
+                        color: isSystem
+                            ? Colors.grey[600]
+                            : isUser
+                                ? Colors.white
+                                : Colors.black87,
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 4),
                   Text(
                     _formatTime(message.timestamp),
@@ -577,27 +540,27 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
           ),
           if (isUser) ...[
             const SizedBox(width: 8),
-            _buildAvatar(MessageType.user),
+            _buildAvatarFromType(ChatMessageType.user),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildAvatar(MessageType type) {
+  Widget _buildAvatarFromType(ChatMessageType type) {
     late IconData icon;
     late Color color;
 
     switch (type) {
-      case MessageType.user:
+      case ChatMessageType.user:
         icon = Icons.person;
         color = AppTheme.primaryColor;
         break;
-      case MessageType.assistant:
+      case ChatMessageType.assistant:
         icon = Icons.psychology;
         color = AppColors.income;
         break;
-      case MessageType.system:
+      case ChatMessageType.system:
         icon = Icons.info_outline;
         color = Colors.grey;
         break;
@@ -618,8 +581,10 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     BuildContext context,
     VoiceSessionState sessionState,
     VoiceServiceCoordinator coordinator,
+    bool isRecording,
+    bool isProcessing,
   ) {
-    final isListening = sessionState == VoiceSessionState.listening;
+    final isListening = isRecording || sessionState == VoiceSessionState.listening;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
@@ -726,12 +691,14 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     VoiceSessionState sessionState,
     VoiceServiceCoordinator coordinator,
   ) {
-    final isListening = sessionState == VoiceSessionState.listening;
+    final voiceManager = ref.watch(globalVoiceAssistantProvider);
+    final isRecording = voiceManager.ballState == FloatingBallState.recording;
+    final isListening = isRecording || sessionState == VoiceSessionState.listening;
 
     return GestureDetector(
-      onTapDown: _hasPermission ? (_) => _startListening(coordinator) : null,
-      onTapUp: _hasPermission ? (_) => _stopListening(coordinator) : null,
-      onTapCancel: _hasPermission ? () => _stopListening(coordinator) : null,
+      onTapDown: _hasPermission ? (_) => _startRecording() : null,
+      onTapUp: _hasPermission ? (_) => _stopRecording() : null,
+      onTapCancel: _hasPermission ? () => _stopRecording() : null,
       child: AnimatedBuilder(
         animation: _pulseController,
         builder: (context, child) {
@@ -899,17 +866,14 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     VoiceSessionState sessionState,
     VoiceServiceCoordinator coordinator,
   ) {
+    final voiceManager = ref.read(globalVoiceAssistantProvider);
+
     return Row(
       children: [
         // 确认按钮
         IconButton(
           onPressed: () async {
-            await coordinator.processVoiceCommand('确认');
-            _addMessage(ChatMessage(
-              type: MessageType.user,
-              content: '确认',
-              timestamp: DateTime.now(),
-            ));
+            await voiceManager.sendTextMessage('确认');
           },
           icon: const Icon(Icons.check_circle_outline),
           iconSize: 20,
@@ -920,12 +884,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
         // 取消按钮
         IconButton(
           onPressed: () async {
-            await coordinator.processVoiceCommand('取消');
-            _addMessage(ChatMessage(
-              type: MessageType.user,
-              content: '取消',
-              timestamp: DateTime.now(),
-            ));
+            await voiceManager.sendTextMessage('取消');
           },
           icon: const Icon(Icons.cancel_outlined),
           iconSize: 20,
@@ -936,54 +895,45 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     );
   }
 
-  // 事件处理方法
-  Future<void> _startListening(VoiceServiceCoordinator coordinator) async {
-    if (!_hasPermission) return;
+  // 事件处理方法 - 使用 GlobalVoiceAssistantManager 进行录音
+  Future<void> _startRecording() async {
+    if (!_hasPermission) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先授予麦克风权限')),
+      );
+      return;
+    }
 
-    await coordinator.startVoiceSession();
-    _pulseController.repeat();
-    _waveController.repeat();
+    final voiceManager = ref.read(globalVoiceAssistantProvider);
+    if (voiceManager.ballState == FloatingBallState.recording) return;
 
-    _addMessage(ChatMessage(
-      type: MessageType.system,
-      content: '正在聆听...',
-      timestamp: DateTime.now(),
-    ));
+    try {
+      // 振动反馈
+      HapticFeedback.mediumImpact();
+
+      // 使用 GlobalVoiceAssistantManager 开始录音
+      await voiceManager.startRecording();
+
+      debugPrint('[VoiceAssistantPage] 开始录音');
+    } catch (e) {
+      debugPrint('[VoiceAssistantPage] 开始录音失败: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('无法开始录音，请检查麦克风权限')),
+      );
+    }
   }
 
-  Future<void> _stopListening(VoiceServiceCoordinator coordinator) async {
-    await coordinator.stopVoiceSession();
-    _pulseController.stop();
-    _pulseController.reset();
-    _waveController.stop();
-    _waveController.reset();
+  Future<void> _stopRecording() async {
+    final voiceManager = ref.read(globalVoiceAssistantProvider);
+    if (voiceManager.ballState != FloatingBallState.recording) return;
 
-    // 在模拟器上提示用户使用文字输入
-    _addMessage(ChatMessage(
-      type: MessageType.assistant,
-      content: '语音识别需要真机环境。\n\n请在下方输入框中输入您的指令，例如：\n• 删除昨天的午餐\n• 把咖啡改成25元\n• 查看本月支出',
-      timestamp: DateTime.now(),
-    ));
-  }
-
-  void _addMessage(ChatMessage message) {
-    setState(() {
-      _messages.add(message);
-    });
-
-    // 保存聊天历史
-    _saveChatHistory();
-
-    // 自动滚动到底部
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    try {
+      // 使用 GlobalVoiceAssistantManager 停止录音并处理
+      await voiceManager.stopRecording();
+      debugPrint('[VoiceAssistantPage] 停止录音');
+    } catch (e) {
+      debugPrint('[VoiceAssistantPage] 停止录音失败: $e');
+    }
   }
 
   // ignore: unused_element
@@ -1036,8 +986,9 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
   void _showCommandHistory() {
     // 过滤出用户发送的命令
-    final userCommands = _messages
-        .where((msg) => msg.type == MessageType.user)
+    final voiceManager = ref.read(globalVoiceAssistantProvider);
+    final userCommands = voiceManager.conversationHistory
+        .where((msg) => msg.type == ChatMessageType.user)
         .toList()
         .reversed
         .toList();
@@ -1191,28 +1142,9 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
   /// 重新执行命令
   Future<void> _replayCommand(String command) async {
-    final coordinator = ref.read(voiceServiceCoordinatorProvider);
-
-    // 添加用户消息
-    _addMessage(ChatMessage(
-      type: MessageType.user,
-      content: command,
-      timestamp: DateTime.now(),
-    ));
-
-    // 执行命令
-    await coordinator.processVoiceCommand(command);
-
-    // 获取处理结果并添加到聊天
-    await Future.delayed(const Duration(milliseconds: 500));
-    final state = ref.read(voiceServiceCoordinatorProvider);
-    if (state.lastResponse != null && state.lastResponse!.isNotEmpty) {
-      _addMessage(ChatMessage(
-        type: MessageType.assistant,
-        content: state.lastResponse!,
-        timestamp: DateTime.now(),
-      ));
-    }
+    // 使用 GlobalVoiceAssistantManager 发送文本消息
+    final voiceManager = ref.read(globalVoiceAssistantProvider);
+    await voiceManager.sendTextMessage(command);
   }
 
   void _showOptions() {
@@ -1297,7 +1229,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
   String _getActionText(VoiceSessionState sessionState) {
     if (!_hasPermission) return '需要权限';
-    if (sessionState == VoiceSessionState.listening) return '正在聆听';
+    if (sessionState == VoiceSessionState.listening) return '正在聆听...';
     if (sessionState == VoiceSessionState.processing) return '正在处理';
     if (sessionState != VoiceSessionState.idle) return '等待回应';
     return '按住说话';
@@ -1305,10 +1237,10 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
   String _getActionHint(VoiceSessionState sessionState) {
     if (!_hasPermission) return '点击申请麦克风权限';
-    if (sessionState == VoiceSessionState.listening) return '松开结束录音';
+    if (sessionState == VoiceSessionState.listening) return '松开即结束';
     if (sessionState == VoiceSessionState.processing) return '正在理解您的指令...';
     if (sessionState != VoiceSessionState.idle) return '请说"确认"或"取消"';
-    return '长按麦克风开始语音交互';
+    return '按住麦克风直接说话';
   }
 
   String _formatTime(DateTime dateTime) {
@@ -1327,38 +1259,5 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     _waveController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-}
-
-// 数据类型定义
-enum MessageType { user, assistant, system }
-
-class ChatMessage {
-  final MessageType type;
-  final String content;
-  final DateTime timestamp;
-
-  const ChatMessage({
-    required this.type,
-    required this.content,
-    required this.timestamp,
-  });
-
-  /// 转换为JSON
-  Map<String, dynamic> toJson() {
-    return {
-      'type': type.index,
-      'content': content,
-      'timestamp': timestamp.toIso8601String(),
-    };
-  }
-
-  /// 从JSON创建
-  factory ChatMessage.fromJson(Map<String, dynamic> json) {
-    return ChatMessage(
-      type: MessageType.values[json['type'] as int],
-      content: json['content'] as String,
-      timestamp: DateTime.parse(json['timestamp'] as String),
-    );
   }
 }

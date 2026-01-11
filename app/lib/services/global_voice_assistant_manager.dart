@@ -87,6 +87,10 @@ class ChatMessage {
   );
 }
 
+/// 命令处理回调类型
+/// 返回处理结果消息，如果返回null则使用内置处理
+typedef CommandProcessorCallback = Future<String?> Function(String command);
+
 /// 全局语音助手管理器
 ///
 /// 单例模式，管理：
@@ -128,6 +132,15 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   // 权限回调（由 UI 层设置）
   void Function(MicrophonePermissionStatus status)? onPermissionRequired;
+
+  // 命令处理回调（由 UI 层设置，用于集成 VoiceServiceCoordinator）
+  CommandProcessorCallback? _commandProcessor;
+
+  /// 设置命令处理回调
+  void setCommandProcessor(CommandProcessorCallback? processor) {
+    _commandProcessor = processor;
+    debugPrint('[GlobalVoiceAssistant] 命令处理器已${processor != null ? "设置" : "清除"}');
+  }
 
   // Getters
   FloatingBallState get ballState => _ballState;
@@ -295,11 +308,16 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   /// 停止录音并处理
   Future<void> stopRecording() async {
-    if (_ballState != FloatingBallState.recording) return;
+    debugPrint('[GlobalVoiceAssistant] stopRecording called, state=$_ballState');
+    if (_ballState != FloatingBallState.recording) {
+      debugPrint('[GlobalVoiceAssistant] 状态不是recording，忽略');
+      return;
+    }
 
     try {
       // 检查录音时长
       final duration = DateTime.now().difference(_recordingStartTime!);
+      debugPrint('[GlobalVoiceAssistant] 录音时长: ${duration.inMilliseconds}ms');
       if (duration.inMilliseconds < 500) {
         await _audioRecorder!.stop();
         setBallState(FloatingBallState.idle);
@@ -310,7 +328,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       setBallState(FloatingBallState.processing);
 
       // 停止录音
+      debugPrint('[GlobalVoiceAssistant] 正在停止录音...');
       final path = await _audioRecorder!.stop();
+      debugPrint('[GlobalVoiceAssistant] 录音已停止, path=$path');
 
       if (path == null || path.isEmpty) {
         _handleError('录音失败');
@@ -327,22 +347,39 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   /// 处理音频
   Future<void> _processAudio(String audioPath) async {
+    debugPrint('[GlobalVoiceAssistant] _processAudio: $audioPath');
     try {
       // 获取当前页面上下文
       final context = _contextService?.currentContext;
+      debugPrint('[GlobalVoiceAssistant] 当前上下文: $context');
 
       // 语音识别
       final audioFile = File(audioPath);
       if (!await audioFile.exists()) {
+        debugPrint('[GlobalVoiceAssistant] 录音文件不存在!');
         _handleError('录音文件不存在');
         return;
       }
+      debugPrint('[GlobalVoiceAssistant] 开始语音识别...');
 
       final result = await _recognitionEngine!.recognizeFromFile(audioFile);
+      debugPrint('[GlobalVoiceAssistant] 识别结果: ${result.text}, error: ${result.error}');
       final recognizedText = result.text;
 
       if (recognizedText.isEmpty) {
-        _handleError('未能识别语音内容');
+        // 检查是否有具体的错误信息
+        if (result.error != null && result.error!.isNotEmpty) {
+          final errorStr = result.error!.toLowerCase();
+          if (errorStr.contains('token') || errorStr.contains('认证')) {
+            _handleError('语音服务暂不可用，请稍后重试');
+          } else if (errorStr.contains('network') || errorStr.contains('网络')) {
+            _handleError('网络连接失败，请检查网络');
+          } else {
+            _handleError('未能识别语音内容');
+          }
+        } else {
+          _handleError('未能识别语音内容，请靠近麦克风说话');
+        }
         return;
       }
 
@@ -365,9 +402,14 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         }
       });
 
-      // 可选：TTS 播报
+      // 可选：TTS 播报（独立错误处理，防止TTS失败影响主流程）
       if (_ttsService != null && response.shouldSpeak) {
-        await _ttsService!.speak(response.message);
+        try {
+          await _ttsService!.speak(response.message);
+        } catch (ttsError) {
+          debugPrint('[GlobalVoiceAssistant] TTS播报失败（已忽略）: $ttsError');
+          // TTS 失败不影响主流程，只记录日志
+        }
       }
 
       // 清理临时文件
@@ -403,6 +445,23 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 获取上下文提示，用于增强理解
     final contextHint = _contextService?.getContextHint() ?? '';
     debugPrint('[GlobalVoiceAssistant] 上下文提示: $contextHint');
+
+    // 如果设置了命令处理器，优先使用它（集成 VoiceServiceCoordinator）
+    if (_commandProcessor != null) {
+      debugPrint('[GlobalVoiceAssistant] 使用外部命令处理器处理: $text');
+      try {
+        final result = await _commandProcessor!(text);
+        if (result != null && result.isNotEmpty) {
+          return _IntentResponse(
+            message: result,
+            shouldSpeak: true,
+          );
+        }
+      } catch (e) {
+        debugPrint('[GlobalVoiceAssistant] 外部命令处理器出错: $e');
+        // 出错时继续使用内置处理
+      }
+    }
 
     // 根据页面上下文增强处理
     if (context != null) {

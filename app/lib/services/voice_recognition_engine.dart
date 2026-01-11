@@ -35,26 +35,43 @@ class VoiceRecognitionEngine {
 
   /// ASR服务选择策略
   Future<ASRResult> transcribe(ProcessedAudio audio) async {
+    debugPrint('[VoiceRecognitionEngine] transcribe开始，音频大小: ${audio.data.length} bytes');
+
     // 1. 检测网络状态
     final hasNetwork = await _networkChecker.isOnline();
+    debugPrint('[VoiceRecognitionEngine] 网络状态: ${hasNetwork ? "在线" : "离线"}');
+    Object? onlineError;
 
     // 2. 选择ASR引擎
     if (hasNetwork && audio.duration.inSeconds < 60) {
       // 短音频 + 有网络：使用在线服务（更准确）
+      debugPrint('[VoiceRecognitionEngine] 使用阿里云在线ASR');
       try {
         final result = await _aliASR.transcribe(audio);
+        debugPrint('[VoiceRecognitionEngine] 阿里云ASR成功: ${result.text}');
         return _postProcess(result);
       } catch (e) {
-        // 在线服务失败，降级到本地
-        debugPrint('Online ASR failed, fallback to local: $e');
-        final result = await _whisper.transcribe(audio);
-        return _postProcess(result);
+        // 在线服务失败，记录错误并降级到本地
+        onlineError = e;
+        debugPrint('[VoiceRecognitionEngine] 阿里云ASR失败，降级到本地: $e');
       }
     } else {
-      // 长音频或无网络：使用本地Whisper
-      final result = await _whisper.transcribe(audio);
-      return _postProcess(result);
+      debugPrint('[VoiceRecognitionEngine] 跳过在线ASR (hasNetwork=$hasNetwork, duration=${audio.duration.inSeconds}s)');
     }
+
+    // 尝试本地识别（作为降级或无网络时的选择）
+    debugPrint('[VoiceRecognitionEngine] 尝试本地Whisper识别');
+    final result = await _whisper.transcribe(audio);
+    final processedResult = _postProcess(result);
+    debugPrint('[VoiceRecognitionEngine] 本地识别结果: ${processedResult.text}');
+
+    // 如果本地识别也返回空结果，且之前有在线错误，抛出原始错误
+    if (processedResult.text.isEmpty && onlineError != null) {
+      debugPrint('[VoiceRecognitionEngine] 本地识别为空且有在线错误，抛出原始错误');
+      throw onlineError;
+    }
+
+    return processedResult;
   }
 
   /// 流式识别（实时转写）
@@ -172,18 +189,55 @@ class VoiceRecognitionEngine {
   /// 从文件识别语音
   Future<FileRecognitionResult> recognizeFromFile(File file) async {
     try {
+      debugPrint('[VoiceRecognitionEngine] recognizeFromFile: ${file.path}');
+
       // 读取音频文件
       final bytes = await file.readAsBytes();
+      debugPrint('[VoiceRecognitionEngine] 文件大小: ${bytes.length} bytes');
+
+      // 如果是WAV文件，需要跳过WAV头部获取纯PCM数据
+      Uint8List pcmData;
+      if (file.path.toLowerCase().endsWith('.wav') && bytes.length > 44) {
+        // WAV文件头部是44字节，跳过它获取纯PCM数据
+        // 验证WAV头部
+        final riff = String.fromCharCodes(bytes.sublist(0, 4));
+        final wave = String.fromCharCodes(bytes.sublist(8, 12));
+        if (riff == 'RIFF' && wave == 'WAVE') {
+          // 找到data chunk的位置
+          int dataOffset = 12;
+          while (dataOffset < bytes.length - 8) {
+            final chunkId = String.fromCharCodes(bytes.sublist(dataOffset, dataOffset + 4));
+            final chunkSize = bytes.buffer.asByteData().getUint32(dataOffset + 4, Endian.little);
+            if (chunkId == 'data') {
+              dataOffset += 8; // 跳过chunk ID和size
+              pcmData = bytes.sublist(dataOffset, min(dataOffset + chunkSize, bytes.length));
+              debugPrint('[VoiceRecognitionEngine] WAV文件，提取PCM数据: ${pcmData.length} bytes');
+              break;
+            }
+            dataOffset += 8 + chunkSize;
+          }
+          pcmData = bytes.sublist(44); // 降级方案：直接跳过前44字节
+        } else {
+          pcmData = bytes;
+        }
+      } else {
+        pcmData = bytes;
+      }
+
+      // 计算音频时长（16000Hz, 16bit, 单声道）
+      final durationMs = (pcmData.length / 32).round(); // 32 bytes per ms
+      debugPrint('[VoiceRecognitionEngine] 估算时长: ${durationMs}ms');
 
       // 创建ProcessedAudio对象
       final audio = ProcessedAudio(
-        data: bytes,
+        data: pcmData,
         segments: [],
-        duration: const Duration(seconds: 30), // 估算
+        duration: Duration(milliseconds: durationMs),
       );
 
       // 使用现有的transcribe方法
       final result = await transcribe(audio);
+      debugPrint('[VoiceRecognitionEngine] 识别结果: ${result.text}');
 
       return FileRecognitionResult(
         isSuccess: true,
@@ -191,6 +245,7 @@ class VoiceRecognitionEngine {
         confidence: result.confidence,
       );
     } catch (e) {
+      debugPrint('[VoiceRecognitionEngine] 识别失败: $e');
       return FileRecognitionResult(
         isSuccess: false,
         error: e.toString(),
@@ -460,6 +515,8 @@ class AliCloudASRService {
   ///
   /// 支持自动重试、超时处理和错误恢复
   Future<ASRResult> transcribe(ProcessedAudio audio) async {
+    debugPrint('[AliCloudASR] transcribe开始，音频数据: ${audio.data.length} bytes, 时长: ${audio.duration.inMilliseconds}ms');
+
     // 检查音频时长是否超过最大限制
     if (audio.duration.inSeconds > ASRErrorHandlingConfig.maxRecognitionSeconds) {
       throw ASRException(
@@ -472,8 +529,11 @@ class AliCloudASRService {
       // 获取Token
       final VoiceTokenInfo tokenInfo;
       try {
+        debugPrint('[AliCloudASR] 正在获取Token...');
         tokenInfo = await _tokenService.getToken();
+        debugPrint('[AliCloudASR] Token获取成功: appKey=${tokenInfo.appKey}, asrRestUrl=${tokenInfo.asrRestUrl}');
       } on VoiceTokenException catch (e) {
+        debugPrint('[AliCloudASR] Token获取失败: ${e.message}');
         throw ASRException(
           'Token获取失败: ${e.message}',
           errorCode: ASRErrorCode.tokenFailed,
@@ -491,6 +551,9 @@ class AliCloudASRService {
         },
       );
 
+      debugPrint('[AliCloudASR] 请求URL: $uri');
+      debugPrint('[AliCloudASR] 发送音频数据: ${audio.data.length} bytes');
+
       // 发送音频数据
       final response = await _dio.postUri(
         uri,
@@ -505,25 +568,32 @@ class AliCloudASRService {
         ),
       );
 
+      debugPrint('[AliCloudASR] 响应状态码: ${response.statusCode}');
+      debugPrint('[AliCloudASR] 响应内容: ${response.data}');
+
       if (response.statusCode == 200) {
         final data = response.data;
 
         if (data['status'] == 20000000) {
           // 成功
+          final resultText = data['result'] ?? '';
+          debugPrint('[AliCloudASR] 识别成功: $resultText');
           return ASRResult(
-            text: data['result'] ?? '',
+            text: resultText,
             confidence: 0.9, // 阿里云一句话识别不返回置信度
             words: [],
             duration: audio.duration,
             isOffline: false,
           );
         } else {
+          debugPrint('[AliCloudASR] 识别失败: status=${data['status']}, message=${data['message']}');
           throw ASRException(
             'ASR失败: ${data['message']}',
             errorCode: ASRErrorCode.serverError,
           );
         }
       } else {
+        debugPrint('[AliCloudASR] HTTP请求失败: ${response.statusCode}');
         throw ASRException(
           'ASR请求失败: ${response.statusCode}',
           errorCode: ASRErrorCode.serverError,

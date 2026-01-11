@@ -437,14 +437,142 @@ class VoiceIntentRouter {
     return entities;
   }
 
+  /// 中文数字到阿拉伯数字的映射
+  static const _chineseDigits = {
+    '零': 0, '〇': 0,
+    '一': 1, '壹': 1,
+    '二': 2, '贰': 2, '两': 2,
+    '三': 3, '叁': 3,
+    '四': 4, '肆': 4,
+    '五': 5, '伍': 5,
+    '六': 6, '陆': 6,
+    '七': 7, '柒': 7,
+    '八': 8, '捌': 8,
+    '九': 9, '玖': 9,
+    '十': 10, '拾': 10,
+    '百': 100, '佰': 100,
+    '千': 1000, '仟': 1000,
+    '万': 10000, '萬': 10000,
+  };
+
+  /// 将中文数字转换为阿拉伯数字
+  ///
+  /// 支持：
+  /// - 基础数字：一二三四五六七八九十
+  /// - 大写数字：壹贰叁肆伍陆柒捌玖拾
+  /// - 复合数字：十五、二十三、一百二十五
+  /// - 混合数字：3百5十、1千5
+  static double? _parseChineseNumber(String input) {
+    if (input.isEmpty) return null;
+
+    // 先尝试直接解析阿拉伯数字
+    final directParse = double.tryParse(input);
+    if (directParse != null) return directParse;
+
+    // 检测是否包含中文数字
+    bool hasChineseDigit = _chineseDigits.keys.any((ch) => input.contains(ch));
+    if (!hasChineseDigit) return null;
+
+    try {
+      int result = 0;
+      int temp = 0;
+      int lastUnit = 1;
+
+      for (int i = 0; i < input.length; i++) {
+        final char = input[i];
+        final digit = _chineseDigits[char];
+
+        if (digit == null) {
+          // 遇到非数字字符，尝试解析阿拉伯数字
+          if (RegExp(r'\d').hasMatch(char)) {
+            // 找到连续的阿拉伯数字
+            String numStr = char;
+            while (i + 1 < input.length && RegExp(r'\d').hasMatch(input[i + 1])) {
+              i++;
+              numStr += input[i];
+            }
+            temp = int.parse(numStr);
+          }
+          continue;
+        }
+
+        if (digit >= 10) {
+          // 遇到单位（十、百、千、万）
+          if (temp == 0) temp = 1; // 处理"十五"这种情况（省略了一）
+
+          if (digit == 10000) {
+            // 万是一个大单位，需要特殊处理
+            result = (result + temp) * digit;
+            temp = 0;
+            lastUnit = 1;
+          } else {
+            temp *= digit;
+            if (digit < lastUnit || lastUnit == 1) {
+              result += temp;
+              temp = 0;
+            }
+            lastUnit = digit;
+          }
+        } else {
+          // 普通数字
+          temp = temp * 10 + digit;
+        }
+      }
+
+      result += temp;
+      return result > 0 ? result.toDouble() : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// 从文本中提取金额（支持中文数字和阿拉伯数字）
+  ///
+  /// 公开静态方法，可供其他类使用（如 BatchIntentAnalyzer）
+  static double? extractAmount(String input) {
+    // 优先匹配阿拉伯数字金额
+    final arabicMatch = RegExp(r'(\d+(?:\.\d+)?)\s*[元块钱]?').firstMatch(input);
+    if (arabicMatch != null) {
+      final amount = double.tryParse(arabicMatch.group(1)!);
+      if (amount != null && amount > 0) return amount;
+    }
+
+    // 匹配中文数字金额
+    // 模式：中文数字 + 可选的单位 + 元/块/钱
+    final chinesePatterns = [
+      // 完整中文数字，如"五十三元"
+      RegExp(r'([零一二三四五六七八九十百千万两壹贰叁肆伍陆柒捌玖拾佰仟萬〇]+)\s*[元块钱]'),
+      // 简单中文数字，如"五块"
+      RegExp(r'([一二三四五六七八九十两壹贰叁肆伍陆柒捌玖拾]+)\s*[元块钱]'),
+      // 混合数字，如"3百5十元"
+      RegExp(r'([\d零一二三四五六七八九十百千万两壹贰叁肆伍陆柒捌玖拾佰仟萬〇]+)\s*[元块钱]'),
+    ];
+
+    for (final pattern in chinesePatterns) {
+      final match = pattern.firstMatch(input);
+      if (match != null) {
+        final amount = _parseChineseNumber(match.group(1)!);
+        if (amount != null && amount > 0) return amount;
+      }
+    }
+
+    // 最后尝试：查找任何数字（阿拉伯或中文）
+    final anyNumberMatch = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(input);
+    if (anyNumberMatch != null) {
+      return double.tryParse(anyNumberMatch.group(1)!);
+    }
+
+    return null;
+  }
+
   /// 提取交易实体
   Future<Map<String, dynamic>> _extractTransactionEntities(String input) async {
     final entities = <String, dynamic>{};
 
-    // 提取金额
-    final amountMatch = RegExp(r'(\d+(?:\.\d+)?)\s*[元块钱]?').firstMatch(input);
-    if (amountMatch != null) {
-      entities['amount'] = double.tryParse(amountMatch.group(1)!) ?? 0.0;
+    // 提取金额（支持中文数字）
+    final amount = extractAmount(input);
+    if (amount != null) {
+      entities['amount'] = amount;
     }
 
     // 提取分类
