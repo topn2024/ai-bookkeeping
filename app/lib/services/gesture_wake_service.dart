@@ -51,8 +51,7 @@ class GestureWakeService {
   bool _wasPhoneFlat = false;
   DateTime? _lastFlipTime;
   static const Duration _flipCooldown = Duration(seconds: 3);
-  static const double _flatThreshold = 1.5;  // 平放阈值 (接近0)
-  static const double _flipThreshold = 8.0;  // 翻转阈值 (接近9.8)
+  static const double _flipThreshold = 8.0;  // 翻转阈值 (接近重力加速度9.8)
 
   /// 原生事件监听
   StreamSubscription? _nativeEventSubscription;
