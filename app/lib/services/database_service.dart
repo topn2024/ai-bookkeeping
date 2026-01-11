@@ -2632,7 +2632,7 @@ class DatabaseService implements IDatabaseService {
     bool isDeleted = false,
   }) async {
     final db = await database;
-    final id = '$entityType_$localId';
+    final id = '${entityType}_$localId';
 
     return await db.insert(
       'sync_metadata',
@@ -2812,7 +2812,7 @@ class DatabaseService implements IDatabaseService {
     required String serverId,
   }) async {
     final db = await database;
-    final id = '$entityType_$localId';
+    final id = '${entityType}_$localId';
     return await db.insert(
       'id_mapping',
       {

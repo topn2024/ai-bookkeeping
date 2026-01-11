@@ -371,7 +371,7 @@ class SocialComparisonService {
     for (final entry in benchmark.categoryBenchmarks.entries) {
       final category = entry.key;
       final avgAmount = entry.value;
-      final userAmount = userStats['$categoryExpense'] as double? ?? 0;
+      final userAmount = userStats['${category}Expense'] as double? ?? 0;
 
       if (userAmount == 0) continue;
 
