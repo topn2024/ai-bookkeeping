@@ -1,7 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/family_report.dart';
 import '../models/member.dart';
+import '../models/transaction.dart';
+import '../models/budget.dart';
 import '../services/family_report_service.dart';
+import 'transaction_provider.dart';
+import 'budget_provider.dart';
 
 /// FamilyReportService Provider
 final familyReportServiceProvider = Provider<FamilyReportService>((ref) {
@@ -43,6 +47,9 @@ class FamilyReportNotifier extends Notifier<FamilyReportState> {
   FamilyReportService get _reportService =>
       ref.read(familyReportServiceProvider);
 
+  List<Transaction> get _transactions => ref.read(transactionProvider);
+  List<Budget> get _budgets => ref.read(budgetProvider);
+
   /// 生成报表
   Future<void> generateReport({
     required String ledgerId,
@@ -59,6 +66,8 @@ class FamilyReportNotifier extends Notifier<FamilyReportState> {
         startDate: startDate,
         endDate: endDate,
         members: members,
+        transactions: _transactions,
+        budgets: _budgets,
       );
       state = state.copyWith(report: report, isLoading: false);
     } catch (e) {
@@ -80,6 +89,8 @@ class FamilyReportNotifier extends Notifier<FamilyReportState> {
         year: year,
         month: month,
         members: members,
+        transactions: _transactions,
+        budgets: _budgets,
       );
       state = state.copyWith(report: report, isLoading: false);
     } catch (e) {
@@ -99,6 +110,8 @@ class FamilyReportNotifier extends Notifier<FamilyReportState> {
         ledgerId: ledgerId,
         weekStart: weekStart,
         members: members,
+        transactions: _transactions,
+        budgets: _budgets,
       );
       state = state.copyWith(report: report, isLoading: false);
     } catch (e) {
@@ -118,6 +131,8 @@ class FamilyReportNotifier extends Notifier<FamilyReportState> {
         ledgerId: ledgerId,
         year: year,
         members: members,
+        transactions: _transactions,
+        budgets: _budgets,
       );
       state = state.copyWith(report: report, isLoading: false);
     } catch (e) {
@@ -180,12 +195,16 @@ final generateReportProvider =
     FutureProvider.family<FamilyFinancialReport, ReportParams>(
         (ref, params) async {
   final reportService = ref.watch(familyReportServiceProvider);
+  final transactions = ref.watch(transactionProvider);
+  final budgets = ref.watch(budgetProvider);
   return reportService.generateReport(
     ledgerId: params.ledgerId,
     periodType: params.periodType,
     startDate: params.startDate,
     endDate: params.endDate,
     members: params.members,
+    transactions: transactions,
+    budgets: budgets,
   );
 });
 
@@ -221,11 +240,15 @@ final monthlyReportProvider =
     FutureProvider.family<FamilyFinancialReport, MonthlyReportParams>(
         (ref, params) async {
   final reportService = ref.watch(familyReportServiceProvider);
+  final transactions = ref.watch(transactionProvider);
+  final budgets = ref.watch(budgetProvider);
   return reportService.generateMonthlyReport(
     ledgerId: params.ledgerId,
     year: params.year,
     month: params.month,
     members: params.members,
+    transactions: transactions,
+    budgets: budgets,
   );
 });
 

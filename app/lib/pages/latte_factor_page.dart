@@ -146,7 +146,9 @@ class LatteFactorPage extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: ElevatedButton.icon(
-                onPressed: () => _showSavingGoalDialog(context),
+                onPressed: displayCategories.isNotEmpty
+                    ? () => _showSavingGoalDialog(context, displayCategories)
+                    : null,
                 icon: const Icon(Icons.savings),
                 label: const Text('设置节约目标'),
                 style: ElevatedButton.styleFrom(
@@ -186,23 +188,36 @@ class LatteFactorPage extends ConsumerWidget {
     );
   }
 
-  void _showSavingGoalDialog(BuildContext context) {
+  void _showSavingGoalDialog(BuildContext context, List<LatteFactorCategory> categories) {
+    if (categories.isEmpty) return;
+
+    final topCategory = categories.first;
+    final suggestedReduction = (topCategory.weeklyCount * 0.3).ceil().clamp(1, topCategory.weeklyCount);
+    final monthlySaving = (topCategory.averageAmount * suggestedReduction * 4).round();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('设置节约目标'),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('选择您想要减少的消费类型和目标：'),
-            SizedBox(height: 16),
-            // 简化的目标设置
-            ListTile(
-              leading: Text('☕', style: TextStyle(fontSize: 24)),
-              title: Text('咖啡：每周减少2次'),
-              subtitle: Text('预计每月节省 ¥260'),
-              trailing: Icon(Icons.check_circle, color: Colors.green),
-            ),
+            const Text('基于您的消费习惯，建议：'),
+            const SizedBox(height: 16),
+            ...categories.take(3).map((cat) {
+              final reduction = (cat.weeklyCount * 0.3).ceil().clamp(1, cat.weeklyCount);
+              final saving = (cat.averageAmount * reduction * 4).round();
+              return ListTile(
+                leading: Text(cat.emoji, style: const TextStyle(fontSize: 24)),
+                title: Text('${cat.name}：每周减少$reduction次'),
+                subtitle: Text('预计每月节省 ¥$saving'),
+                trailing: cat == topCategory
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : Icon(Icons.radio_button_unchecked, color: Colors.grey[400]),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              );
+            }),
           ],
         ),
         actions: [
@@ -214,7 +229,7 @@ class LatteFactorPage extends ConsumerWidget {
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('节约目标已设置')),
+                SnackBar(content: Text('已设置目标：每周减少${topCategory.name}$suggestedReduction次，预计每月节省¥$monthlySaving')),
               );
             },
             child: const Text('确认'),

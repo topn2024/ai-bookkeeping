@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math' as math;
-
-// TODO: 连接到真实的 UserProfileService
-// import '../services/user_profile_service.dart';
+import '../providers/transaction_provider.dart';
+import '../providers/budget_provider.dart';
+import '../models/transaction.dart';
+import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 
 /// 用户画像可视化页面
 ///
@@ -20,68 +22,176 @@ class UserProfileVisualizationPage extends ConsumerStatefulWidget {
 
 class _UserProfileVisualizationPageState
     extends ConsumerState<UserProfileVisualizationPage> {
-  // 模拟用户画像数据（实际项目中从服务获取）
-  late UserProfileDisplayData _profileData;
-
   @override
   void initState() {
     super.initState();
-    _loadProfileData();
   }
 
-  void _loadProfileData() {
-    // TODO: 从 UserProfileService 加载真实数据
-    _profileData = UserProfileDisplayData(
-      personaType: '目标导向型',
-      personaDescription: '理性消费，注重规划',
+  UserProfileDisplayData _calculateProfileData() {
+    final transactions = ref.watch(transactionProvider);
+    final budgets = ref.watch(budgetProvider);
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+
+    // 筛选本月交易
+    final monthlyTransactions = transactions.where((t) =>
+        t.date.isAfter(monthStart.subtract(const Duration(days: 1)))).toList();
+
+    final expenses = monthlyTransactions.where((t) => t.type == TransactionType.expense).toList();
+    final incomes = monthlyTransactions.where((t) => t.type == TransactionType.income).toList();
+
+    final totalExpense = expenses.fold<double>(0, (sum, t) => sum + t.amount);
+    final totalIncome = incomes.fold<double>(0, (sum, t) => sum + t.amount);
+
+    // 计算储蓄率
+    final savingsRate = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome * 100).clamp(0, 100) : 0;
+
+    // 计算预算遵守度
+    final enabledBudgets = budgets.where((b) => b.isEnabled).toList();
+    double budgetCompliance = 100;
+    if (enabledBudgets.isNotEmpty) {
+      final categorySpent = <String, double>{};
+      for (final t in expenses) {
+        categorySpent[t.category] = (categorySpent[t.category] ?? 0) + t.amount;
+      }
+      int withinBudget = 0;
+      for (final budget in enabledBudgets) {
+        final categoryId = budget.categoryId;
+        if (categoryId == null) continue;
+        final spent = categorySpent[categoryId] ?? 0;
+        if (spent <= budget.amount) withinBudget++;
+      }
+      budgetCompliance = enabledBudgets.isNotEmpty
+          ? (withinBudget / enabledBudgets.length * 100)
+          : 100;
+    }
+
+    // 计算消费行为特征
+    final categoryCount = <String, int>{};
+    for (final t in expenses) {
+      categoryCount[t.category] = (categoryCount[t.category] ?? 0) + 1;
+    }
+
+    final behaviors = <BehaviorItem>[];
+    final sortedCategories = categoryCount.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    for (final entry in sortedCategories.take(6)) {
+      final category = DefaultCategories.findById(entry.key);
+      final frequency = _getFrequencyLabel(entry.value);
+      behaviors.add(BehaviorItem(
+        name: category?.localizedName ?? entry.key,
+        frequency: frequency,
+        icon: category?.icon ?? Icons.category,
+      ));
+    }
+
+    // 如果没有数据，显示默认行为
+    if (behaviors.isEmpty) {
+      behaviors.addAll(const [
+        BehaviorItem(name: '餐饮', frequency: '无数据', icon: Icons.restaurant),
+        BehaviorItem(name: '交通', frequency: '无数据', icon: Icons.directions_car),
+        BehaviorItem(name: '购物', frequency: '无数据', icon: Icons.shopping_bag),
+      ]);
+    }
+
+    // 计算能力雷达图数据
+    final recordingHabit = transactions.isNotEmpty ? 0.5 + (transactions.length / 100).clamp(0, 0.5) : 0.0;
+    final planningAbility = budgetCompliance / 100;
+    final savingsAwareness = savingsRate / 100;
+    final riskControl = budgetCompliance > 80 ? 0.8 : budgetCompliance / 100;
+    final rationalSpending = totalExpense > 0 && totalIncome > 0
+        ? (1 - (totalExpense / totalIncome)).clamp(0, 1)
+        : 0.5;
+
+    // 确定用户类型
+    String personaType;
+    String personaDescription;
+    if (savingsRate > 30 && budgetCompliance > 80) {
+      personaType = '目标导向型';
+      personaDescription = '理性消费，注重规划';
+    } else if (savingsRate > 20) {
+      personaType = '稳健型';
+      personaDescription = '收支平衡，稳步积累';
+    } else if (transactions.isEmpty) {
+      personaType = '新用户';
+      personaDescription = '开始记录，了解自己';
+    } else {
+      personaType = '探索型';
+      personaDescription = '积极尝试，寻找平衡';
+    }
+
+    // 生成推荐
+    final recommendations = <String>[];
+    if (savingsRate < 20 && totalIncome > 0) {
+      recommendations.add('您的储蓄率偏低，建议关注非必要支出');
+    }
+    if (budgetCompliance < 80 && enabledBudgets.isNotEmpty) {
+      recommendations.add('部分预算超支，建议调整消费计划');
+    }
+    if (sortedCategories.isNotEmpty) {
+      final topCategory = DefaultCategories.findById(sortedCategories.first.key);
+      recommendations.add('您在${topCategory?.localizedName ?? sortedCategories.first.key}类目消费较多，可关注相关优惠');
+    }
+    if (recommendations.isEmpty) {
+      recommendations.add('继续保持良好的记账习惯');
+    }
+
+    return UserProfileDisplayData(
+      personaType: personaType,
+      personaDescription: personaDescription,
       avatarColor: AppTheme.primaryColor,
-      demographics: [
-        DemographicTag(label: '26-35岁', icon: Icons.cake),
-        DemographicTag(label: '新一线', icon: Icons.location_city),
-        DemographicTag(label: '中等收入', icon: Icons.account_balance),
-        DemographicTag(label: '已婚', icon: Icons.family_restroom),
+      demographics: const [
+        DemographicTag(label: '用户', icon: Icons.person),
       ],
-      behaviors: [
-        BehaviorItem(name: '餐饮', frequency: '高频', icon: Icons.restaurant),
-        BehaviorItem(name: '交通', frequency: '中频', icon: Icons.directions_car),
-        BehaviorItem(name: '购物', frequency: '低频', icon: Icons.shopping_bag),
-        BehaviorItem(name: '娱乐', frequency: '偶发', icon: Icons.movie),
-        BehaviorItem(name: '医疗', frequency: '偶发', icon: Icons.medical_services),
-        BehaviorItem(name: '教育', frequency: '中频', icon: Icons.school),
-      ],
+      behaviors: behaviors,
       radarData: RadarChartData(
-        labels: ['理性消费', '规划能力', '储蓄意识', '风险控制', '记账习惯'],
-        values: [0.85, 0.72, 0.68, 0.78, 0.90],
+        labels: const ['理性消费', '规划能力', '储蓄意识', '风险控制', '记账习惯'],
+        values: [rationalSpending.toDouble(), planningAbility.toDouble(), savingsAwareness.toDouble(), riskControl.toDouble(), recordingHabit.toDouble()],
       ),
       healthIndicators: [
         HealthIndicator(
           name: '储蓄率',
-          value: 28,
+          value: savingsRate.round(),
           unit: '%',
-          status: IndicatorStatus.good,
+          status: savingsRate >= 30 ? IndicatorStatus.excellent
+              : savingsRate >= 20 ? IndicatorStatus.good
+              : savingsRate >= 10 ? IndicatorStatus.fair
+              : IndicatorStatus.poor,
         ),
         HealthIndicator(
           name: '预算遵守度',
-          value: 85,
+          value: budgetCompliance.round(),
           unit: '%',
-          status: IndicatorStatus.excellent,
+          status: budgetCompliance >= 90 ? IndicatorStatus.excellent
+              : budgetCompliance >= 70 ? IndicatorStatus.good
+              : budgetCompliance >= 50 ? IndicatorStatus.fair
+              : IndicatorStatus.poor,
         ),
         HealthIndicator(
-          name: '冲动消费指数',
-          value: 12,
-          unit: '%',
-          status: IndicatorStatus.excellent,
+          name: '记录笔数',
+          value: monthlyTransactions.length,
+          unit: '笔',
+          status: monthlyTransactions.length >= 30 ? IndicatorStatus.excellent
+              : monthlyTransactions.length >= 15 ? IndicatorStatus.good
+              : monthlyTransactions.length >= 5 ? IndicatorStatus.fair
+              : IndicatorStatus.poor,
         ),
       ],
-      recommendations: [
-        '基于您的消费习惯，建议关注"餐饮优化"功能',
-        '您的储蓄率表现良好，可考虑设置更高的储蓄目标',
-      ],
+      recommendations: recommendations,
     );
+  }
+
+  String _getFrequencyLabel(int count) {
+    if (count >= 20) return '高频';
+    if (count >= 10) return '中频';
+    if (count >= 5) return '低频';
+    return '偶发';
   }
 
   @override
   Widget build(BuildContext context) {
+    final profileData = _calculateProfileData();
     return Scaffold(
       appBar: AppBar(
         title: const Text('我的画像'),
@@ -89,9 +199,7 @@ class _UserProfileVisualizationPageState
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              setState(() {
-                _loadProfileData();
-              });
+              setState(() {});
             },
           ),
           IconButton(
@@ -104,32 +212,32 @@ class _UserProfileVisualizationPageState
         padding: const EdgeInsets.all(16),
         children: [
           // 用户头像与人格类型
-          _PersonaCard(data: _profileData),
+          _PersonaCard(data: profileData),
 
           const SizedBox(height: 20),
 
           // 人口统计学标签
-          _DemographicsSection(tags: _profileData.demographics),
+          _DemographicsSection(tags: profileData.demographics),
 
           const SizedBox(height: 20),
 
           // 消费行为特征网格
-          _BehaviorGrid(behaviors: _profileData.behaviors),
+          _BehaviorGrid(behaviors: profileData.behaviors),
 
           const SizedBox(height: 20),
 
           // 偏好雷达图
-          _PreferenceRadarChart(data: _profileData.radarData),
+          _PreferenceRadarChart(data: profileData.radarData),
 
           const SizedBox(height: 20),
 
           // 财务健康指标
-          _HealthIndicatorsSection(indicators: _profileData.healthIndicators),
+          _HealthIndicatorsSection(indicators: profileData.healthIndicators),
 
           const SizedBox(height: 20),
 
           // 个性化推荐
-          _RecommendationsSection(recommendations: _profileData.recommendations),
+          _RecommendationsSection(recommendations: profileData.recommendations),
 
           const SizedBox(height: 24),
         ],

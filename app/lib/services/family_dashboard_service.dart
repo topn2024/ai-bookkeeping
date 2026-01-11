@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/family_dashboard.dart';
 import '../models/member.dart';
 import '../models/transaction.dart';
+import '../models/budget.dart';
+import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
 
@@ -363,130 +366,137 @@ class FamilyDashboardService {
     String ledgerId,
     String period,
   ) async {
-    // 模拟数据
-    return [
-      BudgetStatus(
-        name: '餐饮',
-        type: 'category',
-        budgetAmount: 5000,
-        usedAmount: 4500,
-        remainingAmount: 500,
-        usagePercentage: 90,
-        statusColor: const Color(0xFFFF9800),
-      ),
-      BudgetStatus(
-        name: '购物',
-        type: 'category',
-        budgetAmount: 4000,
-        usedAmount: 3800,
-        remainingAmount: 200,
-        usagePercentage: 95,
-        statusColor: const Color(0xFFF44336),
-      ),
-      BudgetStatus(
-        name: '娱乐',
-        type: 'category',
-        budgetAmount: 2000,
-        usedAmount: 1500,
-        remainingAmount: 500,
-        usagePercentage: 75,
-        statusColor: const Color(0xFF4CAF50),
-      ),
-    ];
+    try {
+      final db = await _db.database;
+
+      // 解析期间
+      final periodDate = DateTime.parse('$period-01');
+      final startOfMonth = DateTime(periodDate.year, periodDate.month, 1);
+      final endOfMonth = DateTime(periodDate.year, periodDate.month + 1, 0, 23, 59, 59);
+
+      // 查询预算
+      final budgetResults = await db.query(
+        'budgets',
+        where: 'ledgerId = ? AND isEnabled = 1',
+        whereArgs: [ledgerId],
+      );
+
+      if (budgetResults.isEmpty) return [];
+
+      // 查询本期支出
+      final expenseResults = await db.query(
+        'transactions',
+        where: 'ledgerId = ? AND datetime >= ? AND datetime <= ? AND type = ?',
+        whereArgs: [
+          ledgerId,
+          startOfMonth.millisecondsSinceEpoch,
+          endOfMonth.millisecondsSinceEpoch,
+          TransactionType.expense.index,
+        ],
+      );
+
+      // 按分类汇总支出
+      final categorySpent = <String, double>{};
+      for (var row in expenseResults) {
+        final transaction = Transaction.fromMap(row);
+        categorySpent[transaction.category] =
+            (categorySpent[transaction.category] ?? 0) + transaction.amount;
+      }
+
+      // 生成预算状态
+      final statuses = <BudgetStatus>[];
+      for (var row in budgetResults) {
+        final budget = Budget.fromMap(row);
+        final categoryId = budget.categoryId;
+        if (categoryId == null) continue;
+
+        final spent = categorySpent[categoryId] ?? 0;
+        final remaining = budget.amount - spent;
+        final usagePercentage = budget.amount > 0 ? (spent / budget.amount * 100) : 0.0;
+
+        Color statusColor;
+        if (usagePercentage >= 90) {
+          statusColor = const Color(0xFFF44336);
+        } else if (usagePercentage >= 70) {
+          statusColor = const Color(0xFFFF9800);
+        } else {
+          statusColor = const Color(0xFF4CAF50);
+        }
+
+        final category = DefaultCategories.findById(categoryId);
+
+        statuses.add(BudgetStatus(
+          name: category?.localizedName ?? budget.name,
+          type: 'category',
+          budgetAmount: budget.amount,
+          usedAmount: spent,
+          remainingAmount: remaining > 0 ? remaining : 0,
+          usagePercentage: usagePercentage,
+          statusColor: statusColor,
+        ));
+      }
+
+      // 按使用率排序
+      statuses.sort((a, b) => b.usagePercentage.compareTo(a.usagePercentage));
+      return statuses.take(5).toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   /// 获取待处理分摊
+  /// 注意：分摊功能需要专门的数据表支持，目前返回空列表
   Future<List<PendingSplit>> _getPendingSplits(String ledgerId) async {
-    // 模拟数据
-    return [
-      PendingSplit(
-        splitId: 'split_1',
-        description: '周末聚餐',
-        totalAmount: 580,
-        pendingAmount: 290,
-        payerName: '小明',
-        participantCount: 4,
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-      PendingSplit(
-        splitId: 'split_2',
-        description: '水电费',
-        totalAmount: 320,
-        pendingAmount: 160,
-        payerName: '小红',
-        participantCount: 2,
-        createdAt: DateTime.now().subtract(const Duration(days: 5)),
-      ),
-    ];
+    // TODO: 需要实现分摊数据表后再完善此功能
+    return [];
   }
 
   /// 获取储蓄目标进度
+  /// 注意：储蓄目标功能需要专门的数据表支持，目前返回空列表
   Future<List<GoalProgress>> _getGoalProgresses(String ledgerId) async {
-    // 模拟数据
-    return [
-      GoalProgress(
-        goalId: 'goal_1',
-        name: '家庭旅行',
-        emoji: '✈️',
-        targetAmount: 20000,
-        currentAmount: 12500,
-        progressPercentage: 62.5,
-        deadline: DateTime.now().add(const Duration(days: 90)),
-        daysRemaining: 90,
-      ),
-      GoalProgress(
-        goalId: 'goal_2',
-        name: '新家电',
-        emoji: '📺',
-        targetAmount: 5000,
-        currentAmount: 3800,
-        progressPercentage: 76,
-        deadline: DateTime.now().add(const Duration(days: 30)),
-        daysRemaining: 30,
-      ),
-    ];
+    // TODO: 需要实现储蓄目标数据表后再完善此功能
+    return [];
   }
 
   /// 获取最近活动
   Future<List<FamilyActivity>> _getRecentActivities(String ledgerId) async {
-    // 模拟数据
-    return [
-      FamilyActivity(
-        id: 'activity_1',
-        type: FamilyActivityType.goalContribution,
-        description: '向「家庭旅行」贡献了一笔',
-        memberId: 'user_1',
-        memberName: '小明',
-        amount: 500,
-        createdAt: DateTime.now().subtract(const Duration(hours: 1)),
-      ),
-      FamilyActivity(
-        id: 'activity_2',
-        type: FamilyActivityType.transaction,
-        description: '记录了一笔餐饮支出',
-        memberId: 'user_2',
-        memberName: '小红',
-        amount: 128,
-        createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-      FamilyActivity(
-        id: 'activity_3',
-        type: FamilyActivityType.split,
-        description: '创建了「周末聚餐」分摊',
-        memberId: 'user_1',
-        memberName: '小明',
-        amount: 580,
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-      FamilyActivity(
-        id: 'activity_4',
-        type: FamilyActivityType.budgetAlert,
-        description: '购物预算已使用95%',
-        memberId: 'system',
-        memberName: '系统',
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-    ];
+    try {
+      final db = await _db.database;
+
+      // 查询最近10条交易
+      final results = await db.query(
+        'transactions',
+        where: 'ledgerId = ?',
+        whereArgs: [ledgerId],
+        orderBy: 'datetime DESC',
+        limit: 10,
+      );
+
+      final activities = <FamilyActivity>[];
+      for (var row in results) {
+        final transaction = Transaction.fromMap(row);
+        final category = DefaultCategories.findById(transaction.category);
+        final categoryName = category?.localizedName ?? transaction.category;
+
+        final description = transaction.type == TransactionType.expense
+            ? '记录了一笔$categoryName支出'
+            : '记录了一笔$categoryName收入';
+
+        activities.add(FamilyActivity(
+          id: transaction.id,
+          type: FamilyActivityType.transaction,
+          description: description,
+          memberId: 'user',
+          memberName: '成员',
+          amount: transaction.amount,
+          createdAt: transaction.date,
+        ));
+      }
+
+      return activities;
+    } catch (e) {
+      return [];
+    }
   }
 
   /// 获取快速统计
@@ -494,16 +504,101 @@ class FamilyDashboardService {
     required String ledgerId,
     required String period,
   }) async {
-    // 模拟数据
-    return QuickStats(
-      todayExpense: 156.5,
-      weekExpense: 1280,
-      monthExpense: 18500,
-      pendingSplitCount: 2,
-      pendingSplitAmount: 450,
-      activeGoalCount: 2,
-      budgetWarningCount: 1,
-    );
+    try {
+      final db = await _db.database;
+      final now = DateTime.now();
+
+      // 今日开始时间
+      final todayStart = DateTime(now.year, now.month, now.day);
+      // 本周开始时间（周一）
+      final weekStart = todayStart.subtract(Duration(days: now.weekday - 1));
+      // 本月开始时间
+      final monthStart = DateTime(now.year, now.month, 1);
+
+      // 查询今日支出
+      final todayResults = await db.query(
+        'transactions',
+        where: 'ledgerId = ? AND datetime >= ? AND type = ?',
+        whereArgs: [
+          ledgerId,
+          todayStart.millisecondsSinceEpoch,
+          TransactionType.expense.index,
+        ],
+      );
+      final todayExpense = todayResults.fold<double>(
+          0, (sum, row) => sum + (row['amount'] as num).toDouble());
+
+      // 查询本周支出
+      final weekResults = await db.query(
+        'transactions',
+        where: 'ledgerId = ? AND datetime >= ? AND type = ?',
+        whereArgs: [
+          ledgerId,
+          weekStart.millisecondsSinceEpoch,
+          TransactionType.expense.index,
+        ],
+      );
+      final weekExpense = weekResults.fold<double>(
+          0, (sum, row) => sum + (row['amount'] as num).toDouble());
+
+      // 查询本月支出
+      final monthResults = await db.query(
+        'transactions',
+        where: 'ledgerId = ? AND datetime >= ? AND type = ?',
+        whereArgs: [
+          ledgerId,
+          monthStart.millisecondsSinceEpoch,
+          TransactionType.expense.index,
+        ],
+      );
+      final monthExpense = monthResults.fold<double>(
+          0, (sum, row) => sum + (row['amount'] as num).toDouble());
+
+      // 查询预算预警数量
+      final budgetResults = await db.query(
+        'budgets',
+        where: 'ledgerId = ? AND isEnabled = 1',
+        whereArgs: [ledgerId],
+      );
+
+      int budgetWarningCount = 0;
+      final categorySpent = <String, double>{};
+      for (var row in monthResults) {
+        final category = row['category'] as String;
+        categorySpent[category] =
+            (categorySpent[category] ?? 0) + (row['amount'] as num).toDouble();
+      }
+
+      for (var row in budgetResults) {
+        final budget = Budget.fromMap(row);
+        final categoryId = budget.categoryId;
+        if (categoryId == null) continue;
+        final spent = categorySpent[categoryId] ?? 0;
+        if (budget.amount > 0 && spent / budget.amount >= 0.8) {
+          budgetWarningCount++;
+        }
+      }
+
+      return QuickStats(
+        todayExpense: todayExpense,
+        weekExpense: weekExpense,
+        monthExpense: monthExpense,
+        pendingSplitCount: 0, // 分摊功能待实现
+        pendingSplitAmount: 0,
+        activeGoalCount: 0, // 目标功能待实现
+        budgetWarningCount: budgetWarningCount,
+      );
+    } catch (e) {
+      return const QuickStats(
+        todayExpense: 0,
+        weekExpense: 0,
+        monthExpense: 0,
+        pendingSplitCount: 0,
+        pendingSplitAmount: 0,
+        activeGoalCount: 0,
+        budgetWarningCount: 0,
+      );
+    }
   }
 }
 

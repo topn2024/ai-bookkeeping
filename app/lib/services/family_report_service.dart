@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/family_report.dart';
 import '../models/member.dart';
+import '../models/transaction.dart';
+import '../models/budget.dart';
+import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 
 /// 家庭报表服务
 class FamilyReportService {
@@ -15,22 +19,24 @@ class FamilyReportService {
     required DateTime startDate,
     required DateTime endDate,
     required List<LedgerMember> members,
+    List<Transaction> transactions = const [],
+    List<Budget> budgets = const [],
   }) async {
     final title = _getReportTitle(periodType, startDate, endDate);
 
+    // 过滤时间范围内的交易
+    final periodTransactions = transactions.where((t) =>
+        t.date.isAfter(startDate.subtract(const Duration(days: 1))) &&
+        t.date.isBefore(endDate.add(const Duration(days: 1)))).toList();
+
     // 计算各项数据
-    final summary = await _calculateSummary(ledgerId, startDate, endDate);
-    final categoryAnalysis =
-        await _calculateCategoryAnalysis(ledgerId, startDate, endDate);
-    final memberAnalysis =
-        await _calculateMemberAnalysis(ledgerId, startDate, endDate, members);
-    final trendAnalysis =
-        await _calculateTrendAnalysis(ledgerId, startDate, endDate);
-    final budgetExecution =
-        await _calculateBudgetExecution(ledgerId, startDate, endDate);
-    final goalProgress =
-        await _calculateGoalProgress(ledgerId, startDate, endDate);
-    final insights = await _generateInsights(
+    final summary = _calculateSummary(periodTransactions, startDate, endDate);
+    final categoryAnalysis = _calculateCategoryAnalysis(periodTransactions);
+    final memberAnalysis = _calculateMemberAnalysis(periodTransactions, members);
+    final trendAnalysis = _calculateTrendAnalysis(periodTransactions, startDate, endDate);
+    final budgetExecution = _calculateBudgetExecution(periodTransactions, budgets);
+    final goalProgress = _calculateGoalProgress();
+    final insights = _generateInsights(
       summary: summary,
       categoryAnalysis: categoryAnalysis,
       trendAnalysis: trendAnalysis,
@@ -82,26 +88,35 @@ class FamilyReportService {
   }
 
   /// 计算收支汇总
-  Future<IncomeExpenseSummary> _calculateSummary(
-    String ledgerId,
+  IncomeExpenseSummary _calculateSummary(
+    List<Transaction> transactions,
     DateTime startDate,
     DateTime endDate,
-  ) async {
-    // 模拟数据
-    const totalIncome = 25000.0;
-    const totalExpense = 18500.0;
-    final netSavings = totalIncome - totalExpense;
-    final savingsRate = (netSavings / totalIncome * 100);
-    final days = endDate.difference(startDate).inDays + 1;
-    final avgDailyExpense = totalExpense / days;
+  ) {
+    final expenses = transactions.where((t) => t.type == TransactionType.expense);
+    final incomes = transactions.where((t) => t.type == TransactionType.income);
 
-    // 计算上期对比
+    final totalExpense = expenses.fold<double>(0, (sum, t) => sum + t.amount);
+    final totalIncome = incomes.fold<double>(0, (sum, t) => sum + t.amount);
+    final netSavings = totalIncome - totalExpense;
+    final savingsRate = totalIncome > 0 ? (netSavings / totalIncome * 100) : 0.0;
+    final days = endDate.difference(startDate).inDays + 1;
+    final avgDailyExpense = days > 0 ? totalExpense / days : 0.0;
+
+    // 计算中位数和最大支出
+    final expenseAmounts = expenses.map((t) => t.amount).toList()..sort();
+    final medianExpense = expenseAmounts.isNotEmpty
+        ? expenseAmounts[expenseAmounts.length ~/ 2]
+        : 0.0;
+    final maxExpense = expenseAmounts.isNotEmpty ? expenseAmounts.last : 0.0;
+
+    // 上期对比暂时使用空值（需要历史数据支持）
     final comparison = PeriodComparison(
-      previousExpense: 19500,
-      previousIncome: 24000,
-      expenseChange: -5.1,
-      incomeChange: 4.2,
-      savingsRateChange: 2.5,
+      previousExpense: 0,
+      previousIncome: 0,
+      expenseChange: 0,
+      incomeChange: 0,
+      savingsRateChange: 0,
     );
 
     return IncomeExpenseSummary(
@@ -109,126 +124,82 @@ class FamilyReportService {
       totalExpense: totalExpense,
       netSavings: netSavings,
       savingsRate: savingsRate,
-      transactionCount: 156,
+      transactionCount: transactions.length,
       avgDailyExpense: avgDailyExpense,
-      medianExpense: 85,
-      maxExpense: 2500,
+      medianExpense: medianExpense,
+      maxExpense: maxExpense,
       comparison: comparison,
     );
   }
 
   /// 计算分类分析
-  Future<List<CategoryAnalysis>> _calculateCategoryAnalysis(
-    String ledgerId,
-    DateTime startDate,
-    DateTime endDate,
-  ) async {
-    // 模拟数据
-    return [
-      CategoryAnalysis(
-        categoryId: 'food',
-        categoryName: '餐饮',
-        icon: Icons.restaurant,
-        color: const Color(0xFFFF9800),
-        amount: 4500,
-        percentage: 24.3,
-        transactionCount: 45,
-        avgTransaction: 100,
-        change: 3.2,
+  List<CategoryAnalysis> _calculateCategoryAnalysis(
+    List<Transaction> transactions,
+  ) {
+    final expenses = transactions.where((t) => t.type == TransactionType.expense);
+    final totalExpense = expenses.fold<double>(0, (sum, t) => sum + t.amount);
+
+    // 按分类汇总
+    final categoryData = <String, List<Transaction>>{};
+    for (final t in expenses) {
+      categoryData.putIfAbsent(t.category, () => []).add(t);
+    }
+
+    // 生成分类分析
+    final analysis = <CategoryAnalysis>[];
+    for (final entry in categoryData.entries) {
+      final categoryId = entry.key;
+      final categoryTransactions = entry.value;
+      final amount = categoryTransactions.fold<double>(0, (sum, t) => sum + t.amount);
+      final percentage = totalExpense > 0 ? (amount / totalExpense * 100) : 0.0;
+      final avgTransaction = categoryTransactions.isNotEmpty
+          ? amount / categoryTransactions.length
+          : 0.0;
+
+      final category = DefaultCategories.findById(categoryId);
+
+      analysis.add(CategoryAnalysis(
+        categoryId: categoryId,
+        categoryName: category?.localizedName ?? categoryId,
+        icon: category?.icon ?? Icons.category,
+        color: category?.color ?? Colors.grey,
+        amount: amount,
+        percentage: percentage,
+        transactionCount: categoryTransactions.length,
+        avgTransaction: avgTransaction,
+        change: null, // 需要历史数据支持
         isAbnormal: false,
-        subCategories: [
-          const SubCategoryBreakdown(
-            id: 'food_dining',
-            name: '外出就餐',
-            amount: 2800,
-            percentage: 62.2,
-          ),
-          const SubCategoryBreakdown(
-            id: 'food_groceries',
-            name: '食材采购',
-            amount: 1700,
-            percentage: 37.8,
-          ),
-        ],
-      ),
-      CategoryAnalysis(
-        categoryId: 'shopping',
-        categoryName: '购物',
-        icon: Icons.shopping_bag,
-        color: const Color(0xFFE91E63),
-        amount: 3800,
-        percentage: 20.5,
-        transactionCount: 28,
-        avgTransaction: 135.7,
-        change: -8.5,
-        isAbnormal: false,
-      ),
-      CategoryAnalysis(
-        categoryId: 'housing',
-        categoryName: '住房',
-        icon: Icons.home,
-        color: const Color(0xFF4CAF50),
-        amount: 5000,
-        percentage: 27.0,
-        transactionCount: 5,
-        avgTransaction: 1000,
-        change: 0,
-        isAbnormal: false,
-      ),
-      CategoryAnalysis(
-        categoryId: 'transport',
-        categoryName: '交通',
-        icon: Icons.directions_car,
-        color: const Color(0xFF2196F3),
-        amount: 2200,
-        percentage: 11.9,
-        transactionCount: 35,
-        avgTransaction: 62.9,
-        change: 1.5,
-        isAbnormal: false,
-      ),
-      CategoryAnalysis(
-        categoryId: 'entertainment',
-        categoryName: '娱乐',
-        icon: Icons.sports_esports,
-        color: const Color(0xFF9C27B0),
-        amount: 1500,
-        percentage: 8.1,
-        transactionCount: 20,
-        avgTransaction: 75,
-        change: 25.3,
-        isAbnormal: true,
-      ),
-    ];
+      ));
+    }
+
+    // 按金额排序
+    analysis.sort((a, b) => b.amount.compareTo(a.amount));
+    return analysis.take(10).toList();
   }
 
   /// 计算成员分析
-  Future<List<MemberAnalysis>> _calculateMemberAnalysis(
-    String ledgerId,
-    DateTime startDate,
-    DateTime endDate,
+  /// 注意：当前交易模型不包含成员ID，返回基于成员列表的空数据
+  List<MemberAnalysis> _calculateMemberAnalysis(
+    List<Transaction> transactions,
     List<LedgerMember> members,
-  ) async {
-    // 模拟数据
+  ) {
+    // 由于交易模型没有 memberId 字段，暂时返回成员基本信息
+    // TODO: 需要在交易模型中添加 memberId 字段以支持成员分析
     final analysis = <MemberAnalysis>[];
 
-    for (int i = 0; i < members.length; i++) {
-      final member = members[i];
-      final expense = 9250 - i * 2000;
-      final income = 12500 + i * 1500;
-
+    for (final member in members) {
       analysis.add(MemberAnalysis(
         memberId: member.userId,
         memberName: member.displayName,
         avatarUrl: member.avatarUrl,
-        income: income.toDouble(),
-        expense: expense.toDouble(),
-        netContribution: (income - expense).toDouble(),
-        transactionCount: 78 - i * 20,
-        expensePercentage: expense / 18500 * 100,
-        topCategories: ['餐饮', '购物', '交通'],
-        expenseChange: -3.2 + i * 2,
-        participationRate: 0.85 - i * 0.1,
+        income: 0,
+        expense: 0,
+        netContribution: 0,
+        transactionCount: 0,
+        expensePercentage: 0,
+        topCategories: [],
+        expenseChange: null,
+        participationRate: 0,
       ));
     }
 
@@ -236,164 +207,150 @@ class FamilyReportService {
   }
 
   /// 计算趋势分析
-  Future<TrendAnalysis> _calculateTrendAnalysis(
-    String ledgerId,
+  TrendAnalysis _calculateTrendAnalysis(
+    List<Transaction> transactions,
     DateTime startDate,
     DateTime endDate,
-  ) async {
+  ) {
+    // 按日期分组交易
+    final dailyExpenses = <DateTime, double>{};
+    final dailyIncomes = <DateTime, double>{};
+
+    for (final t in transactions) {
+      final date = DateTime(t.date.year, t.date.month, t.date.day);
+      if (t.type == TransactionType.expense) {
+        dailyExpenses[date] = (dailyExpenses[date] ?? 0) + t.amount;
+      } else if (t.type == TransactionType.income) {
+        dailyIncomes[date] = (dailyIncomes[date] ?? 0) + t.amount;
+      }
+    }
+
     // 生成趋势数据点
     final expenseTrend = <TrendDataPoint>[];
     final incomeTrend = <TrendDataPoint>[];
-    final savingsRateTrend = <TrendDataPoint>[];
 
     final days = endDate.difference(startDate).inDays + 1;
     for (int i = 0; i < days; i++) {
       final date = startDate.add(Duration(days: i));
-      final baseExpense = 500 + (i % 7) * 80;
-      final income = i == 0 || i == 15 ? 12500 : 0;
+      final dateKey = DateTime(date.year, date.month, date.day);
 
       expenseTrend.add(TrendDataPoint(
         date: date,
         label: '${date.month}/${date.day}',
-        value: baseExpense.toDouble(),
+        value: dailyExpenses[dateKey] ?? 0,
       ));
 
       incomeTrend.add(TrendDataPoint(
         date: date,
         label: '${date.month}/${date.day}',
-        value: income.toDouble(),
+        value: dailyIncomes[dateKey] ?? 0,
       ));
+    }
 
-      if (i % 7 == 6) {
-        // 周储蓄率
-        savingsRateTrend.add(TrendDataPoint(
-          date: date,
-          label: '第${(i ~/ 7) + 1}周',
-          value: 20 + (i % 10).toDouble(),
-        ));
+    // 计算趋势方向
+    TrendDirection direction = TrendDirection.stable;
+    if (expenseTrend.length >= 7) {
+      final firstWeek = expenseTrend.take(7).fold<double>(0, (sum, p) => sum + p.value);
+      final lastWeek = expenseTrend.skip(expenseTrend.length - 7).fold<double>(0, (sum, p) => sum + p.value);
+      if (lastWeek > firstWeek * 1.1) {
+        direction = TrendDirection.increasing;
+      } else if (lastWeek < firstWeek * 0.9) {
+        direction = TrendDirection.decreasing;
       }
     }
 
     return TrendAnalysis(
       expenseTrend: expenseTrend,
       incomeTrend: incomeTrend,
-      savingsRateTrend: savingsRateTrend,
-      expenseTrendDirection: TrendDirection.decreasing,
-      seasonalPatterns: [
-        const SeasonalPattern(
-          description: '周末支出较高',
-          period: '每周',
-          impact: 15.5,
-        ),
-        const SeasonalPattern(
-          description: '月初支出集中',
-          period: '每月',
-          impact: 8.2,
-        ),
-      ],
-      forecast: const TrendForecast(
-        nextPeriodExpense: 17800,
-        nextPeriodIncome: 26000,
-        confidence: 0.78,
-        description: '预计下月支出将略有下降，储蓄率有望提高',
-      ),
+      savingsRateTrend: [], // 需要更复杂的计算
+      expenseTrendDirection: direction,
+      seasonalPatterns: [], // 需要更多历史数据
+      forecast: null, // 需要预测模型
     );
   }
 
   /// 计算预算执行情况
-  Future<BudgetExecutionSummary?> _calculateBudgetExecution(
-    String ledgerId,
-    DateTime startDate,
-    DateTime endDate,
-  ) async {
-    // 模拟数据
+  BudgetExecutionSummary? _calculateBudgetExecution(
+    List<Transaction> transactions,
+    List<Budget> budgets,
+  ) {
+    final enabledBudgets = budgets.where((b) => b.isEnabled).toList();
+    if (enabledBudgets.isEmpty) return null;
+
+    // 按分类计算支出
+    final categorySpent = <String, double>{};
+    for (final t in transactions.where((t) => t.type == TransactionType.expense)) {
+      categorySpent[t.category] = (categorySpent[t.category] ?? 0) + t.amount;
+    }
+
+    // 计算各预算执行情况
+    final budgetExecutions = <BudgetExecution>[];
+    double totalBudget = 0;
+    double totalUsed = 0;
+    int overBudgetCount = 0;
+
+    for (final budget in enabledBudgets) {
+      final categoryId = budget.categoryId;
+      if (categoryId == null) continue;
+
+      final spent = categorySpent[categoryId] ?? 0;
+      final usageRate = budget.amount > 0 ? (spent / budget.amount * 100) : 0.0;
+      final isOverBudget = spent > budget.amount;
+
+      final category = DefaultCategories.findById(categoryId);
+
+      budgetExecutions.add(BudgetExecution(
+        name: category?.localizedName ?? categoryId,
+        budget: budget.amount,
+        used: spent,
+        usageRate: usageRate,
+        isOverBudget: isOverBudget,
+      ));
+
+      totalBudget += budget.amount;
+      totalUsed += spent;
+      if (isOverBudget) overBudgetCount++;
+    }
+
     return BudgetExecutionSummary(
-      totalBudget: 20000,
-      totalUsed: 18500,
-      remaining: 1500,
-      usageRate: 92.5,
-      budgets: [
-        const BudgetExecution(
-          name: '餐饮',
-          budget: 5000,
-          used: 4500,
-          usageRate: 90,
-          isOverBudget: false,
-        ),
-        const BudgetExecution(
-          name: '购物',
-          budget: 4000,
-          used: 3800,
-          usageRate: 95,
-          isOverBudget: false,
-        ),
-        const BudgetExecution(
-          name: '娱乐',
-          budget: 1200,
-          used: 1500,
-          usageRate: 125,
-          isOverBudget: true,
-        ),
-      ],
-      overBudgetCount: 1,
+      totalBudget: totalBudget,
+      totalUsed: totalUsed,
+      remaining: totalBudget - totalUsed,
+      usageRate: totalBudget > 0 ? (totalUsed / totalBudget * 100) : 0,
+      budgets: budgetExecutions,
+      overBudgetCount: overBudgetCount,
     );
   }
 
   /// 计算目标进度
-  Future<List<GoalProgressReport>> _calculateGoalProgress(
-    String ledgerId,
-    DateTime startDate,
-    DateTime endDate,
-  ) async {
-    // 模拟数据
-    return [
-      GoalProgressReport(
-        goalId: 'goal_1',
-        goalName: '家庭旅行',
-        emoji: '✈️',
-        targetAmount: 20000,
-        currentAmount: 12500,
-        progressPercentage: 62.5,
-        periodContribution: 2500,
-        deadline: DateTime.now().add(const Duration(days: 90)),
-        isOnTrack: true,
-      ),
-      GoalProgressReport(
-        goalId: 'goal_2',
-        goalName: '新家电',
-        emoji: '📺',
-        targetAmount: 5000,
-        currentAmount: 3800,
-        progressPercentage: 76,
-        periodContribution: 800,
-        deadline: DateTime.now().add(const Duration(days: 30)),
-        isOnTrack: false,
-      ),
-    ];
+  /// 注意：目标数据需要从外部传入，目前返回空列表
+  List<GoalProgressReport> _calculateGoalProgress() {
+    // TODO: 需要传入储蓄目标数据
+    return [];
   }
 
   /// 生成财务洞察
-  Future<List<FinancialInsight>> _generateInsights({
+  List<FinancialInsight> _generateInsights({
     required IncomeExpenseSummary summary,
     required List<CategoryAnalysis> categoryAnalysis,
     required TrendAnalysis trendAnalysis,
-  }) async {
+  }) {
     final insights = <FinancialInsight>[];
 
     // 储蓄率分析
     if (summary.savingsRate >= 30) {
-      insights.add(const FinancialInsight(
+      insights.add(FinancialInsight(
         type: InsightType.achievement,
         title: '储蓄率优秀',
-        description: '本月储蓄率达到26%，高于平均水平',
+        description: '本期储蓄率达到${summary.savingsRate.toStringAsFixed(1)}%，高于平均水平',
         suggestion: '继续保持良好的储蓄习惯',
         importance: InsightImportance.medium,
       ));
     } else if (summary.savingsRate < 10) {
-      insights.add(const FinancialInsight(
+      insights.add(FinancialInsight(
         type: InsightType.warning,
         title: '储蓄率偏低',
-        description: '本月储蓄率较低，建议关注支出',
+        description: '本期储蓄率为${summary.savingsRate.toStringAsFixed(1)}%，建议关注支出',
         suggestion: '建议检查可削减的非必要支出',
         importance: InsightImportance.high,
       ));
@@ -401,11 +358,11 @@ class FamilyReportService {
 
     // 异常支出分析
     for (final category in categoryAnalysis) {
-      if (category.isAbnormal) {
+      if (category.isAbnormal && category.change != null) {
         insights.add(FinancialInsight(
           type: InsightType.anomaly,
           title: '${category.categoryName}支出异常增长',
-          description: '${category.categoryName}支出比上月增长${category.change?.toStringAsFixed(1)}%',
+          description: '${category.categoryName}支出比上期增长${category.change!.toStringAsFixed(1)}%',
           suggestion: '建议检查是否有不必要的支出',
           importance: InsightImportance.high,
           data: {
@@ -422,6 +379,13 @@ class FamilyReportService {
         type: InsightType.trend,
         title: '支出呈下降趋势',
         description: '近期支出整体呈下降趋势，财务状况改善',
+        importance: InsightImportance.medium,
+      ));
+    } else if (trendAnalysis.expenseTrendDirection == TrendDirection.increasing) {
+      insights.add(const FinancialInsight(
+        type: InsightType.warning,
+        title: '支出呈上升趋势',
+        description: '近期支出整体呈上升趋势，建议关注',
         importance: InsightImportance.medium,
       ));
     }
@@ -445,6 +409,8 @@ class FamilyReportService {
     required int year,
     required int month,
     required List<LedgerMember> members,
+    List<Transaction> transactions = const [],
+    List<Budget> budgets = const [],
   }) async {
     final startDate = DateTime(year, month, 1);
     final endDate = DateTime(year, month + 1, 0);
@@ -455,6 +421,8 @@ class FamilyReportService {
       startDate: startDate,
       endDate: endDate,
       members: members,
+      transactions: transactions,
+      budgets: budgets,
     );
   }
 
@@ -463,6 +431,8 @@ class FamilyReportService {
     required String ledgerId,
     required DateTime weekStart,
     required List<LedgerMember> members,
+    List<Transaction> transactions = const [],
+    List<Budget> budgets = const [],
   }) async {
     final endDate = weekStart.add(const Duration(days: 6));
 
@@ -472,6 +442,8 @@ class FamilyReportService {
       startDate: weekStart,
       endDate: endDate,
       members: members,
+      transactions: transactions,
+      budgets: budgets,
     );
   }
 
@@ -480,6 +452,8 @@ class FamilyReportService {
     required String ledgerId,
     required int year,
     required List<LedgerMember> members,
+    List<Transaction> transactions = const [],
+    List<Budget> budgets = const [],
   }) async {
     final startDate = DateTime(year, 1, 1);
     final endDate = DateTime(year, 12, 31);
@@ -490,6 +464,8 @@ class FamilyReportService {
       startDate: startDate,
       endDate: endDate,
       members: members,
+      transactions: transactions,
+      budgets: budgets,
     );
   }
 }

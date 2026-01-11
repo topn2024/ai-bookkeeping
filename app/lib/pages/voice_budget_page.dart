@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/budget_provider.dart';
+import '../providers/transaction_provider.dart';
+import '../models/transaction.dart';
+import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 
 /// 6.14 语音预算查询页面
 class VoiceBudgetPage extends ConsumerStatefulWidget {
@@ -112,6 +117,75 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
   }
 
   Widget _buildAssistantBubble() {
+    final budgets = ref.watch(budgetProvider);
+    final monthlyExpense = ref.watch(monthlyExpenseProvider);
+    final transactions = ref.watch(transactionProvider);
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+
+    // 计算总预算
+    final enabledBudgets = budgets.where((b) => b.isEnabled).toList();
+    final totalBudget = enabledBudgets.fold<double>(0, (sum, b) => sum + b.amount);
+    final remaining = totalBudget - monthlyExpense;
+    final usagePercent = totalBudget > 0 ? monthlyExpense / totalBudget : 0.0;
+
+    // 计算剩余天数
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final remainingDays = daysInMonth - now.day + 1;
+
+    // 按分类计算支出
+    final monthlyTransactions = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.date.isAfter(monthStart.subtract(const Duration(days: 1)))).toList();
+
+    final categorySpent = <String, double>{};
+    for (final t in monthlyTransactions) {
+      categorySpent[t.category] = (categorySpent[t.category] ?? 0) + t.amount;
+    }
+
+    // 生成分类预算数据
+    final categoryBudgets = <_CategoryBudgetData>[];
+    String? warningMessage;
+    double maxOverspentPercent = 0;
+    String? maxOverspentCategory;
+
+    for (final budget in enabledBudgets.take(4)) {
+      final categoryId = budget.categoryId;
+      if (categoryId == null) continue; // Skip total budget
+
+      final spent = categorySpent[categoryId] ?? 0;
+      final budgetRemaining = budget.amount - spent;
+      final percent = budget.amount > 0 ? spent / budget.amount : 0.0;
+
+      final category = DefaultCategories.findById(categoryId);
+      final emoji = _getCategoryEmoji(categoryId);
+      final name = category?.localizedName ?? categoryId;
+
+      Color color;
+      if (percent > 0.8) {
+        color = AppTheme.errorColor;
+        if (percent > maxOverspentPercent) {
+          maxOverspentPercent = percent;
+          maxOverspentCategory = name;
+        }
+      } else if (percent > 0.6) {
+        color = AppTheme.warningColor;
+      } else {
+        color = AppTheme.successColor;
+      }
+
+      categoryBudgets.add(_CategoryBudgetData(
+        name: '$emoji $name',
+        total: budget.amount,
+        remaining: budgetRemaining > 0 ? budgetRemaining : 0,
+        color: color,
+      ));
+    }
+
+    if (maxOverspentCategory != null) {
+      warningMessage = '$maxOverspentCategory预算已用${(maxOverspentPercent * 100).round()}%，建议本月减少相关支出';
+    }
+
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -168,136 +242,165 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '总预算',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondaryColor,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            '¥5,000.00',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+              child: totalBudget == 0
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text('暂未设置预算，请先设置月度预算'),
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '剩余',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondaryColor,
+                    )
+                  : Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '总预算',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textSecondaryColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '¥${totalBudget.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '¥2,180.50',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.successColor,
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '剩余',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textSecondaryColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '¥${remaining > 0 ? remaining.toStringAsFixed(2) : '0.00'}',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w600,
+                                    color: remaining > 0 ? AppTheme.successColor : AppTheme.errorColor,
+                                  ),
+                                ),
+                              ],
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // 进度条
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: usagePercent.clamp(0.0, 1.0),
+                            backgroundColor: Colors.white,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              usagePercent > 0.8 ? AppTheme.errorColor : AppTheme.primaryColor,
+                            ),
+                            minHeight: 8,
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // 进度条
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: 0.564,
-                      backgroundColor: Colors.white,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppTheme.primaryColor,
-                      ),
-                      minHeight: 8,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '已使用 ${(usagePercent * 100).toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textSecondaryColor,
+                              ),
+                            ),
+                            Text(
+                              '还剩 $remainingDays 天',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textSecondaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '已使用 56.4%',
+            ),
+            if (categoryBudgets.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              // 分类预算
+              const Text(
+                '各分类剩余',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...categoryBudgets.map((data) => _buildCategoryBudget(
+                    data.name,
+                    data.total,
+                    data.remaining,
+                    data.color,
+                  )),
+            ],
+            if (warningMessage != null) ...[
+              const SizedBox(height: 16),
+              // AI建议
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.warningColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.lightbulb_outline,
+                      color: AppTheme.warningColor,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        warningMessage,
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppTheme.textSecondaryColor,
+                          color: AppTheme.warningColor,
                         ),
-                      ),
-                      Text(
-                        '还剩 12 天',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            // 分类预算
-            const Text(
-              '各分类剩余',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildCategoryBudget('🍜 餐饮', 1200, 720, AppTheme.warningColor),
-            _buildCategoryBudget('🚗 交通', 800, 520, AppTheme.successColor),
-            _buildCategoryBudget('🛒 购物', 1500, 280, AppTheme.errorColor),
-            _buildCategoryBudget('🎬 娱乐', 500, 380, AppTheme.successColor),
-            const SizedBox(height: 16),
-            // AI建议
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.warningColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.lightbulb_outline,
-                    color: AppTheme.warningColor,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '购物预算已用81%，建议本月减少非必要购物',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.warningColor,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  String _getCategoryEmoji(String categoryId) {
+    const emojiMap = {
+      'food': '🍜',
+      'transport': '🚗',
+      'shopping': '🛒',
+      'entertainment': '🎬',
+      'housing': '🏠',
+      'medical': '🏥',
+      'education': '📚',
+      'travel': '✈️',
+      'utilities': '💡',
+      'clothing': '👔',
+    };
+    return emojiMap[categoryId] ?? '📝';
   }
 
   Widget _buildCategoryBudget(
@@ -473,4 +576,19 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
       ),
     );
   }
+}
+
+/// Helper class for category budget data
+class _CategoryBudgetData {
+  final String name;
+  final double total;
+  final double remaining;
+  final Color color;
+
+  _CategoryBudgetData({
+    required this.name,
+    required this.total,
+    required this.remaining,
+    required this.color,
+  });
 }

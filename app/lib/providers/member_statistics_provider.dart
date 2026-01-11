@@ -213,8 +213,8 @@ class MemberStatisticsNotifier extends Notifier<MemberStatisticsState> {
         .toList();
 
     // 计算每个成员的统计数据
-    // 注意：实际应用中，交易应该关联到成员ID
-    // 这里使用模拟数据演示功能
+    // 注意：当前Transaction模型不包含memberId字段，无法按成员统计
+    // TODO: 需要在Transaction模型中添加memberId字段以支持成员统计
     final memberStats = <MemberSpendingStats>[];
     final groupCategoryBreakdown = <String, double>{};
     double totalGroupExpense = 0;
@@ -224,21 +224,16 @@ class MemberStatisticsNotifier extends Notifier<MemberStatisticsState> {
       // 获取成员预算
       final budget = budgets.where((b) => b.memberId == member.id).firstOrNull;
 
-      // 模拟数据：根据成员角色分配不同的消费金额
-      // 实际实现时应该根据交易记录中的memberId来统计
-      final mockExpense = _getMockExpenseForMember(member, dateRange);
-      final mockIncome = _getMockIncomeForMember(member, dateRange);
-      final mockCategories = _getMockCategoriesForMember(member);
-
+      // 由于Transaction模型没有memberId字段，暂时返回基于预算的数据或零值
       final stats = MemberSpendingStats(
         memberId: member.id,
         memberName: member.userName,
         role: member.role,
-        totalExpense: budget?.currentSpent ?? mockExpense,
-        totalIncome: mockIncome,
-        netAmount: mockIncome - (budget?.currentSpent ?? mockExpense),
-        transactionCount: (mockExpense / 50).round(),
-        categoryBreakdown: mockCategories,
+        totalExpense: budget?.currentSpent ?? 0,
+        totalIncome: 0,
+        netAmount: -(budget?.currentSpent ?? 0),
+        transactionCount: 0,
+        categoryBreakdown: const {},
         budgetLimit: budget?.monthlyLimit ?? 0,
         budgetUsage: budget?.usagePercent ?? 0,
       );
@@ -246,12 +241,6 @@ class MemberStatisticsNotifier extends Notifier<MemberStatisticsState> {
       memberStats.add(stats);
       totalGroupExpense += stats.totalExpense;
       totalGroupIncome += stats.totalIncome;
-
-      // 合并分类统计
-      for (final entry in stats.categoryBreakdown.entries) {
-        groupCategoryBreakdown[entry.key] =
-            (groupCategoryBreakdown[entry.key] ?? 0) + entry.value;
-      }
     }
 
     // 找出最高消费者和最节省者
@@ -281,40 +270,6 @@ class MemberStatisticsNotifier extends Notifier<MemberStatisticsState> {
       comparisonData: comparisonData,
       isLoading: false,
     );
-  }
-
-  // 模拟数据生成方法
-  double _getMockExpenseForMember(LedgerMember member, DateTimeRange range) {
-    final days = range.end.difference(range.start).inDays + 1;
-    final baseDaily = switch (member.role) {
-      MemberRole.owner => 150.0,
-      MemberRole.admin => 120.0,
-      MemberRole.editor => 100.0,
-      MemberRole.viewer => 80.0,
-    };
-    return baseDaily * days * (0.8 + (member.id.hashCode % 40) / 100);
-  }
-
-  double _getMockIncomeForMember(LedgerMember member, DateTimeRange range) {
-    final days = range.end.difference(range.start).inDays + 1;
-    if (days < 28) return 0; // 只有月度才有收入
-    return switch (member.role) {
-      MemberRole.owner => 15000.0,
-      MemberRole.admin => 12000.0,
-      MemberRole.editor => 10000.0,
-      MemberRole.viewer => 8000.0,
-    };
-  }
-
-  Map<String, double> _getMockCategoriesForMember(LedgerMember member) {
-    final base = member.id.hashCode % 1000;
-    return {
-      '餐饮': 800.0 + base * 0.3,
-      '交通': 300.0 + base * 0.1,
-      '购物': 500.0 + base * 0.2,
-      '娱乐': 200.0 + base * 0.1,
-      '其他': 100.0 + base * 0.05,
-    };
   }
 
   void refresh() {
