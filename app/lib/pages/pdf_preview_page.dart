@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import '../theme/app_theme.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 
 /// PDF导出预览页面
 /// 原型设计 5.05：PDF导出预览

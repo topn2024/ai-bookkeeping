@@ -7,6 +7,7 @@ import '../models/transaction.dart';
 import '../providers/recurring_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/account_provider.dart';
+import '../extensions/extensions.dart';
 import '../theme/app_theme.dart';
 
 class RecurringManagementPage extends ConsumerWidget {

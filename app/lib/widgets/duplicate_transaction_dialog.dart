@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 import '../services/duplicate_detection_service.dart';
 import '../theme/app_theme.dart';
 

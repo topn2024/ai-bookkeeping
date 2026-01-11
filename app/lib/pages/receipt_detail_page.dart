@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
 import '../models/transaction.dart';
-import '../services/database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 
 /// 商品明细项
 class ReceiptItem {
@@ -631,7 +632,7 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
 
   /// 确认记账
   Future<void> _confirmBookkeeping() async {
-    final db = DatabaseService();
+    final db = sl<IDatabaseService>();
 
     // 创建交易记录
     final transaction = Transaction(

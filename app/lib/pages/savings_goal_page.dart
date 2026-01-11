@@ -5,6 +5,7 @@ import '../models/savings_goal.dart';
 import '../models/category.dart';
 import '../providers/savings_goal_provider.dart';
 import '../providers/category_provider.dart';
+import '../extensions/category_extensions.dart';
 import 'vault_overview_page.dart';
 
 class SavingsGoalPage extends ConsumerWidget {

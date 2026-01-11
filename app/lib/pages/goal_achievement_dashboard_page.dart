@@ -4,11 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math' as math;
 
 import '../services/goal_achievement_service.dart';
-import '../services/database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 
 /// 目标达成服务 Provider
 final goalAchievementServiceProvider = Provider<GoalAchievementService>((ref) {
-  return GoalAchievementService(DatabaseService());
+  // 通过服务定位器获取数据库服务实例
+  final dbService = sl<IDatabaseService>();
+  return GoalAchievementService(dbService);
 });
 
 /// 目标达成概览 Provider

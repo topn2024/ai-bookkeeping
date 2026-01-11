@@ -8,6 +8,7 @@ import '../providers/transaction_provider.dart';
 import '../providers/investment_provider.dart';
 import '../providers/debt_provider.dart';
 import '../models/transaction.dart';
+import '../extensions/account_extensions.dart';
 
 class AssetOverviewPage extends ConsumerStatefulWidget {
   const AssetOverviewPage({super.key});

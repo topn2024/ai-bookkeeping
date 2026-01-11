@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/budget_vault.dart';
-import '../services/database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../services/allocation_service.dart';
 import 'transaction_provider.dart';
 
@@ -88,14 +89,15 @@ class BudgetVaultState {
 
 /// 小金库状态管理 Provider
 class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
-  late final DatabaseService _db;
+  late final IDatabaseService _db;
   late final AllocationService _allocationService;
 
   String _currentLedgerId = 'default';
 
   @override
   BudgetVaultState build() {
-    _db = DatabaseService();
+    // 通过服务定位器获取数据库服务
+    _db = sl<IDatabaseService>();
     _allocationService = AllocationService();
 
     // 初始加载（带错误处理）

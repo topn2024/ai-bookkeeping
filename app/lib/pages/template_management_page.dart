@@ -6,6 +6,7 @@ import '../models/transaction.dart';
 import '../providers/template_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/account_provider.dart';
+import '../extensions/extensions.dart';
 import '../theme/app_theme.dart';
 
 class TemplateManagementPage extends ConsumerWidget {

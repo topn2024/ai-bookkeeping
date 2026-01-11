@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../providers/transaction_provider.dart';
+import '../../extensions/category_extensions.dart';
 
 /// 月度报告页面
 /// 原型设计 7.01：月度报告

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../services/voice_service_coordinator.dart';
-import '../services/database_service.dart';
 import '../services/voice_recognition_engine.dart';
 import '../services/tts_service.dart';
 import '../services/voice/entity_disambiguation_service.dart';
@@ -16,6 +17,8 @@ import '../services/voice_feedback_system.dart';
 /// ChangeNotifierProvider for reactive state management.
 final voiceServiceCoordinatorProvider = ChangeNotifierProvider<VoiceServiceCoordinator>((ref) {
   final ttsService = TTSService();
+  // 通过服务定位器获取数据库服务
+  final databaseService = sl<IDatabaseService>();
 
   final coordinator = VoiceServiceCoordinator(
     recognitionEngine: VoiceRecognitionEngine(),
@@ -26,7 +29,7 @@ final voiceServiceCoordinatorProvider = ChangeNotifierProvider<VoiceServiceCoord
     navigationService: VoiceNavigationService(),
     intentRouter: VoiceIntentRouter(),
     feedbackSystem: VoiceFeedbackSystem(ttsService: ttsService),
-    databaseService: DatabaseService(),
+    databaseService: databaseService,
   );
 
   // Ensure proper cleanup when provider is disposed

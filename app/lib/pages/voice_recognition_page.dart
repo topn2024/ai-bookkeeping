@@ -13,6 +13,7 @@ import '../providers/transaction_provider.dart';
 import '../services/ai_service.dart';
 import '../services/source_file_service.dart';
 import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 import '../models/transaction.dart';
 import '../widgets/duplicate_transaction_dialog.dart';
 import '../services/category_localization_service.dart';

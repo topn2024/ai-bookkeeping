@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/result.dart';
-import '../../services/database_service.dart';
+import '../../core/di/service_locator.dart';
+import '../../core/contracts/i_database_service.dart';
 import '../../services/offline_queue_service.dart';
 import '../../services/auto_sync_service.dart';
 
@@ -60,8 +61,8 @@ class CrudState<T> {
 /// }
 /// ```
 abstract class CrudNotifier<T, ID> extends Notifier<CrudState<T>> {
-  /// 数据库服务实例
-  DatabaseService get db => DatabaseService();
+  /// 数据库服务实例（通过服务定位器获取）
+  IDatabaseService get db => sl<IDatabaseService>();
   OfflineQueueService get _offlineQueue => OfflineQueueService();
 
   /// 表名（用于日志和错误信息）
@@ -282,7 +283,8 @@ abstract class CrudNotifier<T, ID> extends Notifier<CrudState<T>> {
 /// 适用于不需要 isLoading/error 状态的简单场景
 /// 自动集成同步钩子，所有CRUD操作都会标记为待同步并触发自动同步
 abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
-  DatabaseService get db => DatabaseService();
+  /// 数据库服务实例（通过服务定位器获取）
+  IDatabaseService get db => sl<IDatabaseService>();
   OfflineQueueService get _offlineQueue => OfflineQueueService();
   AutoSyncService get _autoSync => AutoSyncService();
 

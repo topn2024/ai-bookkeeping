@@ -5,6 +5,7 @@ import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../providers/transaction_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../extensions/category_extensions.dart';
 
 /// 分类饼图下钻页面
 /// 原型设计 7.05：分类饼图下钻

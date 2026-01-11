@@ -3,7 +3,8 @@ import '../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/budget_vault.dart';
 import '../services/vault_repository.dart';
-import '../services/database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../providers/ledger_context_provider.dart';
 import '../providers/budget_vault_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -550,7 +551,7 @@ class _VaultCreatePageState extends ConsumerState<VaultCreatePage> {
     );
 
     try {
-      final db = await DatabaseService().database;
+      final db = await sl<IDatabaseService>().database;
       final repository = VaultRepository(db);
       await repository.create(vault);
 

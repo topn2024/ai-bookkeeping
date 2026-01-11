@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/budget_vault.dart';
-import '../services/database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import 'vault_create_page.dart';
 import 'transaction_list_page.dart';
 
@@ -34,7 +35,7 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
   }
 
   Future<void> _loadRealTransactions() async {
-    final db = DatabaseService();
+    final db = sl<IDatabaseService>();
     final allocations = await db.getVaultAllocations(widget.vault.id);
     final transfers = await db.getVaultTransfers(widget.vault.id);
 

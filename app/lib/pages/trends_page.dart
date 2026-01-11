@@ -5,6 +5,7 @@ import '../l10n/l10n.dart';
 import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 import 'category_detail_page.dart';
 import 'reports/trend_drill_page.dart';
 

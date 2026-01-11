@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/budget.dart';
 import '../models/transaction.dart';
-import '../services/database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import 'base/crud_notifier.dart';
 import 'transaction_provider.dart';
 import 'ledger_provider.dart';
@@ -207,7 +208,8 @@ final allBudgetUsagesProvider = Provider<List<BudgetUsage>>((ref) {
 
 /// 零基预算分配管理器
 class ZeroBasedBudgetNotifier extends Notifier<Map<String, ZeroBasedAllocation>> {
-  DatabaseService get db => DatabaseService();
+  /// 数据库服务实例（通过服务定位器获取）
+  IDatabaseService get db => sl<IDatabaseService>();
 
   @override
   Map<String, ZeroBasedAllocation> build() {

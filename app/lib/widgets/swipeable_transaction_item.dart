@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 import '../theme/app_theme.dart';
 
 /// 可滑入操作按钮的交易条目组件

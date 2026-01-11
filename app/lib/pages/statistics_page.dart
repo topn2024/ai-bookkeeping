@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../providers/transaction_provider.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
+import '../extensions/category_extensions.dart';
 import 'category_detail_page.dart';
 import 'period_comparison_page.dart';
 

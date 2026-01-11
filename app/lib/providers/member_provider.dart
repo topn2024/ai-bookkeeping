@@ -1,7 +1,8 @@
 import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/member.dart';
-import '../services/database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 
 // ============== 成员管理 Provider ==============
 
@@ -38,7 +39,8 @@ class MemberState {
 }
 
 class MemberNotifier extends Notifier<MemberState> {
-  final DatabaseService _db = DatabaseService();
+  /// 数据库服务实例（通过服务定位器获取）
+  IDatabaseService get _db => sl<IDatabaseService>();
 
   @override
   MemberState build() {

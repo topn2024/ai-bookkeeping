@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../providers/transaction_provider.dart';
+import '../../extensions/category_extensions.dart';
 
 /// 趋势图下钻页面
 /// 原型设计 7.06：趋势图下钻

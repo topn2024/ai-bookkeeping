@@ -4,7 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../theme/app_theme.dart';
-import '../services/database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../models/import_batch.dart';
 import 'import/smart_format_detection_page.dart';
 import 'import/import_history_page.dart';
@@ -47,7 +48,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   /// 加载最近导入记录
   Future<void> _loadRecentImports() async {
     try {
-      final db = await DatabaseService().database;
+      final db = await sl<IDatabaseService>().database;
       final results = await db.query(
         'import_batches',
         orderBy: 'createdAt DESC',

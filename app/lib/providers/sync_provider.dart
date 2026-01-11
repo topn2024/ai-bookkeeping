@@ -2,11 +2,12 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/sync.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../services/sync_service.dart';
 import '../services/server_sync_service.dart' hide SyncStatus;
 import '../services/data_cleanup_service.dart';
 import '../services/offline_queue_service.dart';
-import '../services/database_service.dart';
 
 /// 同步状态
 class SyncState {
@@ -114,7 +115,8 @@ class SyncNotifier extends Notifier<SyncState> {
   final ServerSyncService _serverSync = ServerSyncService();
   final DataCleanupService _cleanupService = DataCleanupService();
   final OfflineQueueService _offlineQueue = OfflineQueueService();
-  final DatabaseService _db = DatabaseService();
+  /// 数据库服务实例（通过服务定位器获取）
+  IDatabaseService get _db => sl<IDatabaseService>();
 
   StreamSubscription<SyncProgress>? _progressSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;

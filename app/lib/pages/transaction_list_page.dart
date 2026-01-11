@@ -7,6 +7,7 @@ import '../providers/account_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../models/account.dart';
+import '../extensions/extensions.dart';
 import '../widgets/source_image_viewer.dart';
 import '../widgets/source_audio_player.dart';
 import '../widgets/swipeable_transaction_item.dart';

@@ -3,6 +3,7 @@ import '../l10n/l10n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../models/account.dart';
+import '../extensions/account_extensions.dart';
 import '../providers/account_provider.dart';
 
 class AccountManagementPage extends ConsumerWidget {

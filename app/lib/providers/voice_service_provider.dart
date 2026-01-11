@@ -2,7 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/riverpod.dart';
 
 import '../models/transaction.dart';
-import '../services/database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../services/voice/entity_disambiguation_service.dart';
 import '../services/voice/voice_delete_service.dart';
 import '../services/voice/voice_modify_service.dart';
@@ -39,9 +40,9 @@ final ttsServiceProvider = Provider<TTSService>((ref) {
   return TTSService();
 });
 
-/// 数据库服务Provider
-final databaseServiceProvider = Provider<DatabaseService>((ref) {
-  return DatabaseService();
+/// 数据库服务Provider（通过服务定位器获取）
+final databaseServiceProvider = Provider<IDatabaseService>((ref) {
+  return sl<IDatabaseService>();
 });
 
 /// 语音意图路由器Provider
@@ -129,7 +130,7 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
   final VoiceModifyService _modifyService;
   final VoiceRecognitionEngine _recognitionEngine;
   final TTSService _ttsService;
-  final DatabaseService _databaseService;
+  final IDatabaseService _databaseService;
 
   VoiceInteractionNotifier({
     required EntityDisambiguationService entityService,
@@ -137,7 +138,7 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
     required VoiceModifyService modifyService,
     required VoiceRecognitionEngine recognitionEngine,
     required TTSService ttsService,
-    required DatabaseService databaseService,
+    required IDatabaseService databaseService,
   }) : _entityService = entityService,
        _deleteService = deleteService,
        _modifyService = modifyService,

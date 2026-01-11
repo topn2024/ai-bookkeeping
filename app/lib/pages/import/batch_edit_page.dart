@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../theme/app_theme.dart';
 import '../../models/transaction.dart';
 import '../../models/category.dart';
+import '../../extensions/category_extensions.dart';
 
 /// 批量编辑页面
 /// 原型设计 5.07：批量编辑

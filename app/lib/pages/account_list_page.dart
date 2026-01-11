@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/l10n.dart';
 import '../theme/app_theme.dart';
 import '../models/account.dart';
+import '../extensions/account_extensions.dart';
 import '../providers/account_provider.dart';
 
 /// 账户列表页面

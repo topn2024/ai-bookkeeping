@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 import 'transaction_detail_page.dart';
 import 'advanced_filter_page.dart';
 

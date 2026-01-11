@@ -9,6 +9,7 @@ import '../providers/budget_provider.dart';
 import '../providers/gamification_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 import '../widgets/budget_alert_widget.dart';
 import 'transaction_list_page.dart';
 import 'add_transaction_page.dart';

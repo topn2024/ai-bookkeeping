@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/ledger.dart';
 import '../models/member.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../services/database_service.dart';
 
 /// 当前账本上下文状态
@@ -159,7 +161,7 @@ class LedgerContextNotifier extends Notifier<LedgerContextState> {
   /// 加载用户的所有账本
   Future<List<Ledger>> _loadUserLedgers(String userId) async {
     try {
-      final db = await DatabaseService().database;
+      final db = await sl<IDatabaseService>().database;
       final results = await db.query(
         'ledgers',
         where: 'ownerId = ? OR id IN (SELECT ledgerId FROM ledger_members WHERE userId = ?)',
@@ -184,7 +186,7 @@ class LedgerContextNotifier extends Notifier<LedgerContextState> {
   /// 加载账本成员
   Future<List<LedgerMember>> _loadLedgerMembers(String ledgerId) async {
     try {
-      final db = await DatabaseService().database;
+      final db = await sl<IDatabaseService>().database;
       final results = await db.query(
         'ledger_members',
         where: 'ledgerId = ?',

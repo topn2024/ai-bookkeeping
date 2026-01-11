@@ -9,6 +9,7 @@ import '../services/source_file_service.dart';
 import '../providers/transaction_provider.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
+import '../extensions/category_extensions.dart';
 import '../services/category_localization_service.dart';
 import '../utils/date_utils.dart';
 

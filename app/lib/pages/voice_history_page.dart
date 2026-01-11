@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
-import '../services/database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../models/transaction.dart';
 
 /// 语音识别类型
@@ -55,7 +56,7 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
   /// 从数据库加载语音和图片识别记录
   Future<void> _loadVoiceRecords() async {
     try {
-      final db = await DatabaseService().database;
+      final db = await sl<IDatabaseService>().database;
 
       // 查询来源为voice或image的交易记录
       final results = await db.query(

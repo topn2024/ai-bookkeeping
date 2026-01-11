@@ -11,6 +11,7 @@ import '../services/qwen_service.dart' show ReceiptItem;
 import '../services/source_file_service.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
+import '../extensions/category_extensions.dart';
 import '../widgets/duplicate_transaction_dialog.dart';
 import '../services/category_localization_service.dart';
 import '../utils/date_utils.dart';

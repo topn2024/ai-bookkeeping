@@ -6,6 +6,7 @@ import '../l10n/l10n.dart';
 import '../providers/budget_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/ledger_provider.dart';
+import '../extensions/category_extensions.dart';
 
 class BudgetManagementPage extends ConsumerStatefulWidget {
   const BudgetManagementPage({super.key});

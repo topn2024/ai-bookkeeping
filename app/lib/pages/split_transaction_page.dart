@@ -7,6 +7,7 @@ import '../models/transaction.dart';
 import '../models/transaction_split.dart';
 import '../models/category.dart';
 import '../models/account.dart';
+import '../extensions/extensions.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/category_provider.dart';
 
