@@ -906,7 +906,15 @@ class _BackupTab extends ConsumerWidget {
     );
 
     if (confirmed == true) {
-      await ref.read(syncProvider.notifier).deleteBackup(backup.id);
+      try {
+        await ref.read(syncProvider.notifier).deleteBackup(backup.id);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('删除备份失败: $e')),
+          );
+        }
+      }
     }
   }
 

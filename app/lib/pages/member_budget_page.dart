@@ -597,17 +597,26 @@ class _EditBudgetSheetState extends ConsumerState<_EditBudgetSheet> {
           ),
           FilledButton(
             onPressed: () async {
-              if (widget.existingBudget != null) {
-                await ref.read(memberProvider.notifier).deleteMemberBudget(
-                  widget.existingBudget!.id,
-                );
-              }
-              if (mounted) {
-                Navigator.pop(context);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('预算已删除')),
-                );
+              try {
+                if (widget.existingBudget != null) {
+                  await ref.read(memberProvider.notifier).deleteMemberBudget(
+                    widget.existingBudget!.id,
+                  );
+                }
+                if (mounted) {
+                  Navigator.pop(context);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('预算已删除')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('删除失败: $e')),
+                  );
+                }
               }
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
