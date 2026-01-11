@@ -278,7 +278,7 @@ class VoiceNavigationService extends ChangeNotifier {
       route: '/accounts',
       name: '账户列表',
       module: '账户管理',
-      aliases: ['账户', '账户列表', '我的账户'],
+      aliases: ['账户', '账户列表', '我的账户', '账本管理', '账本', '账户管理'],
       voiceAdaptation: VoiceAdaptation.high,
     ),
     '/accounts/detail': PageConfig(
@@ -486,7 +486,7 @@ class VoiceNavigationService extends ChangeNotifier {
       route: '/settings',
       name: '设置',
       module: '设置中心',
-      aliases: ['设置', '设置中心', '打开设置'],
+      aliases: ['设置', '设置中心', '打开设置', '配置', '配置界面', '系统配置'],
       voiceAdaptation: VoiceAdaptation.high,
     ),
     '/settings/profile': PageConfig(

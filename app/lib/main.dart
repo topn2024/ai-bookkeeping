@@ -329,8 +329,16 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
   /// 检查是否是导航命令
   bool _isNavigationCommand(String command) {
-    final navigationKeywords = ['打开', '去', '跳转', '进入', '查看', '看看'];
-    final targetKeywords = ['设置', '首页', '主页', '预算', '报表', '统计', '储蓄', '钱龄', '分析'];
+    final navigationKeywords = [
+      '打开', '去', '跳转', '进入', '查看', '看看',
+      '想进行', '进行', '管理', '想看', '想去', '帮我打开',
+    ];
+    final targetKeywords = [
+      '设置', '配置', '首页', '主页', '预算', '报表', '统计',
+      '储蓄', '钱龄', '分析', '账户', '分类', '交易', '记录',
+      '语音', '主题', '通知', '提醒', '备份', '同步', '安全',
+      '账本', '习惯', '家庭', '导入', '导出', '搜索',
+    ];
 
     final hasNavigationKeyword = navigationKeywords.any((k) => command.contains(k));
     final hasTargetKeyword = targetKeywords.any((k) => command.contains(k));

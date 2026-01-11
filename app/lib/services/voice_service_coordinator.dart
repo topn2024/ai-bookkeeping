@@ -13,6 +13,7 @@ import 'voice/voice_intent_router.dart';
 import 'voice/multi_intent_models.dart';
 import 'voice/conversation_context.dart';
 import 'voice/barge_in_detector.dart';
+import 'voice/ai_intent_decomposer.dart';
 import 'voice_recognition_engine.dart';
 import 'tts_service.dart';
 import 'voice_navigation_service.dart';
@@ -47,6 +48,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 打断检测器
   final BargeInDetector _bargeInDetector;
+
+  /// AI意图分解器（大模型兜底）
+  final AIIntentDecomposer _aiDecomposer;
 
   /// 是否启用流式TTS模式
   bool _streamingTTSEnabled = true;
@@ -99,6 +103,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     AutomationTaskService? automationService,
     ConversationContext? conversationContext,
     BargeInDetector? bargeInDetector,
+    AIIntentDecomposer? aiDecomposer,
     bool enableStreamingTTS = true,
   }) : _recognitionEngine = recognitionEngine ?? VoiceRecognitionEngine(),
        _ttsService = ttsService ?? TTSService(enableStreaming: enableStreamingTTS),
@@ -113,6 +118,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
        _automationService = automationService ?? AutomationTaskService(),
        _conversationContext = conversationContext ?? ConversationContext(),
        _bargeInDetector = bargeInDetector ?? BargeInDetector(),
+       _aiDecomposer = aiDecomposer ?? AIIntentDecomposer(),
        _streamingTTSEnabled = enableStreamingTTS {
     // 设置打断检测回调
     _bargeInDetector.onBargeInDetected = _handleBargeIn;
@@ -1289,10 +1295,62 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   }
 
   /// 处理未知意图
+  ///
+  /// 当规则匹配无法识别意图时，尝试使用AI大模型进行兜底处理
   Future<VoiceSessionResult> _handleUnknownIntent(
     IntentAnalysisResult intentResult,
     String originalInput,
   ) async {
+    debugPrint('[VoiceCoordinator] 规则匹配未识别，尝试AI兜底: $originalInput');
+
+    // 尝试使用AI大模型进行意图分解
+    try {
+      final aiResult = await _aiDecomposer.decompose(originalInput);
+
+      if (aiResult != null && aiResult.intents.isNotEmpty) {
+        debugPrint('[VoiceCoordinator] AI识别到${aiResult.intents.length}个意图');
+
+        // 转换为MultiIntentResult
+        final multiResult = _aiDecomposer.toMultiIntentResult(aiResult);
+
+        if (multiResult != null && !multiResult.isEmpty) {
+          // 处理AI识别的导航意图
+          if (multiResult.navigationIntent != null) {
+            final navIntent = multiResult.navigationIntent!;
+            debugPrint('[VoiceCoordinator] AI识别到导航意图: ${navIntent.targetPage}');
+
+            final navResult = _navigationService.parseNavigation(originalInput);
+            if (navResult.success) {
+              final message = '正在打开${navResult.pageName}';
+              await _ttsService.speak(message);
+              return VoiceSessionResult.success(message, {
+                'navigation': navResult.route,
+                'aiAssisted': true,
+              });
+            }
+          }
+
+          // 处理AI识别的交易意图
+          if (multiResult.completeIntents.isNotEmpty) {
+            debugPrint('[VoiceCoordinator] AI识别到${multiResult.completeIntents.length}个完整交易意图');
+
+            final executedCount = await _executeCompleteIntents(multiResult.completeIntents);
+            if (executedCount > 0) {
+              final message = '已记录$executedCount笔交易';
+              await _ttsService.speak(message);
+              return VoiceSessionResult.success(message, {
+                'executedCount': executedCount,
+                'aiAssisted': true,
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[VoiceCoordinator] AI兜底失败: $e');
+    }
+
+    // AI也无法识别，返回错误
     const message = '抱歉，我没有理解您的指令。请说得更清楚一些，或者尝试其他表达方式。';
     await _ttsService.speak(message);
     return VoiceSessionResult.error(message);
