@@ -30,7 +30,7 @@ class WantsNeedsInsightPage extends ConsumerWidget {
     for (final entry in expenseByCategory.entries) {
       final categoryId = entry.key;
       final amount = entry.value;
-      final category = DefaultCategories.expenseCategories
+      final category = DefaultCategories.allCategories
           .where((c) => c.id == categoryId)
           .firstOrNull;
       final emoji = _getCategoryEmoji(categoryId);
