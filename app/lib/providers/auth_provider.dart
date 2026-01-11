@@ -418,7 +418,7 @@ class AuthNotifier extends Notifier<AuthState> {
       }
     }
 
-    return '请求失败: ${e.message}';
+    return e.message ?? '请求失败，请稍后重试';
   }
 
   /// 刷新用户信息
