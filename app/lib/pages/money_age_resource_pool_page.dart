@@ -1,19 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
-import '../theme/app_theme.dart';
+import '../models/resource_pool.dart';
+import '../models/transaction.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
+import '../providers/transaction_provider.dart';
+
+/// 资源池Provider - 从数据库获取真实数据
+final resourcePoolsProvider = FutureProvider<List<ResourcePool>>((ref) async {
+  final db = sl<IDatabaseService>();
+  return await db.getAllResourcePools();
+});
 
 /// FIFO资源池页面
 /// 原型设计 2.07：FIFO资源池
 /// - 说明卡片：FIFO原则解释
 /// - 资源池列表：已消耗完、部分消耗、当前消费中、待使用
 /// - 总结卡片：可用资金、平均钱龄、活跃资源池数
+/// 数据来源：resource_pools表 + transactions表
 class MoneyAgeResourcePoolPage extends ConsumerWidget {
   const MoneyAgeResourcePoolPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final resourcePoolsAsync = ref.watch(resourcePoolsProvider);
+    final transactions = ref.watch(transactionProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -21,19 +35,61 @@ class MoneyAgeResourcePoolPage extends ConsumerWidget {
           children: [
             _buildPageHeader(context, theme),
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _buildInfoCard(context, theme),
-                    _buildResourcePoolList(context, theme),
-                    _buildSummaryCard(context, theme),
-                    const SizedBox(height: 20),
-                  ],
+              child: resourcePoolsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => Center(
+                  child: Text('加载失败: $error'),
                 ),
+                data: (pools) {
+                  if (pools.isEmpty) {
+                    return _buildEmptyState(context, theme);
+                  }
+                  return SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _buildInfoCard(context, theme),
+                        _buildResourcePoolList(context, theme, pools, transactions),
+                        _buildSummaryCard(context, theme, pools),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.account_balance_outlined,
+            size: 64,
+            color: theme.colorScheme.outline,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '暂无资金池数据',
+            style: TextStyle(
+              fontSize: 16,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '添加收入后将自动创建资金池',
+            style: TextStyle(
+              fontSize: 14,
+              color: theme.colorScheme.outline,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -118,53 +174,146 @@ class MoneyAgeResourcePoolPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildResourcePoolList(BuildContext context, ThemeData theme) {
+  Widget _buildResourcePoolList(
+    BuildContext context,
+    ThemeData theme,
+    List<ResourcePool> pools,
+    List<Transaction> transactions,
+  ) {
+    // 根据状态分组
+    final consumedPools = pools.where((p) => p.isFullyConsumed).toList();
+    final partialPools = pools.where((p) => !p.isFullyConsumed && p.consumptionRate > 0).toList();
+    final pendingPools = pools.where((p) => !p.isFullyConsumed && p.consumptionRate == 0).toList();
+
+    // 按创建时间排序
+    consumedPools.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    partialPools.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    pendingPools.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    // 查找对应的收入交易获取名称
+    String getPoolName(ResourcePool pool) {
+      final income = transactions.firstWhere(
+        (t) => t.id == pool.incomeTransactionId,
+        orElse: () => Transaction(
+          id: '',
+          amount: pool.originalAmount,
+          type: TransactionType.income,
+          category: '收入',
+          date: pool.createdAt,
+          accountId: '',
+        ),
+      );
+      return income.note?.isNotEmpty == true ? income.note! : income.category;
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 已消耗完
-          _buildPoolItem(
-            context,
-            theme,
-            name: '11月工资',
-            date: '11月15日',
-            amount: 15000,
-            remaining: 0,
-            status: PoolStatus.consumed,
+          // 当前消费中的资金池
+          if (partialPools.isNotEmpty) ...[
+            _buildSectionHeader(theme, '消费中', partialPools.length),
+            ...partialPools.map((pool) => _buildPoolItem(
+              context,
+              theme,
+              name: getPoolName(pool),
+              date: DateFormat('M月d日').format(pool.createdAt),
+              amount: pool.originalAmount,
+              remaining: pool.remainingAmount,
+              status: PoolStatus.current,
+              ageInDays: pool.ageInDays,
+            )),
+            const SizedBox(height: 16),
+          ],
+
+          // 待使用的资金池
+          if (pendingPools.isNotEmpty) ...[
+            _buildSectionHeader(theme, '待使用', pendingPools.length),
+            ...pendingPools.map((pool) => _buildPoolItem(
+              context,
+              theme,
+              name: getPoolName(pool),
+              date: DateFormat('M月d日').format(pool.createdAt),
+              amount: pool.originalAmount,
+              remaining: pool.remainingAmount,
+              status: PoolStatus.pending,
+              ageInDays: pool.ageInDays,
+            )),
+            const SizedBox(height: 16),
+          ],
+
+          // 已消耗完的资金池（最多显示5个）
+          if (consumedPools.isNotEmpty) ...[
+            _buildSectionHeader(theme, '已消耗', consumedPools.length),
+            ...consumedPools.take(5).map((pool) => _buildPoolItem(
+              context,
+              theme,
+              name: getPoolName(pool),
+              date: DateFormat('M月d日').format(pool.createdAt),
+              amount: pool.originalAmount,
+              remaining: 0,
+              status: PoolStatus.consumed,
+              ageInDays: pool.ageInDays,
+            )),
+            if (consumedPools.length > 5)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Center(
+                  child: Text(
+                    '还有 ${consumedPools.length - 5} 个已消耗的资金池',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.outline,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+
+          // 空状态
+          if (partialPools.isEmpty && pendingPools.isEmpty && consumedPools.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  '暂无资金池数据',
+                  style: TextStyle(color: theme.colorScheme.outline),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(ThemeData theme, String title, int count) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-          const SizedBox(height: 8),
-          // 部分消耗
-          _buildPoolItem(
-            context,
-            theme,
-            name: '12月工资',
-            date: '12月15日',
-            amount: 15000,
-            remaining: 3200,
-            status: PoolStatus.partial,
-          ),
-          const SizedBox(height: 8),
-          // 当前消费中
-          _buildPoolItem(
-            context,
-            theme,
-            name: '1月工资',
-            date: '1月5日',
-            amount: 15000,
-            remaining: 12800,
-            status: PoolStatus.current,
-          ),
-          const SizedBox(height: 8),
-          // 待使用
-          _buildPoolItem(
-            context,
-            theme,
-            name: '年终奖',
-            date: '12月25日',
-            amount: 8000,
-            remaining: 8000,
-            status: PoolStatus.pending,
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 12,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
         ],
       ),
@@ -179,12 +328,13 @@ class MoneyAgeResourcePoolPage extends ConsumerWidget {
     required double amount,
     required double remaining,
     required PoolStatus status,
+    required int ageInDays,
   }) {
     Color borderColor;
     Color bgColor;
     Widget statusIcon;
     String statusText;
-    Color? progressColor;
+    late Color progressColor;
 
     switch (status) {
       case PoolStatus.consumed:
@@ -199,42 +349,27 @@ class MoneyAgeResourcePoolPage extends ConsumerWidget {
           ),
           child: const Icon(Icons.check, color: Colors.white, size: 16),
         );
-        statusText = '已用完';
+        statusText = '已消耗';
         progressColor = theme.colorScheme.outline;
         break;
       case PoolStatus.partial:
-        borderColor = AppColors.warning;
-        bgColor = theme.colorScheme.surface;
+        borderColor = Colors.orange;
+        bgColor = Colors.orange.shade50;
         statusIcon = Container(
           width: 32,
           height: 32,
           decoration: BoxDecoration(
-            color: AppColors.warning,
+            color: Colors.orange.shade100,
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.hourglass_bottom, color: Colors.white, size: 16),
+          child: const Icon(Icons.trending_down, color: Colors.orange, size: 16),
         );
-        statusText = '剩余';
-        progressColor = AppColors.warning;
+        statusText = '部分消耗';
+        progressColor = Colors.orange;
         break;
       case PoolStatus.current:
-        borderColor = AppColors.success;
-        bgColor = const Color(0xFFE8F5E9);
-        statusIcon = Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: AppColors.success,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.play_arrow, color: Colors.white, size: 16),
-        );
-        statusText = '剩余';
-        progressColor = AppColors.success;
-        break;
-      case PoolStatus.pending:
         borderColor = theme.colorScheme.primary;
-        bgColor = theme.colorScheme.surface;
+        bgColor = theme.colorScheme.primaryContainer.withValues(alpha: 0.3);
         statusIcon = Container(
           width: 32,
           height: 32,
@@ -242,194 +377,183 @@ class MoneyAgeResourcePoolPage extends ConsumerWidget {
             color: theme.colorScheme.primaryContainer,
             shape: BoxShape.circle,
           ),
-          child: Icon(Icons.schedule, color: theme.colorScheme.primary, size: 16),
+          child: Icon(Icons.play_arrow, color: theme.colorScheme.primary, size: 16),
+        );
+        statusText = '消费中';
+        progressColor = theme.colorScheme.primary;
+        break;
+      case PoolStatus.pending:
+        borderColor = Colors.green;
+        bgColor = Colors.green.shade50;
+        statusIcon = Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: Colors.green.shade100,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.schedule, color: Colors.green, size: 16),
         );
         statusText = '待使用';
-        progressColor = theme.colorScheme.primary;
+        progressColor = Colors.green;
         break;
     }
 
-    final used = amount - remaining;
-    final remainPercent = (remaining / amount * 100).round();
+    final consumptionRate = amount > 0 ? (amount - remaining) / amount : 0.0;
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
-        border: status != PoolStatus.consumed
-            ? Border.all(color: borderColor, width: 2)
-            : null,
+        border: Border.all(color: borderColor.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
           Row(
             children: [
               statusIcon,
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           name,
-                          style: const TextStyle(
-                            fontSize: 13,
+                          style: TextStyle(
                             fontWeight: FontWeight.w500,
+                            color: status == PoolStatus.consumed
+                                ? theme.colorScheme.outline
+                                : theme.colorScheme.onSurface,
                           ),
                         ),
-                        if (status == PoolStatus.current) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.success,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              '当前',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.white,
-                              ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: progressColor.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            statusText,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: progressColor,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ],
+                        ),
                       ],
                     ),
+                    const SizedBox(height: 4),
                     Text(
-                      '$date · ¥${amount.toStringAsFixed(0)}',
+                      '$date · ${ageInDays}天前',
                       style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 12,
+                        color: theme.colorScheme.outline,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (status != PoolStatus.consumed)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '¥${remaining.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: progressColor,
-                      ),
-                    ),
-                    Text(
-                      statusText,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
             ],
           ),
           const SizedBox(height: 8),
           // 进度条
-          Container(
-            height: 6,
-            decoration: BoxDecoration(
-              color: status == PoolStatus.consumed
-                  ? theme.colorScheme.outline
-                  : theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(3),
-            ),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: remaining / amount,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: progressColor,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: consumptionRate,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+              minHeight: 4,
             ),
           ),
-          if (status != PoolStatus.consumed) ...[
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  status == PoolStatus.pending
-                      ? '100% 未使用'
-                      : '已用 ¥${used.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '剩余 ¥${remaining.toStringAsFixed(0)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: status == PoolStatus.consumed
+                      ? theme.colorScheme.outline
+                      : progressColor,
                 ),
-                if (status != PoolStatus.pending)
-                  Text(
-                    '剩余 $remainPercent%',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-              ],
-            ),
-          ],
+              ),
+              Text(
+                '原 ¥${amount.toStringAsFixed(0)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryCard(BuildContext context, ThemeData theme) {
+  Widget _buildSummaryCard(BuildContext context, ThemeData theme, List<ResourcePool> pools) {
+    // 计算统计数据
+    final activePools = pools.where((p) => !p.isFullyConsumed).toList();
+    final totalRemaining = activePools.fold<double>(0, (sum, p) => sum + p.remainingAmount);
+    final avgAge = activePools.isEmpty
+        ? 0
+        : activePools.fold<int>(0, (sum, p) => sum + p.ageInDays) ~/ activePools.length;
+
     return Container(
       margin: const EdgeInsets.all(12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary.withValues(alpha: 0.1),
+            theme.colorScheme.primary.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Column(
         children: [
-          _buildSummaryItem(
-            theme,
-            value: '¥24,000',
-            label: '可用资金',
-            valueColor: theme.colorScheme.primary,
+          Text(
+            '资金池总览',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
           ),
-          Container(width: 1, height: 40, color: theme.dividerColor),
-          _buildSummaryItem(
-            theme,
-            value: '42天',
-            label: '平均钱龄',
-            valueColor: AppColors.success,
-          ),
-          Container(width: 1, height: 40, color: theme.dividerColor),
-          _buildSummaryItem(
-            theme,
-            value: '3',
-            label: '活跃资源池',
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildSummaryItem(
+                theme,
+                label: '可用资金',
+                value: '¥${totalRemaining.toStringAsFixed(0)}',
+                icon: Icons.account_balance_wallet,
+              ),
+              _buildSummaryItem(
+                theme,
+                label: '平均钱龄',
+                value: '$avgAge天',
+                icon: Icons.schedule,
+              ),
+              _buildSummaryItem(
+                theme,
+                label: '活跃池数',
+                value: '${activePools.length}',
+                icon: Icons.layers,
+              ),
+            ],
           ),
         ],
       ),
@@ -438,26 +562,28 @@ class MoneyAgeResourcePoolPage extends ConsumerWidget {
 
   Widget _buildSummaryItem(
     ThemeData theme, {
-    required String value,
     required String label,
-    Color? valueColor,
+    required String value,
+    required IconData icon,
   }) {
     return Column(
       children: [
+        Icon(icon, color: theme.colorScheme.primary, size: 24),
+        const SizedBox(height: 8),
         Text(
           value,
           style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: valueColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: theme.colorScheme.onSurface,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           label,
           style: TextStyle(
-            fontSize: 11,
-            color: theme.colorScheme.onSurfaceVariant,
+            fontSize: 12,
+            color: theme.colorScheme.outline,
           ),
         ),
       ],
@@ -466,8 +592,8 @@ class MoneyAgeResourcePoolPage extends ConsumerWidget {
 }
 
 enum PoolStatus {
-  consumed, // 已消耗完
-  partial, // 部分消耗
-  current, // 当前消费中
-  pending, // 待使用
+  consumed,  // 已消耗完
+  partial,   // 部分消耗
+  current,   // 当前消费中
+  pending,   // 待使用
 }

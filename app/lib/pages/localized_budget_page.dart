@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/common_types.dart' show CityTier, CityTierExtension;
+import '../providers/transaction_provider.dart';
 
 /// 本地化预算推荐页面
 ///
 /// 对应原型设计 3.12 本地化预算推荐
-/// 基于用户所在城市的消费水平提供预算建议
+/// 基于用户所在城市的消费水平和实际收入提供预算建议
+/// 数据来源：monthlyIncomeProvider（用户月收入）
 class LocalizedBudgetPage extends ConsumerStatefulWidget {
   const LocalizedBudgetPage({super.key});
 
@@ -20,6 +22,9 @@ class _LocalizedBudgetPageState extends ConsumerState<LocalizedBudgetPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 获取用户月收入
+    final monthlyIncome = ref.watch(monthlyIncomeProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('本地化预算推荐'),
@@ -36,6 +41,7 @@ class _LocalizedBudgetPageState extends ConsumerState<LocalizedBudgetPage> {
           _LocationCard(
             cityName: _cityName,
             cityTier: _currentCity,
+            monthlyIncome: monthlyIncome,
             onChangeCity: () => _showCitySelector(context),
           ),
 
@@ -46,10 +52,14 @@ class _LocalizedBudgetPageState extends ConsumerState<LocalizedBudgetPage> {
           _RecommendedBudgetSection(
             cityTier: _currentCity,
             cityName: _cityName,
+            monthlyIncome: monthlyIncome,
           ),
 
           // 城市对比
-          _CityComparisonCard(currentTier: _currentCity),
+          _CityComparisonCard(
+            currentTier: _currentCity,
+            monthlyIncome: monthlyIncome,
+          ),
 
           const SizedBox(height: 24),
 
@@ -168,11 +178,13 @@ class _LocalizedBudgetPageState extends ConsumerState<LocalizedBudgetPage> {
 class _LocationCard extends StatelessWidget {
   final String cityName;
   final CityTier cityTier;
+  final double monthlyIncome;
   final VoidCallback onChangeCity;
 
   const _LocationCard({
     required this.cityName,
     required this.cityTier,
+    required this.monthlyIncome,
     required this.onChangeCity,
   });
 
@@ -255,12 +267,20 @@ class _LocationCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${_getTierLabel(cityTier)} · 消费水平指数 ${_getCostIndex(cityTier)}',
+                    '${_getTierLabel(cityTier)} · 消费指数 ${_getCostIndex(cityTier)}',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.9),
                       fontSize: 12,
                     ),
                   ),
+                  if (monthlyIncome > 0)
+                    Text(
+                      '您的月收入: ¥${monthlyIncome.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 11,
+                      ),
+                    ),
                 ],
               ),
             ],
@@ -451,15 +471,17 @@ class _CharacteristicChip extends StatelessWidget {
 class _RecommendedBudgetSection extends StatelessWidget {
   final CityTier cityTier;
   final String cityName;
+  final double monthlyIncome;
 
   const _RecommendedBudgetSection({
     required this.cityTier,
     required this.cityName,
+    required this.monthlyIncome,
   });
 
   @override
   Widget build(BuildContext context) {
-    final budgets = _getBudgets(cityTier);
+    final budgets = _getBudgets(cityTier, monthlyIncome);
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -492,7 +514,134 @@ class _RecommendedBudgetSection extends StatelessWidget {
     );
   }
 
-  List<BudgetRecommendation> _getBudgets(CityTier tier) {
+  /// 获取预算推荐
+  /// 如果用户有收入数据，基于收入比例计算；否则使用城市参考值
+  List<BudgetRecommendation> _getBudgets(CityTier tier, double income) {
+    // 城市成本系数（相对于基准）
+    final costMultiplier = _getCostMultiplier(tier);
+
+    // 如果有收入数据，基于收入计算推荐预算
+    if (income > 0) {
+      return _getIncomeBasedBudgets(tier, income, costMultiplier);
+    }
+
+    // 否则使用城市参考值
+    return _getReferenceBudgets(tier);
+  }
+
+  /// 获取城市成本系数
+  double _getCostMultiplier(CityTier tier) {
+    switch (tier) {
+      case CityTier.tier1:
+        return 1.35;
+      case CityTier.newTier1:
+        return 1.15;
+      case CityTier.tier2:
+        return 0.95;
+      case CityTier.tier3:
+        return 0.75;
+      case CityTier.tier4Plus:
+        return 0.65;
+      case CityTier.overseas:
+        return 1.80;
+      case CityTier.unknown:
+        return 1.00;
+    }
+  }
+
+  /// 基于收入的预算推荐（使用收入比例）
+  List<BudgetRecommendation> _getIncomeBasedBudgets(
+    CityTier tier,
+    double income,
+    double costMultiplier,
+  ) {
+    // 推荐比例（基于50/30/20规则调整）
+    final rentRatio = _getRentRatio(tier);
+    final transportRatio = _getTransportRatio(tier);
+    final foodRatio = 0.20; // 餐饮固定20%
+    final entertainmentRatio = 0.15; // 娱乐固定15%
+
+    return [
+      BudgetRecommendation(
+        emoji: '🏠',
+        name: '房租/房贷',
+        amount: income * rentRatio,
+        description: '根据您的收入，建议房租占比 ${(rentRatio * 100).toStringAsFixed(0)}%',
+        tip: '占收入建议比例',
+        tipValue: '${(rentRatio * 100).toStringAsFixed(0)}%',
+        tipColor: Colors.orange,
+        gradientColors: [const Color(0xFFFF6B6B), const Color(0xFFFF8E53)],
+      ),
+      BudgetRecommendation(
+        emoji: '🚇',
+        name: '交通通勤',
+        amount: income * transportRatio,
+        description: '根据城市交通成本估算',
+        tip: '占收入比例',
+        tipValue: '${(transportRatio * 100).toStringAsFixed(0)}%',
+        tipColor: Colors.blue,
+        gradientColors: [const Color(0xFF4ECDC4), const Color(0xFF44A08D)],
+      ),
+      BudgetRecommendation(
+        emoji: '🍽️',
+        name: '餐饮',
+        amount: income * foodRatio,
+        description: '包含日常三餐和偶尔外食',
+        tip: '省钱建议',
+        tipValue: '自己做饭可省40%+',
+        tipColor: Colors.green,
+        gradientColors: [const Color(0xFFFFD93D), const Color(0xFFFF9500)],
+      ),
+      BudgetRecommendation(
+        emoji: '🛍️',
+        name: '购物娱乐',
+        amount: income * entertainmentRatio,
+        description: '日常消费、电影、健身等',
+        gradientColors: [const Color(0xFFA855F7), const Color(0xFF7C3AED)],
+      ),
+    ];
+  }
+
+  /// 获取房租占收入比例（按城市级别）
+  double _getRentRatio(CityTier tier) {
+    switch (tier) {
+      case CityTier.tier1:
+        return 0.30; // 一线城市30%
+      case CityTier.newTier1:
+        return 0.25; // 新一线25%
+      case CityTier.tier2:
+        return 0.20; // 二线20%
+      case CityTier.tier3:
+      case CityTier.tier4Plus:
+        return 0.15; // 三线及以下15%
+      case CityTier.overseas:
+        return 0.35; // 海外35%
+      case CityTier.unknown:
+        return 0.25;
+    }
+  }
+
+  /// 获取交通占收入比例（按城市级别）
+  double _getTransportRatio(CityTier tier) {
+    switch (tier) {
+      case CityTier.tier1:
+        return 0.08; // 一线城市8%
+      case CityTier.newTier1:
+        return 0.06; // 新一线6%
+      case CityTier.tier2:
+        return 0.05; // 二线5%
+      case CityTier.tier3:
+      case CityTier.tier4Plus:
+        return 0.03; // 三线及以下3%
+      case CityTier.overseas:
+        return 0.10; // 海外10%
+      case CityTier.unknown:
+        return 0.05;
+    }
+  }
+
+  /// 城市参考值（当没有用户收入数据时使用）
+  List<BudgetRecommendation> _getReferenceBudgets(CityTier tier) {
     switch (tier) {
       case CityTier.tier1:
         return [
@@ -500,7 +649,7 @@ class _RecommendedBudgetSection extends StatelessWidget {
             emoji: '🏠',
             name: '房租/房贷',
             amount: 4500,
-            description: '上海平均租房 ¥4,200-5,500/月',
+            description: '一线城市参考: ¥4,200-5,500/月',
             tip: '占收入建议比例',
             tipValue: '30-35%',
             tipColor: Colors.orange,
@@ -512,7 +661,7 @@ class _RecommendedBudgetSection extends StatelessWidget {
             amount: 800,
             description: '地铁月票 + 偶尔打车',
             tip: '省钱建议',
-            tipValue: '地铁日票¥18，比打车省60%',
+            tipValue: '地铁日票比打车省60%',
             tipColor: Colors.green,
             gradientColors: [const Color(0xFF4ECDC4), const Color(0xFF44A08D)],
           ),
@@ -520,7 +669,7 @@ class _RecommendedBudgetSection extends StatelessWidget {
             emoji: '🍽️',
             name: '餐饮',
             amount: 2200,
-            description: '上海外卖均价 ¥35-45/餐',
+            description: '外卖均价 ¥35-45/餐',
             tip: '省钱建议',
             tipValue: '食堂就餐可省40%+',
             tipColor: Colors.green,
@@ -540,7 +689,7 @@ class _RecommendedBudgetSection extends StatelessWidget {
             emoji: '🏠',
             name: '房租/房贷',
             amount: 3000,
-            description: '新一线平均租房 ¥2,500-3,500/月',
+            description: '新一线参考: ¥2,500-3,500/月',
             tip: '占收入建议比例',
             tipValue: '25-30%',
             tipColor: Colors.orange,
@@ -574,7 +723,7 @@ class _RecommendedBudgetSection extends StatelessWidget {
             emoji: '🏠',
             name: '房租/房贷',
             amount: 2000,
-            description: '二线城市平均租房 ¥1,500-2,500/月',
+            description: '二线参考: ¥1,500-2,500/月',
             tip: '占收入建议比例',
             tipValue: '20-25%',
             tipColor: Colors.orange,
@@ -608,7 +757,7 @@ class _RecommendedBudgetSection extends StatelessWidget {
             emoji: '🏠',
             name: '房租/房贷',
             amount: 1000,
-            description: '三线城市平均租房 ¥800-1,500/月',
+            description: '三线参考: ¥800-1,500/月',
             tip: '占收入建议比例',
             tipValue: '15-20%',
             tipColor: Colors.orange,
@@ -642,7 +791,7 @@ class _RecommendedBudgetSection extends StatelessWidget {
             emoji: '🏠',
             name: '房租/房贷',
             amount: 800,
-            description: '四线及以下城市平均租房 ¥500-1,000/月',
+            description: '四线及以下参考: ¥500-1,000/月',
             gradientColors: [const Color(0xFFFF6B6B), const Color(0xFFFF8E53)],
           ),
           BudgetRecommendation(
@@ -837,19 +986,29 @@ class _BudgetCategoryCard extends StatelessWidget {
 /// 城市对比卡片
 class _CityComparisonCard extends StatelessWidget {
   final CityTier currentTier;
+  final double monthlyIncome;
 
-  const _CityComparisonCard({required this.currentTier});
+  const _CityComparisonCard({
+    required this.currentTier,
+    required this.monthlyIncome,
+  });
 
   @override
   Widget build(BuildContext context) {
+    // 基于用户收入计算各城市对比值，或使用参考值
+    final tier1Amount = monthlyIncome > 0 ? monthlyIncome * 0.73 : 12000.0; // 73% 支出
+    final newTier1Amount = monthlyIncome > 0 ? monthlyIncome * 0.66 : 8000.0; // 66% 支出
+    final tier2Amount = monthlyIncome > 0 ? monthlyIncome * 0.60 : 5500.0; // 60% 支出
+    final tier3Amount = monthlyIncome > 0 ? monthlyIncome * 0.53 : 3500.0; // 53% 支出
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '不同城市预算对比',
-            style: TextStyle(
+          Text(
+            monthlyIncome > 0 ? '基于您收入的城市支出对比' : '不同城市预算对比',
+            style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
@@ -867,7 +1026,7 @@ class _CityComparisonCard extends StatelessWidget {
                   children: [
                     _ComparisonItem(
                       label: '一线城市',
-                      amount: 12000,
+                      amount: tier1Amount,
                       examples: '上海/北京',
                       color: Colors.red,
                       isSelected: currentTier == CityTier.tier1,
@@ -875,7 +1034,7 @@ class _CityComparisonCard extends StatelessWidget {
                     _VerticalDivider(),
                     _ComparisonItem(
                       label: '新一线',
-                      amount: 8000,
+                      amount: newTier1Amount,
                       examples: '杭州/成都',
                       color: Colors.orange,
                       isSelected: currentTier == CityTier.newTier1,
@@ -883,7 +1042,7 @@ class _CityComparisonCard extends StatelessWidget {
                     _VerticalDivider(),
                     _ComparisonItem(
                       label: '二线城市',
-                      amount: 5500,
+                      amount: tier2Amount,
                       examples: '长沙/郑州',
                       color: Colors.blue,
                       isSelected: currentTier == CityTier.tier2,
@@ -891,7 +1050,7 @@ class _CityComparisonCard extends StatelessWidget {
                     _VerticalDivider(),
                     _ComparisonItem(
                       label: '三线及以下',
-                      amount: 3500,
+                      amount: tier3Amount,
                       examples: '其他',
                       color: Colors.green,
                       isSelected: currentTier == CityTier.tier3,
@@ -911,7 +1070,9 @@ class _CityComparisonCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '以上数据基于各城市生活成本指数计算，仅供参考',
+                          monthlyIncome > 0
+                              ? '基于您的月收入和各城市生活成本指数计算'
+                              : '以上数据基于各城市生活成本指数计算，仅供参考',
                           style: TextStyle(
                             fontSize: 11,
                             color: Colors.blue[700],

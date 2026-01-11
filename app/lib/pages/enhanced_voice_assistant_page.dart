@@ -828,23 +828,6 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     // The coordinator will manage session state and navigation automatically
   }
 
-  // ignore: unused_element
-  String _generateMockResponse(String command) {
-    if (command.contains('删除')) {
-      return '好的，我找到了相关记录。请确认要删除的项目：\n• 昨天 12:30 午餐 ¥35.00\n\n请说"确认"删除，或"取消"操作。';
-    } else if (command.contains('改成') || command.contains('修改')) {
-      return '好的，我找到了咖啡的记录。确认要将金额从¥28.00改为¥25.00吗？\n\n请说"确认"或"取消"。';
-    } else if (command.contains('查看') || command.contains('统计')) {
-      return '本月支出统计：\n• 餐饮：¥1,250\n• 交通：¥380\n• 购物：¥650\n• 其他：¥220\n\n总支出：¥2,500';
-    } else if (command.contains('添加')) {
-      return '好的，已为您添加一笔交易：\n• 类型：交通\n• 金额：¥30.00\n• 时间：刚刚\n\n记录已保存成功！';
-    } else if (command.contains('打开') || command.contains('页面')) {
-      return '正在为您跳转到设置页面...';
-    } else {
-      return '抱歉，我没有完全理解您的指令。请再说一遍，或者尝试其他表达方式。';
-    }
-  }
-
   void _addMessage(ChatMessage message) {
     setState(() {
       _messages.add(message);

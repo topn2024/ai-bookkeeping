@@ -348,8 +348,8 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
 
   Widget _buildMonthlyTrendPage(AnnualReport report) {
     final months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
-    final maxValue = [...report.monthlyIncome, ...report.monthlyExpense]
-        .reduce((a, b) => a > b ? a : b);
+    final allValues = [...report.monthlyIncome, ...report.monthlyExpense];
+    final maxValue = allValues.isEmpty ? 1.0 : allValues.reduce((a, b) => a > b ? a : b);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),

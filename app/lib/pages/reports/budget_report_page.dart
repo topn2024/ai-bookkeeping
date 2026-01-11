@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../providers/budget_provider.dart';
+import '../../providers/transaction_provider.dart';
+import '../../models/transaction.dart';
+import '../../models/category.dart';
 import '../budget_management_page.dart';
 import '../category_detail_page.dart';
 
 /// 预算报告页面
 /// 原型设计 7.04：预算报告
-/// - 周期选择器（12月、11月、10月、Q4、全年）
+/// - 周期选择器（本月、上月、近3月、全年）
 /// - 总预算执行率进度条
 /// - 分类执行情况列表
+/// 数据来源：budgetProvider, transactionProvider
 class BudgetReportPage extends ConsumerStatefulWidget {
   const BudgetReportPage({super.key});
 
@@ -18,24 +23,16 @@ class BudgetReportPage extends ConsumerStatefulWidget {
 
 class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
   int _selectedPeriod = 0;
-  final List<String> _periods = ['12月', '11月', '10月', 'Q4', '全年'];
-
-  // 模拟预算数据
-  final double _totalBudget = 20000;
-  final double _usedBudget = 15700;
-
-  final List<_BudgetCategory> _categories = [
-    _BudgetCategory('餐饮', 3000, 3450, Colors.red),
-    _BudgetCategory('交通', 1500, 1200, Colors.blue),
-    _BudgetCategory('购物', 2000, 1800, Colors.green),
-    _BudgetCategory('娱乐', 1000, 750, Colors.purple),
-    _BudgetCategory('居住', 8000, 7500, Colors.orange),
-  ];
+  final List<String> _periods = ['本月', '上月', '近3月', '全年'];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final executionRate = _totalBudget > 0 ? (_usedBudget / _totalBudget * 100) : 0.0;
+    final budgetUsages = ref.watch(allBudgetUsagesProvider);
+    final transactions = ref.watch(transactionProvider);
+
+    // 根据选择的周期过滤数据
+    final filteredData = _getFilteredBudgetData(budgetUsages, transactions);
 
     return Scaffold(
       body: SafeArea(
@@ -44,18 +41,156 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
             _buildPageHeader(context, theme),
             _buildPeriodSelector(theme),
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _buildOverallProgress(theme, executionRate),
-                    _buildCategoryBreakdown(theme),
-                    _buildAdjustBudgetButton(context, theme),
-                  ],
-                ),
-              ),
+              child: filteredData.categories.isEmpty
+                  ? _buildEmptyState(context, theme)
+                  : SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          _buildOverallProgress(theme, filteredData),
+                          _buildCategoryBreakdown(theme, filteredData.categories),
+                          _buildAdjustBudgetButton(context, theme),
+                        ],
+                      ),
+                    ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 根据选择的周期获取过滤后的预算数据
+  _FilteredBudgetData _getFilteredBudgetData(
+    List<BudgetUsage> budgetUsages,
+    List<Transaction> transactions,
+  ) {
+    final now = DateTime.now();
+    DateTime startDate;
+    DateTime endDate = now;
+
+    switch (_selectedPeriod) {
+      case 0: // 本月
+        startDate = DateTime(now.year, now.month, 1);
+        break;
+      case 1: // 上月
+        final lastMonth = DateTime(now.year, now.month - 1, 1);
+        startDate = lastMonth;
+        endDate = DateTime(now.year, now.month, 0); // 上月最后一天
+        break;
+      case 2: // 近3月
+        startDate = DateTime(now.year, now.month - 2, 1);
+        break;
+      case 3: // 全年
+        startDate = DateTime(now.year, 1, 1);
+        break;
+      default:
+        startDate = DateTime(now.year, now.month, 1);
+    }
+
+    // 过滤当前周期内的交易
+    final periodTransactions = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        !t.date.isBefore(startDate) &&
+        !t.date.isAfter(endDate)).toList();
+
+    // 按分类统计支出
+    final categoryExpenses = <String, double>{};
+    for (final t in periodTransactions) {
+      categoryExpenses[t.category] = (categoryExpenses[t.category] ?? 0) + t.amount;
+    }
+
+    // 获取预算数据并匹配实际支出
+    final categories = <_BudgetCategoryData>[];
+    double totalBudget = 0;
+    double totalUsed = 0;
+
+    // 从预算中获取分类预算
+    for (final usage in budgetUsages) {
+      if (usage.budget.categoryId != null) {
+        final categoryId = usage.budget.categoryId!;
+        final spent = categoryExpenses[categoryId] ?? 0;
+        final budget = usage.budget.amount;
+
+        // 获取分类颜色
+        final category = DefaultCategories.findById(categoryId);
+        final color = category?.color ?? Colors.grey;
+
+        categories.add(_BudgetCategoryData(
+          categoryId: categoryId,
+          name: category?.name ?? categoryId,
+          budget: budget,
+          used: spent,
+          color: color,
+        ));
+
+        totalBudget += budget;
+        totalUsed += spent;
+      }
+    }
+
+    // 如果没有分类预算，显示按分类的实际支出
+    if (categories.isEmpty && categoryExpenses.isNotEmpty) {
+      for (final entry in categoryExpenses.entries) {
+        final category = DefaultCategories.findById(entry.key);
+        final color = category?.color ?? Colors.grey;
+
+        categories.add(_BudgetCategoryData(
+          categoryId: entry.key,
+          name: category?.name ?? entry.key,
+          budget: 0, // 无预算
+          used: entry.value,
+          color: color,
+        ));
+        totalUsed += entry.value;
+      }
+    }
+
+    // 按支出金额排序
+    categories.sort((a, b) => b.used.compareTo(a.used));
+
+    return _FilteredBudgetData(
+      totalBudget: totalBudget,
+      totalUsed: totalUsed,
+      categories: categories,
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.account_balance_wallet_outlined,
+            size: 64,
+            color: theme.colorScheme.outline,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '暂无预算数据',
+            style: TextStyle(
+              fontSize: 16,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '设置预算后可查看执行报告',
+            style: TextStyle(
+              fontSize: 14,
+              color: theme.colorScheme.outline,
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BudgetManagementPage()),
+            ),
+            icon: const Icon(Icons.add),
+            label: const Text('设置预算'),
+          ),
+        ],
       ),
     );
   }
@@ -126,7 +261,10 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
   }
 
   /// 总预算执行率
-  Widget _buildOverallProgress(ThemeData theme, double executionRate) {
+  Widget _buildOverallProgress(ThemeData theme, _FilteredBudgetData data) {
+    final executionRate = data.totalBudget > 0
+        ? (data.totalUsed / data.totalBudget * 100)
+        : 0.0;
     final isOverBudget = executionRate > 100;
     final progressColor = isOverBudget ? Colors.red : Colors.green;
 
@@ -157,37 +295,42 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
                 ),
               ),
               Text(
-                '${executionRate.toStringAsFixed(1)}%',
+                data.totalBudget > 0
+                    ? '${executionRate.toStringAsFixed(1)}%'
+                    : '未设置预算',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: progressColor,
+                  color: data.totalBudget > 0 ? progressColor : theme.colorScheme.outline,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: (executionRate / 100).clamp(0.0, 1.0),
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-              minHeight: 8,
+          if (data.totalBudget > 0)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: (executionRate / 100).clamp(0.0, 1.0),
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                minHeight: 8,
+              ),
             ),
-          ),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '已用 ¥${_usedBudget.toStringAsFixed(0)}',
+                '已用 ¥${data.totalUsed.toStringAsFixed(0)}',
                 style: TextStyle(
                   fontSize: 12,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               Text(
-                '预算 ¥${_totalBudget.toStringAsFixed(0)}',
+                data.totalBudget > 0
+                    ? '预算 ¥${data.totalBudget.toStringAsFixed(0)}'
+                    : '总支出',
                 style: TextStyle(
                   fontSize: 12,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -201,7 +344,7 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
   }
 
   /// 分类执行情况
-  Widget _buildCategoryBreakdown(ThemeData theme) {
+  Widget _buildCategoryBreakdown(ThemeData theme, List<_BudgetCategoryData> categories) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -216,13 +359,13 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
             ),
           ),
           const SizedBox(height: 12),
-          ..._categories.map((cat) => _buildCategoryItem(theme, cat)),
+          ...categories.map((cat) => _buildCategoryItem(theme, cat)),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryItem(ThemeData theme, _BudgetCategory category) {
+  Widget _buildCategoryItem(ThemeData theme, _BudgetCategoryData category) {
     final rate = category.budget > 0 ? (category.used / category.budget * 100) : 0.0;
     final isOverBudget = rate > 100;
     final progressColor = isOverBudget ? Colors.red : category.color;
@@ -232,7 +375,7 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
         context,
         MaterialPageRoute(
           builder: (context) => CategoryDetailPage(
-            categoryId: category.name,
+            categoryId: category.categoryId,
             isExpense: true,
           ),
         ),
@@ -276,24 +419,26 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
                   ],
                 ),
                 Text(
-                  '${rate.toStringAsFixed(0)}%',
+                  category.budget > 0 ? '${rate.toStringAsFixed(0)}%' : '-',
                   style: TextStyle(
                     fontWeight: FontWeight.w500,
-                    color: progressColor,
+                    color: category.budget > 0 ? progressColor : theme.colorScheme.outline,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(
-                value: (rate / 100).clamp(0.0, 1.0),
-                backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-                minHeight: 4,
+            if (category.budget > 0) ...[
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: (rate / 100).clamp(0.0, 1.0),
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                  minHeight: 4,
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -306,7 +451,9 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
                   ),
                 ),
                 Text(
-                  '预算 ¥${category.budget.toStringAsFixed(0)}',
+                  category.budget > 0
+                      ? '预算 ¥${category.budget.toStringAsFixed(0)}'
+                      : '无预算',
                   style: TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.onSurfaceVariant,
@@ -341,11 +488,32 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
   }
 }
 
-class _BudgetCategory {
+/// 过滤后的预算数据
+class _FilteredBudgetData {
+  final double totalBudget;
+  final double totalUsed;
+  final List<_BudgetCategoryData> categories;
+
+  _FilteredBudgetData({
+    required this.totalBudget,
+    required this.totalUsed,
+    required this.categories,
+  });
+}
+
+/// 分类预算数据
+class _BudgetCategoryData {
+  final String categoryId;
   final String name;
   final double budget;
   final double used;
   final Color color;
 
-  _BudgetCategory(this.name, this.budget, this.used, this.color);
+  _BudgetCategoryData({
+    required this.categoryId,
+    required this.name,
+    required this.budget,
+    required this.used,
+    required this.color,
+  });
 }

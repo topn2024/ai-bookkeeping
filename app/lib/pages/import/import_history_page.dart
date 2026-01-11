@@ -3,11 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../theme/app_theme.dart';
+import '../../models/import_batch.dart';
+import '../../core/di/service_locator.dart';
+import '../../core/contracts/i_database_service.dart';
+
+/// 导入历史Provider - 从数据库获取真实数据
+final importBatchesProvider = FutureProvider<List<ImportBatch>>((ref) async {
+  final db = sl<IDatabaseService>();
+  return await db.getImportBatches();
+});
 
 /// 导入历史页面
 /// 原型设计 5.08：导入历史
 /// - 统计卡片（渐变背景，总导入次数、导入交易数）
 /// - 历史记录列表（状态图标、文件名、日期、导入数量）
+/// 数据来源：importBatchesProvider（从数据库获取真实导入批次）
 class ImportHistoryPage extends ConsumerStatefulWidget {
   const ImportHistoryPage({super.key});
 
@@ -16,67 +26,51 @@ class ImportHistoryPage extends ConsumerStatefulWidget {
 }
 
 class _ImportHistoryPageState extends ConsumerState<ImportHistoryPage> {
-  bool _isLoading = true;
-
-  // 模拟统计数据
-  final int _totalImports = 12;
-  final int _totalTransactions = 856;
-
-  // 模拟历史记录
-  final List<ImportHistoryItem> _historyItems = [
-    ImportHistoryItem(
-      fileName: '微信账单_202412.csv',
-      importDate: DateTime.now().subtract(const Duration(days: 2)),
-      importedCount: 126,
-      duplicateCount: 3,
-      status: ImportHistoryStatus.success,
-    ),
-    ImportHistoryItem(
-      fileName: '支付宝账单_202412.csv',
-      importDate: DateTime.now().subtract(const Duration(days: 5)),
-      importedCount: 89,
-      duplicateCount: 1,
-      status: ImportHistoryStatus.success,
-    ),
-    ImportHistoryItem(
-      fileName: '工行账单.pdf',
-      importDate: DateTime.now().subtract(const Duration(days: 8)),
-      importedCount: 56,
-      duplicateCount: 4,
-      totalCount: 60,
-      status: ImportHistoryStatus.partial,
-    ),
-    ImportHistoryItem(
-      fileName: '建行账单_202411.csv',
-      importDate: DateTime.now().subtract(const Duration(days: 15)),
-      importedCount: 78,
-      duplicateCount: 0,
-      status: ImportHistoryStatus.success,
-    ),
-    ImportHistoryItem(
-      fileName: '招行账单.xlsx',
-      importDate: DateTime.now().subtract(const Duration(days: 20)),
-      importedCount: 0,
-      duplicateCount: 0,
-      status: ImportHistoryStatus.failed,
-      errorMessage: '文件格式不支持',
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
-    _loadHistory();
   }
 
-  Future<void> _loadHistory() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    setState(() => _isLoading = false);
+  Future<void> _refreshHistory() async {
+    // ignore: unused_result
+    ref.refresh(importBatchesProvider);
+  }
+
+  /// 将ImportBatch转换为显示用的ImportHistoryItem
+  List<ImportHistoryItem> _convertBatchesToHistoryItems(List<ImportBatch> batches) {
+    return batches.map((batch) {
+      ImportHistoryStatus status;
+      if (batch.failedCount > 0 && batch.importedCount == 0) {
+        status = ImportHistoryStatus.failed;
+      } else if (batch.failedCount > 0 || batch.skippedCount > 0) {
+        status = ImportHistoryStatus.partial;
+      } else {
+        status = ImportHistoryStatus.success;
+      }
+
+      return ImportHistoryItem(
+        fileName: batch.fileName,
+        importDate: batch.createdAt,
+        importedCount: batch.importedCount,
+        duplicateCount: batch.skippedCount,
+        totalCount: batch.totalCount,
+        status: status,
+        errorMessage: batch.errorLog,
+      );
+    }).toList();
+  }
+
+  /// 计算统计数据
+  ({int totalImports, int totalTransactions}) _calculateStats(List<ImportBatch> batches) {
+    final totalImports = batches.length;
+    final totalTransactions = batches.fold<int>(0, (sum, batch) => sum + batch.importedCount);
+    return (totalImports: totalImports, totalTransactions: totalTransactions);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final batchesAsync = ref.watch(importBatchesProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -84,20 +78,41 @@ class _ImportHistoryPageState extends ConsumerState<ImportHistoryPage> {
           children: [
             _buildPageHeader(context, theme),
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : RefreshIndicator(
-                      onRefresh: _loadHistory,
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: Column(
-                          children: [
-                            _buildStatsCard(context, theme),
-                            _buildHistoryList(context, theme),
-                          ],
-                        ),
+              child: batchesAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
+                      const SizedBox(height: 16),
+                      Text('加载失败: $error'),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _refreshHistory,
+                        child: const Text('重试'),
+                      ),
+                    ],
+                  ),
+                ),
+                data: (batches) {
+                  final stats = _calculateStats(batches);
+                  final historyItems = _convertBatchesToHistoryItems(batches);
+
+                  return RefreshIndicator(
+                    onRefresh: _refreshHistory,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Column(
+                        children: [
+                          _buildStatsCard(context, theme, stats.totalImports, stats.totalTransactions),
+                          _buildHistoryList(context, theme, historyItems),
+                        ],
                       ),
                     ),
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -132,7 +147,7 @@ class _ImportHistoryPageState extends ConsumerState<ImportHistoryPage> {
     );
   }
 
-  Widget _buildStatsCard(BuildContext context, ThemeData theme) {
+  Widget _buildStatsCard(BuildContext context, ThemeData theme, int totalImports, int totalTransactions) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -150,7 +165,7 @@ class _ImportHistoryPageState extends ConsumerState<ImportHistoryPage> {
           Column(
             children: [
               Text(
-                '$_totalImports',
+                '$totalImports',
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
@@ -174,7 +189,7 @@ class _ImportHistoryPageState extends ConsumerState<ImportHistoryPage> {
           Column(
             children: [
               Text(
-                '$_totalTransactions',
+                '$totalTransactions',
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
@@ -195,8 +210,8 @@ class _ImportHistoryPageState extends ConsumerState<ImportHistoryPage> {
     );
   }
 
-  Widget _buildHistoryList(BuildContext context, ThemeData theme) {
-    if (_historyItems.isEmpty) {
+  Widget _buildHistoryList(BuildContext context, ThemeData theme, List<ImportHistoryItem> historyItems) {
+    if (historyItems.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
@@ -222,7 +237,7 @@ class _ImportHistoryPageState extends ConsumerState<ImportHistoryPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
-        children: _historyItems.map((item) => _buildHistoryItem(theme, item)).toList(),
+        children: historyItems.map((item) => _buildHistoryItem(theme, item)).toList(),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 
 import '../../theme/app_theme.dart';
+import '../../models/import_batch.dart';
 import '../import_page.dart';
 import 'smart_format_detection_page.dart';
 import 'import_history_page.dart';
@@ -52,20 +53,10 @@ class _ImportMainPageState extends ConsumerState<ImportMainPage> {
     ),
   ];
 
-  // 最近导入记录（模拟数据）
-  final List<RecentImportRecord> _recentImports = [
-    RecentImportRecord(
-      fileName: '微信账单_202512.csv',
-      importDate: DateTime.now().subtract(const Duration(days: 2)),
-      count: 156,
-      source: 'wechat',
-      status: ImportRecordStatus.success,
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final recentImportsAsync = ref.watch(importBatchesProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -79,7 +70,11 @@ class _ImportMainPageState extends ConsumerState<ImportMainPage> {
                   children: [
                     _buildUploadArea(context, theme),
                     _buildQuickImportSection(context, theme),
-                    _buildRecentImportsSection(context, theme),
+                    recentImportsAsync.when(
+                      loading: () => const SizedBox.shrink(),
+                      error: (e, _) => const SizedBox.shrink(),
+                      data: (batches) => _buildRecentImportsSection(context, theme, batches),
+                    ),
                   ],
                 ),
               ),
@@ -259,8 +254,8 @@ class _ImportMainPageState extends ConsumerState<ImportMainPage> {
   }
 
   /// 最近导入记录
-  Widget _buildRecentImportsSection(BuildContext context, ThemeData theme) {
-    if (_recentImports.isEmpty) return const SizedBox.shrink();
+  Widget _buildRecentImportsSection(BuildContext context, ThemeData theme, List<ImportBatch> batches) {
+    if (batches.isEmpty) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -291,13 +286,23 @@ class _ImportMainPageState extends ConsumerState<ImportMainPage> {
             ],
           ),
           const SizedBox(height: 12),
-          ...(_recentImports.take(3).map((record) => _buildRecentImportItem(theme, record))),
+          ...(batches.take(3).map((batch) => _buildRecentImportItem(theme, batch))),
         ],
       ),
     );
   }
 
-  Widget _buildRecentImportItem(ThemeData theme, RecentImportRecord record) {
+  Widget _buildRecentImportItem(ThemeData theme, ImportBatch batch) {
+    // 根据文件名检测来源
+    String source = 'generic';
+    if (batch.fileName.contains('微信') || batch.fileName.toLowerCase().contains('wechat')) {
+      source = 'wechat';
+    } else if (batch.fileName.contains('支付宝') || batch.fileName.toLowerCase().contains('alipay')) {
+      source = 'alipay';
+    } else if (batch.fileName.contains('银行') || batch.fileName.toLowerCase().contains('bank')) {
+      source = 'bank';
+    }
+
     final sourceColors = {
       'wechat': const Color(0xFF07C160),
       'alipay': const Color(0xFF1677FF),
@@ -309,8 +314,22 @@ class _ImportMainPageState extends ConsumerState<ImportMainPage> {
       'bank': Icons.account_balance,
     };
 
-    final color = sourceColors[record.source] ?? theme.colorScheme.primary;
-    final icon = sourceIcons[record.source] ?? Icons.description;
+    final color = sourceColors[source] ?? theme.colorScheme.primary;
+    final icon = sourceIcons[source] ?? Icons.description;
+
+    // 确定状态
+    String statusText;
+    Color statusColor;
+    if (batch.failedCount > 0 && batch.importedCount == 0) {
+      statusText = '失败';
+      statusColor = AppColors.error;
+    } else if (batch.failedCount > 0 || batch.skippedCount > 0) {
+      statusText = '部分成功';
+      statusColor = Colors.orange;
+    } else {
+      statusText = '成功';
+      statusColor = AppColors.success;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -343,7 +362,7 @@ class _ImportMainPageState extends ConsumerState<ImportMainPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  record.fileName,
+                  batch.fileName,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -351,7 +370,7 @@ class _ImportMainPageState extends ConsumerState<ImportMainPage> {
                   ),
                 ),
                 Text(
-                  '导入 ${record.count} 笔 · ${_formatDate(record.importDate)}',
+                  '导入 ${batch.importedCount} 笔 · ${_formatDate(batch.createdAt)}',
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.colorScheme.onSurfaceVariant,
@@ -363,14 +382,14 @@ class _ImportMainPageState extends ConsumerState<ImportMainPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.1),
+              color: statusColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              '成功',
+              statusText,
               style: TextStyle(
                 fontSize: 12,
-                color: AppColors.success,
+                color: statusColor,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -484,26 +503,3 @@ class QuickImportOption {
   });
 }
 
-/// 最近导入记录
-class RecentImportRecord {
-  final String fileName;
-  final DateTime importDate;
-  final int count;
-  final String source;
-  final ImportRecordStatus status;
-
-  RecentImportRecord({
-    required this.fileName,
-    required this.importDate,
-    required this.count,
-    required this.source,
-    required this.status,
-  });
-}
-
-/// 导入记录状态
-enum ImportRecordStatus {
-  success,
-  partial,
-  failed,
-}
