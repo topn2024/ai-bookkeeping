@@ -3,6 +3,8 @@ import logging
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.header import Header
+from email.utils import formataddr
 from typing import Optional
 
 from app.core.config import get_settings
@@ -101,8 +103,9 @@ class NotificationEmailService:
 
         try:
             msg = MIMEMultipart("alternative")
-            msg["Subject"] = subject
-            msg["From"] = f"{self.settings.SMTP_FROM_NAME} <{self.settings.SMTP_FROM_EMAIL or self.settings.SMTP_USER}>"
+            msg["Subject"] = Header(subject, "utf-8")
+            from_email = self.settings.SMTP_FROM_EMAIL or self.settings.SMTP_USER
+            msg["From"] = formataddr((str(Header(self.settings.SMTP_FROM_NAME, "utf-8")), from_email))
             msg["To"] = to_email
 
             if text_body:
