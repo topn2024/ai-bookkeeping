@@ -561,10 +561,15 @@ class _VaultCreatePageState extends ConsumerState<VaultCreatePage> {
       }
 
       if (mounted) {
-        Navigator.pop(context, true);
+        // 先显示成功消息，再关闭页面
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('小金库 "$name" ${_isEditMode ? '更新' : '创建'}成功')),
         );
+        // 延迟一小段时间让SnackBar显示，然后关闭页面
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (mounted) {
+          Navigator.pop(context, true);
+        }
       }
     } catch (e) {
       if (mounted) {
