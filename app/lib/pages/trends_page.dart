@@ -283,7 +283,7 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
       return GestureDetector(
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const TrendDrillPage()),
+          MaterialPageRoute(builder: (_) => TrendDrillPage(dateRange: _getDateRange())),
         ),
         child: Container(
           height: 200,
@@ -327,7 +327,7 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const TrendDrillPage()),
+        MaterialPageRoute(builder: (_) => TrendDrillPage(dateRange: _getDateRange())),
       ),
       child: Container(
         height: 200,

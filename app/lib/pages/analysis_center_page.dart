@@ -199,6 +199,37 @@ class _TrendAnalysisTab extends ConsumerWidget {
 
   const _TrendAnalysisTab({required this.selectedPeriod});
 
+  /// 根据选中的周期获取日期范围
+  DateTimeRange _getDateRange() {
+    final now = DateTime.now();
+    switch (selectedPeriod) {
+      case 0: // 本月
+        return DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: now,
+        );
+      case 1: // 上月
+        final lastMonth = DateTime(now.year, now.month - 1, 1);
+        final lastMonthEnd = DateTime(now.year, now.month, 0);
+        return DateTimeRange(start: lastMonth, end: lastMonthEnd);
+      case 2: // 近3月
+        return DateTimeRange(
+          start: DateTime(now.year, now.month - 2, 1),
+          end: now,
+        );
+      case 3: // 今年
+        return DateTimeRange(
+          start: DateTime(now.year, 1, 1),
+          end: now,
+        );
+      default:
+        return DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: now,
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -233,7 +264,7 @@ class _TrendAnalysisTab extends ConsumerWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const TrendDrillPage()),
+            MaterialPageRoute(builder: (_) => TrendDrillPage(dateRange: _getDateRange())),
           );
         },
         borderRadius: BorderRadius.circular(12),
@@ -348,7 +379,7 @@ class _TrendAnalysisTab extends ConsumerWidget {
                     label: '趋势下钻',
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const TrendDrillPage()),
+                      MaterialPageRoute(builder: (_) => TrendDrillPage(dateRange: _getDateRange())),
                     ),
                   ),
                 ),

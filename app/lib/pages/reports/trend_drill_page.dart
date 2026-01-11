@@ -14,7 +14,13 @@ import '../../extensions/category_extensions.dart';
 /// - 折线图区域（可点击数据点）
 /// - 选中日期的交易列表
 class TrendDrillPage extends ConsumerStatefulWidget {
-  const TrendDrillPage({super.key});
+  /// 日期范围，为 null 时显示所有数据
+  final DateTimeRange? dateRange;
+
+  const TrendDrillPage({
+    super.key,
+    this.dateRange,
+  });
 
   @override
   ConsumerState<TrendDrillPage> createState() => _TrendDrillPageState();
@@ -26,10 +32,18 @@ class _TrendDrillPageState extends ConsumerState<TrendDrillPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final transactions = ref.watch(transactionProvider);
+    final allTransactions = ref.watch(transactionProvider);
+
+    // 根据日期范围过滤交易
+    final filteredTransactions = widget.dateRange != null
+        ? allTransactions.where((t) =>
+            !t.date.isBefore(widget.dateRange!.start) &&
+            !t.date.isAfter(widget.dateRange!.end))
+        .toList()
+        : allTransactions;
 
     // 计算统计数据
-    final expenseTransactions = transactions
+    final expenseTransactions = filteredTransactions
         .where((t) => t.type == TransactionType.expense)
         .toList();
 
