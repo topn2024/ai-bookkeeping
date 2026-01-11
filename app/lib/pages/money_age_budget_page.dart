@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/transaction.dart';
+import '../models/category.dart';
+import '../providers/transaction_provider.dart';
+import '../providers/budget_provider.dart';
+import '../providers/money_age_provider.dart';
+import '../extensions/category_extensions.dart';
 import '../theme/app_theme.dart';
 
 /// 钱龄预算联动页面
@@ -25,9 +31,9 @@ class MoneyAgeBudgetPage extends ConsumerWidget {
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    _buildPredictionCard(context, theme),
-                    _buildBudgetImpactList(context, theme),
-                    _buildAISuggestion(context, theme),
+                    _buildPredictionCard(context, theme, ref),
+                    _buildBudgetImpactList(context, theme, ref),
+                    _buildAISuggestion(context, theme, ref),
                     const SizedBox(height: 100),
                   ],
                 ),
@@ -68,100 +74,231 @@ class MoneyAgeBudgetPage extends ConsumerWidget {
   }
 
   /// 钱龄影响预测卡片
-  Widget _buildPredictionCard(BuildContext context, ThemeData theme) {
-    return Container(
-      margin: const EdgeInsets.all(12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          // 标题说明
-          Column(
-            children: [
-              Text(
-                '按当前预算执行',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                '月末预计钱龄',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+  Widget _buildPredictionCard(BuildContext context, ThemeData theme, WidgetRef ref) {
+    final dashboardAsync = ref.watch(moneyAgeDashboardProvider);
+
+    return dashboardAsync.when(
+      data: (dashboard) {
+        final currentAge = dashboard?.averageMoneyAge ?? 0;
+        // 简单预测：假设按当前预算执行，每月可增加5-10天
+        final predictedGain = (currentAge * 0.15).round().clamp(3, 15);
+        final predictedAge = currentAge + predictedGain;
+
+        return Container(
+          margin: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
           ),
-          const SizedBox(height: 12),
-          // 钱龄对比
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
             children: [
-              // 当前
               Column(
                 children: [
-                  const Text(
-                    '42天',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
                   Text(
-                    '当前',
+                    '按当前预算执行',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 13,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '月末预计钱龄',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Icon(
-                  Icons.arrow_forward,
-                  color: AppColors.success,
-                ),
-              ),
-              // 预计
-              Column(
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    '48天',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
+                  Column(
+                    children: [
+                      Text(
+                        '$currentAge天',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '当前',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Icon(
+                      Icons.arrow_forward,
                       color: AppColors.success,
                     ),
                   ),
-                  Text(
-                    '+6天 ↑',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.success,
-                    ),
+                  Column(
+                    children: [
+                      Text(
+                        '$predictedAge天',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.success,
+                        ),
+                      ),
+                      Text(
+                        '+$predictedGain天 ↑',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ],
           ),
-        ],
+        );
+      },
+      loading: () => Container(
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => Container(
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Center(child: Text('暂无钱龄数据')),
       ),
     );
   }
 
   /// 各预算项对钱龄的影响分析
-  Widget _buildBudgetImpactList(BuildContext context, ThemeData theme) {
+  Widget _buildBudgetImpactList(BuildContext context, ThemeData theme, WidgetRef ref) {
+    final budgets = ref.watch(budgetProvider);
+    final transactions = ref.watch(transactionProvider);
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+
+    // 本月按分类汇总支出
+    final monthlyExpenses = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.date.isAfter(monthStart.subtract(const Duration(days: 1))) &&
+        t.date.isBefore(now.add(const Duration(days: 1)))).toList();
+
+    final categorySpent = <String, double>{};
+    for (final t in monthlyExpenses) {
+      categorySpent[t.category] = (categorySpent[t.category] ?? 0) + t.amount;
+    }
+
+    // 获取有效预算并计算影响
+    final activeBudgets = budgets.where((b) => b.isEnabled && b.amount > 0).toList();
+
+    if (activeBudgets.isEmpty && categorySpent.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '各预算项对钱龄的影响',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(child: Text('暂无预算数据')),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 构建预算影响项目
+    final impactItems = <Widget>[];
+
+    for (final budget in activeBudgets.take(5)) {
+      final categoryId = budget.categoryId;
+      if (categoryId == null) continue;
+
+      final spent = categorySpent[categoryId] ?? 0;
+      final category = DefaultCategories.findById(categoryId);
+      final progress = budget.amount > 0 ? spent / budget.amount : 0.0;
+
+      // 计算对钱龄的影响（简化算法：超支越多，负面影响越大）
+      int impact;
+      bool isPositive;
+      if (progress <= 0.5) {
+        impact = ((1 - progress) * 10).round();
+        isPositive = true;
+      } else if (progress <= 0.8) {
+        impact = ((progress - 0.5) * -6).round();
+        isPositive = false;
+      } else {
+        impact = ((progress - 0.8) * -15).round() - 3;
+        isPositive = false;
+      }
+
+      Color progressColor;
+      if (progress <= 0.5) {
+        progressColor = AppColors.success;
+      } else if (progress <= 0.8) {
+        progressColor = AppColors.warning;
+      } else {
+        progressColor = AppColors.error;
+      }
+
+      final emoji = _getCategoryEmoji(categoryId);
+
+      impactItems.add(_buildBudgetImpactItem(
+        context,
+        theme,
+        emoji: emoji,
+        name: '${category?.localizedName ?? categoryId}预算',
+        current: spent,
+        budget: budget.amount,
+        impact: impact,
+        isPositive: isPositive,
+        progressPercent: progress.clamp(0.0, 1.0),
+        progressColor: progressColor,
+      ));
+      impactItems.add(const SizedBox(height: 8));
+    }
+
+    // 移除最后一个SizedBox
+    if (impactItems.isNotEmpty) {
+      impactItems.removeLast();
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
@@ -175,50 +312,27 @@ class MoneyAgeBudgetPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          // 餐饮预算
-          _buildBudgetImpactItem(
-            context,
-            theme,
-            emoji: '🍜',
-            name: '餐饮预算',
-            current: 1800,
-            budget: 2500,
-            impact: -8,
-            isPositive: false,
-            progressPercent: 0.72,
-            progressColor: AppColors.warning,
-          ),
-          const SizedBox(height: 8),
-          // 交通预算
-          _buildBudgetImpactItem(
-            context,
-            theme,
-            emoji: '🚗',
-            name: '交通预算',
-            current: 320,
-            budget: 600,
-            impact: -2,
-            isPositive: false,
-            progressPercent: 0.53,
-            progressColor: AppColors.success,
-          ),
-          const SizedBox(height: 8),
-          // 储蓄计划
-          _buildBudgetImpactItem(
-            context,
-            theme,
-            emoji: '💰',
-            name: '储蓄计划',
-            current: 3000,
-            budget: 3000,
-            impact: 16,
-            isPositive: true,
-            progressPercent: 1.0,
-            progressColor: AppColors.success,
-          ),
+          ...impactItems,
         ],
       ),
     );
+  }
+
+  String _getCategoryEmoji(String categoryId) {
+    final emojiMap = {
+      'food': '🍜',
+      'transport': '🚗',
+      'shopping': '🛒',
+      'entertainment': '🎮',
+      'medical': '💊',
+      'education': '📚',
+      'housing': '🏠',
+      'utilities': '💡',
+      'communication': '📱',
+      'saving': '💰',
+      'other': '📋',
+    };
+    return emojiMap[categoryId] ?? '📋';
   }
 
   Widget _buildBudgetImpactItem(
@@ -319,7 +433,63 @@ class MoneyAgeBudgetPage extends ConsumerWidget {
   }
 
   /// AI建议
-  Widget _buildAISuggestion(BuildContext context, ThemeData theme) {
+  Widget _buildAISuggestion(BuildContext context, ThemeData theme, WidgetRef ref) {
+    final budgets = ref.watch(budgetProvider);
+    final transactions = ref.watch(transactionProvider);
+    final dashboardAsync = ref.watch(moneyAgeDashboardProvider);
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+
+    // 本月按分类汇总支出
+    final monthlyExpenses = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.date.isAfter(monthStart.subtract(const Duration(days: 1))) &&
+        t.date.isBefore(now.add(const Duration(days: 1)))).toList();
+
+    final categorySpent = <String, double>{};
+    for (final t in monthlyExpenses) {
+      categorySpent[t.category] = (categorySpent[t.category] ?? 0) + t.amount;
+    }
+
+    // 找出超支最多的预算
+    String suggestion = '合理规划预算，可以有效提升您的钱龄水平';
+
+    final activeBudgets = budgets.where((b) => b.isEnabled && b.amount > 0 && b.categoryId != null).toList();
+
+    if (activeBudgets.isNotEmpty) {
+      // 找出进度最高（即最接近超支）的预算
+      double maxProgress = 0;
+      String? targetCategoryId;
+      double targetBudget = 0;
+
+      for (final budget in activeBudgets) {
+        final spent = categorySpent[budget.categoryId!] ?? 0;
+        final progress = spent / budget.amount;
+        if (progress > maxProgress && progress > 0.6) {
+          maxProgress = progress;
+          targetCategoryId = budget.categoryId;
+          targetBudget = budget.amount;
+        }
+      }
+
+      if (targetCategoryId != null) {
+        final category = DefaultCategories.findById(targetCategoryId);
+        final categoryName = category?.localizedName ?? targetCategoryId;
+        final reducedBudget = (targetBudget * 0.8).round();
+        final savings = (targetBudget - reducedBudget).round();
+
+        // 获取当前钱龄
+        final currentAge = dashboardAsync.when(
+          data: (d) => d?.averageMoneyAge ?? 30,
+          loading: () => 30,
+          error: (_, __) => 30,
+        );
+        final predictedAge = currentAge + (savings / 100).round();
+
+        suggestion = '将$categoryName预算从¥${targetBudget.toStringAsFixed(0)}降至¥$reducedBudget，每月可额外储蓄¥$savings，预计可将钱龄提升至$predictedAge天（+${predictedAge - currentAge}天）';
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(12),
@@ -349,7 +519,7 @@ class MoneyAgeBudgetPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '将餐饮预算从¥2,500降至¥2,000，每月可额外储蓄¥500，预计可将钱龄��升至52天（+10天）',
+                  suggestion,
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.colorScheme.onSurfaceVariant,

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/transaction.dart';
+import '../../models/category.dart';
+import '../../providers/transaction_provider.dart';
+import '../../providers/budget_provider.dart';
+import '../../extensions/category_extensions.dart';
 import '../budget_management_page.dart';
 
 /// 消费趋势预测页面
@@ -32,10 +37,10 @@ class SpendingPredictionPage extends ConsumerWidget {
       body: ListView(
         children: [
           // 本月预测卡片
-          _MonthlyPredictionCard(),
+          const _MonthlyPredictionCard(),
 
           // 分类预测
-          _CategoryPredictionSection(),
+          const _CategoryPredictionSection(),
 
           // 预测说明
           _PredictionExplanation(),
@@ -67,9 +72,55 @@ class SpendingPredictionPage extends ConsumerWidget {
 }
 
 /// 本月预测卡片
-class _MonthlyPredictionCard extends StatelessWidget {
+class _MonthlyPredictionCard extends ConsumerWidget {
+  const _MonthlyPredictionCard();
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final transactions = ref.watch(transactionProvider);
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+
+    // 本月已支出
+    final monthlyExpenses = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.date.isAfter(monthStart.subtract(const Duration(days: 1))) &&
+        t.date.isBefore(now.add(const Duration(days: 1)))).toList();
+    final spent = monthlyExpenses.fold<double>(0, (sum, t) => sum + t.amount);
+
+    // 上月同期支出（用于预测）
+    final lastMonthStart = DateTime(now.year, now.month - 1, 1);
+    final lastMonthSameDay = DateTime(now.year, now.month - 1, now.day);
+    final lastMonthEnd = DateTime(now.year, now.month, 0);
+    final lastMonthPartialExpenses = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.date.isAfter(lastMonthStart.subtract(const Duration(days: 1))) &&
+        t.date.isBefore(lastMonthSameDay.add(const Duration(days: 1)))).toList();
+    final lastMonthFullExpenses = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.date.isAfter(lastMonthStart.subtract(const Duration(days: 1))) &&
+        t.date.isBefore(lastMonthEnd.add(const Duration(days: 1)))).toList();
+
+    final lastMonthPartialSpent = lastMonthPartialExpenses.fold<double>(0, (sum, t) => sum + t.amount);
+    final lastMonthFullSpent = lastMonthFullExpenses.fold<double>(0, (sum, t) => sum + t.amount);
+
+    // 简单预测：基于上月同期的比例
+    double predicted;
+    if (lastMonthPartialSpent > 0 && lastMonthFullSpent > 0) {
+      final ratio = lastMonthFullSpent / lastMonthPartialSpent;
+      predicted = spent * ratio;
+    } else {
+      // 没有历史数据时，按日均推算
+      final daysElapsed = now.day;
+      final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+      predicted = (spent / daysElapsed) * daysInMonth;
+    }
+
+    final predictedRemaining = (predicted - spent).clamp(0, double.infinity);
+    final progress = predicted > 0 ? spent / predicted : 0.0;
+    final daysRemaining = DateTime(now.year, now.month + 1, 0).day - now.day;
+    final variance = (predicted * 0.05).round(); // 5%误差范围
+
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -96,9 +147,9 @@ class _MonthlyPredictionCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              const Text(
-                '¥8,650',
-                style: TextStyle(
+              Text(
+                '¥${predicted.toStringAsFixed(0)}',
+                style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -106,7 +157,7 @@ class _MonthlyPredictionCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                '±¥320',
+                '±¥$variance',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.white.withValues(alpha: 0.8),
@@ -124,9 +175,9 @@ class _MonthlyPredictionCard extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.8),
                 ),
               ),
-              const Text(
-                '¥5,280',
-                style: TextStyle(
+              Text(
+                '¥${spent.toStringAsFixed(0)}',
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -140,9 +191,9 @@ class _MonthlyPredictionCard extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.8),
                 ),
               ),
-              const Text(
-                '¥3,370',
-                style: TextStyle(
+              Text(
+                '¥${predictedRemaining.toStringAsFixed(0)}',
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -154,7 +205,7 @@ class _MonthlyPredictionCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(2),
             child: LinearProgressIndicator(
-              value: 0.61,
+              value: progress.clamp(0.0, 1.0),
               minHeight: 4,
               backgroundColor: Colors.white.withValues(alpha: 0.3),
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
@@ -165,14 +216,14 @@ class _MonthlyPredictionCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '进度 61%',
+                '进度 ${(progress * 100).toStringAsFixed(0)}%',
                 style: TextStyle(
                   fontSize: 11,
                   color: Colors.white.withValues(alpha: 0.8),
                 ),
               ),
               Text(
-                '剩余12天',
+                '剩余$daysRemaining天',
                 style: TextStyle(
                   fontSize: 11,
                   color: Colors.white.withValues(alpha: 0.8),
@@ -187,35 +238,112 @@ class _MonthlyPredictionCard extends StatelessWidget {
 }
 
 /// 分类预测区域
-class _CategoryPredictionSection extends StatelessWidget {
+class _CategoryPredictionSection extends ConsumerWidget {
+  const _CategoryPredictionSection();
+
   @override
-  Widget build(BuildContext context) {
-    final predictions = [
-      _PredictionData(
-        emoji: '🍜',
-        category: '餐饮',
-        predicted: 2400,
-        spent: 1800,
-        budget: 2500,
-        trend: -8,
-      ),
-      _PredictionData(
-        emoji: '🚗',
-        category: '交通',
-        predicted: 850,
-        spent: 680,
-        budget: 800,
-        trend: 15,
-      ),
-      _PredictionData(
-        emoji: '🛒',
-        category: '购物',
-        predicted: 1200,
-        spent: 720,
-        budget: 1500,
-        trend: -22,
-      ),
-    ];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final transactions = ref.watch(transactionProvider);
+    final budgets = ref.watch(budgetProvider);
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+    final lastMonthStart = DateTime(now.year, now.month - 1, 1);
+    final lastMonthEnd = DateTime(now.year, now.month, 0);
+
+    // 本月按分类汇总
+    final monthlyExpenses = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.date.isAfter(monthStart.subtract(const Duration(days: 1))) &&
+        t.date.isBefore(now.add(const Duration(days: 1)))).toList();
+
+    final categorySpent = <String, double>{};
+    for (final t in monthlyExpenses) {
+      categorySpent[t.category] = (categorySpent[t.category] ?? 0) + t.amount;
+    }
+
+    // 上月按分类汇总
+    final lastMonthExpenses = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.date.isAfter(lastMonthStart.subtract(const Duration(days: 1))) &&
+        t.date.isBefore(lastMonthEnd.add(const Duration(days: 1)))).toList();
+
+    final lastMonthCategorySpent = <String, double>{};
+    for (final t in lastMonthExpenses) {
+      lastMonthCategorySpent[t.category] = (lastMonthCategorySpent[t.category] ?? 0) + t.amount;
+    }
+
+    // 构建分类预测数据
+    final predictions = <_PredictionData>[];
+    final daysElapsed = now.day;
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+
+    // 取支出最多的分类
+    final sortedCategories = categorySpent.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    for (final entry in sortedCategories.take(5)) {
+      final categoryId = entry.key;
+      final spent = entry.value;
+      final lastMonthSpent = lastMonthCategorySpent[categoryId] ?? 0;
+
+      // 预测本月支出
+      final predicted = daysElapsed > 0 ? (spent / daysElapsed) * daysInMonth : spent;
+
+      // 计算趋势
+      int trend = 0;
+      if (lastMonthSpent > 0) {
+        trend = ((predicted - lastMonthSpent) / lastMonthSpent * 100).round();
+      }
+
+      // 获取预算
+      final budget = budgets
+          .where((b) => b.categoryId == categoryId && b.isEnabled)
+          .fold<double>(0, (sum, b) => sum + b.amount);
+
+      final category = DefaultCategories.findById(categoryId);
+      final emoji = _getCategoryEmoji(categoryId);
+
+      predictions.add(_PredictionData(
+        emoji: emoji,
+        category: category?.localizedName ?? categoryId,
+        predicted: predicted,
+        spent: spent,
+        budget: budget > 0 ? budget : predicted * 1.2, // 无预算时用预测值的120%
+        trend: trend,
+      ));
+    }
+
+    if (predictions.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '分类预测',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: Text(
+                  '暂无支出数据',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -234,6 +362,22 @@ class _CategoryPredictionSection extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _getCategoryEmoji(String categoryId) {
+    final emojiMap = {
+      'food': '🍜',
+      'transport': '🚗',
+      'shopping': '🛒',
+      'entertainment': '🎮',
+      'medical': '💊',
+      'education': '📚',
+      'housing': '🏠',
+      'utilities': '💡',
+      'communication': '📱',
+      'other': '📋',
+    };
+    return emojiMap[categoryId] ?? '📋';
   }
 }
 

@@ -5,6 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
+import '../models/transaction.dart';
+import '../models/category.dart';
+import '../providers/transaction_provider.dart';
+import '../providers/money_age_provider.dart';
+import '../extensions/category_extensions.dart';
 
 /// 聊天消息类型
 enum ChatMessageType {
@@ -579,17 +584,11 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
     }
 
     if (input.contains('花了多少') || input.contains('支出')) {
-      return {
-        'message': '今天您一共支出了 ¥128.50，包括：\n\n🍜 餐饮 ¥45.00\n🚗 交通 ¥38.50\n🛒 购物 ¥45.00\n\n比昨天少花了 ¥32.00 呢！',
-        'metadata': null,
-      };
+      return _generateSpendingResponse();
     }
 
     if (input.contains('钱龄')) {
-      return {
-        'message': '您当前的钱龄是 42天，处于"良好"水平 🌟\n\n这意味着您花的钱平均是42天前赚的，财务缓冲能力不错！\n\n想了解如何提升钱龄吗？',
-        'metadata': null,
-      };
+      return _generateMoneyAgeResponse();
     }
 
     return {
@@ -649,5 +648,133 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
         );
       }
     });
+  }
+
+  /// 生成支出查询响应（使用真实数据）
+  Map<String, dynamic> _generateSpendingResponse() {
+    final transactions = ref.read(transactionProvider);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    // 今日支出
+    final todayExpenses = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.date.year == today.year &&
+        t.date.month == today.month &&
+        t.date.day == today.day).toList();
+
+    // 昨日支出
+    final yesterdayExpenses = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.date.year == yesterday.year &&
+        t.date.month == yesterday.month &&
+        t.date.day == yesterday.day).toList();
+
+    final todayTotal = todayExpenses.fold<double>(0, (sum, t) => sum + t.amount);
+    final yesterdayTotal = yesterdayExpenses.fold<double>(0, (sum, t) => sum + t.amount);
+
+    // 按分类汇总
+    final categoryTotals = <String, double>{};
+    for (final t in todayExpenses) {
+      categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
+    }
+
+    // 排序并生成分类明细
+    final sortedCategories = categoryTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final categoryDetails = sortedCategories.take(3).map((e) {
+      final category = DefaultCategories.findById(e.key);
+      final emoji = _getCategoryEmoji(e.key);
+      return '$emoji ${category?.localizedName ?? e.key} ¥${e.value.toStringAsFixed(2)}';
+    }).join('\n');
+
+    // 与昨日比较
+    String comparison = '';
+    if (yesterdayTotal > 0) {
+      final diff = yesterdayTotal - todayTotal;
+      if (diff > 0) {
+        comparison = '\n\n比昨天少花了 ¥${diff.toStringAsFixed(2)} 呢！';
+      } else if (diff < 0) {
+        comparison = '\n\n比昨天多花了 ¥${(-diff).toStringAsFixed(2)}';
+      }
+    }
+
+    if (todayExpenses.isEmpty) {
+      return {
+        'message': '今天还没有支出记录哦！\n\n开始记录您的第一笔支出吧 ✨',
+        'metadata': null,
+      };
+    }
+
+    return {
+      'message': '今天您一共支出了 ¥${todayTotal.toStringAsFixed(2)}，包括：\n\n$categoryDetails$comparison',
+      'metadata': null,
+    };
+  }
+
+  /// 生成钱龄查询响应（使用真实数据）
+  Map<String, dynamic> _generateMoneyAgeResponse() {
+    final dashboardAsync = ref.read(moneyAgeDashboardProvider);
+
+    return dashboardAsync.when(
+      data: (dashboard) {
+        if (dashboard == null) {
+          return {
+            'message': '暂时无法获取钱龄数据，请稍后再试 😅',
+            'metadata': null,
+          };
+        }
+
+        final avgAge = dashboard.averageMoneyAge;
+        final level = dashboard.level;
+
+        String levelEmoji;
+        switch (level) {
+          case '健康':
+            levelEmoji = '🌟';
+            break;
+          case '良好':
+            levelEmoji = '✨';
+            break;
+          case '一般':
+            levelEmoji = '📊';
+            break;
+          default:
+            levelEmoji = '💪';
+        }
+
+        return {
+          'message': '您当前的钱龄是 $avgAge天，处于"$level"水平 $levelEmoji\n\n这意味着您花的钱平均是$avgAge天前赚的。\n\n想了解如何提升钱龄吗？',
+          'metadata': null,
+        };
+      },
+      loading: () => {
+        'message': '正在查询钱龄数据...',
+        'metadata': null,
+      },
+      error: (_, __) => {
+        'message': '查询钱龄时遇到问题，请稍后再试 😅',
+        'metadata': null,
+      },
+    );
+  }
+
+  /// 获取分类对应的emoji
+  String _getCategoryEmoji(String categoryId) {
+    final emojiMap = {
+      'food': '🍜',
+      'transport': '🚗',
+      'shopping': '🛒',
+      'entertainment': '🎮',
+      'medical': '💊',
+      'education': '📚',
+      'housing': '🏠',
+      'utilities': '💡',
+      'communication': '📱',
+      'other': '📋',
+    };
+    return emojiMap[categoryId] ?? '📋';
   }
 }
