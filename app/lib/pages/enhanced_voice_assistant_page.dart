@@ -13,6 +13,8 @@ import '../theme/antigravity_shadows.dart';
 import '../l10n/app_localizations.dart';
 import 'settings_page.dart';
 import 'main_navigation.dart';
+import 'add_transaction_page.dart';
+import 'image_recognition_page.dart';
 
 /// 增强版语音助手页面 - 集成完整语音服务功能
 ///
@@ -608,128 +610,278 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     VoiceSessionState sessionState,
     VoiceServiceCoordinator coordinator,
   ) {
+    final isListening = sessionState == VoiceSessionState.listening;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: AntigravityShadows.L2,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: SafeArea(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // 语音按钮和状态
+            // 状态提示文字
+            Text(
+              _getActionText(sessionState),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: isListening ? AppColors.expense : AppTheme.textSecondaryColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _getActionHint(sessionState),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondaryColor,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // 三个按钮区域
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // 语音按钮
-                GestureDetector(
-                  onTapDown: _hasPermission ? (_) => _startListening(coordinator) : null,
-                  onTapUp: _hasPermission ? (_) => _stopListening(coordinator) : null,
-                  onTapCancel: _hasPermission ? () => _stopListening(coordinator) : null,
-                  child: AnimatedBuilder(
-                    animation: _pulseController,
-                    builder: (context, child) {
-                      return Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: _hasPermission
-                              ? (sessionState == VoiceSessionState.listening
-                                  ? AppColors.expense
-                                  : AppTheme.primaryColor)
-                              : Colors.grey,
-                          shape: BoxShape.circle,
-                          boxShadow: sessionState == VoiceSessionState.listening
-                              ? [
-                                  BoxShadow(
-                                    color: AppColors.expense.withValues(alpha: 0.3),
-                                    blurRadius: 20,
-                                    spreadRadius: _pulseController.value * 10,
-                                  ),
-                                ]
-                              : AntigravityShadows.L2,
-                        ),
-                        child: Icon(
-                          _hasPermission
-                              ? (sessionState == VoiceSessionState.listening ? Icons.mic : Icons.mic_none)
-                              : Icons.mic_off,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      );
-                    },
-                  ),
+                // 拍照记账按钮（左侧）
+                _buildSideButton(
+                  icon: Icons.camera_alt_outlined,
+                  label: '拍照',
+                  onTap: () => _navigateToImageRecognition(context),
                 ),
 
-                const SizedBox(width: 16),
+                // 语音按钮（中间，主要）
+                _buildMainMicButton(sessionState, coordinator),
 
-                // 状态文本
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _getActionText(sessionState),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _getActionHint(sessionState),
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
+                // 手动记账按钮（右侧）
+                _buildSideButton(
+                  icon: Icons.edit_outlined,
+                  label: '手动',
+                  onTap: () => _navigateToManualEntry(context),
                 ),
-
-                // 快捷操作按钮
-                if (sessionState != VoiceSessionState.idle) ...[
-                  const SizedBox(width: 8),
-                  _buildQuickActionButtons(context, sessionState, coordinator),
-                ],
               ],
             ),
 
             // 权限提示
             if (!_hasPermission) ...[
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: AppColors.warning.withValues(alpha: 0.3),
+              GestureDetector(
+                onTap: _requestPermission,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.mic_off, color: AppColors.warning, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '需要麦克风权限才能使用语音功能',
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.mic_off, color: AppColors.warning, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        '点击申请麦克风权限',
                         style: TextStyle(
                           color: AppColors.warning,
-                          fontSize: 14,
+                          fontSize: 13,
                         ),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: _requestPermission,
-                      child: const Text('申请权限'),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
+            ],
+
+            // 快捷操作按钮（会话进行中时显示）
+            if (sessionState != VoiceSessionState.idle) ...[
+              const SizedBox(height: 12),
+              _buildQuickActionButtons(context, sessionState, coordinator),
             ],
           ],
         ),
       ),
+    );
+  }
+
+  /// 主麦克风按钮（中央大按钮）
+  Widget _buildMainMicButton(
+    VoiceSessionState sessionState,
+    VoiceServiceCoordinator coordinator,
+  ) {
+    final isListening = sessionState == VoiceSessionState.listening;
+
+    return GestureDetector(
+      onTapDown: _hasPermission ? (_) => _startListening(coordinator) : null,
+      onTapUp: _hasPermission ? (_) => _stopListening(coordinator) : null,
+      onTapCancel: _hasPermission ? () => _stopListening(coordinator) : null,
+      child: AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          return Column(
+            children: [
+              // 波浪动画容器
+              SizedBox(
+                width: 120,
+                height: 120,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // 外层波浪（录音时显示）
+                    if (isListening) ...[
+                      // 第三层波浪
+                      AnimatedBuilder(
+                        animation: _waveController,
+                        builder: (context, child) {
+                          return Container(
+                            width: 88 + (_waveController.value * 32),
+                            height: 88 + (_waveController.value * 32),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.expense.withValues(
+                                alpha: 0.1 * (1 - _waveController.value),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      // 第二层波浪
+                      AnimatedBuilder(
+                        animation: _pulseController,
+                        builder: (context, child) {
+                          return Container(
+                            width: 88 + (_pulseController.value * 20),
+                            height: 88 + (_pulseController.value * 20),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.expense.withValues(
+                                alpha: 0.15 * (1 - _pulseController.value),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      // 第一层波浪（最内层）
+                      Container(
+                        width: 96,
+                        height: 96,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.expense.withValues(alpha: 0.1),
+                        ),
+                      ),
+                    ],
+                    // 主按钮
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: _hasPermission
+                              ? (isListening
+                                  ? [AppColors.expense, AppColors.expense.withValues(alpha: 0.85)]
+                                  : [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.85)])
+                              : [Colors.grey, Colors.grey.shade400],
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isListening ? AppColors.expense : AppTheme.primaryColor)
+                                .withValues(alpha: 0.35),
+                            blurRadius: isListening ? 24 : 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        _hasPermission
+                            ? (isListening ? Icons.mic : Icons.mic_none)
+                            : Icons.mic_off,
+                        color: Colors.white,
+                        size: 40,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '语音',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isListening ? AppColors.expense : AppTheme.textSecondaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// 侧边按钮（拍照/手动）
+  Widget _buildSideButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceVariantColor,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppTheme.dividerColor,
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: AppTheme.textSecondaryColor,
+              size: 24,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondaryColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 导航到拍照记账
+  void _navigateToImageRecognition(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ImageRecognitionPage()),
+    );
+  }
+
+  /// 导航到手动记账
+  void _navigateToManualEntry(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddTransactionPage()),
     );
   }
 
@@ -781,6 +933,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
     await coordinator.startVoiceSession();
     _pulseController.repeat();
+    _waveController.repeat();
 
     _addMessage(ChatMessage(
       type: MessageType.system,
@@ -793,6 +946,8 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     await coordinator.stopVoiceSession();
     _pulseController.stop();
     _pulseController.reset();
+    _waveController.stop();
+    _waveController.reset();
 
     // 在模拟器上提示用户使用文字输入
     _addMessage(ChatMessage(

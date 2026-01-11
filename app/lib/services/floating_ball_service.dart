@@ -138,16 +138,17 @@ class FloatingBallWidget extends StatefulWidget {
 }
 
 class _FloatingBallWidgetState extends State<FloatingBallWidget>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   Offset? _position;
   FloatingBallState _state = FloatingBallState.normal;
   bool _isDragging = false;
   late AnimationController _animationController;
+  late AnimationController _breatheController;
   Animation<Offset>? _snapAnimation;
 
   // 悬浮球尺寸
-  static const double _ballSize = 50.0;
-  static const double _ballSizeExpanded = 60.0;
+  static const double _ballSize = 52.0;
+  static const double _ballSizeExpanded = 62.0;
 
   // 安全边距
   static const double _edgePadding = 16.0;
@@ -162,6 +163,11 @@ class _FloatingBallWidgetState extends State<FloatingBallWidget>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    _breatheController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+
     _animationController.addListener(() {
       if (_snapAnimation != null) {
         setState(() {
@@ -180,6 +186,7 @@ class _FloatingBallWidgetState extends State<FloatingBallWidget>
   @override
   void dispose() {
     _animationController.dispose();
+    _breatheController.dispose();
     super.dispose();
   }
 
@@ -283,37 +290,62 @@ class _FloatingBallWidgetState extends State<FloatingBallWidget>
           setState(() => _isDragging = false);
           _snapToEdge(screenSize);
         },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          width: currentSize,
-          height: currentSize,
-          decoration: BoxDecoration(
-            color: _getBallColor(),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: _isDragging ? 0.3 : 0.2),
-                blurRadius: _isDragging ? 12 : 8,
-                offset: Offset(0, _isDragging ? 4 : 2),
+        child: AnimatedBuilder(
+          animation: _breatheController,
+          builder: (context, child) {
+            final breatheScale = 1.0 + (_breatheController.value * 0.05);
+            return Transform.scale(
+              scale: _isDragging ? 1.1 : breatheScale,
+              child: Container(
+                width: currentSize,
+                height: currentSize,
+                decoration: BoxDecoration(
+                  gradient: _getBallGradient(),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _getPrimaryColor().withValues(alpha: 0.4),
+                      blurRadius: _isDragging ? 16 : 12,
+                      offset: Offset(0, _isDragging ? 6 : 4),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: _getBallContent(),
+                ),
               ),
-            ],
-          ),
-          child: Center(
-            child: _getBallContent(),
-          ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Color _getBallColor() {
+  /// 获取渐变色
+  LinearGradient _getBallGradient() {
     switch (_state) {
       case FloatingBallState.amountDetected:
-        return Colors.orange;
-      case FloatingBallState.expanded:
-        return Colors.blue;
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFB347), Color(0xFFFF8C00)],
+        );
       default:
-        return Colors.blue.shade400;
+        // 可爱的粉紫渐变，女性喜欢的配色
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFF9A9E), Color(0xFFFECFEF)],
+        );
+    }
+  }
+
+  Color _getPrimaryColor() {
+    switch (_state) {
+      case FloatingBallState.amountDetected:
+        return const Color(0xFFFF8C00);
+      default:
+        return const Color(0xFFFF9A9E);
     }
   }
 
@@ -330,10 +362,10 @@ class _FloatingBallWidgetState extends State<FloatingBallWidget>
       );
     }
 
-    return const Icon(
-      Icons.mic,
-      color: Colors.white,
-      size: 24,
+    // 可爱的猫咪表情图标
+    return const Text(
+      '🐱',
+      style: TextStyle(fontSize: 26),
     );
   }
 }
