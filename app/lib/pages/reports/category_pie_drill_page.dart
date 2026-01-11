@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 import '../../models/transaction.dart';
 import '../../models/category.dart';
@@ -24,13 +25,48 @@ class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
   int _selectedPeriod = 0;
   final List<String> _periods = ['本月', '本季', '本年', '自定义'];
 
+  /// 获取当前选择周期的日期范围
+  DateTimeRange _getDateRange() {
+    final now = DateTime.now();
+    switch (_selectedPeriod) {
+      case 0: // 本月
+        return DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: now,
+        );
+      case 1: // 本季
+        final quarterStart = DateTime(now.year, ((now.month - 1) ~/ 3) * 3 + 1, 1);
+        return DateTimeRange(start: quarterStart, end: now);
+      case 2: // 本年
+        return DateTimeRange(
+          start: DateTime(now.year, 1, 1),
+          end: now,
+        );
+      default: // 自定义 - 默认最近30天
+        return DateTimeRange(
+          start: now.subtract(const Duration(days: 30)),
+          end: now,
+        );
+    }
+  }
+
+  /// 根据日期范围过滤交易
+  List<Transaction> _filterTransactionsByPeriod(List<Transaction> transactions) {
+    final range = _getDateRange();
+    return transactions.where((t) {
+      return t.date.isAfter(range.start.subtract(const Duration(days: 1))) &&
+          t.date.isBefore(range.end.add(const Duration(days: 1)));
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final transactions = ref.watch(transactionProvider);
+    final allTransactions = ref.watch(transactionProvider);
 
-    // 过滤支出交易
-    final expenseTransactions = transactions
+    // 先按周期过滤，再过滤支出交易
+    final filteredTransactions = _filterTransactionsByPeriod(allTransactions);
+    final expenseTransactions = filteredTransactions
         .where((t) => t.type == TransactionType.expense)
         .toList();
 
@@ -52,7 +88,7 @@ class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
           children: [
             _buildPageHeader(context, theme),
             _buildPeriodSelector(theme),
-            _buildPieChart(theme, totalExpense),
+            _buildPieChart(theme, sortedCategories, totalExpense),
             Expanded(
               child: _buildCategoryList(theme, sortedCategories, categoryCounts, totalExpense),
             ),
@@ -136,44 +172,109 @@ class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
     );
   }
 
-  /// 环形图
-  Widget _buildPieChart(ThemeData theme, double totalExpense) {
+  /// 环形图 - 使用真实数据
+  Widget _buildPieChart(
+    ThemeData theme,
+    List<MapEntry<String, double>> categories,
+    double totalExpense,
+  ) {
+    // 分类颜色
+    final colors = [
+      const Color(0xFFFF7043),
+      const Color(0xFF42A5F5),
+      const Color(0xFF66BB6A),
+      const Color(0xFFAB47BC),
+      const Color(0xFFFFCA28),
+      const Color(0xFF26A69A),
+      const Color(0xFFEC407A),
+      const Color(0xFF5C6BC0),
+    ];
+
+    // 生成饼图扇区数据
+    final sections = categories.isEmpty
+        ? [
+            PieChartSectionData(
+              value: 1,
+              color: theme.colorScheme.surfaceContainerHighest,
+              radius: 24,
+              showTitle: false,
+            ),
+          ]
+        : categories.asMap().entries.map((entry) {
+            final index = entry.key;
+            final categoryEntry = entry.value;
+            final percentage = totalExpense > 0
+                ? (categoryEntry.value / totalExpense * 100)
+                : 0.0;
+
+            return PieChartSectionData(
+              value: categoryEntry.value,
+              color: colors[index % colors.length],
+              radius: 24,
+              showTitle: percentage >= 5, // 只显示占比>=5%的标签
+              title: '${percentage.toStringAsFixed(0)}%',
+              titleStyle: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            );
+          }).toList();
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // 模拟环形图
-          Container(
+          SizedBox(
             width: 200,
             height: 200,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: theme.colorScheme.surfaceContainerHighest,
-                width: 24,
-              ),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '总支出',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurfaceVariant,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                PieChart(
+                  PieChartData(
+                    sections: sections,
+                    centerSpaceRadius: 70,
+                    sectionsSpace: 2,
+                    pieTouchData: PieTouchData(
+                      enabled: true,
+                      touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                        if (event is FlTapUpEvent &&
+                            pieTouchResponse?.touchedSection != null) {
+                          final index = pieTouchResponse!
+                              .touchedSection!.touchedSectionIndex;
+                          if (index >= 0 && index < categories.length) {
+                            _drillDownCategory(
+                              context,
+                              categories[index].key,
+                            );
+                          }
+                        }
+                      },
                     ),
                   ),
-                  Text(
-                    '¥${totalExpense.toStringAsFixed(0)}',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.onSurface,
+                ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '总支出',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                    Text(
+                      '¥${totalExpense.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 12),
@@ -187,7 +288,7 @@ class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
               ),
               const SizedBox(width: 4),
               Text(
-                '点击扇区查看详情',
+                categories.isEmpty ? '暂无支出数据' : '点击扇区查看详情',
                 style: TextStyle(
                   fontSize: 12,
                   color: theme.colorScheme.primary,

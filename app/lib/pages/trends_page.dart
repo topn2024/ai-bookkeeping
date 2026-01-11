@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../theme/app_theme.dart';
 import '../l10n/l10n.dart';
 import '../providers/transaction_provider.dart';
@@ -42,11 +43,55 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
     super.dispose();
   }
 
+  /// 根据选中的周期获取日期范围
+  DateTimeRange _getDateRange() {
+    final now = DateTime.now();
+    switch (_selectedPeriod) {
+      case 0: // 本月
+        return DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: now,
+        );
+      case 1: // 上月
+        final lastMonth = DateTime(now.year, now.month - 1, 1);
+        final lastMonthEnd = DateTime(now.year, now.month, 0);
+        return DateTimeRange(start: lastMonth, end: lastMonthEnd);
+      case 2: // 近3月
+        return DateTimeRange(
+          start: DateTime(now.year, now.month - 2, 1),
+          end: now,
+        );
+      case 3: // 今年
+        return DateTimeRange(
+          start: DateTime(now.year, 1, 1),
+          end: now,
+        );
+      default:
+        return DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: now,
+        );
+    }
+  }
+
+  /// 过滤指定周期的交易
+  List<Transaction> _filterTransactionsByPeriod(List<Transaction> transactions) {
+    final range = _getDateRange();
+    return transactions.where((t) {
+      return !t.date.isBefore(range.start) && !t.date.isAfter(range.end);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final transactions = ref.watch(transactionProvider);
-    final monthlyExpense = ref.watch(monthlyExpenseProvider);
+    final allTransactions = ref.watch(transactionProvider);
+    final transactions = _filterTransactionsByPeriod(allTransactions);
+
+    // 计算过滤后的支出总额
+    final periodExpense = transactions
+        .where((t) => t.type == TransactionType.expense)
+        .fold(0.0, (sum, t) => sum + t.amount);
 
     return Scaffold(
       body: SafeArea(
@@ -59,7 +104,7 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildTrendContent(context, theme, transactions, monthlyExpense),
+                  _buildTrendContent(context, theme, transactions, periodExpense),
                   _buildCategoryContent(context, theme, transactions),
                   _buildInsightContent(context, theme),
                 ],
@@ -171,10 +216,12 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
     BuildContext context,
     ThemeData theme,
     List<Transaction> transactions,
-    double monthlyExpense,
+    double periodExpense,
   ) {
-    final dayCount = DateTime.now().day;
-    final dailyAvg = dayCount > 0 ? monthlyExpense / dayCount : 0.0;
+    // 计算周期天数
+    final range = _getDateRange();
+    final dayCount = range.end.difference(range.start).inDays + 1;
+    final dailyAvg = dayCount > 0 ? periodExpense / dayCount : 0.0;
 
     // 计算最高单日支出
     final expenseByDay = <String, double>{};
@@ -208,8 +255,8 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 图表占位区域
-          _buildChartPlaceholder(context, theme),
+          // 消费趋势折线图
+          _buildTrendChart(context, theme, expenseByDay),
           const SizedBox(height: 16),
           // 统计卡片
           _buildSummaryCards(context, theme, dailyAvg, maxDaily),
@@ -222,8 +269,61 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
     );
   }
 
-  /// 图表占位区域
-  Widget _buildChartPlaceholder(BuildContext context, ThemeData theme) {
+  /// 消费趋势折线图
+  Widget _buildTrendChart(
+    BuildContext context,
+    ThemeData theme,
+    Map<String, double> expenseByDay,
+  ) {
+    // 按日期排序
+    final sortedEntries = expenseByDay.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    if (sortedEntries.isEmpty) {
+      return GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TrendDrillPage()),
+        ),
+        child: Container(
+          height: 200,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.show_chart,
+                  size: 48,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '暂无消费数据',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 准备图表数据点
+    final spots = <FlSpot>[];
+    for (int i = 0; i < sortedEntries.length; i++) {
+      spots.add(FlSpot(i.toDouble(), sortedEntries[i].value));
+    }
+
+    // 计算最大值用于Y轴
+    final maxY = sortedEntries.map((e) => e.value).reduce((a, b) => a > b ? a : b);
+    final yMax = maxY > 0 ? maxY * 1.2 : 100.0;
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -231,35 +331,122 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
       ),
       child: Container(
         height: 200,
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.show_chart,
-                size: 48,
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '消费趋势折线图',
-                style: TextStyle(
-                  color: theme.colorScheme.onSurfaceVariant,
+        child: LineChart(
+          LineChartData(
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: yMax / 4,
+              getDrawingHorizontalLine: (value) {
+                return FlLine(
+                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                  strokeWidth: 1,
+                );
+              },
+            ),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 50,
+                  getTitlesWidget: (value, meta) {
+                    if (value == 0) return const SizedBox.shrink();
+                    return Text(
+                      '¥${value.toInt()}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    );
+                  },
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '点击可下钻查看详情',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 22,
+                  interval: sortedEntries.length > 7 ? (sortedEntries.length / 5).ceil().toDouble() : 1,
+                  getTitlesWidget: (value, meta) {
+                    final index = value.toInt();
+                    if (index < 0 || index >= sortedEntries.length) {
+                      return const SizedBox.shrink();
+                    }
+                    // 提取日期的日部分
+                    final dateParts = sortedEntries[index].key.split('-');
+                    final day = dateParts.length >= 3 ? dateParts[2] : '';
+                    return Text(
+                      day,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            ),
+            borderData: FlBorderData(show: false),
+            minX: 0,
+            maxX: (sortedEntries.length - 1).toDouble(),
+            minY: 0,
+            maxY: yMax,
+            lineBarsData: [
+              LineChartBarData(
+                spots: spots,
+                isCurved: true,
+                curveSmoothness: 0.3,
+                color: theme.colorScheme.primary,
+                barWidth: 2,
+                isStrokeCapRound: true,
+                dotData: FlDotData(
+                  show: sortedEntries.length <= 15,
+                  getDotPainter: (spot, percent, barData, index) {
+                    return FlDotCirclePainter(
+                      radius: 3,
+                      color: theme.colorScheme.primary,
+                      strokeWidth: 1,
+                      strokeColor: theme.colorScheme.surface,
+                    );
+                  },
+                ),
+                belowBarData: BarAreaData(
+                  show: true,
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 ),
               ),
             ],
+            lineTouchData: LineTouchData(
+              touchTooltipData: LineTouchTooltipData(
+                getTooltipColor: (touchedSpot) => theme.colorScheme.inverseSurface,
+                getTooltipItems: (touchedSpots) {
+                  return touchedSpots.map((spot) {
+                    final index = spot.x.toInt();
+                    final date = index < sortedEntries.length ? sortedEntries[index].key : '';
+                    return LineTooltipItem(
+                      '$date\n¥${spot.y.toStringAsFixed(0)}',
+                      TextStyle(
+                        color: theme.colorScheme.onInverseSurface,
+                        fontSize: 12,
+                      ),
+                    );
+                  }).toList();
+                },
+              ),
+            ),
           ),
         ),
       ),

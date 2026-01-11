@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 import '../../models/transaction.dart';
 import '../../models/category.dart';
@@ -62,7 +63,7 @@ class _TrendDrillPageState extends ConsumerState<TrendDrillPage> {
           children: [
             _buildPageHeader(context, theme),
             _buildDataOverview(theme, dailyAvg, maxDaily, minDaily),
-            _buildChartArea(theme),
+            _buildChartArea(theme, dailyTotals),
             if (_selectedDate != null)
               Expanded(
                 child: _buildTransactionList(theme, selectedTransactions),
@@ -177,12 +178,52 @@ class _TrendDrillPageState extends ConsumerState<TrendDrillPage> {
     );
   }
 
-  /// 折线图区域
-  Widget _buildChartArea(ThemeData theme) {
+  /// 折线图区域 - 使用真实数据
+  Widget _buildChartArea(ThemeData theme, Map<DateTime, double> dailyTotals) {
+    // 按日期排序
+    final sortedDays = dailyTotals.keys.toList()..sort();
+
+    if (sortedDays.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(16),
+        height: 200,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            '暂无支出数据',
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
+
+    // 生成折线图数据点
+    final spots = sortedDays.asMap().entries.map((entry) {
+      final index = entry.key;
+      final date = entry.value;
+      return FlSpot(index.toDouble(), dailyTotals[date] ?? 0);
+    }).toList();
+
+    // 计算Y轴最大值
+    final maxY = dailyTotals.values.isEmpty
+        ? 100.0
+        : dailyTotals.values.reduce((a, b) => a > b ? a : b) * 1.2;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
-      height: 200,
+      height: 220,
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
@@ -197,37 +238,118 @@ class _TrendDrillPageState extends ConsumerState<TrendDrillPage> {
       child: Column(
         children: [
           Expanded(
-            child: GestureDetector(
-              onTapUp: (details) {
-                // 模拟点击数据点
-                setState(() {
-                  _selectedDate = DateTime.now().subtract(const Duration(days: 5));
-                });
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
+            child: LineChart(
+              LineChartData(
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: theme.colorScheme.primary,
+                    barWidth: 2,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) {
+                        final isSelected = _selectedDate != null &&
+                            index < sortedDays.length &&
+                            sortedDays[index].year == _selectedDate!.year &&
+                            sortedDays[index].month == _selectedDate!.month &&
+                            sortedDays[index].day == _selectedDate!.day;
+                        return FlDotCirclePainter(
+                          radius: isSelected ? 6 : 4,
+                          color: isSelected
+                              ? theme.colorScheme.error
+                              : theme.colorScheme.primary,
+                          strokeWidth: 2,
+                          strokeColor: Colors.white,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ],
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= sortedDays.length) {
+                          return const SizedBox.shrink();
+                        }
+                        // 只显示部分日期
+                        if (sortedDays.length <= 7 ||
+                            index == 0 ||
+                            index == sortedDays.length - 1 ||
+                            index % (sortedDays.length ~/ 5) == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              DateFormat('M/d').format(sortedDays[index]),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                      reservedSize: 22,
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.show_chart,
-                        size: 40,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '消费趋势折线图',
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: maxY / 4,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                borderData: FlBorderData(show: false),
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchCallback: (FlTouchEvent event, LineTouchResponse? response) {
+                    if (event is FlTapUpEvent &&
+                        response?.lineBarSpots != null &&
+                        response!.lineBarSpots!.isNotEmpty) {
+                      final spotIndex = response.lineBarSpots!.first.spotIndex;
+                      if (spotIndex >= 0 && spotIndex < sortedDays.length) {
+                        setState(() {
+                          _selectedDate = sortedDays[spotIndex];
+                        });
+                      }
+                    }
+                  },
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (spots) {
+                      return spots.map((spot) {
+                        final index = spot.spotIndex;
+                        if (index < 0 || index >= sortedDays.length) {
+                          return null;
+                        }
+                        return LineTooltipItem(
+                          '${DateFormat('M月d日').format(sortedDays[index])}\n¥${spot.y.toStringAsFixed(0)}',
+                          TextStyle(
+                            color: theme.colorScheme.onPrimary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      }).toList();
+                    },
                   ),
                 ),
+                minY: 0,
+                maxY: maxY,
               ),
             ),
           ),

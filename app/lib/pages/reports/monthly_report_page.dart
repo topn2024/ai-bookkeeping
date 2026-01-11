@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 import '../../models/transaction.dart';
 import '../../models/category.dart';
@@ -55,9 +56,9 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
                 child: Column(
                   children: [
                     _buildSummaryCard(theme, totalIncome, totalExpense, balance),
-                    _buildTrendChart(theme),
+                    _buildTrendChart(theme, monthTransactions),
                     _buildCategoryBreakdown(theme, monthTransactions),
-                    _buildMoneyAgeCard(theme),
+                    _buildMoneyAgeCard(theme, monthTransactions),
                   ],
                 ),
               ),
@@ -172,33 +173,130 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
     );
   }
 
-  /// 日消费趋势图
-  Widget _buildTrendChart(ThemeData theme) {
+  /// 日消费趋势图 - 使用真实数据
+  Widget _buildTrendChart(ThemeData theme, List<Transaction> transactions) {
+    // 按日期汇总支出
+    final expenseByDay = <int, double>{};
+    final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
+
+    // 初始化所有日期为0
+    for (int i = 1; i <= daysInMonth; i++) {
+      expenseByDay[i] = 0;
+    }
+
+    // 汇总每日支出
+    for (final t in transactions.where((t) => t.type == TransactionType.expense)) {
+      expenseByDay[t.date.day] = (expenseByDay[t.date.day] ?? 0) + t.amount;
+    }
+
+    // 找出最大值用于Y轴
+    final maxExpense = expenseByDay.values.isEmpty
+        ? 100.0
+        : expenseByDay.values.reduce((a, b) => a > b ? a : b);
+    final yMax = maxExpense > 0 ? maxExpense * 1.2 : 100.0;
+
+    // 生成柱状图数据
+    final barGroups = expenseByDay.entries.map((entry) {
+      return BarChartGroupData(
+        x: entry.key,
+        barRods: [
+          BarChartRodData(
+            toY: entry.value,
+            color: theme.colorScheme.primary,
+            width: daysInMonth > 20 ? 6 : 10,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
+          ),
+        ],
+      );
+    }).toList();
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      height: 150,
+      padding: const EdgeInsets.all(16),
+      height: 180,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.bar_chart,
-              size: 40,
-              color: theme.colorScheme.onSurfaceVariant,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '日消费趋势',
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
             ),
-            const SizedBox(height: 8),
-            Text(
-              '日消费趋势',
-              style: TextStyle(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: expenseByDay.values.every((v) => v == 0)
+                ? Center(
+                    child: Text(
+                      '本月暂无支出记录',
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  )
+                : BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: yMax,
+                      barTouchData: BarTouchData(
+                        enabled: true,
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            return BarTooltipItem(
+                              '${group.x}日\n¥${rod.toY.toStringAsFixed(0)}',
+                              TextStyle(
+                                color: theme.colorScheme.onPrimary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              // 只显示部分日期标签
+                              if (value.toInt() % 5 == 1 || value.toInt() == daysInMonth) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    '${value.toInt()}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                            reservedSize: 20,
+                          ),
+                        ),
+                        leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      gridData: const FlGridData(show: false),
+                      barGroups: barGroups,
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }
@@ -318,8 +416,26 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
     );
   }
 
-  /// 钱龄表现卡片
-  Widget _buildMoneyAgeCard(ThemeData theme) {
+  /// 钱龄表现卡片 - 使用真实数据
+  /// 钱龄：从收入到支出的平均时间差
+  Widget _buildMoneyAgeCard(ThemeData theme, List<Transaction> transactions) {
+    // 计算本月平均钱龄
+    // 简化算法：用月初到每笔支出的天数的平均值
+    final monthStart = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+    final expenseTransactions = transactions
+        .where((t) => t.type == TransactionType.expense)
+        .toList();
+
+    double avgMoneyAge = 0;
+    if (expenseTransactions.isNotEmpty) {
+      final totalDays = expenseTransactions.fold<int>(0, (sum, t) {
+        return sum + t.date.difference(monthStart).inDays;
+      });
+      avgMoneyAge = totalDays / expenseTransactions.length;
+    }
+
+    final moneyAgeDays = avgMoneyAge.round();
+
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -352,7 +468,7 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
             children: [
               const Text('月均钱龄'),
               Text(
-                '42天',
+                expenseTransactions.isEmpty ? '--' : '$moneyAgeDays天',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   color: Colors.green[700],
@@ -364,9 +480,9 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('较上月'),
+              const Text('支出笔数'),
               Text(
-                '↑ 5天',
+                '${expenseTransactions.length}笔',
                 style: TextStyle(color: Colors.green[700]),
               ),
             ],
