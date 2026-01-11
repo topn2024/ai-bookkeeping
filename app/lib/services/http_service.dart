@@ -3,15 +3,17 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'secure_storage_service.dart';
 import 'app_config_service.dart';
+import '../core/contracts/i_http_service.dart';
+import '../core/config/config.dart';
 
-class HttpService {
+class HttpService implements IHttpService {
   static final HttpService _instance = HttpService._internal();
   late Dio _dio;
   final SecureStorageService _secureStorage = SecureStorageService();
   final AppConfigService _configService = AppConfigService();
 
-  // 默认配置（仅在配置服务未初始化时使用）
-  static const String _defaultApiBaseUrl = 'https://160.202.238.29/api/v1';
+  // 默认配置 - 使用集中化配置
+  static String get _defaultApiBaseUrl => ApiEndpoints.apiBaseUrl;
 
   // API 版本（与服务器 APIVersionConfig 保持同步）
   static const String apiVersion = '1.0.0';

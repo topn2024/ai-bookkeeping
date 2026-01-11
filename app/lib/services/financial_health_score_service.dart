@@ -1,4 +1,4 @@
-import 'database_service.dart';
+import '../core/contracts/i_database_service.dart';
 
 /// 得分组成部分
 class ScoreComponent {
@@ -135,7 +135,7 @@ class FinancialHealthScore {
 /// - 消费结构得分（0-20分）：反映消费合理性
 /// - 记账习惯得分（0-20分）：反映财务管理习惯
 class FinancialHealthScoreService {
-  final DatabaseService _db;
+  final IDatabaseService _db;
 
   FinancialHealthScoreService(this._db);
 

@@ -8,22 +8,23 @@ import 'package:intl/intl.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../models/account.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import 'gamification_service.dart';
 
 /// 增强版导出服务
 /// 设计文档第11.5节：数据导出功能矩阵（2.0增强版）
 /// 支持习惯数据导出、位置热力图导出、导出水印等高级功能
 class EnhancedExportService {
-  final DatabaseService _db;
+  final IDatabaseService _db;
   final GamificationService _gamification;
 
   EnhancedExportService({
-    DatabaseService? databaseService,
+    IDatabaseService? databaseService,
     GamificationService? gamificationService,
-  })  : _db = databaseService ?? DatabaseService(),
+  })  : _db = databaseService ?? sl<IDatabaseService>(),
         _gamification = gamificationService ??
-            GamificationService(databaseService ?? DatabaseService());
+            GamificationService(databaseService ?? sl<IDatabaseService>());
 
   // ========== 习惯数据导出 ==========
 

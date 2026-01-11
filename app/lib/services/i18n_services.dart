@@ -26,3 +26,6 @@ export 'translation_quality_service.dart';
 export 'i18n_goal_detection_service.dart';
 export 'category_localization_service.dart';
 export 'account_localization_service.dart';
+
+// 基础设施
+export '../core/base/base_localization_service.dart';

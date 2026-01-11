@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -8,13 +9,32 @@ class PaymentNotificationEvent {
   final double amount;
   final String? merchant;
   final DateTime timestamp;
+  final String? title;
+  final String? text;
 
   PaymentNotificationEvent({
     required this.app,
     required this.amount,
     this.merchant,
     required this.timestamp,
+    this.title,
+    this.text,
   });
+
+  factory PaymentNotificationEvent.fromJson(Map<String, dynamic> json) {
+    return PaymentNotificationEvent(
+      app: json['appName'] as String? ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      merchant: json['merchant'] as String?,
+      timestamp: DateTime.fromMillisecondsSinceEpoch(
+          json['timestamp'] as int? ?? DateTime.now().millisecondsSinceEpoch),
+      title: json['title'] as String?,
+      text: json['text'] as String?,
+    );
+  }
+
+  @override
+  String toString() => 'PaymentNotificationEvent(app: $app, amount: $amount, merchant: $merchant)';
 }
 
 /// 支付通知监听服务
@@ -26,17 +46,46 @@ class PaymentNotificationService {
 
   static const MethodChannel _channel =
       MethodChannel('com.bookkeeping.ai/payment_notification');
+  static const EventChannel _eventChannel =
+      EventChannel('com.bookkeeping.ai/payment_notification_events');
 
   final StreamController<PaymentNotificationEvent> _eventController =
       StreamController<PaymentNotificationEvent>.broadcast();
   Stream<PaymentNotificationEvent> get onPaymentDetected =>
       _eventController.stream;
 
+  StreamSubscription? _eventSubscription;
   bool _isMonitoring = false;
+  bool _initialized = false;
 
   /// 初始化
   Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
+
+    // 方式1: MethodChannel 回调
     _channel.setMethodCallHandler(_handleMethodCall);
+
+    // 方式2: EventChannel 流式监听 (来自 NotificationListenerService)
+    _eventSubscription = _eventChannel.receiveBroadcastStream().listen(
+      (dynamic data) {
+        if (data is String) {
+          try {
+            final json = jsonDecode(data) as Map<String, dynamic>;
+            final event = PaymentNotificationEvent.fromJson(json);
+            debugPrint('PaymentNotificationService: Detected via event: $event');
+            _eventController.add(event);
+          } catch (e) {
+            debugPrint('PaymentNotificationService: Error parsing event data: $e');
+          }
+        }
+      },
+      onError: (error) {
+        debugPrint('PaymentNotificationService: EventChannel error: $error');
+      },
+    );
+
+    debugPrint('PaymentNotificationService initialized');
   }
 
   /// 处理原生调用
@@ -94,6 +143,8 @@ class PaymentNotificationService {
   bool get isMonitoring => _isMonitoring;
 
   void dispose() {
+    _eventSubscription?.cancel();
     _eventController.close();
+    _initialized = false;
   }
 }

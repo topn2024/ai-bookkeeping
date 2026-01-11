@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
-import 'database_service.dart';
+import '../core/contracts/i_database_service.dart';
 import 'financial_health_score_service.dart';
 import '../models/resource_pool.dart';
 import '../models/budget_vault.dart';
@@ -125,10 +125,10 @@ class GoalAchievementOverview {
 ///
 /// 追踪和计算用户在各个财务目标上的达成情况
 class GoalAchievementService {
-  final DatabaseService _dbService;
+  final IDatabaseService _dbService;
   final FinancialHealthScoreService _healthService;
 
-  GoalAchievementService(DatabaseService db)
+  GoalAchievementService(IDatabaseService db)
       : _dbService = db,
         _healthService = FinancialHealthScoreService(db);
 

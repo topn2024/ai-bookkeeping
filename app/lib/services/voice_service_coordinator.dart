@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/transaction.dart' as model;
-import '../services/database_service.dart';
-import '../services/database_voice_extension.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../services/duplicate_detection_service.dart';
 import 'voice/entity_disambiguation_service.dart';
 import 'voice/voice_delete_service.dart';
@@ -38,7 +38,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   final VoiceNavigationService _navigationService;
   final VoiceIntentRouter _intentRouter;
   final VoiceFeedbackSystem _feedbackSystem;
-  final DatabaseService _databaseService;
+  final IDatabaseService _databaseService;
   final ScreenReaderService _screenReaderService;
   final AutomationTaskService _automationService;
 
@@ -94,7 +94,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     VoiceNavigationService? navigationService,
     VoiceIntentRouter? intentRouter,
     VoiceFeedbackSystem? feedbackSystem,
-    DatabaseService? databaseService,
+    IDatabaseService? databaseService,
     ScreenReaderService? screenReaderService,
     AutomationTaskService? automationService,
     ConversationContext? conversationContext,
@@ -108,7 +108,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
        _navigationService = navigationService ?? VoiceNavigationService(),
        _intentRouter = intentRouter ?? VoiceIntentRouter(),
        _feedbackSystem = feedbackSystem ?? VoiceFeedbackSystem(),
-       _databaseService = databaseService ?? DatabaseService(),
+       _databaseService = databaseService ?? sl<IDatabaseService>(),
        _screenReaderService = screenReaderService ?? ScreenReaderService(),
        _automationService = automationService ?? AutomationTaskService(),
        _conversationContext = conversationContext ?? ConversationContext(),

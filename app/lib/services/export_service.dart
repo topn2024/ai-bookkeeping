@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../models/account.dart';
+import '../extensions/category_extensions.dart';
 
 /// 导出格式
 enum ExportFormat {

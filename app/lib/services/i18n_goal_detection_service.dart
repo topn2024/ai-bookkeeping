@@ -1,5 +1,5 @@
 import '../l10n/app_localizations.dart';
-import 'locale_format_service.dart';
+import '../core/formatting/formatting_service.dart';
 import 'category_localization_service.dart';
 
 /// 国际化目标达成检测服务
@@ -108,14 +108,14 @@ class I18nGoalDetectionService {
   /// 检测货币支持
   I18nGoalResult _checkCurrencySupport() {
     final goal = goals['currency_support']!;
-    final supportedCurrencies = LocaleFormatService.supportedCurrencies.length;
+    final supportedCurrencies = FormattingService.instance.supportedCurrencies.length;
     final achieved = supportedCurrencies >= goal.targetValue;
 
     return I18nGoalResult(
       goal: goal,
       currentValue: supportedCurrencies,
       achieved: achieved,
-      details: '支持 $supportedCurrencies 种货币: ${LocaleFormatService.supportedCurrencies.map((c) => c.code).join(", ")}',
+      details: '支持 $supportedCurrencies 种货币: ${FormattingService.instance.supportedCurrencies.map((c) => c.code).join(", ")}',
     );
   }
 
@@ -139,7 +139,7 @@ class I18nGoalDetectionService {
     final goal = goals['category_localization']!;
 
     // 获取分类翻译表的覆盖率
-    final categories = CategoryLocalizationService.supportedLocales;
+    final categories = CategoryLocalizationService.supportedLocaleOptions;
     final totalLanguages = categories.length;
 
     // 假设所有分类都有完整翻译（实际应该检查每个分类的翻译完整性）

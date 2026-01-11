@@ -1,18 +1,11 @@
-import 'dart:ui' as ui;
-import 'package:flutter/material.dart';
+import '../core/base/base_localization_service.dart';
 
 /// 分类本地化服务
 ///
 /// 根据设备区域自动选择合适的语言显示分类名称
-/// 支持：中文(zh)、英文(en)、日文(ja)
-class CategoryLocalizationService {
+/// 支持：中文(zh)、英文(en)、日文(ja)、韩文(ko)
+class CategoryLocalizationService extends BaseLocalizationService<String> {
   static CategoryLocalizationService? _instance;
-
-  /// 当前使用的语言代码
-  String _currentLocale = 'zh';
-
-  /// 用户手动选择的语言（null表示使用系统语言）
-  String? _userOverrideLocale;
 
   CategoryLocalizationService._();
 
@@ -21,78 +14,35 @@ class CategoryLocalizationService {
     return _instance!;
   }
 
-  /// 初始化服务，检测设备区域
-  void initialize() {
-    if (_userOverrideLocale != null) {
-      _currentLocale = _userOverrideLocale!;
-      return;
-    }
+  @override
+  Map<String, Map<String, String>> get translations => _categoryTranslations;
 
-    // 获取设备语言设置
-    final deviceLocale = ui.PlatformDispatcher.instance.locale;
-    _currentLocale = _mapLocaleToSupported(deviceLocale.languageCode);
+  /// 自定义分类翻译（运行时添加）
+  static final Map<String, Map<String, String>> _customTranslations = {};
+
+  @override
+  void addCustomTranslation(String id, Map<String, String> localeTranslations) {
+    _customTranslations[id] = localeTranslations;
   }
-
-  /// 从BuildContext初始化（在Widget中使用）
-  void initializeFromContext(BuildContext context) {
-    if (_userOverrideLocale != null) {
-      _currentLocale = _userOverrideLocale!;
-      return;
-    }
-
-    final locale = Localizations.localeOf(context);
-    _currentLocale = _mapLocaleToSupported(locale.languageCode);
-  }
-
-  /// 将语言代码映射到支持的语言
-  String _mapLocaleToSupported(String languageCode) {
-    switch (languageCode.toLowerCase()) {
-      case 'zh': // 中文
-        return 'zh';
-      case 'ja': // 日语
-        return 'ja';
-      case 'ko': // 韩语
-        return 'ko';
-      case 'en': // 英语
-      default:   // 其他语言默认使用英语
-        return 'en';
-    }
-  }
-
-  /// 获取当前语言代码
-  String get currentLocale => _currentLocale;
-
-  /// 手动设置语言
-  void setLocale(String? locale) {
-    _userOverrideLocale = locale;
-    if (locale != null) {
-      _currentLocale = _mapLocaleToSupported(locale);
-    } else {
-      // 恢复系统语言
-      initialize();
-    }
-  }
-
-  /// 判断是否使用了用户自定义语言
-  bool get isUserOverride => _userOverrideLocale != null;
 
   /// 获取分类的本地化名称
   String getCategoryName(String categoryId) {
-    return _categoryTranslations[categoryId]?[_currentLocale]
-        ?? _categoryTranslations[categoryId]?['en']
-        ?? categoryId;
+    // 先检查自定义翻译
+    final custom = _customTranslations[categoryId]?[currentLocale];
+    if (custom != null) {
+      return custom;
+    }
+
+    return getLocalizedName(categoryId);
   }
 
   /// 获取指定语言的分类名称
   String getCategoryNameForLocale(String categoryId, String locale) {
-    final mappedLocale = _mapLocaleToSupported(locale);
-    return _categoryTranslations[categoryId]?[mappedLocale]
-        ?? _categoryTranslations[categoryId]?['en']
-        ?? categoryId;
+    return getLocalizedNameForLocale(categoryId, locale);
   }
 
   /// 获取所有支持的语言
-  static const List<LocaleOption> supportedLocales = [
+  static const List<LocaleOption> supportedLocaleOptions = [
     LocaleOption(code: 'zh', name: '中文', nativeName: '中文'),
     LocaleOption(code: 'en', name: 'English', nativeName: 'English'),
     LocaleOption(code: 'ja', name: 'Japanese', nativeName: '日本語'),
@@ -1060,14 +1010,6 @@ class CategoryLocalizationService {
       'ko': '계좌이체',
     },
   };
-
-  /// 添加自定义分类的翻译
-  void addCustomTranslation(String categoryId, Map<String, String> translations) {
-    _customTranslations[categoryId] = translations;
-  }
-
-  /// 自定义分类翻译（运行时添加）
-  static final Map<String, Map<String, String>> _customTranslations = {};
 }
 
 /// 语言选项

@@ -1,18 +1,11 @@
-import 'dart:ui' as ui;
-import 'package:flutter/material.dart';
+import '../core/base/base_localization_service.dart';
 
 /// 账户本地化服务
 ///
 /// 根据设备区域自动选择合适的语言显示账户名称
 /// 支持：中文(zh)、英文(en)、日文(ja)、韩文(ko)
-class AccountLocalizationService {
+class AccountLocalizationService extends BaseLocalizationService<String> {
   static AccountLocalizationService? _instance;
-
-  /// 当前使用的语言代码
-  String _currentLocale = 'zh';
-
-  /// 用户手动选择的语言（null表示使用系统语言）
-  String? _userOverrideLocale;
 
   AccountLocalizationService._();
 
@@ -21,60 +14,16 @@ class AccountLocalizationService {
     return _instance!;
   }
 
-  /// 初始化服务，检测设备区域
-  void initialize() {
-    if (_userOverrideLocale != null) {
-      _currentLocale = _userOverrideLocale!;
-      return;
-    }
+  @override
+  Map<String, Map<String, String>> get translations => _accountTranslations;
 
-    // 获取设备语言设置
-    final deviceLocale = ui.PlatformDispatcher.instance.locale;
-    _currentLocale = _mapLocaleToSupported(deviceLocale.languageCode);
+  /// 自定义账户翻译（运行时添加）
+  static final Map<String, Map<String, String>> _customTranslations = {};
+
+  @override
+  void addCustomTranslation(String id, Map<String, String> localeTranslations) {
+    _customTranslations[id] = localeTranslations;
   }
-
-  /// 从BuildContext初始化（在Widget中使用）
-  void initializeFromContext(BuildContext context) {
-    if (_userOverrideLocale != null) {
-      _currentLocale = _userOverrideLocale!;
-      return;
-    }
-
-    final locale = Localizations.localeOf(context);
-    _currentLocale = _mapLocaleToSupported(locale.languageCode);
-  }
-
-  /// 将语言代码映射到支持的语言
-  String _mapLocaleToSupported(String languageCode) {
-    switch (languageCode.toLowerCase()) {
-      case 'zh': // 中文
-        return 'zh';
-      case 'ja': // 日语
-        return 'ja';
-      case 'ko': // 韩语
-        return 'ko';
-      case 'en': // 英语
-      default:   // 其他语言默认使用英语
-        return 'en';
-    }
-  }
-
-  /// 获取当前语言代码
-  String get currentLocale => _currentLocale;
-
-  /// 手动设置语言
-  void setLocale(String? locale) {
-    _userOverrideLocale = locale;
-    if (locale != null) {
-      _currentLocale = _mapLocaleToSupported(locale);
-    } else {
-      // 恢复系统语言
-      initialize();
-    }
-  }
-
-  /// 判断是否使用了用户自定义语言
-  bool get isUserOverride => _userOverrideLocale != null;
 
   /// 获取账户的本地化名称
   ///
@@ -82,18 +31,24 @@ class AccountLocalizationService {
   /// [originalName] 原始账户名称（用于自定义账户）
   String getAccountName(String accountId, {String? originalName}) {
     // 先尝试通过ID查找
-    final translated = _accountTranslations[accountId.toLowerCase()]?[_currentLocale];
-    if (translated != null) {
+    final translated = getLocalizedName(accountId);
+    if (translated != accountId) {
       return translated;
     }
 
     // 再尝试通过英文名称查找
     final byEnglishName = _englishNameMapping[accountId.toLowerCase()];
     if (byEnglishName != null) {
-      final result = _accountTranslations[byEnglishName]?[_currentLocale];
-      if (result != null) {
+      final result = getLocalizedName(byEnglishName);
+      if (result != byEnglishName) {
         return result;
       }
+    }
+
+    // 检查自定义翻译
+    final custom = _customTranslations[accountId.toLowerCase()]?[currentLocale];
+    if (custom != null) {
+      return custom;
     }
 
     // 如果都找不到，返回原始名称或ID
@@ -102,16 +57,15 @@ class AccountLocalizationService {
 
   /// 获取指定语言的账户名称
   String getAccountNameForLocale(String accountId, String locale, {String? originalName}) {
-    final mappedLocale = _mapLocaleToSupported(locale);
-    final translated = _accountTranslations[accountId.toLowerCase()]?[mappedLocale];
-    if (translated != null) {
+    final translated = getLocalizedNameForLocale(accountId, locale);
+    if (translated != accountId) {
       return translated;
     }
 
     final byEnglishName = _englishNameMapping[accountId.toLowerCase()];
     if (byEnglishName != null) {
-      final result = _accountTranslations[byEnglishName]?[mappedLocale];
-      if (result != null) {
+      final result = getLocalizedNameForLocale(byEnglishName, locale);
+      if (result != byEnglishName) {
         return result;
       }
     }
@@ -252,14 +206,6 @@ class AccountLocalizationService {
       'ko': '우정저축은행',
     },
   };
-
-  /// 添加自定义账户的翻译
-  void addCustomTranslation(String accountId, Map<String, String> translations) {
-    _customTranslations[accountId] = translations;
-  }
-
-  /// 自定义账户翻译（运行时添加）
-  static final Map<String, Map<String, String>> _customTranslations = {};
 }
 
 /// 账户名称本地化扩展

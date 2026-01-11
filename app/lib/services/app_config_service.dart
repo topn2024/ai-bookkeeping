@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/logger.dart';
+import '../core/config/config.dart';
 
 /// 应用配置服务
 /// 从服务器获取配置，支持本地缓存和离线回退
@@ -16,8 +17,8 @@ class AppConfigService {
   static const String _cacheTimeKey = 'app_settings_cache_time';
   static const Duration _cacheExpiry = Duration(hours: 24);
 
-  // 默认配置（硬编码回退值）
-  static const String _defaultApiBaseUrl = 'https://160.202.238.29/api/v1';
+  // 默认配置 - 使用集中化配置
+  static String get _defaultApiBaseUrl => ApiEndpoints.apiBaseUrl;
   // 生产环境默认启用证书验证（安全优先）
   // 注意：开发环境如需使用自签名证书，请通过服务器配置下发 skip_certificate_verification: true
   static const bool _defaultSkipCertVerification = false;
@@ -154,7 +155,7 @@ class AppSettingsConfig {
     return AppSettingsConfig(
       configVersion: '1.0.0',
       minAppVersion: '1.0.0',
-      apiBaseUrl: 'https://160.202.238.29/api/v1',
+      apiBaseUrl: ApiEndpoints.apiBaseUrl,
       skipCertificateVerification: false,  // 生产环境默认启用证书验证（安全优先）
       aiModels: AIModelConfig.defaults(),
       network: NetworkConfig.defaults(),
@@ -168,7 +169,7 @@ class AppSettingsConfig {
     return AppSettingsConfig(
       configVersion: json['config_version'] ?? '1.0.0',
       minAppVersion: json['min_app_version'] ?? '1.0.0',
-      apiBaseUrl: json['api_base_url'] ?? 'https://160.202.238.29/api/v1',
+      apiBaseUrl: json['api_base_url'] ?? ApiEndpoints.apiBaseUrl,
       skipCertificateVerification: json['skip_certificate_verification'] ?? false,
       aiModels: json['ai_models'] != null
           ? AIModelConfig.fromJson(json['ai_models'])

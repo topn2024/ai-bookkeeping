@@ -13,14 +13,15 @@ import '../models/savings_goal.dart';
 import '../models/recurring_transaction.dart';
 import '../models/template.dart';
 import '../models/category.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import 'gamification_service.dart';
 
 /// 备份包导出服务
 /// 设计文档第11.5节：数据导出功能矩阵（2.0增强版）
 /// 支持完整数据备份、恢复和加密
 class BackupExportService {
-  final DatabaseService _db;
+  final IDatabaseService _db;
 
   static const String _backupVersion = '2.0.0';
   static const String _manifestFileName = 'manifest.json';
@@ -28,8 +29,8 @@ class BackupExportService {
   static const String _settingsFileName = 'settings.json';
   static const String _mediaFolderName = 'media';
 
-  BackupExportService({DatabaseService? databaseService})
-      : _db = databaseService ?? DatabaseService();
+  BackupExportService({IDatabaseService? databaseService})
+      : _db = databaseService ?? sl<IDatabaseService>();
 
   /// 创建完整备份包
   Future<BackupResult> createFullBackup({

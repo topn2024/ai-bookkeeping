@@ -553,12 +553,14 @@ class NLUIntent {
 
 /// 实体类型
 enum EntityType {
+  amount,       // 金额
   category,     // 分类
   merchant,     // 商家
   item,         // 物品
   description,  // 描述
   account,      // 账户
   person,       // 人物
+  date,         // 日期
 }
 
 /// 实体

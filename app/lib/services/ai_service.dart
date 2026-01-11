@@ -3,6 +3,14 @@ import 'dart:typed_data';
 import 'qwen_service.dart';
 import '../models/category.dart';
 
+// 拆分后的专注服务（门面模式）
+import 'ai/image_recognition_service.dart';
+import 'ai/text_parsing_service.dart';
+import 'ai/category_suggestion_service.dart';
+
+// 导出拆分的服务，方便直接使用
+export 'ai/ai_services.dart';
+
 /// AI识别结果模型
 class AIRecognitionResult {
   final double? amount;
@@ -292,15 +300,36 @@ class MultiAIRecognitionResult {
   }
 }
 
-/// AI服务类
+/// AI服务类（门面模式）
+///
 /// 使用阿里云通义千问模型进行智能记账
+/// 作为统一入口，内部委托给专注的子服务：
+/// - [ImageRecognitionService] - 图片识别
+/// - [TextParsingService] - 文本/音频解析
+/// - [CategorySuggestionService] - 分类建议
+///
+/// 可以直接使用此门面类，也可以直接使用拆分后的子服务
 class AIService {
   static final AIService _instance = AIService._internal();
   final QwenService _qwenService = QwenService();
 
+  // 拆分后的专注服务
+  final ImageRecognitionService _imageService = ImageRecognitionService();
+  final TextParsingService _textService = TextParsingService();
+  final CategorySuggestionService _categoryService = CategorySuggestionService();
+
   factory AIService() => _instance;
 
   AIService._internal();
+
+  /// 获取图片识别服务实例
+  ImageRecognitionService get imageRecognition => _imageService;
+
+  /// 获取文本解析服务实例
+  TextParsingService get textParsing => _textService;
+
+  /// 获取分类建议服务实例
+  CategorySuggestionService get categorySuggestion => _categoryService;
 
   /// 图片识别记账
   /// 上传小票/收据图片，使用千问视觉模型自动识别交易信息

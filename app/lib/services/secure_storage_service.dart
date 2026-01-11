@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../core/contracts/i_secure_storage_service.dart';
 
 /// 安全存储服务 - 用于存储敏感信息（Token、密钥等）
-class SecureStorageService {
+class SecureStorageService implements ISecureStorageService {
   static final SecureStorageService _instance = SecureStorageService._internal();
   factory SecureStorageService() => _instance;
   SecureStorageService._internal();

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../core/config.dart';
+import '../core/config/config.dart';
 import '../core/logger.dart';
 import 'app_config_service.dart';
 
@@ -16,13 +17,10 @@ class QwenService {
   /// 获取 AI 模型配置
   AIModelConfig get _models => _configService.config.aiModels;
 
-  // API端点
-  static const String _textApiUrl =
-      'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation';
-  static const String _visionApiUrl =
-      'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
-  static const String _audioApiUrl =
-      'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
+  // API端点 - 使用集中化配置
+  static String get _textApiUrl => ApiEndpoints.qwenTextApi;
+  static String get _visionApiUrl => ApiEndpoints.qwenVisionApi;
+  static String get _audioApiUrl => ApiEndpoints.qwenAudioApi;
 
   /// 二级分类提示词 - 用于 AI 精确分类
   static const String _categoryPrompt = '''

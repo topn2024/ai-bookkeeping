@@ -219,6 +219,399 @@ class ScreenReaderService extends ChangeNotifier {
       allBills: validBills,
     );
   }
+
+  // ==================== 自动化功能 ====================
+
+  /// 支付宝包名
+  static const String alipayPackage = 'com.eg.android.AlipayGphone';
+
+  /// 微信包名
+  static const String wechatPackage = 'com.tencent.mm';
+
+  /// 启动应用
+  ///
+  /// [packageName] 应用包名
+  /// 返回是否成功启动
+  Future<bool> launchApp(String packageName) async {
+    if (!isSupported) return false;
+
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'launchApp',
+        {'packageName': packageName},
+      );
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 启动应用失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return false;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 启动应用失败: $e');
+      return false;
+    }
+  }
+
+  /// 获取当前前台应用包名
+  Future<String?> getCurrentPackageName() async {
+    if (!isSupported) return null;
+
+    try {
+      final result = await _channel.invokeMethod<String>('getCurrentPackageName');
+      return result;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 获取当前包名失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return null;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 获取当前包名失败: $e');
+      return null;
+    }
+  }
+
+  /// 通过文本点击元素
+  ///
+  /// [text] 要查找的文本
+  /// 返回是否成功点击
+  Future<bool> clickElement(String text) async {
+    if (!isSupported) return false;
+
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'clickElement',
+        {'text': text},
+      );
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 点击元素失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return false;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 点击元素失败: $e');
+      return false;
+    }
+  }
+
+  /// 通过视图ID点击元素
+  Future<bool> clickElementById(String viewId) async {
+    if (!isSupported) return false;
+
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'clickElementById',
+        {'viewId': viewId},
+      );
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 通过ID点击元素失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return false;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 通过ID点击元素失败: $e');
+      return false;
+    }
+  }
+
+  /// 在指定坐标执行点击
+  Future<bool> performClick(double x, double y) async {
+    if (!isSupported) return false;
+
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'performClick',
+        {'x': x, 'y': y},
+      );
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 坐标点击失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return false;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 坐标点击失败: $e');
+      return false;
+    }
+  }
+
+  /// 执行滑动手势
+  ///
+  /// [startX], [startY] 起始坐标
+  /// [endX], [endY] 结束坐标
+  /// [duration] 持续时间（毫秒）
+  Future<bool> performSwipe(
+    double startX,
+    double startY,
+    double endX,
+    double endY, {
+    int duration = 300,
+  }) async {
+    if (!isSupported) return false;
+
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'performSwipe',
+        {
+          'startX': startX,
+          'startY': startY,
+          'endX': endX,
+          'endY': endY,
+          'duration': duration,
+        },
+      );
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 滑动失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return false;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 滑动失败: $e');
+      return false;
+    }
+  }
+
+  /// 向下滚动（滑动列表）
+  Future<bool> scrollDown({int screenHeight = 2000}) async {
+    if (!isSupported) return false;
+
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'scrollDown',
+        {'screenHeight': screenHeight},
+      );
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 向下滚动失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return false;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 向下滚动失败: $e');
+      return false;
+    }
+  }
+
+  /// 向上滚动
+  Future<bool> scrollUp({int screenHeight = 2000}) async {
+    if (!isSupported) return false;
+
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'scrollUp',
+        {'screenHeight': screenHeight},
+      );
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 向上滚动失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return false;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 向上滚动失败: $e');
+      return false;
+    }
+  }
+
+  /// 等待元素出现
+  ///
+  /// [text] 要等待的文本
+  /// [timeout] 超时时间（毫秒）
+  /// 返回是否找到元素
+  Future<bool> waitForElement(String text, {int timeout = 5000}) async {
+    if (!isSupported) return false;
+
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'waitForElement',
+        {'text': text, 'timeout': timeout},
+      );
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 等待元素失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return false;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 等待元素失败: $e');
+      return false;
+    }
+  }
+
+  /// 等待特定应用出现在前台
+  ///
+  /// [packageName] 包名
+  /// [timeout] 超时时间（毫秒）
+  Future<bool> waitForApp(String packageName, {int timeout = 5000}) async {
+    if (!isSupported) return false;
+
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'waitForApp',
+        {'packageName': packageName, 'timeout': timeout},
+      );
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 等待应用失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return false;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 等待应用失败: $e');
+      return false;
+    }
+  }
+
+  /// 检查元素是否存在
+  Future<bool> elementExists(String text) async {
+    if (!isSupported) return false;
+
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'elementExists',
+        {'text': text},
+      );
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 检查元素存在失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return false;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 检查元素存在失败: $e');
+      return false;
+    }
+  }
+
+  /// 执行返回操作
+  Future<bool> performBack() async {
+    if (!isSupported) return false;
+
+    try {
+      final result = await _channel.invokeMethod<bool>('performBack');
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 返回操作失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return false;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 返回操作失败: $e');
+      return false;
+    }
+  }
+
+  /// 回到桌面
+  Future<bool> performHome() async {
+    if (!isSupported) return false;
+
+    try {
+      final result = await _channel.invokeMethod<bool>('performHome');
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('ScreenReaderService: 回到桌面失败: ${e.message}');
+      _handleServiceNotEnabled(e);
+      return false;
+    } catch (e) {
+      debugPrint('ScreenReaderService: 回到桌面失败: $e');
+      return false;
+    }
+  }
+
+  /// 处理服务未启用的异常
+  void _handleServiceNotEnabled(PlatformException e) {
+    if (e.code == 'SERVICE_NOT_ENABLED') {
+      _isEnabled = false;
+      notifyListeners();
+    }
+  }
+
+  // ==================== 高级导航方法 ====================
+
+  /// 导航到支付宝账单页面
+  ///
+  /// 流程: 启动支付宝 -> 点击"我的" -> 点击"账单"
+  /// 返回是否成功导航
+  Future<bool> navigateToAlipayBills() async {
+    // 启动支付宝
+    if (!await launchApp(alipayPackage)) {
+      return false;
+    }
+
+    // 等待支付宝启动
+    if (!await waitForApp(alipayPackage, timeout: 8000)) {
+      return false;
+    }
+
+    // 等待首页加载
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    // 点击"我的"
+    if (!await clickElement('我的')) {
+      return false;
+    }
+
+    // 等待"我的"页面加载
+    await Future.delayed(const Duration(milliseconds: 1000));
+
+    // 点击"账单"
+    if (!await clickElement('账单')) {
+      // 尝试其他可能的文案
+      if (!await clickElement('全部账单')) {
+        return false;
+      }
+    }
+
+    // 等待账单页面加载
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    return true;
+  }
+
+  /// 导航到微信账单页面
+  ///
+  /// 流程: 启动微信 -> 点击"我" -> 点击"服务"/"支付" -> 点击"钱包" -> 点击"账单"
+  /// 返回是否成功导航
+  Future<bool> navigateToWeChatBills() async {
+    // 启动微信
+    if (!await launchApp(wechatPackage)) {
+      return false;
+    }
+
+    // 等待微信启动
+    if (!await waitForApp(wechatPackage, timeout: 8000)) {
+      return false;
+    }
+
+    // 等待首页加载
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    // 点击"我"
+    if (!await clickElement('我')) {
+      return false;
+    }
+
+    // 等待"我"页面加载
+    await Future.delayed(const Duration(milliseconds: 1000));
+
+    // 点击"服务"或"支付"（不同版本微信文案不同）
+    if (!await clickElement('服务')) {
+      if (!await clickElement('支付')) {
+        return false;
+      }
+    }
+
+    // 等待支付页面加载
+    await Future.delayed(const Duration(milliseconds: 1000));
+
+    // 点击"钱包"
+    if (!await clickElement('钱包')) {
+      return false;
+    }
+
+    // 等待钱包页面加载
+    await Future.delayed(const Duration(milliseconds: 1000));
+
+    // 点击"账单"
+    if (!await clickElement('账单')) {
+      return false;
+    }
+
+    // 等待账单页面加载
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    return true;
+  }
 }
 
 /// 屏幕内容
