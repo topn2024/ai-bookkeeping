@@ -134,7 +134,7 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
           ],
         ),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: AntigravityShadows.L4,
+        boxShadow: AntigravityShadows.l4,
       ),
       child: Column(
         children: [
@@ -239,7 +239,7 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,7 +308,7 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

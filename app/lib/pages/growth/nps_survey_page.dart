@@ -165,7 +165,7 @@ class _NpsSurveyPageState extends ConsumerState<NpsSurveyPage> {
                 decoration: BoxDecoration(
                   color: isSelected ? color : color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(isSelected ? 10 : 8),
-                  boxShadow: isSelected ? AntigravityShadows.L2 : null,
+                  boxShadow: isSelected ? AntigravityShadows.l2 : null,
                 ),
                 child: Center(
                   child: Text(
@@ -285,7 +285,7 @@ class _NpsSurveyPageState extends ConsumerState<NpsSurveyPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        boxShadow: AntigravityShadows.L3,
+        boxShadow: AntigravityShadows.l3,
       ),
       child: SafeArea(
         top: false,

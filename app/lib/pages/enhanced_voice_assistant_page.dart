@@ -25,7 +25,10 @@ import 'image_recognition_page.dart';
 /// - 语音反馈
 /// - 会话管理
 class EnhancedVoiceAssistantPage extends ConsumerStatefulWidget {
-  const EnhancedVoiceAssistantPage({super.key});
+  /// 返回回调（用于嵌入在IndexedStack中时）
+  final VoidCallback? onBack;
+
+  const EnhancedVoiceAssistantPage({super.key, this.onBack});
 
   @override
   ConsumerState<EnhancedVoiceAssistantPage> createState() => _EnhancedVoiceAssistantPageState();
@@ -190,7 +193,13 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
       elevation: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
-        onPressed: () => Navigator.pop(context),
+        onPressed: () {
+          if (widget.onBack != null) {
+            widget.onBack!();
+          } else if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          }
+        },
       ),
       title: Row(
         children: [
@@ -533,7 +542,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
                   bottomLeft: Radius.circular(isUser ? 16 : 4),
                   bottomRight: Radius.circular(isUser ? 4 : 16),
                 ),
-                boxShadow: isSystem ? null : AntigravityShadows.L1,
+                boxShadow: isSystem ? null : AntigravityShadows.l1,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -215,18 +215,10 @@ class AccessibleErrorService {
   final List<void Function(List<AccessibleError>)> _errorListeners = [];
 
   /// 是否自动播报错误
-  bool _autoAnnounce = true;
+  bool autoAnnounce = true;
 
   /// 播报延迟（毫秒）
   final int _announceDelay = 100;
-
-  /// 获取是否自动播报
-  bool get autoAnnounce => _autoAnnounce;
-
-  /// 设置是否自动播报
-  set autoAnnounce(bool value) {
-    _autoAnnounce = value;
-  }
 
   /// 获取所有活动错误
   List<AccessibleError> get activeErrors => _activeErrors.values.toList();

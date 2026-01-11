@@ -233,7 +233,7 @@ class _DetractorCarePageState extends ConsumerState<DetractorCarePage> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Row(
         children: [
@@ -368,7 +368,7 @@ class _DetractorCarePageState extends ConsumerState<DetractorCarePage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        boxShadow: AntigravityShadows.L3,
+        boxShadow: AntigravityShadows.l3,
       ),
       child: SafeArea(
         top: false,

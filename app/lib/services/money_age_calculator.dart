@@ -90,29 +90,14 @@ class MoneyAgeCalculator {
   /// 获取所有消耗记录（只读）
   List<ResourceConsumption> get consumptions => List.unmodifiable(_consumptions);
 
-  /// 获取当前策略
-  ConsumptionStrategy get strategy => _strategy;
+  /// 消费策略
+  ConsumptionStrategy strategy = ConsumptionStrategy.fifo;
 
-  /// 设置消费策略
-  set strategy(ConsumptionStrategy value) {
-    _strategy = value;
-  }
+  /// 账本过滤器
+  String? ledgerFilter;
 
-  /// 获取账本过滤器
-  String? get ledgerFilter => _ledgerFilter;
-
-  /// 设置账本过滤器
-  set ledgerFilter(String? value) {
-    _ledgerFilter = value;
-  }
-
-  /// 获取账户过滤器
-  String? get accountFilter => _accountFilter;
-
-  /// 设置账户过滤器
-  set accountFilter(String? value) {
-    _accountFilter = value;
-  }
+  /// 账户过滤器
+  String? accountFilter;
 
   /// 生成唯一ID
   String _generateId() {

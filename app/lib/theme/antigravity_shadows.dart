@@ -11,11 +11,11 @@ class AntigravityShadows {
   static const Color _shadowColor = Color(0xFF6495ED);
 
   /// L0 - 无阴影（平铺内容）
-  static const List<BoxShadow> L0 = [];
+  static const List<BoxShadow> l0 = [];
 
   /// L1 - 轻微阴影（分割线卡片）
   /// elevation: 1-2dp, blur: 3
-  static List<BoxShadow> get L1 => [
+  static List<BoxShadow> get l1 => [
     BoxShadow(
       color: _shadowColor.withValues(alpha: 0.08),
       blurRadius: 3,
@@ -32,7 +32,7 @@ class AntigravityShadows {
 
   /// L2 - 普通阴影（普通卡片）
   /// elevation: 3-4dp, blur: 6
-  static List<BoxShadow> get L2 => [
+  static List<BoxShadow> get l2 => [
     BoxShadow(
       color: _shadowColor.withValues(alpha: 0.12),
       blurRadius: 6,
@@ -49,7 +49,7 @@ class AntigravityShadows {
 
   /// L3 - 中等阴影（悬浮卡片）
   /// elevation: 6-8dp, blur: 12
-  static List<BoxShadow> get L3 => [
+  static List<BoxShadow> get l3 => [
     BoxShadow(
       color: _shadowColor.withValues(alpha: 0.16),
       blurRadius: 12,
@@ -66,7 +66,7 @@ class AntigravityShadows {
 
   /// L4 - 强烈阴影（弹窗/对话框/FAB）
   /// elevation: 12-16dp, blur: 24
-  static List<BoxShadow> get L4 => [
+  static List<BoxShadow> get l4 => [
     BoxShadow(
       color: _shadowColor.withValues(alpha: 0.20),
       blurRadius: 24,
@@ -83,7 +83,7 @@ class AntigravityShadows {
 
   /// L5 - 最强阴影（全屏覆盖层）
   /// elevation: 24dp+, blur: 32
-  static List<BoxShadow> get L5 => [
+  static List<BoxShadow> get l5 => [
     BoxShadow(
       color: _shadowColor.withValues(alpha: 0.24),
       blurRadius: 48,
@@ -102,19 +102,19 @@ class AntigravityShadows {
   static List<BoxShadow> getLevel(int level) {
     switch (level) {
       case 0:
-        return L0;
+        return l0;
       case 1:
-        return L1;
+        return l1;
       case 2:
-        return L2;
+        return l2;
       case 3:
-        return L3;
+        return l3;
       case 4:
-        return L4;
+        return l4;
       case 5:
-        return L5;
+        return l5;
       default:
-        return L2;
+        return l2;
     }
   }
 }
@@ -122,17 +122,17 @@ class AntigravityShadows {
 /// 反重力阴影装饰器扩展
 extension AntigravityShadowDecoration on BoxDecoration {
   /// 应用L1阴影
-  BoxDecoration withShadowL1() => copyWith(boxShadow: AntigravityShadows.L1);
+  BoxDecoration withShadowL1() => copyWith(boxShadow: AntigravityShadows.l1);
 
   /// 应用L2阴影
-  BoxDecoration withShadowL2() => copyWith(boxShadow: AntigravityShadows.L2);
+  BoxDecoration withShadowL2() => copyWith(boxShadow: AntigravityShadows.l2);
 
   /// 应用L3阴影
-  BoxDecoration withShadowL3() => copyWith(boxShadow: AntigravityShadows.L3);
+  BoxDecoration withShadowL3() => copyWith(boxShadow: AntigravityShadows.l3);
 
   /// 应用L4阴影
-  BoxDecoration withShadowL4() => copyWith(boxShadow: AntigravityShadows.L4);
+  BoxDecoration withShadowL4() => copyWith(boxShadow: AntigravityShadows.l4);
 
   /// 应用L5阴影
-  BoxDecoration withShadowL5() => copyWith(boxShadow: AntigravityShadows.L5);
+  BoxDecoration withShadowL5() => copyWith(boxShadow: AntigravityShadows.l5);
 }

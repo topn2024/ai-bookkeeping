@@ -158,7 +158,7 @@ class _PerformanceMonitorPageState extends ConsumerState<PerformanceMonitorPage>
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Column(
         children: [
@@ -205,7 +205,7 @@ class _PerformanceMonitorPageState extends ConsumerState<PerformanceMonitorPage>
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,7 +277,7 @@ class _PerformanceMonitorPageState extends ConsumerState<PerformanceMonitorPage>
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -340,7 +340,7 @@ class _PerformanceMonitorPageState extends ConsumerState<PerformanceMonitorPage>
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

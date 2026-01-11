@@ -116,7 +116,7 @@ class _MultimodalInputPageState extends ConsumerState<MultimodalInputPage> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -235,7 +235,7 @@ class _MultimodalInputPageState extends ConsumerState<MultimodalInputPage> {
                     ? AppColors.expense.withValues(alpha: 0.2)
                     : theme.colorScheme.primaryContainer,
                 shape: BoxShape.circle,
-                boxShadow: _isRecording ? AntigravityShadows.L4 : AntigravityShadows.L2,
+                boxShadow: _isRecording ? AntigravityShadows.l4 : AntigravityShadows.l2,
               ),
               child: Icon(
                 Icons.mic,
@@ -390,7 +390,7 @@ class _MultimodalInputPageState extends ConsumerState<MultimodalInputPage> {
                         ? theme.colorScheme.primary
                         : theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: isSelected ? AntigravityShadows.L2 : null,
+                    boxShadow: isSelected ? AntigravityShadows.l2 : null,
                   ),
                   child: Icon(
                     _getModeIcon(mode),
@@ -422,7 +422,7 @@ class _MultimodalInputPageState extends ConsumerState<MultimodalInputPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        boxShadow: AntigravityShadows.L3,
+        boxShadow: AntigravityShadows.l3,
       ),
       child: SafeArea(
         top: false,

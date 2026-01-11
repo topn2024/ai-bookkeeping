@@ -94,7 +94,7 @@ class _HandwritingRecognitionPageState
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,7 +147,7 @@ class _HandwritingRecognitionPageState
           color: theme.colorScheme.outlineVariant,
           width: 2,
         ),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
@@ -346,7 +346,7 @@ class _HandwritingRecognitionPageState
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        boxShadow: AntigravityShadows.L3,
+        boxShadow: AntigravityShadows.l3,
       ),
       child: SafeArea(
         top: false,

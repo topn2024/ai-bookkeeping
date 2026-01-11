@@ -105,7 +105,7 @@ class ViralCampaignPage extends ConsumerWidget {
           ],
         ),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: AntigravityShadows.L4,
+        boxShadow: AntigravityShadows.l4,
       ),
       child: Column(
         children: [
@@ -161,7 +161,7 @@ class ViralCampaignPage extends ConsumerWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,7 +231,7 @@ class ViralCampaignPage extends ConsumerWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,7 +387,7 @@ class ViralCampaignPage extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        boxShadow: AntigravityShadows.L3,
+        boxShadow: AntigravityShadows.l3,
       ),
       child: SafeArea(
         top: false,

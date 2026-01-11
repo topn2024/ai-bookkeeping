@@ -90,7 +90,7 @@ class AchievementSharePage extends ConsumerWidget {
           ],
         ),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: AntigravityShadows.L4,
+        boxShadow: AntigravityShadows.l4,
       ),
       child: Column(
         children: [
@@ -159,7 +159,7 @@ class AchievementSharePage extends ConsumerWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -234,7 +234,7 @@ class AchievementSharePage extends ConsumerWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AntigravityShadows.L2,
+        boxShadow: AntigravityShadows.l2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

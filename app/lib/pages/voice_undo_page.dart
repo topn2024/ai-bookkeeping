@@ -221,7 +221,7 @@ class _VoiceUndoPageState extends ConsumerState<VoiceUndoPage> {
                     : Colors.transparent,
                 width: 2,
               ),
-              boxShadow: AntigravityShadows.L2,
+              boxShadow: AntigravityShadows.l2,
             ),
             child: Row(
               children: [
@@ -302,7 +302,7 @@ class _VoiceUndoPageState extends ConsumerState<VoiceUndoPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        boxShadow: AntigravityShadows.L3,
+        boxShadow: AntigravityShadows.l3,
       ),
       child: SafeArea(
         top: false,

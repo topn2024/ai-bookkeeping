@@ -32,20 +32,26 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   bool _hasCheckedUpdate = false;
 
   // 页面列表（不包含中间的+按钮）
-  final List<Widget> _pages = const [
-    HomePage(),
-    AnalysisCenterPage(),
-    EnhancedVoiceAssistantPage(),  // 小记宠物助手
-    ProfilePage(),
-  ];
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+    _pages = [
+      const HomePage(),
+      const AnalysisCenterPage(),
+      EnhancedVoiceAssistantPage(onBack: _goToHome),  // 小记宠物助手
+      const ProfilePage(),
+    ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowUpdate();
       _initializeLedgerContext();
     });
+  }
+
+  /// 返回首页
+  void _goToHome() {
+    setState(() => _currentIndex = 0);
   }
 
   /// 初始化账本上下文
@@ -104,7 +110,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
 
   /// 中间的+按钮
   /// 单击：手动记账
-  /// 长按：语音记账
+  /// 长按：语音记账（底部浮层）
   Widget _buildCenterButton(BuildContext context) {
     return Transform.translate(
       offset: const Offset(0, 8),  // 向下偏移
@@ -117,8 +123,8 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
           );
         },
         onLongPress: () {
-          // 长按进入语音助手（小记）
-          setState(() => _currentIndex = 2);  // 切换到小记页面
+          // 长按显示底部语音录入浮层
+          _showVoiceRecordingSheet(context);
         },
         child: Container(
           width: 64,
@@ -148,6 +154,16 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
           ),
         ),
       ),
+    );
+  }
+
+  /// 显示语音录入底部浮层
+  void _showVoiceRecordingSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => const VoiceRecordingSheet(),
     );
   }
 
@@ -189,6 +205,194 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
           label: context.l10n.profile,
         ),
       ],
+    );
+  }
+}
+
+/// 语音录入底部浮层
+class VoiceRecordingSheet extends StatefulWidget {
+  const VoiceRecordingSheet({super.key});
+
+  @override
+  State<VoiceRecordingSheet> createState() => _VoiceRecordingSheetState();
+}
+
+class _VoiceRecordingSheetState extends State<VoiceRecordingSheet>
+    with SingleTickerProviderStateMixin {
+  bool _isRecording = false;
+  late AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  void _toggleRecording() {
+    setState(() {
+      _isRecording = !_isRecording;
+      if (_isRecording) {
+        _pulseController.repeat();
+      } else {
+        _pulseController.stop();
+        _pulseController.reset();
+        // 模拟器提示
+        _showSimulatorHint();
+      }
+    });
+  }
+
+  void _showSimulatorHint() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('语音识别需要真机环境'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 拖动条
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // 标题
+            Text(
+              _isRecording ? '正在聆听...' : '按住说话',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: _isRecording ? AppTheme.expenseColor : AppTheme.textPrimaryColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _isRecording ? '松开结束录音' : '长按麦克风开始语音记账',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.textSecondaryColor,
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // 语音按钮
+            GestureDetector(
+              onTapDown: (_) => _toggleRecording(),
+              onTapUp: (_) {
+                if (_isRecording) _toggleRecording();
+              },
+              onTapCancel: () {
+                if (_isRecording) _toggleRecording();
+              },
+              child: AnimatedBuilder(
+                animation: _pulseController,
+                builder: (context, child) {
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // 波浪效果
+                      if (_isRecording) ...[
+                        Container(
+                          width: 120 + (_pulseController.value * 30),
+                          height: 120 + (_pulseController.value * 30),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppTheme.expenseColor.withValues(
+                              alpha: 0.1 * (1 - _pulseController.value),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: 100 + (_pulseController.value * 15),
+                          height: 100 + (_pulseController.value * 15),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppTheme.expenseColor.withValues(
+                              alpha: 0.15 * (1 - _pulseController.value),
+                            ),
+                          ),
+                        ),
+                      ],
+                      // 主按钮
+                      Container(
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: _isRecording
+                                ? [AppTheme.expenseColor, AppTheme.expenseColor.withValues(alpha: 0.85)]
+                                : [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.85)],
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: (_isRecording ? AppTheme.expenseColor : AppTheme.primaryColor)
+                                  .withValues(alpha: 0.35),
+                              blurRadius: 20,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          _isRecording ? Icons.mic : Icons.mic_none,
+                          color: Colors.white,
+                          size: 40,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // 提示文字
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.lightbulb_outline, size: 16, color: AppTheme.textSecondaryColor),
+                const SizedBox(width: 4),
+                Text(
+                  '试试说"午餐花了35元"',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textSecondaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

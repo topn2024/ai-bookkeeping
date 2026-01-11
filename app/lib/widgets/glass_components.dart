@@ -208,7 +208,7 @@ class _GlassNavItem extends StatelessWidget {
                     ? selectedColor.withValues(alpha: 0.12)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: isSelected ? AntigravityShadows.L2 : null,
+                boxShadow: isSelected ? AntigravityShadows.l2 : null,
               ),
               child: Icon(icon, color: color, size: 24),
             ),
@@ -321,7 +321,7 @@ class _GlassFabState extends State<GlassFab>
               ],
             ),
             borderRadius: BorderRadius.circular(16),
-            boxShadow: AntigravityShadows.L4,
+            boxShadow: AntigravityShadows.l4,
           ),
           child: Center(child: widget.child),
         ),
@@ -551,7 +551,7 @@ class AntigravityBottomSheet extends StatelessWidget {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: AntigravityShadows.L5,
+            boxShadow: AntigravityShadows.l5,
           ),
           child: Column(
             children: [
@@ -776,7 +776,7 @@ class _ToastOverlayState extends State<_ToastOverlay>
                 decoration: BoxDecoration(
                   color: _backgroundColor,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: AntigravityShadows.L4,
+                  boxShadow: AntigravityShadows.l4,
                 ),
                 child: Row(
                   children: [

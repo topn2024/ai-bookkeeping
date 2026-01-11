@@ -300,7 +300,7 @@ class _GlassFloatingIsland extends FloatingIsland {
               color: Colors.white.withValues(alpha: 0.3),
               width: 1,
             ),
-            boxShadow: AntigravityShadows.L3,
+            boxShadow: AntigravityShadows.l3,
           ),
           child: child,
         ),

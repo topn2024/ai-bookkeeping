@@ -190,23 +190,10 @@ class KeyboardNavigationService {
   final List<bool Function(KeyEvent)> _keyListeners = [];
 
   /// 是否显示快捷键提示
-  bool _showShortcutHints = true;
+  bool showShortcutHints = true;
 
-  /// 获取是否启用
-  bool get enabled => _enabled;
-
-  /// 设置是否启用
-  set enabled(bool value) {
-    _enabled = value;
-  }
-
-  /// 获取是否显示快捷键提示
-  bool get showShortcutHints => _showShortcutHints;
-
-  /// 设置是否显示快捷键提示
-  set showShortcutHints(bool value) {
-    _showShortcutHints = value;
-  }
+  /// 是否启用
+  bool enabled = true;
 
   /// 初始化默认快捷键
   void initializeDefaultShortcuts() {

@@ -168,7 +168,7 @@ class _SystemLogPageState extends ConsumerState<SystemLogPage> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: AntigravityShadows.L1,
+        boxShadow: AntigravityShadows.l1,
       ),
       child: ExpansionTile(
         leading: Container(
