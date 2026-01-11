@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../qwen_service.dart';
+import '../voice_service_coordinator.dart' show VoiceIntentType;
 import 'voice_intent_router.dart';
 
 /// 智能意图识别器
@@ -96,9 +97,9 @@ class SmartIntentRecognizer {
   Future<SmartIntentResult?> _layer1ExactRule(String input) async {
     try {
       final result = await _ruleRouter.analyzeIntent(input);
-      if (result.type != VoiceIntentType.unknown) {
+      if (result.intent != VoiceIntentType.unknown) {
         return SmartIntentResult(
-          intentType: _mapIntentType(result.type),
+          intentType: _mapIntentType(result.intent),
           confidence: result.confidence,
           entities: _extractEntities(result),
           source: RecognitionSource.exactRule,
