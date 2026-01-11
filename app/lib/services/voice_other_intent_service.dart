@@ -196,12 +196,6 @@ class VoiceOtherIntentService extends ChangeNotifier {
     '报表', '分析', '趋势', '对比', '排名', '最多', '最少',
   ];
 
-  /// 情感表达关键词
-  static const List<String> _emotionalKeywords = [
-    '好烦', '郁闷', '开心', '高兴', '焦虑', '担心', '难过',
-    '后悔', '惊讶', '不错', '太好了', '糟糕', '完蛋', '压力',
-  ];
-
   /// 闲聊关键词
   static const List<String> _chitChatKeywords = [
     '你好', '嗨', '早上好', '晚上好', '谢谢', '再见', '拜拜',

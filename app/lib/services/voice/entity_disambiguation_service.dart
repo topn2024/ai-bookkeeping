@@ -16,6 +16,9 @@ class EntityDisambiguationService extends ChangeNotifier {
   /// 当前会话的上下文
   DisambiguationContext? _currentContext;
 
+  /// 获取当前上下文
+  DisambiguationContext? get currentContext => _currentContext;
+
   /// 最近操作的记录（用于"刚才那笔"等指代）
   final List<RecentRecord> _recentRecords = [];
 
@@ -379,7 +382,9 @@ class EntityDisambiguationService extends ChangeNotifier {
               final diff = (candidate.amount - amountInfo.exactAmount!).abs();
               if (diff < 1) {
                 score += 0.5; // 金额精确匹配很重要
-              } else if (diff < 5) score += 0.3;
+              } else if (diff < 5) {
+                score += 0.3;
+              }
             }
             break;
           case ReferenceType.merchant:

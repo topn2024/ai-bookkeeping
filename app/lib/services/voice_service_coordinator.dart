@@ -72,6 +72,19 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 最大历史记录数
   static const int maxHistorySize = 50;
 
+  /// 会话超时配置
+  static const Duration _sessionTimeout = Duration(seconds: 30);
+  static const Duration _waitingStateTimeout = Duration(seconds: 60);
+
+  /// 会话超时计时器
+  Timer? _sessionTimeoutTimer;
+
+  /// 最后活动时间（用于调试和监控）
+  DateTime? _lastActivityTime;
+
+  /// 获取最后活动时间
+  DateTime? get lastActivityTime => _lastActivityTime;
+
   VoiceServiceCoordinator({
     VoiceRecognitionEngine? recognitionEngine,
     TTSService? ttsService,
@@ -173,6 +186,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   Future<VoiceSessionResult> startVoiceSession() async {
     try {
       _sessionState = VoiceSessionState.listening;
+      _startSessionTimeout(); // 启动会话超时计时器
       notifyListeners();
 
       // 初始化语音识别
@@ -187,6 +201,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       return VoiceSessionResult.success('语音识别已启动');
     } catch (e) {
+      _cancelSessionTimeout();
       _sessionState = VoiceSessionState.idle;
       notifyListeners();
       return VoiceSessionResult.error('启动语音识别失败: $e');
@@ -196,6 +211,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 处理单次语音命令
   Future<VoiceSessionResult> processVoiceCommand(String voiceInput) async {
     try {
+      _resetSessionTimeout(); // 用户有活动，重置超时
       _sessionState = VoiceSessionState.processing;
       notifyListeners();
 
@@ -960,7 +976,10 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       return VoiceSessionResult.success(message);
     } catch (e) {
       final message = '添加记录失败: $e';
-      await _ttsService.speak('添加记录失败，请重试');
+      await _feedbackSystem.provideErrorFeedback(
+        error: '添加记录时遇到问题',
+        suggestion: '请稍后重试，或换一种方式描述',
+      );
       return VoiceSessionResult.error(message);
     }
   }
@@ -1013,7 +1032,10 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       return VoiceSessionResult.success(message);
     } catch (e) {
       final message = '查询失败: $e';
-      await _ttsService.speak('查询失败，请重试');
+      await _feedbackSystem.provideErrorFeedback(
+        error: '查询记录时遇到问题',
+        suggestion: '请稍后重试',
+      );
       return VoiceSessionResult.error(message);
     }
   }
@@ -1351,13 +1373,238 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 启动会话超时计时器
+  void _startSessionTimeout() {
+    _cancelSessionTimeout();
+    _lastActivityTime = DateTime.now();
+
+    final timeout = _isWaitingState() ? _waitingStateTimeout : _sessionTimeout;
+
+    _sessionTimeoutTimer = Timer(timeout, () {
+      _handleSessionTimeout();
+    });
+  }
+
+  /// 取消会话超时计时器
+  void _cancelSessionTimeout() {
+    _sessionTimeoutTimer?.cancel();
+    _sessionTimeoutTimer = null;
+  }
+
+  /// 重置会话超时（用户有活动时调用）
+  void _resetSessionTimeout() {
+    if (_sessionState != VoiceSessionState.idle) {
+      _startSessionTimeout();
+    }
+  }
+
+  /// 检查是否处于等待状态
+  bool _isWaitingState() {
+    return _sessionState == VoiceSessionState.waitingForConfirmation ||
+           _sessionState == VoiceSessionState.waitingForClarification ||
+           _sessionState == VoiceSessionState.waitingForMultiIntentConfirmation ||
+           _sessionState == VoiceSessionState.waitingForAmountSupplement;
+  }
+
+  /// 处理会话超时
+  Future<void> _handleSessionTimeout() async {
+    if (_sessionState == VoiceSessionState.idle) return;
+
+    debugPrint('VoiceServiceCoordinator: session timeout');
+
+    // 通知用户
+    await _feedbackSystem.provideFeedback(
+      message: '会话已超时，如需继续请重新开始',
+      type: VoiceFeedbackType.info,
+      priority: VoiceFeedbackPriority.medium,
+    );
+
+    // 清理会话
+    _clearSession();
+    notifyListeners();
+  }
+
+  /// 取消当前进行中的操作
+  ///
+  /// 用于错误恢复和用户主动取消场景
+  Future<void> cancelCurrentOperation() async {
+    try {
+      // 取消语音识别
+      await _recognitionEngine.cancelTranscription();
+
+      // 停止 TTS
+      await _ttsService.stop();
+
+      // 取消删除操作
+      _deleteService.cancelDelete();
+
+      // 取消修改操作
+      _modifyService.cancelModification();
+
+      // 取消自动化任务
+      _automationService.cancelTask();
+
+      debugPrint('VoiceServiceCoordinator: all operations cancelled');
+    } catch (e) {
+      debugPrint('VoiceServiceCoordinator: cancel operation error - $e');
+    }
+  }
+
   /// 清除当前会话
   void _clearSession() {
+    _cancelSessionTimeout();
     _currentSession = null;
     _pendingMultiIntent = null;
     _sessionState = VoiceSessionState.idle;
     _deleteService.cancelDelete();
     _modifyService.clearSession();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 错误恢复机制
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 错误重试计数
+  int _errorRetryCount = 0;
+  static const int _maxErrorRetries = 3;
+
+  /// 尝试从错误状态恢复
+  ///
+  /// 返回是否成功恢复
+  Future<bool> tryRecoverFromError() async {
+    if (_sessionState != VoiceSessionState.error) {
+      return true; // 不在错误状态，无需恢复
+    }
+
+    debugPrint('VoiceServiceCoordinator: attempting error recovery');
+
+    try {
+      // 停止所有正在进行的操作
+      await cancelCurrentOperation();
+
+      // 重置状态
+      _clearSession();
+      _errorRetryCount = 0;
+
+      // 通知用户
+      await _feedbackSystem.provideFeedback(
+        message: '已恢复，请重试',
+        type: VoiceFeedbackType.info,
+        priority: VoiceFeedbackPriority.high,
+      );
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('VoiceServiceCoordinator: error recovery failed - $e');
+      return false;
+    }
+  }
+
+  /// 处理可恢复错误
+  ///
+  /// 对于网络超时、Token过期等可恢复错误，自动重试
+  /// 可由 UI 层调用进行手动重试
+  Future<VoiceSessionResult> handleRecoverableError(
+    String operation,
+    Object error,
+    Future<VoiceSessionResult> Function() retryOperation,
+  ) async {
+    final errorType = _classifyError(error);
+
+    if (errorType == VoiceErrorType.recoverable && _errorRetryCount < _maxErrorRetries) {
+      _errorRetryCount++;
+      debugPrint('VoiceServiceCoordinator: retrying $operation (attempt $_errorRetryCount/$_maxErrorRetries)');
+
+      // 等待后重试
+      await Future.delayed(Duration(milliseconds: 500 * _errorRetryCount));
+
+      try {
+        final result = await retryOperation();
+        _errorRetryCount = 0; // 成功后重置
+        return result;
+      } catch (e) {
+        return handleRecoverableError(operation, e, retryOperation);
+      }
+    }
+
+    // 不可恢复或重试次数用尽
+    _sessionState = VoiceSessionState.error;
+    _errorRetryCount = 0;
+    notifyListeners();
+
+    final message = _getErrorMessage(error, errorType);
+    final suggestion = _getErrorSuggestion(errorType);
+    await _feedbackSystem.provideErrorFeedback(
+      error: message,
+      suggestion: suggestion,
+    );
+
+    return VoiceSessionResult.error(message);
+  }
+
+  /// 错误分类
+  VoiceErrorType _classifyError(Object error) {
+    final errorString = error.toString().toLowerCase();
+
+    // 网络相关错误 - 可恢复
+    if (errorString.contains('timeout') ||
+        errorString.contains('网络') ||
+        errorString.contains('connection') ||
+        errorString.contains('socket')) {
+      return VoiceErrorType.recoverable;
+    }
+
+    // Token相关错误 - 可恢复
+    if (errorString.contains('token') ||
+        errorString.contains('认证') ||
+        errorString.contains('auth')) {
+      return VoiceErrorType.recoverable;
+    }
+
+    // 权限错误 - 不可恢复（需要用户操作）
+    if (errorString.contains('permission') ||
+        errorString.contains('权限')) {
+      return VoiceErrorType.permissionDenied;
+    }
+
+    // 服务不可用 - 不可恢复
+    if (errorString.contains('503') ||
+        errorString.contains('service unavailable') ||
+        errorString.contains('服务不可用')) {
+      return VoiceErrorType.serviceUnavailable;
+    }
+
+    // 其他错误
+    return VoiceErrorType.unknown;
+  }
+
+  /// 获取用户友好的错误消息
+  String _getErrorMessage(Object error, VoiceErrorType errorType) {
+    switch (errorType) {
+      case VoiceErrorType.recoverable:
+        return '网络不稳定';
+      case VoiceErrorType.permissionDenied:
+        return '需要麦克风权限';
+      case VoiceErrorType.serviceUnavailable:
+        return '语音服务暂时不可用';
+      case VoiceErrorType.unknown:
+        return '操作遇到问题';
+    }
+  }
+
+  /// 获取错误建议
+  String _getErrorSuggestion(VoiceErrorType errorType) {
+    switch (errorType) {
+      case VoiceErrorType.recoverable:
+        return '请检查网络连接后重试';
+      case VoiceErrorType.permissionDenied:
+        return '请在系统设置中授予麦克风权限';
+      case VoiceErrorType.serviceUnavailable:
+        return '请稍后再试，或使用离线模式';
+      case VoiceErrorType.unknown:
+        return '请稍后重试';
+    }
   }
 
   /// 添加命令到历史记录
@@ -1383,6 +1630,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 释放资源
   @override
   void dispose() {
+    // 取消会话超时计时器
+    _cancelSessionTimeout();
+
     // 释放语音识别引擎
     _recognitionEngine.dispose();
 
@@ -1437,6 +1687,15 @@ enum VoiceSessionState {
   waitingForAmountSupplement,     // 等待金额补充
   automationRunning,              // 自动化任务执行中
   error,                          // 错误状态
+  recovering,                     // 恢复中
+}
+
+/// 语音错误类型
+enum VoiceErrorType {
+  recoverable,        // 可恢复错误（网络超时、Token过期等）
+  permissionDenied,   // 权限被拒绝
+  serviceUnavailable, // 服务不可用
+  unknown,            // 未知错误
 }
 
 /// 语音意图类型

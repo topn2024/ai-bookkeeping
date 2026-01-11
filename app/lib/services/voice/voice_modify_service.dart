@@ -164,11 +164,14 @@ class VoiceModifyService extends ChangeNotifier {
       case DisambiguationStatus.noReference:
         // 没有指代词，尝试使用上下文中的当前记录
         if (context?.currentRecord != null) {
+          final record = context!.currentRecord!;
+          final needConfirm = modifications.length > 1 ||
+              _isSignificantChange(record, modifications);
           return await _executeModification(
-            context!.currentRecord!,
+            record,
             modifications,
             updateCallback,
-            needConfirmation: modifications.length > 1,
+            needConfirmation: needConfirm,
           );
         }
         return ModifyResult.noTargetSpecified();
@@ -420,33 +423,132 @@ class VoiceModifyService extends ChangeNotifier {
     TransactionRecord record,
     List<FieldModification> modifications,
   ) {
+    final level = _determineConfirmLevel(record, modifications);
+    // Level 2及以上需要确认
+    return level.index >= ModifyConfirmLevel.level2.index;
+  }
+
+  /// 确定修改确认级别
+  ///
+  /// 参考删除服务的4级确认系统：
+  /// - Level 1: 轻量确认（小额修改，24小时内记录）
+  /// - Level 2: 标准确认（大额修改或历史记录）
+  /// - Level 3: 严格确认（敏感操作，如类型变更）
+  /// - Level 4: 禁止语音（必须手动操作）
+  ModifyConfirmLevel _determineConfirmLevel(
+    TransactionRecord record,
+    List<FieldModification> modifications,
+  ) {
+    // 检查是否有敏感字段修改
     for (final mod in modifications) {
-      switch (mod.field) {
-        case ModifyField.amount:
-          final newAmount = mod.newValue as double;
-          final diff = (newAmount - record.amount).abs();
-          // 金额变化超过50%视为重大变更
-          if (diff / record.amount > 0.5) return true;
-          // 金额变化超过100元视为重大变更
-          if (diff > 100) return true;
-          break;
-
-        case ModifyField.transactionType:
-          // 类型变更始终需要确认
-          return true;
-
-        case ModifyField.date:
-          // 日期跨度超过7天需要确认
-          final newDate = mod.newValue as DateTime;
-          final diff = newDate.difference(record.date).inDays.abs();
-          if (diff > 7) return true;
-          break;
-
-        default:
-          break;
+      // 类型变更（支出→收入等）始终需要严格确认
+      if (mod.field == ModifyField.transactionType) {
+        return ModifyConfirmLevel.level3;
       }
     }
-    return false;
+
+    // 计算记录年龄
+    final now = DateTime.now();
+    final recordAge = now.difference(record.date);
+    final isRecentRecord = recordAge.inHours < 24;
+
+    // 检查金额相关变更
+    for (final mod in modifications) {
+      if (mod.field == ModifyField.amount) {
+        final newAmount = mod.newValue as double;
+        final diff = (newAmount - record.amount).abs();
+        final changeRatio = record.amount > 0 ? diff / record.amount : 1.0;
+
+        // 大额交易（新金额超过500元）需要标准确认
+        if (newAmount >= 500) {
+          return ModifyConfirmLevel.level2;
+        }
+
+        // 金额变化超过200元需要标准确认
+        if (diff >= 200) {
+          return ModifyConfirmLevel.level2;
+        }
+
+        // 金额变化超过50%且超过50元需要标准确认
+        if (changeRatio > 0.5 && diff >= 50) {
+          return ModifyConfirmLevel.level2;
+        }
+
+        // 历史记录（超过24小时）的金额修改需要标准确认
+        if (!isRecentRecord && diff >= 20) {
+          return ModifyConfirmLevel.level2;
+        }
+      }
+
+      // 日期跨度超过7天需要标准确认
+      if (mod.field == ModifyField.date) {
+        final newDate = mod.newValue as DateTime;
+        final dateDiff = newDate.difference(record.date).inDays.abs();
+        if (dateDiff > 7) {
+          return ModifyConfirmLevel.level2;
+        }
+      }
+    }
+
+    // 多字段修改需要标准确认
+    if (modifications.length > 1) {
+      return ModifyConfirmLevel.level2;
+    }
+
+    // 历史记录的任何修改需要轻量确认
+    if (!isRecentRecord) {
+      return ModifyConfirmLevel.level1;
+    }
+
+    // 小额近期记录的简单修改，无需确认
+    return ModifyConfirmLevel.none;
+  }
+
+  /// 生成修改确认提示
+  String _generateConfirmPrompt(
+    TransactionRecord record,
+    List<FieldModification> modifications,
+    ModifyConfirmLevel level,
+  ) {
+    final description = record.description ?? record.category ?? '记录';
+    final amountStr = '¥${record.amount.toStringAsFixed(2)}';
+
+    switch (level) {
+      case ModifyConfirmLevel.none:
+        return '';
+
+      case ModifyConfirmLevel.level1:
+        // 轻量确认
+        if (modifications.length == 1) {
+          final mod = modifications.first;
+          return '确认将$description的${mod.fieldName}改为${mod.displayValue}吗？';
+        }
+        return '确认修改$description $amountStr吗？';
+
+      case ModifyConfirmLevel.level2:
+        // 标准确认：强调金额或变更幅度
+        if (modifications.any((m) => m.field == ModifyField.amount)) {
+          final amountMod = modifications.firstWhere(
+            (m) => m.field == ModifyField.amount,
+          );
+          return '这是一笔较大金额的修改。'
+              '确定要将$description的金额从$amountStr改为${amountMod.displayValue}吗？';
+        }
+        return '这条记录已有一段时间。确定要修改$description $amountStr吗？';
+
+      case ModifyConfirmLevel.level3:
+        // 严格确认：敏感操作
+        if (modifications.any((m) => m.field == ModifyField.transactionType)) {
+          final typeMod = modifications.firstWhere(
+            (m) => m.field == ModifyField.transactionType,
+          );
+          return '注意：您正在更改交易类型为${typeMod.newValue}，这可能影响统计。请确认此操作。';
+        }
+        return '这是一个敏感操作，请确认修改$description $amountStr。';
+
+      case ModifyConfirmLevel.level4:
+        return '此操作需要在屏幕上手动确认';
+    }
   }
 
   /// 执行修改
@@ -456,6 +558,9 @@ class VoiceModifyService extends ChangeNotifier {
     TransactionUpdateCallback updateCallback, {
     bool needConfirmation = false,
   }) async {
+    // 确定确认级别
+    final confirmLevel = _determineConfirmLevel(record, modifications);
+
     // 构建修改预览
     final preview = ModifyPreview(
       originalRecord: record,
@@ -463,14 +568,30 @@ class VoiceModifyService extends ChangeNotifier {
       previewRecord: _applyModifications(record, modifications),
     );
 
-    if (needConfirmation) {
+    // 根据确认级别决定是否需要确认
+    final shouldConfirm = needConfirmation ||
+        confirmLevel.index >= ModifyConfirmLevel.level2.index;
+
+    if (shouldConfirm) {
+      // 生成确认提示
+      final confirmPrompt = _generateConfirmPrompt(
+        record,
+        modifications,
+        confirmLevel,
+      );
+
       // 保存待确认的修改
       _currentSession = ModifySessionContext(
         currentRecord: record,
         pendingModifications: modifications,
+        confirmLevel: confirmLevel,
       );
 
-      return ModifyResult.needConfirmation(preview: preview);
+      return ModifyResult.needConfirmation(
+        preview: preview,
+        confirmLevel: confirmLevel,
+        confirmPrompt: confirmPrompt,
+      );
     }
 
     // 直接执行修改
@@ -532,12 +653,16 @@ class VoiceModifyService extends ChangeNotifier {
       // 清除会话
       _currentSession = null;
 
+      // 检查是否需要确认（多字段修改或重大变更）
+      final needConfirm = modifications.length > 1 ||
+          _isSignificantChange(record, modifications);
+
       // 执行修改
       return await _executeModification(
         record,
         modifications,
         updateCallback,
-        needConfirmation: modifications.length > 1,
+        needConfirmation: needConfirm,
       );
     }
 
@@ -711,6 +836,17 @@ enum ModifyField {
   transactionType, // 交易类型
 }
 
+/// 修改确认级别
+///
+/// 参考删除服务的4级确认系统，用于控制修改操作的确认流程
+enum ModifyConfirmLevel {
+  none, // 无需确认：小额近期记录的简单修改
+  level1, // 轻量确认：语音确认即可（历史记录的小额修改）
+  level2, // 标准确认：语音或屏幕确认（大额修改、多字段修改）
+  level3, // 严格确认：必须屏幕点击（类型变更等敏感操作）
+  level4, // 禁止语音：必须手动操作（批量修改等高风险操作）
+}
+
 /// 字段修改
 class FieldModification {
   final ModifyField field;
@@ -808,12 +944,14 @@ class ModifySessionContext {
   final List<FieldModification>? pendingModifications;
   final List<ScoredCandidate>? candidateRecords;
   final String? clarificationPrompt;
+  final ModifyConfirmLevel? confirmLevel;
 
   const ModifySessionContext({
     this.currentRecord,
     this.pendingModifications,
     this.candidateRecords,
     this.clarificationPrompt,
+    this.confirmLevel,
   });
 
   DisambiguationContext? toDisambiguationContext() {
@@ -834,6 +972,8 @@ class ModifyResult {
   final List<ScoredCandidate>? candidates;
   final String? prompt;
   final String? errorMessage;
+  final ModifyConfirmLevel? confirmLevel;
+  final String? confirmPrompt;
 
   const ModifyResult({
     required this.status,
@@ -844,6 +984,8 @@ class ModifyResult {
     this.candidates,
     this.prompt,
     this.errorMessage,
+    this.confirmLevel,
+    this.confirmPrompt,
   });
 
   factory ModifyResult.success({
@@ -859,10 +1001,16 @@ class ModifyResult {
     );
   }
 
-  factory ModifyResult.needConfirmation({required ModifyPreview preview}) {
+  factory ModifyResult.needConfirmation({
+    required ModifyPreview preview,
+    ModifyConfirmLevel? confirmLevel,
+    String? confirmPrompt,
+  }) {
     return ModifyResult(
       status: ModifyResultStatus.needConfirmation,
       preview: preview,
+      confirmLevel: confirmLevel,
+      confirmPrompt: confirmPrompt,
     );
   }
 
@@ -930,6 +1078,10 @@ class ModifyResult {
         return '修改完成';
 
       case ModifyResultStatus.needConfirmation:
+        // 优先使用带确认级别的提示
+        if (confirmPrompt != null && confirmPrompt!.isNotEmpty) {
+          return confirmPrompt!;
+        }
         return '确认${preview?.generatePreviewText() ?? "修改"}吗？';
 
       case ModifyResultStatus.needClarification:
@@ -951,6 +1103,11 @@ class ModifyResult {
         return errorMessage ?? '修改失败';
     }
   }
+
+  /// 是否需要屏幕确认（严格级别及以上）
+  bool get requiresScreenConfirmation =>
+      confirmLevel != null &&
+      confirmLevel!.index >= ModifyConfirmLevel.level3.index;
 }
 
 /// 修改结果状态

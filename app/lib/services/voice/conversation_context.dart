@@ -17,6 +17,9 @@ class ConversationContext {
   /// 当前会话ID
   String? _sessionId;
 
+  /// 获取当前会话ID
+  String? get sessionId => _sessionId;
+
   /// 最后一次交易引用
   TransactionReference? _lastTransactionRef;
 

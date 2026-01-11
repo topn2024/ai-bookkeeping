@@ -6,9 +6,6 @@ class SentenceSplitter {
   /// 强分隔符（明确的句子边界）
   static final _strongDelimiters = RegExp(r'[。！？；\n]');
 
-  /// 弱分隔符（需要结合上下文判断）
-  static final _softDelimiters = RegExp(r'[，,]');
-
   /// 连接词（表示新事件开始）
   static final _connectors = [
     '然后',

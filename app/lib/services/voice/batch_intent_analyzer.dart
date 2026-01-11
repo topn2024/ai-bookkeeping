@@ -58,7 +58,7 @@ class BatchIntentAnalyzer {
       );
 
       // 2. 使用 NLU 引擎提取实体
-      final nluResult = _nluEngine.parse(segment);
+      final nluResult = await _nluEngine.parse(segment);
 
       // 3. 提取金额
       final amount = _extractAmount(segment, intentResult, nluResult);
@@ -119,8 +119,11 @@ class BatchIntentAnalyzer {
 
     // 从 NLU 实体中提取
     for (final entity in nluResult.entities) {
-      if (entity.type == EntityType.amount && entity.value is double) {
-        return entity.value as double;
+      if (entity.type == EntityType.amount) {
+        final parsed = double.tryParse(entity.value);
+        if (parsed != null && parsed > 0) {
+          return parsed;
+        }
       }
     }
 
@@ -225,8 +228,11 @@ class BatchIntentAnalyzer {
   DateTime? _extractDateTime(String text, NLUResult nluResult) {
     // 从 NLU 实体中提取
     for (final entity in nluResult.entities) {
-      if (entity.type == EntityType.date && entity.value is DateTime) {
-        return entity.value as DateTime;
+      if (entity.type == EntityType.date) {
+        final parsed = DateTime.tryParse(entity.value);
+        if (parsed != null) {
+          return parsed;
+        }
       }
     }
 

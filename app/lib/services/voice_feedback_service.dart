@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 /// 智能语音反馈与客服系统
@@ -667,7 +666,6 @@ class VoiceFeedbackService extends ChangeNotifier {
       case EmotionType.satisfied:
         return '很高兴您有好的体验！';
       case EmotionType.neutral:
-      default:
         return '感谢您的反馈。';
     }
   }

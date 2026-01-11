@@ -44,6 +44,9 @@ abstract class WakeWordEngine {
 class SimpleWakeWordEngine implements WakeWordEngine {
   bool _isInitialized = false;
 
+  /// 是否已初始化
+  bool get isInitialized => _isInitialized;
+
   @override
   Future<void> initialize({
     required List<String> wakeWords,
@@ -85,6 +88,12 @@ class PorcupineWakeWordEngine implements WakeWordEngine {
 
   List<String> _wakeWords = [];
   bool _isInitialized = false;
+
+  /// 获取唤醒词列表
+  List<String> get wakeWords => List.unmodifiable(_wakeWords);
+
+  /// 是否已初始化
+  bool get isInitialized => _isInitialized;
 
   /// Porcupine AccessKey (从Picovoice Console获取)
   final String? accessKey;

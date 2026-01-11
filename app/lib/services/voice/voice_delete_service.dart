@@ -38,15 +38,6 @@ class VoiceDeleteService extends ChangeNotifier {
   // 删除意图识别模式
   // ═══════════════════════════════════════════════════════════════
 
-  /// 单笔删除模式
-  static final List<RegExp> _singleDeletePatterns = [
-    RegExp(r'删[除掉]?(刚才|这笔|那笔|上一笔)'),
-    RegExp(r'删[除掉]?(今天|昨天|前天)?(.{1,10}?)(那笔|这笔)?'),
-    RegExp(r'把(.{1,10}?)删[除掉]?'),
-    RegExp(r'去掉(.{1,10}?)'),
-    RegExp(r'取消(.{1,10}?)'),
-  ];
-
   /// 批量删除模式
   static final List<RegExp> _batchDeletePatterns = [
     RegExp(r'删[除掉]?(所有|全部|这些)(.{1,10}?)'),
@@ -432,7 +423,7 @@ class VoiceDeleteService extends ChangeNotifier {
           canRecover: true,
           recoveryDays: recycleBinRetentionDays,
           message: isBatch
-              ? '已删除${records.length}笔记录，${recycleBinRetentionDays}天内可在回收站恢复'
+              ? '已删除${records.length}笔记录，$recycleBinRetentionDays天内可在回收站恢复'
               : '已删除，可在回收站恢复',
         );
       } else {

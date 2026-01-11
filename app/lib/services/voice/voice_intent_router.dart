@@ -1,9 +1,6 @@
-import 'dart:convert';
 import 'dart:math' as math;
 
-import '../nlu_engine.dart';
 import '../voice_service_coordinator.dart' show VoiceIntentType, VoiceSessionContext;
-import '../../models/transaction.dart';
 import 'multi_intent_models.dart';
 import 'sentence_splitter.dart';
 import 'batch_intent_analyzer.dart';
@@ -93,7 +90,26 @@ class VoiceIntentRouter {
     RegExp(r'识别.*这个|读.*这个|记.*这笔', caseSensitive: false),
     RegExp(r'帮我.*记|自动.*记账', caseSensitive: false),
     RegExp(r'识别.*账单|读取.*账单|这.*账单', caseSensitive: false),
-    RegExp(r'微信.*记账|支付宝.*记账|读.*微信|读.*支付宝', caseSensitive: false),
+  ];
+
+  /// 自动化支付宝账单同步意图的关键词模式
+  static final _automateAlipayPatterns = [
+    RegExp(r'打开.*支付宝.*账单|支付宝.*账单.*记录', caseSensitive: false),
+    RegExp(r'同步.*支付宝|支付宝.*同步', caseSensitive: false),
+    RegExp(r'导入.*支付宝|支付宝.*导入', caseSensitive: false),
+    RegExp(r'支付宝.*自动.*记|自动.*支付宝.*记', caseSensitive: false),
+    RegExp(r'帮我.*打开.*支付宝.*记录', caseSensitive: false),
+    RegExp(r'读取.*支付宝.*账单', caseSensitive: false),
+  ];
+
+  /// 自动化微信账单同步意图的关键词模式
+  static final _automateWeChatPatterns = [
+    RegExp(r'打开.*微信.*账单|微信.*账单.*记录', caseSensitive: false),
+    RegExp(r'同步.*微信|微信.*同步', caseSensitive: false),
+    RegExp(r'导入.*微信|微信.*导入', caseSensitive: false),
+    RegExp(r'微信.*自动.*记|自动.*微信.*记', caseSensitive: false),
+    RegExp(r'帮我.*打开.*微信.*记录', caseSensitive: false),
+    RegExp(r'读取.*微信.*账单', caseSensitive: false),
   ];
 
   /// 分析语音输入并识别意图
@@ -227,6 +243,8 @@ class VoiceIntentRouter {
     scores[VoiceIntentType.cancelAction] = _calculatePatternScore(input, _cancelPatterns);
     scores[VoiceIntentType.clarifySelection] = _calculatePatternScore(input, _clarifyPatterns);
     scores[VoiceIntentType.screenRecognition] = _calculatePatternScore(input, _screenRecognitionPatterns);
+    scores[VoiceIntentType.automateAlipaySync] = _calculatePatternScore(input, _automateAlipayPatterns);
+    scores[VoiceIntentType.automateWeChatSync] = _calculatePatternScore(input, _automateWeChatPatterns);
 
     // 上下文增强
     if (context != null) {
@@ -554,8 +572,13 @@ class VoiceIntentRouter {
         return '取消操作';
       case VoiceIntentType.clarifySelection:
         return '澄清选择';
+      case VoiceIntentType.screenRecognition:
+        return '屏幕识别记账';
+      case VoiceIntentType.automateAlipaySync:
+        return '自动化支付宝账单同步';
+      case VoiceIntentType.automateWeChatSync:
+        return '自动化微信账单同步';
       case VoiceIntentType.unknown:
-      default:
         return '未知意图';
     }
   }

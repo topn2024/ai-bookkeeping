@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import '../models/transaction.dart';
 import 'tts_service.dart';
 import 'voice/voice_intent_router.dart';
 import 'voice_service_coordinator.dart' show VoiceIntentType;

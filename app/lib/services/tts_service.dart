@@ -137,6 +137,11 @@ class TTSService {
   /// [text] 要朗读的文本
   /// [interrupt] 是否打断当前播报
   /// [forceStreaming] 强制使用流式模式（忽略全局设置）
+  /// 流式TTS失败次数（用于自动降级）
+  int _streamingFailCount = 0;
+  static const int _maxStreamingFailures = 3;
+  static const Duration _streamingTimeout = Duration(seconds: 3);
+
   Future<void> speak(
     String text, {
     bool interrupt = true,
@@ -152,19 +157,37 @@ class TTSService {
       await stop();
     }
 
-    final useStreaming = forceStreaming ?? _streamingMode;
+    // 如果流式TTS连续失败多次，自动降级到离线模式
+    final shouldUseStreaming = (forceStreaming ?? _streamingMode) &&
+        _streamingFailCount < _maxStreamingFailures;
 
     try {
       _isSpeaking = true;
 
-      if (useStreaming && _streamingTTS != null) {
-        // 使用流式TTS（低延迟）
-        await _streamingTTS!.speak(text, interrupt: interrupt);
+      if (shouldUseStreaming && _streamingTTS != null) {
+        // 使用流式TTS（低延迟），带超时保护
+        try {
+          await _streamingTTS!.speak(text, interrupt: interrupt)
+              .timeout(_streamingTimeout, onTimeout: () {
+            debugPrint('TTS: streaming timeout, falling back to offline');
+            throw TimeoutException('Streaming TTS timeout');
+          });
+          // 成功后重置失败计数
+          _streamingFailCount = 0;
+        } on TimeoutException {
+          _streamingFailCount++;
+          debugPrint('TTS: streaming fail count = $_streamingFailCount');
+          // 降级到离线TTS
+          await _speakWithOfflineEngine(text);
+        } catch (e) {
+          _streamingFailCount++;
+          debugPrint('TTS: streaming error, fail count = $_streamingFailCount, error: $e');
+          // 降级到离线TTS
+          await _speakWithOfflineEngine(text);
+        }
       } else {
-        // 使用传统TTS
-        _speakingController.add(TTSSpeakingState.started);
-        await _engine.speak(text);
-        _speakingController.add(TTSSpeakingState.completed);
+        // 使用传统TTS（离线）
+        await _speakWithOfflineEngine(text);
       }
 
       _isSpeaking = false;
@@ -174,6 +197,19 @@ class TTSService {
       debugPrint('TTS speak failed: $e');
       rethrow;
     }
+  }
+
+  /// 使用离线引擎播报
+  Future<void> _speakWithOfflineEngine(String text) async {
+    _speakingController.add(TTSSpeakingState.started);
+    await _engine.speak(text);
+    _speakingController.add(TTSSpeakingState.completed);
+  }
+
+  /// 重置流式TTS失败计数（用于网络恢复后重试）
+  void resetStreamingFailCount() {
+    _streamingFailCount = 0;
+    debugPrint('TTS: streaming fail count reset');
   }
 
   /// 流式朗读（快速响应模式）
