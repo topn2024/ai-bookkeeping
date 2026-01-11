@@ -23,13 +23,8 @@ class ConcurrentVoicePipeline {
   StreamController<ProcessEvent>? _processController;
   StreamController<OutputEvent>? _outputController;
 
-  /// 当前正在进行的任务
-  Future<void>? _currentInputTask;
-  Future<void>? _currentProcessTask;
-  Future<void>? _currentOutputTask;
-
-  /// 取消标记
-  bool _isCancelled = false;
+  /// 取消令牌（使用Completer实现线程安全的取消机制）
+  CancellationToken _cancellationToken = CancellationToken();
 
   /// 管道事件流
   final _eventController = StreamController<PipelineEvent>.broadcast();
@@ -65,7 +60,8 @@ class ConcurrentVoicePipeline {
 
   /// 启动会话
   void startSession() {
-    _isCancelled = false;
+    // 重置取消令牌
+    _cancellationToken = CancellationToken();
     _stateMachine.startSession();
     _startInputFlow();
     _emitEvent(PipelineEvent.sessionStarted);
@@ -74,7 +70,7 @@ class ConcurrentVoicePipeline {
 
   /// 结束会话
   void endSession() {
-    _isCancelled = true;
+    _cancellationToken.cancel();
     _stateMachine.endSession();
     _stopAllFlows();
     _emitEvent(PipelineEvent.sessionEnded);
@@ -87,11 +83,12 @@ class ConcurrentVoicePipeline {
   void _startInputFlow() {
     if (_inputController == null || _inputController!.isClosed) return;
 
-    _currentInputTask = _runInputFlow();
+    unawaited(_runInputFlow());
   }
 
   Future<void> _runInputFlow() async {
-    while (!_isCancelled && _stateMachine.isSessionActive) {
+    final token = _cancellationToken;
+    while (!token.isCancelled && _stateMachine.isSessionActive) {
       try {
         // 等待可以开始监听
         if (!_canStartListening()) {
@@ -105,7 +102,7 @@ class ConcurrentVoicePipeline {
         // 执行输入处理（VAD + ASR）
         final inputResult = await _processInput();
 
-        if (inputResult != null && !_isCancelled) {
+        if (inputResult != null && !token.isCancelled) {
           _stateMachine.processUserInput();
 
           // 将结果传递给处理流
@@ -115,6 +112,7 @@ class ConcurrentVoicePipeline {
         _stateMachine.finishProcessing();
 
       } catch (e) {
+        if (token.isCancelled) break;
         debugPrint('ConcurrentVoicePipeline: input flow error - $e');
         _emitEvent(PipelineEvent.error);
       }
@@ -151,11 +149,12 @@ class ConcurrentVoicePipeline {
 
   /// 启动处理流
   void _startProcessFlow(String userInput) {
-    _currentProcessTask = _runProcessFlow(userInput);
+    unawaited(_runProcessFlow(userInput));
   }
 
   Future<void> _runProcessFlow(String userInput) async {
-    if (_isCancelled) return;
+    final token = _cancellationToken;
+    if (token.isCancelled) return;
 
     try {
       _emitEvent(PipelineEvent.processingStarted);
@@ -163,7 +162,7 @@ class ConcurrentVoicePipeline {
       // 执行AI响应生成
       final response = await _processResponse(userInput);
 
-      if (response != null && !_isCancelled) {
+      if (response != null && !token.isCancelled) {
         // 将结果传递给输出流
         _startOutputFlow(response);
       }
@@ -171,6 +170,7 @@ class ConcurrentVoicePipeline {
       _emitEvent(PipelineEvent.processingCompleted);
 
     } catch (e) {
+      if (token.isCancelled) return;
       debugPrint('ConcurrentVoicePipeline: process flow error - $e');
       _emitEvent(PipelineEvent.error);
     }
@@ -192,11 +192,12 @@ class ConcurrentVoicePipeline {
 
   /// 启动输出流
   void _startOutputFlow(String response) {
-    _currentOutputTask = _runOutputFlow(response);
+    unawaited(_runOutputFlow(response));
   }
 
   Future<void> _runOutputFlow(String response) async {
-    if (_isCancelled) return;
+    final token = _cancellationToken;
+    if (token.isCancelled) return;
 
     try {
       _stateMachine.startSpeaking(content: response);
@@ -205,12 +206,13 @@ class ConcurrentVoicePipeline {
       // 执行TTS输出
       await _processOutput(response);
 
-      if (!_isCancelled) {
+      if (!token.isCancelled) {
         _stateMachine.finishSpeaking();
         _emitEvent(PipelineEvent.speakingCompleted);
       }
 
     } catch (e) {
+      if (token.isCancelled) return;
       debugPrint('ConcurrentVoicePipeline: output flow error - $e');
       _stateMachine.stopSpeaking();
       _emitEvent(PipelineEvent.error);
@@ -256,7 +258,7 @@ class ConcurrentVoicePipeline {
 
   /// 停止所有流
   void _stopAllFlows() {
-    _isCancelled = true;
+    _cancellationToken.cancel();
     _stateMachine.stopListening();
     _stateMachine.stopSpeaking();
 
@@ -298,13 +300,45 @@ class ConcurrentVoicePipeline {
 
   /// 释放资源
   void dispose() {
-    _isCancelled = true;
+    _cancellationToken.cancel();
     _inputController?.close();
     _processController?.close();
     _outputController?.close();
     _eventController.close();
     _stateMachine.dispose();
   }
+}
+
+/// 取消令牌
+///
+/// 用于安全地在多个异步操作间传递取消信号
+/// 一旦取消，状态不可逆
+class CancellationToken {
+  bool _isCancelled = false;
+
+  /// 是否已取消
+  bool get isCancelled => _isCancelled;
+
+  /// 执行取消
+  void cancel() {
+    _isCancelled = true;
+  }
+
+  /// 如果已取消则抛出异常
+  void throwIfCancelled() {
+    if (_isCancelled) {
+      throw CancellationException();
+    }
+  }
+}
+
+/// 取消异常
+class CancellationException implements Exception {
+  final String message;
+  CancellationException([this.message = 'Operation was cancelled']);
+
+  @override
+  String toString() => 'CancellationException: $message';
 }
 
 // ==================== 处理器接口 ====================

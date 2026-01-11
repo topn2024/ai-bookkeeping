@@ -20,6 +20,9 @@ class AudioStreamPlayer {
   final _stateController = StreamController<AudioStreamState>.broadcast();
   Stream<AudioStreamState> get stateStream => _stateController.stream;
 
+  /// 播放器状态订阅（用于正确释放资源）
+  StreamSubscription<PlayerState>? _playerStateSubscription;
+
   /// 当前音量
   double _volume = 1.0;
 
@@ -32,8 +35,8 @@ class AudioStreamPlayer {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    // 监听播放状态
-    _player.playerStateStream.listen((state) {
+    // 监听播放状态（保存订阅以便释放）
+    _playerStateSubscription = _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
         _isPlaying = false;
         _stateController.add(AudioStreamState.completed);
@@ -197,6 +200,7 @@ class AudioStreamPlayer {
 
   /// 释放资源
   void dispose() {
+    _playerStateSubscription?.cancel();
     stop();
     _stateController.close();
     _player.dispose();

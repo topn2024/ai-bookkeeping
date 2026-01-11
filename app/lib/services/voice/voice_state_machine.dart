@@ -199,17 +199,39 @@ class VoiceStateMachine {
   /// 请求打断
   ///
   /// 当用户在AI说话时开始说话，触发打断
-  void requestInterrupt() {
-    if (_speakingState == SpeakingState.speaking) {
-      fadeOutSpeaking();
+  /// 原子操作：同时更新speaking和listening状态，确保状态一致性
+  void requestInterrupt({String? pendingContent}) {
+    if (_sessionState != SessionState.active) return;
+    if (_speakingState != SpeakingState.speaking) return;
+
+    // 原子性状态转换：同时更新两个状态
+    _speakingState = SpeakingState.fading;
+    _listeningState = ListeningState.listening;
+
+    // 保存被打断的上下文（如果有）
+    if (pendingContent != null) {
+      _interruptedContext = InterruptedContext(
+        content: pendingContent,
+        timestamp: DateTime.now(),
+      );
     }
 
-    if (_listeningState == ListeningState.idle && _sessionState == SessionState.active) {
-      startListening();
-    }
-
+    // 只发射一次事件
     _emitEvent(VoiceStateEvent.interruptRequested);
-    debugPrint('VoiceStateMachine: interrupt requested');
+    _emitState();
+    debugPrint('VoiceStateMachine: interrupt requested (atomic transition)');
+  }
+
+  /// 取消打断（误检恢复）
+  ///
+  /// 如果打断是误检，允许恢复到说话状态
+  void cancelInterrupt() {
+    if (_speakingState != SpeakingState.fading) return;
+
+    _speakingState = SpeakingState.speaking;
+    _listeningState = ListeningState.idle;
+    _emitState();
+    debugPrint('VoiceStateMachine: interrupt cancelled');
   }
 
   /// 清除打断上下文

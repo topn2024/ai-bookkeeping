@@ -40,6 +40,16 @@ class BargeInDetector {
   void Function()? onBargeInDetected;
   void Function(String keyword)? onKeywordDetected;
 
+  /// 确认延迟计时器（防止误检）
+  Timer? _confirmationTimer;
+
+  /// 待确认的打断来源
+  BargeInSource? _pendingBargeInSource;
+
+  /// 冷却计时器（打断后的冷却期）
+  Timer? _cooldownTimer;
+  bool _isInCooldown = false;
+
   BargeInDetector({BargeInConfig? config})
       : _config = config ?? BargeInConfig.defaultConfig;
 
@@ -55,7 +65,18 @@ class BargeInDetector {
     _isEnabled = false;
     _state = BargeInState.idle;
     _energyHistory.clear();
+    _cancelTimers();
     debugPrint('BargeInDetector: stopped');
+  }
+
+  /// 取消所有计时器
+  void _cancelTimers() {
+    _confirmationTimer?.cancel();
+    _confirmationTimer = null;
+    _cooldownTimer?.cancel();
+    _cooldownTimer = null;
+    _pendingBargeInSource = null;
+    _isInCooldown = false;
   }
 
   /// 通知TTS开始播放
@@ -169,9 +190,42 @@ class BargeInDetector {
     return null;
   }
 
-  /// 处理打断检测
+  /// 处理打断检测（带确认延迟）
   void _handleBargeInDetected(BargeInSource source) {
     if (_state == BargeInState.bargeInDetected) return;
+    if (_isInCooldown) return; // 冷却期内忽略
+
+    // 如果已有待确认的打断，直接确认（持续检测到说话）
+    if (_pendingBargeInSource != null && _confirmationTimer != null) {
+      _confirmBargeIn(source);
+      return;
+    }
+
+    // 记录待确认状态
+    _state = BargeInState.userSpeaking;
+    _pendingBargeInSource = source;
+
+    // 启动确认延迟计时器
+    _confirmationTimer?.cancel();
+    _confirmationTimer = Timer(_config.confirmationDelay, () {
+      // 延迟后仍处于用户说话状态，确认打断
+      if (_state == BargeInState.userSpeaking && _pendingBargeInSource != null) {
+        _confirmBargeIn(_pendingBargeInSource!);
+      } else {
+        // 状态已变化，取消打断
+        _pendingBargeInSource = null;
+        debugPrint('BargeInDetector: barge-in cancelled (state changed)');
+      }
+    });
+
+    debugPrint('BargeInDetector: potential barge-in from $source, waiting for confirmation');
+  }
+
+  /// 确认打断
+  void _confirmBargeIn(BargeInSource source) {
+    _confirmationTimer?.cancel();
+    _confirmationTimer = null;
+    _pendingBargeInSource = null;
 
     _state = BargeInState.bargeInDetected;
 
@@ -184,7 +238,38 @@ class BargeInDetector {
     _eventController.add(event);
     onBargeInDetected?.call();
 
-    debugPrint('BargeInDetector: barge-in detected from $source');
+    // 启动冷却期
+    _startCooldown();
+
+    debugPrint('BargeInDetector: barge-in confirmed from $source');
+  }
+
+  /// 启动冷却期
+  void _startCooldown() {
+    _isInCooldown = true;
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer(_config.cooldownDuration, () {
+      _isInCooldown = false;
+      debugPrint('BargeInDetector: cooldown ended');
+    });
+  }
+
+  /// 取消待确认的打断（误检恢复）
+  void cancelPendingBargeIn() {
+    if (_pendingBargeInSource != null) {
+      _confirmationTimer?.cancel();
+      _confirmationTimer = null;
+      _pendingBargeInSource = null;
+      _state = BargeInState.monitoring;
+
+      _eventController.add(BargeInEvent(
+        type: BargeInEventType.cancelled,
+        source: BargeInSource.energy,
+        timestamp: DateTime.now(),
+      ));
+
+      debugPrint('BargeInDetector: pending barge-in cancelled');
+    }
   }
 
   /// 处理关键词检测
@@ -208,12 +293,14 @@ class BargeInDetector {
   void reset() {
     _state = BargeInState.idle;
     _energyHistory.clear();
+    _cancelTimers();
     debugPrint('BargeInDetector: reset');
   }
 
   /// 释放资源
   void dispose() {
     stop();
+    _cancelTimers();
     _eventController.close();
   }
 }

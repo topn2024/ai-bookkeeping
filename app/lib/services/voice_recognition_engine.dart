@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' show min;
-import 'dart:typed_data';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
@@ -272,6 +271,16 @@ class AliCloudASRService {
   /// 限流恢复时间
   DateTime? _rateLimitResetTime;
 
+  /// 流式识别计时器（用于外部取消）
+  Timer? _timeoutTimer;
+  Timer? _silenceTimer;
+
+  /// 是否已取消
+  bool _isCancelled = false;
+
+  /// 流式识别控制器（用于外部取消）
+  StreamController<ASRPartialResult>? _streamController;
+
   AliCloudASRService({VoiceTokenService? tokenService})
       : _tokenService = tokenService ?? VoiceTokenService(),
         _dio = Dio() {
@@ -319,7 +328,7 @@ class AliCloudASRService {
       } else {
         final waitSeconds =
             _rateLimitResetTime?.difference(DateTime.now()).inSeconds ?? 60;
-        throw ASRException('服务繁忙，请在${waitSeconds}秒后重试',
+        throw ASRException('服务繁忙，请在$waitSeconds秒后重试',
             errorCode: ASRErrorCode.rateLimited);
       }
     }
@@ -520,25 +529,36 @@ class AliCloudASRService {
   /// 支持静音检测、超时处理和连接恢复
   Stream<ASRPartialResult> transcribeStream(
       Stream<Uint8List> audioStream) async* {
-    final controller = StreamController<ASRPartialResult>();
+    // 重置状态
+    _isCancelled = false;
+    _cleanupTimers();
 
-    // 超时计时器
-    Timer? timeoutTimer;
-    Timer? silenceTimer;
+    final controller = StreamController<ASRPartialResult>();
+    _streamController = controller;
+
     bool isCompleted = false;
+
+    // 标记完成并清理
+    void markCompleted() {
+      if (!isCompleted) {
+        isCompleted = true;
+        _cleanupTimers();
+      }
+    }
 
     // 重置静音计时器
     void resetSilenceTimer() {
-      silenceTimer?.cancel();
-      silenceTimer = Timer(
+      _silenceTimer?.cancel();
+      _silenceTimer = Timer(
         Duration(seconds: ASRErrorHandlingConfig.silenceTimeoutSeconds),
         () {
-          if (!isCompleted) {
+          if (!isCompleted && !_isCancelled) {
             debugPrint('Silence timeout, stopping recognition');
             controller.addError(ASRException(
               '检测到静音，识别自动停止',
               errorCode: ASRErrorCode.recognitionTimeout,
             ));
+            markCompleted();
             _webSocket?.close();
           }
         },
@@ -546,15 +566,16 @@ class AliCloudASRService {
     }
 
     // 启动总超时计时器
-    timeoutTimer = Timer(
+    _timeoutTimer = Timer(
       Duration(seconds: ASRErrorHandlingConfig.maxRecognitionSeconds),
       () {
-        if (!isCompleted) {
+        if (!isCompleted && !_isCancelled) {
           debugPrint('Recognition timeout');
           controller.addError(ASRException(
             '识别超时，已达到最大时长限制',
             errorCode: ASRErrorCode.recognitionTimeout,
           ));
+          markCompleted();
           _webSocket?.close();
         }
       },
@@ -646,11 +667,11 @@ class AliCloudASRService {
               ));
             } else if (header['name'] == 'TranscriptionCompleted') {
               // 识别完成
-              isCompleted = true;
+              markCompleted();
               controller.close();
             } else if (header['name'] == 'TaskFailed') {
               // 识别失败
-              isCompleted = true;
+              markCompleted();
               controller.addError(ASRException(
                 '识别失败: ${header['status_text']}',
                 errorCode: ASRErrorCode.serverError,
@@ -660,7 +681,7 @@ class AliCloudASRService {
           }
         },
         onError: (error) {
-          isCompleted = true;
+          markCompleted();
           controller.addError(ASRException(
             'WebSocket错误: $error',
             errorCode: ASRErrorCode.noConnection,
@@ -668,7 +689,7 @@ class AliCloudASRService {
           controller.close();
         },
         onDone: () {
-          isCompleted = true;
+          markCompleted();
           if (!controller.isClosed) {
             controller.close();
           }
@@ -681,6 +702,12 @@ class AliCloudASRService {
       );
 
       await for (final chunk in audioStream) {
+        // 检查是否已取消
+        if (_isCancelled) {
+          debugPrint('AliCloudASRService: transcription cancelled during audio stream');
+          break;
+        }
+
         // 重置静音计时器
         resetSilenceTimer();
 
@@ -693,35 +720,39 @@ class AliCloudASRService {
         }
       }
 
-      // 发送结束命令
-      final stopParams = {
-        'header': {
-          'message_id': _generateMessageId(),
-          'task_id': taskId,
-          'namespace': 'SpeechTranscriber',
-          'name': 'StopTranscription',
-          'appkey': tokenInfo.appKey,
-        },
-      };
-      _webSocket?.add(jsonEncode(stopParams));
+      // 发送结束命令（如果未取消）
+      if (!_isCancelled && _webSocket?.readyState == WebSocket.open) {
+        final stopParams = {
+          'header': {
+            'message_id': _generateMessageId(),
+            'task_id': taskId,
+            'namespace': 'SpeechTranscriber',
+            'name': 'StopTranscription',
+            'appkey': tokenInfo.appKey,
+          },
+        };
+        _webSocket?.add(jsonEncode(stopParams));
+      }
     } on ASRException {
       rethrow;
     } on VoiceTokenException catch (e) {
+      markCompleted();
       controller.addError(ASRException(
         'Token获取失败: ${e.message}',
         errorCode: ASRErrorCode.tokenFailed,
       ));
       controller.close();
     } catch (e) {
+      markCompleted();
       controller.addError(ASRException(
         '流式识别错误: $e',
         errorCode: ASRErrorCode.unknown,
       ));
       controller.close();
     } finally {
-      // 清理计时器
-      timeoutTimer?.cancel();
-      silenceTimer?.cancel();
+      // 清理计时器和控制器引用
+      _cleanupTimers();
+      _streamController = null;
     }
 
     yield* controller.stream;
@@ -735,10 +766,21 @@ class AliCloudASRService {
     return 'task_${DateTime.now().millisecondsSinceEpoch}';
   }
 
+  /// 清理计时器
+  void _cleanupTimers() {
+    _timeoutTimer?.cancel();
+    _timeoutTimer = null;
+    _silenceTimer?.cancel();
+    _silenceTimer = null;
+  }
+
   /// 停止当前流式识别
   ///
   /// 发送StopTranscription命令并关闭WebSocket连接
   Future<void> stopTranscription() async {
+    // 先清理计时器
+    _cleanupTimers();
+
     if (_webSocket == null || _webSocket!.readyState != WebSocket.open) {
       return;
     }
@@ -769,11 +811,36 @@ class AliCloudASRService {
     }
   }
 
+  /// 取消当前流式识别（用于打断场景）
+  ///
+  /// 立即停止识别，不等待服务器响应
+  Future<void> cancelTranscription() async {
+    _isCancelled = true;
+    _cleanupTimers();
+
+    // 关闭流控制器
+    if (_streamController != null && !_streamController!.isClosed) {
+      _streamController!.close();
+    }
+    _streamController = null;
+
+    // 关闭WebSocket（不发送停止命令，直接关闭）
+    try {
+      await _webSocket?.close();
+    } catch (e) {
+      debugPrint('AliCloudASRService: cancel transcription error - $e');
+    }
+    _webSocket = null;
+    _currentTaskId = null;
+
+    debugPrint('AliCloudASRService: transcription cancelled');
+  }
+
   /// 当前任务ID
   String? _currentTaskId;
 
   void dispose() {
-    stopTranscription();
+    cancelTranscription();
     _dio.close();
   }
 }

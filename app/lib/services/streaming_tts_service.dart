@@ -186,45 +186,98 @@ class StreamingTTSService {
     List<String> sentences,
     VoiceTokenInfo tokenInfo,
   ) async {
-    // 预取配置：同时合成的句子数
+    // 预取配置
     const prefetchCount = 2;
+    const maxQueueSize = 5; // 最大队列长度，防止内存溢出
+    const synthesisTimeout = Duration(seconds: 15); // 单句合成超时
 
-    final audioQueue = <Future<File?>>[];
+    // 使用Map存储Future，支持动态移除已完成的
+    final audioFutures = <int, Future<File?>>{};
+    final tempFiles = <File>[]; // 跟踪所有临时文件，确保清理
 
-    // 启动预取
-    for (var i = 0; i < sentences.length && i < prefetchCount; i++) {
-      audioQueue.add(_synthesizeToFile(sentences[i], tokenInfo, i));
+    try {
+      // 启动预取
+      for (var i = 0; i < sentences.length && i < prefetchCount; i++) {
+        audioFutures[i] = _synthesizeToFileWithTimeout(
+          sentences[i], tokenInfo, i, synthesisTimeout,
+        );
+      }
+
+      // 边合成边播放
+      for (var i = 0; i < sentences.length; i++) {
+        if (_isCancelled) break;
+
+        // 等待当前句子合成完成
+        final future = audioFutures[i];
+        if (future == null) {
+          debugPrint('StreamingTTSService: missing future for sentence $i');
+          continue;
+        }
+
+        final audioFile = await future;
+        audioFutures.remove(i); // 移除已完成的Future
+
+        if (audioFile == null || _isCancelled) continue;
+
+        tempFiles.add(audioFile); // 跟踪临时文件
+
+        // 记录首字延迟
+        if (i == 0 && _synthesisStartTime != null) {
+          _firstChunkLatency = DateTime.now().difference(_synthesisStartTime!);
+          debugPrint('StreamingTTSService: first chunk latency = ${_firstChunkLatency!.inMilliseconds}ms');
+          _stateController.add(StreamingTTSState.firstChunkReady);
+        }
+
+        // 启动下一个句子的预取（限制队列大小）
+        final nextIndex = i + prefetchCount;
+        if (nextIndex < sentences.length && audioFutures.length < maxQueueSize) {
+          audioFutures[nextIndex] = _synthesizeToFileWithTimeout(
+            sentences[nextIndex], tokenInfo, nextIndex, synthesisTimeout,
+          );
+        }
+
+        // 播放当前句子
+        await _playAudioFile(audioFile);
+
+        // 立即删除已播放的临时文件
+        _safeDeleteFile(audioFile);
+        tempFiles.remove(audioFile);
+      }
+    } finally {
+      // 确保清理所有临时文件（即使发生异常或取消）
+      for (final file in tempFiles) {
+        _safeDeleteFile(file);
+      }
     }
+  }
 
-    // 边合成边播放
-    for (var i = 0; i < sentences.length; i++) {
-      if (_isCancelled) break;
+  /// 带超时保护的合成
+  Future<File?> _synthesizeToFileWithTimeout(
+    String text,
+    VoiceTokenInfo tokenInfo,
+    int index,
+    Duration timeout,
+  ) async {
+    try {
+      return await _synthesizeToFile(text, tokenInfo, index)
+          .timeout(timeout, onTimeout: () {
+        debugPrint('StreamingTTSService: synthesis timeout for sentence $index');
+        return null;
+      });
+    } catch (e) {
+      debugPrint('StreamingTTSService: synthesis failed for sentence $index - $e');
+      return null;
+    }
+  }
 
-      // 等待当前句子合成完成
-      final audioFile = await audioQueue[i];
-
-      if (audioFile == null || _isCancelled) continue;
-
-      // 记录首字延迟
-      if (i == 0 && _synthesisStartTime != null) {
-        _firstChunkLatency = DateTime.now().difference(_synthesisStartTime!);
-        debugPrint('StreamingTTSService: first chunk latency = ${_firstChunkLatency!.inMilliseconds}ms');
-        _stateController.add(StreamingTTSState.firstChunkReady);
+  /// 安全删除文件
+  void _safeDeleteFile(File file) {
+    try {
+      if (file.existsSync()) {
+        file.deleteSync();
       }
-
-      // 启动下一个句子的预取
-      final nextIndex = i + prefetchCount;
-      if (nextIndex < sentences.length) {
-        audioQueue.add(_synthesizeToFile(sentences[nextIndex], tokenInfo, nextIndex));
-      }
-
-      // 播放当前句子
-      await _playAudioFile(audioFile);
-
-      // 删除临时文件
-      try {
-        await audioFile.delete();
-      } catch (_) {}
+    } catch (e) {
+      debugPrint('StreamingTTSService: failed to delete temp file - $e');
     }
   }
 
