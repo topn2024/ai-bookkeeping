@@ -44,9 +44,13 @@ class VoiceIntentRouter {
   /// 添加意图的关键词模式
   static final _addPatterns = [
     RegExp(r'添加|新增|记录|记一笔', caseSensitive: false),
-    RegExp(r'花了|买了|付了|支付', caseSensitive: false),
-    RegExp(r'收入|赚了|进账', caseSensitive: false),
+    RegExp(r'花了|买了|付了|支付|消费', caseSensitive: false),
+    RegExp(r'收入|赚了|进账|工资|奖金', caseSensitive: false),
     RegExp(r'记账|记录.*消费', caseSensitive: false),
+    // 简单金额表达：数字+单位 (如 "35块", "50元", "100")
+    RegExp(r'\d+(\.\d+)?\s*(块|元|块钱)?', caseSensitive: false),
+    // 中文数字金额 (如 "五十块", "三十元")
+    RegExp(r'[一二三四五六七八九十百千万]+\s*(块|元|块钱)', caseSensitive: false),
   ];
 
   /// 查询意图的关键词模式
@@ -331,9 +335,26 @@ class VoiceIntentRouter {
 
   /// 应用特殊规则增强
   void _applySpecialRules(Map<VoiceIntentType, double> scores, String input) {
-    // 金额相关的输入更可能是添加或查询
-    if (RegExp(r'\d+(\.\d+)?\s*[元块钱]').hasMatch(input)) {
-      if (input.contains('花了') || input.contains('买了') || input.contains('支付')) {
+    // 金额相关的输入更可能是添加交易
+    final hasArabicAmount = RegExp(r'\d+(\.\d+)?\s*(元|块|块钱)?').hasMatch(input);
+    final hasChineseAmount = RegExp(r'[一二三四五六七八九十百千万]+\s*(块|元|块钱)').hasMatch(input);
+    final hasAmount = hasArabicAmount || hasChineseAmount;
+
+    if (hasAmount) {
+      // 如果有金额，并且没有明确的查询/删除/修改关键词，很可能是记账
+      final hasQueryKeyword = RegExp(r'多少|查|统计|显示|总共').hasMatch(input);
+      final hasDeleteKeyword = RegExp(r'删除|删掉|去掉|移除').hasMatch(input);
+      final hasModifyKeyword = RegExp(r'修改|更改|改成|换成').hasMatch(input);
+
+      if (!hasQueryKeyword && !hasDeleteKeyword && !hasModifyKeyword) {
+        // 简单的金额+类别描述，很可能是记账
+        scores[VoiceIntentType.addTransaction] =
+            (scores[VoiceIntentType.addTransaction] ?? 0.0) + 0.3;
+      }
+
+      // 如果还有消费相关动词，进一步增强
+      if (input.contains('花了') || input.contains('买了') || input.contains('支付') ||
+          input.contains('吃') || input.contains('喝') || input.contains('打车')) {
         scores[VoiceIntentType.addTransaction] =
             (scores[VoiceIntentType.addTransaction] ?? 0.0) + 0.2;
       }
@@ -577,11 +598,13 @@ class VoiceIntentRouter {
 
     // 提取分类
     final categoryKeywords = {
-      '餐饮': ['吃', '餐', '饭', '菜', '喝', '咖啡', '茶'],
-      '交通': ['打车', '地铁', '公交', '出租车', '滴滴', '油费'],
-      '购物': ['买', '购', '商场', '淘宝', '京东', '购物'],
-      '娱乐': ['电影', '游戏', 'ktv', '唱歌', '娱乐'],
-      '医疗': ['医院', '看病', '药', '体检', '医疗'],
+      '餐饮': ['吃', '餐', '饭', '菜', '喝', '咖啡', '茶', '奶茶', '外卖', '零食', '水果', '早点', '夜宵'],
+      '交通': ['打车', '地铁', '公交', '出租车', '滴滴', '油费', '停车', '高铁', '火车', '飞机', '机票'],
+      '购物': ['买', '购', '商场', '淘宝', '京东', '购物', '超市', '网购', '衣服', '鞋'],
+      '娱乐': ['电影', '游戏', 'ktv', '唱歌', '娱乐', '旅游', '酒店', '门票'],
+      '医疗': ['医院', '看病', '药', '体检', '医疗', '挂号'],
+      '日用': ['日用', '生活', '水电', '话费', '充值', '网费', '房租'],
+      '学习': ['书', '课', '学习', '培训', '教育'],
     };
 
     for (final entry in categoryKeywords.entries) {
