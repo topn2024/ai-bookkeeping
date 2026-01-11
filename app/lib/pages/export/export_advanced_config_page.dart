@@ -481,14 +481,16 @@ class _ExportAdvancedConfigPageState extends ConsumerState<ExportAdvancedConfigP
 
     // 模拟导出过程
     Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pop(context); // 关闭进度对话框
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_getFormatName()}文件已生成，正在分享...'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-      Navigator.pop(context); // 返回上一页
+      if (context.mounted) {
+        Navigator.pop(context); // 关闭进度对话框
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${_getFormatName()}文件已生成，正在分享...'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        Navigator.pop(context); // 返回上一页
+      }
     });
   }
 

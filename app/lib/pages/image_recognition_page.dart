@@ -210,7 +210,9 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
     if (!confirmed) return; // 用户取消
 
     // 返回上一页
-    Navigator.pop(context, _recognitionResult);
+    if (context.mounted) {
+      Navigator.pop(context, _recognitionResult);
+    }
   }
 
   /// 确认并创建多笔交易
@@ -222,7 +224,7 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
 
     final createdCount = await _showMultiConfirmDialog(transactions);
 
-    if (createdCount > 0) {
+    if (createdCount > 0 && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('已记录$createdCount笔交易'),

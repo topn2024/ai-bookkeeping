@@ -1304,13 +1304,15 @@ class _DebtDetailPageState extends ConsumerState<DebtDetailPage> {
                     note: noteController.text.isNotEmpty ? noteController.text : null,
                   );
               await _loadPayments();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('还款已记录'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('还款已记录'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
             },
             child: const Text('确认'),
           ),
