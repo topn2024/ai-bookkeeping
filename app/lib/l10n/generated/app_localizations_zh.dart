@@ -168,7 +168,7 @@ class SZh extends S {
   String get home => '首页';
 
   @override
-  String get trends => '趋势';
+  String get trends => '看帐';
 
   @override
   String get statistics => '统计';

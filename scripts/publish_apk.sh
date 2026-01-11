@@ -36,12 +36,84 @@ IS_FORCE_UPDATE="false"
 DO_BUILD="false"
 FLUTTER_CMD="${FLUTTER_CMD:-D:/flutter/bin/flutter}"
 APP_DIR="${APP_DIR:-./app}"
+SKIP_SIGNATURE_CHECK="false"
+
+# 正式发布证书指纹 (SHA-256)
+# 此证书用于所有正式发布版本，请勿修改
+RELEASE_CERT_SHA256="13d33ab9de62c3e1dc333cc7fbf1b9bdb9ebbe2d00cc067f69f32c2b313a0043"
 
 # 颜色输出
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
+
+# 查找 apksigner 工具
+find_apksigner() {
+    # macOS
+    if [ -d "$HOME/Library/Android/sdk" ]; then
+        APKSIGNER=$(find "$HOME/Library/Android/sdk/build-tools" -name "apksigner" 2>/dev/null | sort -V | tail -1)
+    fi
+    # Linux
+    if [ -z "$APKSIGNER" ] && [ -d "$ANDROID_HOME" ]; then
+        APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name "apksigner" 2>/dev/null | sort -V | tail -1)
+    fi
+    # Windows (Git Bash)
+    if [ -z "$APKSIGNER" ] && [ -d "$LOCALAPPDATA/Android/Sdk" ]; then
+        APKSIGNER=$(find "$LOCALAPPDATA/Android/Sdk/build-tools" -name "apksigner.bat" 2>/dev/null | sort -V | tail -1)
+    fi
+    echo "$APKSIGNER"
+}
+
+# 验证 APK 签名
+# 返回: 0=正确的Release签名, 1=Debug签名或错误签名, 2=无法验证
+verify_apk_signature() {
+    local apk_path="$1"
+    local apksigner=$(find_apksigner)
+
+    if [ -z "$apksigner" ]; then
+        echo -e "${YELLOW}⚠ 警告: 未找到 apksigner 工具，无法验证签名${NC}"
+        echo -e "${YELLOW}  请安装 Android SDK Build Tools${NC}"
+        return 2
+    fi
+
+    echo "使用 apksigner: $apksigner"
+
+    # 获取 APK 签名信息
+    local cert_info=$("$apksigner" verify --print-certs "$apk_path" 2>&1)
+
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}✗ APK 签名验证失败${NC}"
+        echo "$cert_info"
+        return 1
+    fi
+
+    # 提取证书信息
+    local cert_dn=$(echo "$cert_info" | grep "certificate DN:" | head -1)
+    local cert_sha256=$(echo "$cert_info" | grep "SHA-256 digest:" | head -1 | awk '{print $NF}')
+
+    echo "证书 DN: $cert_dn"
+    echo "证书 SHA-256: $cert_sha256"
+
+    # 检查是否为 Debug 证书
+    if echo "$cert_dn" | grep -qi "Android Debug"; then
+        echo -e "${RED}✗ 错误: APK 使用了 Debug 证书签名！${NC}"
+        echo -e "${RED}  生产环境发布必须使用 Release 证书${NC}"
+        return 1
+    fi
+
+    # 检查是否为预期的 Release 证书
+    if [ "$cert_sha256" != "$RELEASE_CERT_SHA256" ]; then
+        echo -e "${RED}✗ 错误: APK 签名证书与预期不符！${NC}"
+        echo -e "${RED}  预期: $RELEASE_CERT_SHA256${NC}"
+        echo -e "${RED}  实际: $cert_sha256${NC}"
+        echo -e "${RED}  请使用正确的 Release keystore 签名${NC}"
+        return 1
+    fi
+
+    echo -e "${GREEN}✓ 签名验证通过: 使用正确的 Release 证书${NC}"
+    return 0
+}
 
 # 帮助信息
 show_help() {
@@ -59,7 +131,12 @@ show_help() {
     echo "  --min-version VER   最低支持版本 (可选)"
     echo "  --force             标记为强制更新"
     echo "  --publish           创建后自动发布"
+    echo "  --skip-signature-check  跳过签名验证 (危险! 不推荐)"
     echo "  -h, --help          显示帮助"
+    echo ""
+    echo "安全检查:"
+    echo "  发布前会自动验证 APK 签名，确保使用正确的 Release 证书"
+    echo "  如果检测到 Debug 证书或未知证书，发布将被阻止"
     echo ""
     echo "环境变量:"
     echo "  ADMIN_USERNAME      管理员用户名 (默认: admin)"
@@ -123,6 +200,10 @@ while [[ $# -gt 0 ]]; do
             AUTO_PUBLISH="true"
             shift
             ;;
+        --skip-signature-check)
+            SKIP_SIGNATURE_CHECK="true"
+            shift
+            ;;
         -h|--help)
             show_help
             exit 0
@@ -177,12 +258,12 @@ echo "强制更新: $IS_FORCE_UPDATE"
 echo "API 地址: $API_BASE_URL"
 echo ""
 
-# 计算总步骤数
+# 计算总步骤数 (构建 + 签名验证 + 登录 + 创建版本 + 上传 + 发布)
 if [ "$DO_BUILD" = "true" ]; then
-    TOTAL_STEPS=5
+    TOTAL_STEPS=6
     STEP=0
 else
-    TOTAL_STEPS=4
+    TOTAL_STEPS=5
     STEP=0
 fi
 
@@ -247,6 +328,42 @@ BUILDINFO
     echo -e "${GREEN}构建成功: $APK_PATH ($APK_SIZE)${NC}"
     echo ""
 fi
+
+# 签名验证步骤
+STEP=$((STEP + 1))
+echo -e "${YELLOW}[$STEP/$TOTAL_STEPS] 验证 APK 签名...${NC}"
+
+if [ "$SKIP_SIGNATURE_CHECK" = "true" ]; then
+    echo -e "${YELLOW}⚠ 警告: 已跳过签名验证 (--skip-signature-check)${NC}"
+    echo -e "${YELLOW}  这可能导致发布错误签名的 APK！${NC}"
+else
+    verify_apk_signature "$APK_PATH"
+    VERIFY_RESULT=$?
+
+    if [ $VERIFY_RESULT -eq 1 ]; then
+        echo ""
+        echo -e "${RED}========================================${NC}"
+        echo -e "${RED}发布已中止: 签名验证失败${NC}"
+        echo -e "${RED}========================================${NC}"
+        echo ""
+        echo "请确保:"
+        echo "  1. key.properties 文件配置正确"
+        echo "  2. storeFile 路径指向正确的 release.keystore"
+        echo "  3. 使用 flutter build apk --release 构建"
+        echo ""
+        echo "如果确实需要跳过检查 (不推荐)，请使用 --skip-signature-check"
+        exit 1
+    elif [ $VERIFY_RESULT -eq 2 ]; then
+        echo -e "${YELLOW}⚠ 无法自动验证签名，请人工确认 APK 签名正确${NC}"
+        read -p "是否继续发布? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "发布已取消"
+            exit 1
+        fi
+    fi
+fi
+echo ""
 
 # 1. 登录获取 Token
 STEP=$((STEP + 1))

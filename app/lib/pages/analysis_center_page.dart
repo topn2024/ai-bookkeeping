@@ -1,0 +1,1108 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/transaction_provider.dart';
+import '../models/transaction.dart';
+import '../models/category.dart';
+import '../providers/ledger_context_provider.dart';
+
+// 趋势分析相关
+import 'reports/trend_drill_page.dart';
+import 'reports/expense_heatmap_page.dart';
+
+// 分类分析相关
+import 'reports/category_pie_drill_page.dart';
+import 'tag_statistics_page.dart';
+import 'wants_needs_insight_page.dart';
+import 'category_detail_page.dart';
+
+// 统计对比相关
+import 'period_comparison_page.dart';
+import 'member_comparison_page.dart';
+import 'peer_comparison_page.dart';
+
+// 报告中心相关
+import 'reports/monthly_report_page.dart';
+import 'annual_report_page.dart';
+import 'reports/annual_summary_page.dart';
+import 'reports/budget_report_page.dart';
+import 'custom_report_page.dart';
+
+// 洞察发现相关
+import 'reports/insight_analysis_page.dart';
+import 'latte_factor_page.dart';
+import 'subscription_waste_page.dart';
+import 'ai/spending_prediction_page.dart';
+import 'actionable_advice_page.dart';
+
+// 专项分析相关
+import 'money_age_page.dart';
+import 'money_age_influence_page.dart';
+import 'money_age_progress_page.dart';
+import 'money_age_resource_pool_page.dart';
+import 'financial_health_dashboard_page.dart';
+import 'goal_achievement_dashboard_page.dart';
+import 'budget_health_page.dart';
+import 'vault_health_page.dart';
+import 'location_analysis_page.dart';
+import 'asset_overview_page.dart';
+import 'ai/ai_learning_report_page.dart';
+import 'ai_learning_curve_page.dart';
+import 'family_leaderboard_page.dart';
+
+/// 数据分析中心页面
+///
+/// 整合所有分析类页面的统一入口
+/// 原型设计：数据分析中心
+///
+/// 结构：
+/// - Tab 1: 趋势分析 - 消费趋势、热力图
+/// - Tab 2: 分类分析 - 分类占比、标签统计
+/// - Tab 3: 统计对比 - 同环比、成员对比、同类对比
+/// - Tab 4: 报告中心 - 月报、年报、预算报告、自定义报告
+/// - Tab 5: 洞察发现 - AI洞察、拿铁因子、订阅浪费、消费预测
+/// - Tab 6: 专项分析 - 钱龄、健康评估、位置分析、资产概览
+class AnalysisCenterPage extends ConsumerStatefulWidget {
+  const AnalysisCenterPage({super.key});
+
+  @override
+  ConsumerState<AnalysisCenterPage> createState() => _AnalysisCenterPageState();
+}
+
+class _AnalysisCenterPageState extends ConsumerState<AnalysisCenterPage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  int _selectedPeriod = 0;
+
+  final List<String> _periods = ['本月', '上月', '近3月', '今年'];
+  final List<_TabItem> _tabs = [
+    _TabItem(icon: Icons.trending_up, label: '趋势'),
+    _TabItem(icon: Icons.pie_chart, label: '分类'),
+    _TabItem(icon: Icons.compare_arrows, label: '对比'),
+    _TabItem(icon: Icons.description, label: '报告'),
+    _TabItem(icon: Icons.lightbulb, label: '洞察'),
+    _TabItem(icon: Icons.analytics, label: '专项'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _tabs.length, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(context, theme),
+            _buildPeriodSelector(context, theme),
+            _buildTabBar(context, theme),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _TrendAnalysisTab(selectedPeriod: _selectedPeriod),
+                  _CategoryAnalysisTab(selectedPeriod: _selectedPeriod),
+                  _ComparisonTab(selectedPeriod: _selectedPeriod),
+                  _ReportCenterTab(),
+                  _InsightTab(),
+                  _SpecialAnalysisTab(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Row(
+        children: [
+          Text(
+            '数据分析',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: () {
+              // TODO: 打开筛选页面
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPeriodSelector(BuildContext context, ThemeData theme) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: List.generate(_periods.length, (index) {
+          final isSelected = _selectedPeriod == index;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(_periods[index]),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() => _selectedPeriod = index);
+                }
+              },
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildTabBar(BuildContext context, ThemeData theme) {
+    return TabBar(
+      controller: _tabController,
+      isScrollable: true,
+      tabAlignment: TabAlignment.start,
+      tabs: _tabs.map((tab) => Tab(
+        icon: Icon(tab.icon, size: 20),
+        text: tab.label,
+      )).toList(),
+    );
+  }
+}
+
+class _TabItem {
+  final IconData icon;
+  final String label;
+
+  _TabItem({required this.icon, required this.label});
+}
+
+// ==================== Tab 1: 趋势分析 ====================
+
+class _TrendAnalysisTab extends ConsumerWidget {
+  final int selectedPeriod;
+
+  const _TrendAnalysisTab({required this.selectedPeriod});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final transactions = ref.watch(transactionProvider);
+    final monthlyExpense = ref.watch(monthlyExpenseProvider);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // 趋势图表卡片
+        _buildTrendChartCard(context, theme, transactions, monthlyExpense),
+        const SizedBox(height: 16),
+
+        // 统计卡片
+        _buildStatisticsRow(context, theme, transactions),
+        const SizedBox(height: 16),
+
+        // 快捷入口
+        _buildQuickAccess(context, theme),
+        const SizedBox(height: 16),
+
+        // TOP分类
+        _buildTopCategories(context, theme, transactions),
+      ],
+    );
+  }
+
+  Widget _buildTrendChartCard(BuildContext context, ThemeData theme,
+      List<Transaction> transactions, double monthlyExpense) {
+    return Card(
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TrendDrillPage()),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text('消费趋势', style: theme.textTheme.titleMedium),
+                  const Spacer(),
+                  Icon(Icons.arrow_forward_ios, size: 16, color: theme.hintColor),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // 图表占位
+              Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.show_chart, size: 48, color: theme.hintColor),
+                      const SizedBox(height: 8),
+                      Text('点击查看详细趋势', style: TextStyle(color: theme.hintColor)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '本月支出 ¥${monthlyExpense.toStringAsFixed(0)}',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatisticsRow(BuildContext context, ThemeData theme,
+      List<Transaction> transactions) {
+    final expenses = transactions.where((t) => t.type == TransactionType.expense).toList();
+    final days = DateTime.now().day;
+    final dailyAvg = expenses.isEmpty ? 0.0 :
+        expenses.fold<double>(0, (sum, t) => sum + t.amount) / days;
+
+    return Row(
+      children: [
+        Expanded(
+          child: _StatCard(
+            icon: Icons.calendar_today,
+            label: '日均支出',
+            value: '¥${dailyAvg.toStringAsFixed(0)}',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _StatCard(
+            icon: Icons.arrow_upward,
+            label: '最高单日',
+            value: '¥${_getMaxDaily(expenses).toStringAsFixed(0)}',
+          ),
+        ),
+      ],
+    );
+  }
+
+  double _getMaxDaily(List<Transaction> expenses) {
+    if (expenses.isEmpty) return 0;
+    final dailyTotals = <String, double>{};
+    for (final t in expenses) {
+      final key = '${t.date.year}-${t.date.month}-${t.date.day}';
+      dailyTotals[key] = (dailyTotals[key] ?? 0) + t.amount;
+    }
+    return dailyTotals.values.isEmpty ? 0 : dailyTotals.values.reduce((a, b) => a > b ? a : b);
+  }
+
+  Widget _buildQuickAccess(BuildContext context, ThemeData theme) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('快捷分析', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickAccessItem(
+                    icon: Icons.grid_on,
+                    label: '消费热力图',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ExpenseHeatmapPage()),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _QuickAccessItem(
+                    icon: Icons.zoom_in,
+                    label: '趋势下钻',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TrendDrillPage()),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopCategories(BuildContext context, ThemeData theme,
+      List<Transaction> transactions) {
+    final expenses = transactions.where((t) => t.type == TransactionType.expense).toList();
+    final categoryTotals = <String, double>{};
+    for (final t in expenses) {
+      categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
+    }
+    final sorted = categoryTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final top5 = sorted.take(5).toList();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('TOP分类', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            ...top5.map((e) => _CategoryItem(
+              category: e.key,
+              amount: e.value,
+              total: expenses.fold<double>(0, (sum, t) => sum + t.amount),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => CategoryDetailPage(categoryId: e.key)),
+              ),
+            )),
+            if (top5.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text('暂无数据', style: TextStyle(color: theme.hintColor)),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================== Tab 2: 分类分析 ====================
+
+class _CategoryAnalysisTab extends ConsumerWidget {
+  final int selectedPeriod;
+
+  const _CategoryAnalysisTab({required this.selectedPeriod});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final transactions = ref.watch(transactionProvider);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // 分类饼图卡片
+        _buildPieChartCard(context, theme, transactions),
+        const SizedBox(height: 16),
+
+        // 快捷入口
+        _buildQuickAccess(context, theme),
+        const SizedBox(height: 16),
+
+        // 分类列表
+        _buildCategoryList(context, theme, transactions),
+      ],
+    );
+  }
+
+  Widget _buildPieChartCard(BuildContext context, ThemeData theme,
+      List<Transaction> transactions) {
+    return Card(
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const CategoryPieDrillPage()),
+        ),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text('分类占比', style: theme.textTheme.titleMedium),
+                  const Spacer(),
+                  Icon(Icons.arrow_forward_ios, size: 16, color: theme.hintColor),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.pie_chart, size: 48, color: theme.hintColor),
+                      const SizedBox(height: 8),
+                      Text('点击查看分类详情', style: TextStyle(color: theme.hintColor)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickAccess(BuildContext context, ThemeData theme) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('分类工具', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickAccessItem(
+                    icon: Icons.local_offer,
+                    label: '标签统计',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TagStatisticsPage()),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _QuickAccessItem(
+                    icon: Icons.category,
+                    label: '消费分类洞察',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const WantsNeedsInsightPage()),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryList(BuildContext context, ThemeData theme,
+      List<Transaction> transactions) {
+    final expenses = transactions.where((t) => t.type == TransactionType.expense).toList();
+    final categoryTotals = <String, double>{};
+    for (final t in expenses) {
+      categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
+    }
+    final sorted = categoryTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final total = expenses.fold<double>(0, (sum, t) => sum + t.amount);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('全部分类', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            ...sorted.map((e) => _CategoryItem(
+              category: e.key,
+              amount: e.value,
+              total: total,
+              showPercentage: true,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => CategoryDetailPage(categoryId: e.key)),
+              ),
+            )),
+            if (sorted.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text('暂无数据', style: TextStyle(color: theme.hintColor)),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================== Tab 3: 统计对比 ====================
+
+class _ComparisonTab extends ConsumerWidget {
+  final int selectedPeriod;
+
+  const _ComparisonTab({required this.selectedPeriod});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final ledgerContext = ref.watch(ledgerContextProvider);
+    final currentLedger = ledgerContext.currentLedger;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // 同环比分析入口
+        _buildComparisonCard(
+          context, theme,
+          icon: Icons.compare_arrows,
+          title: '期间对比',
+          subtitle: '同比、环比分析，查看消费变化趋势',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PeriodComparisonPage()),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // 成员对比入口
+        _buildComparisonCard(
+          context, theme,
+          icon: Icons.people,
+          title: '成员对比',
+          subtitle: currentLedger != null ? '家庭成员消费对比分析' : '需要先加入家庭账本',
+          enabled: currentLedger != null,
+          onTap: () {
+            if (currentLedger != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => MemberComparisonPage(
+                  ledgerId: currentLedger.id,
+                  ledgerName: currentLedger.name,
+                )),
+              );
+            }
+          },
+        ),
+        const SizedBox(height: 12),
+
+        // 同类对比入口
+        _buildComparisonCard(
+          context, theme,
+          icon: Icons.groups,
+          title: '同类用户对比',
+          subtitle: '与相似用户匿名对比，了解消费水平',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PeerComparisonPage()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildComparisonCard(BuildContext context, ThemeData theme, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool enabled = true,
+  }) {
+    return Card(
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: enabled
+              ? theme.colorScheme.primaryContainer
+              : theme.disabledColor.withAlpha(30),
+          child: Icon(icon, color: enabled
+              ? theme.colorScheme.primary
+              : theme.disabledColor),
+        ),
+        title: Text(title, style: TextStyle(
+          color: enabled ? null : theme.disabledColor,
+        )),
+        subtitle: Text(subtitle),
+        trailing: enabled
+            ? const Icon(Icons.arrow_forward_ios, size: 16)
+            : null,
+        onTap: enabled ? onTap : null,
+      ),
+    );
+  }
+}
+
+// ==================== Tab 4: 报告中心 ====================
+
+class _ReportCenterTab extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildReportSection(context, theme, '定期报告', [
+          _ReportItem(
+            icon: Icons.calendar_month,
+            title: '月度报告',
+            subtitle: '本月财务总结与分析',
+            page: const MonthlyReportPage(),
+          ),
+          _ReportItem(
+            icon: Icons.calendar_today,
+            title: '年度报告',
+            subtitle: '全年财务回顾与展望',
+            page: const AnnualReportPage(),
+          ),
+          _ReportItem(
+            icon: Icons.summarize,
+            title: '年度总结',
+            subtitle: '年度数据汇总与亮点',
+            page: const AnnualSummaryPage(),
+          ),
+        ]),
+        const SizedBox(height: 16),
+
+        _buildReportSection(context, theme, '专项报告', [
+          _ReportItem(
+            icon: Icons.account_balance_wallet,
+            title: '预算报告',
+            subtitle: '预算执行情况分析',
+            page: const BudgetReportPage(),
+          ),
+          _ReportItem(
+            icon: Icons.tune,
+            title: '自定义报告',
+            subtitle: '按需定制分析报告',
+            page: const CustomReportPage(),
+          ),
+        ]),
+        const SizedBox(height: 16),
+
+        // 家庭报告 - 需要先选择家庭账本
+        _buildFamilyReportSection(context, theme),
+      ],
+    );
+  }
+
+  Widget _buildReportSection(BuildContext context, ThemeData theme,
+      String title, List<_ReportItem> items) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            ...items.map((item) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                backgroundColor: theme.colorScheme.secondaryContainer,
+                child: Icon(item.icon, color: theme.colorScheme.secondary, size: 20),
+              ),
+              title: Text(item.title),
+              subtitle: Text(item.subtitle, style: theme.textTheme.bodySmall),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => item.page),
+              ),
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFamilyReportSection(BuildContext context, ThemeData theme) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('家庭报告', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                backgroundColor: theme.colorScheme.tertiaryContainer,
+                child: Icon(Icons.family_restroom, color: theme.colorScheme.tertiary, size: 20),
+              ),
+              title: const Text('家庭年度回顾'),
+              subtitle: Text('家庭成员消费对比与总结', style: theme.textTheme.bodySmall),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                // 显示选择家庭和年份的对话框
+                _showFamilyReportDialog(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFamilyReportDialog(BuildContext context) {
+    final currentYear = DateTime.now().year;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('家庭年度回顾'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('请先在设置中创建或加入家庭账本，然后即可生成家庭年度回顾报告。'),
+            const SizedBox(height: 16),
+            Text('将生成 $currentYear 年的回顾报告',
+              style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportItem {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget page;
+
+  _ReportItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.page,
+  });
+}
+
+// ==================== Tab 5: 洞察发现 ====================
+
+class _InsightTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // AI洞察
+        _buildInsightCard(
+          context, theme,
+          icon: Icons.auto_awesome,
+          title: 'AI智能洞察',
+          subtitle: '消费习惯、异常检测、优化建议',
+          color: Colors.purple,
+          page: const InsightAnalysisPage(),
+        ),
+        const SizedBox(height: 12),
+
+        // 拿铁因子
+        _buildInsightCard(
+          context, theme,
+          icon: Icons.local_cafe,
+          title: '拿铁因子分析',
+          subtitle: '小额高频消费累计影响',
+          color: Colors.brown,
+          page: const LatteFactorPage(),
+        ),
+        const SizedBox(height: 12),
+
+        // 订阅浪费
+        _buildInsightCard(
+          context, theme,
+          icon: Icons.subscriptions,
+          title: '订阅浪费识别',
+          subtitle: '发现未使用的订阅服务',
+          color: Colors.orange,
+          page: const SubscriptionWastePage(),
+        ),
+        const SizedBox(height: 12),
+
+        // 消费预测
+        _buildInsightCard(
+          context, theme,
+          icon: Icons.timeline,
+          title: '消费趋势预测',
+          subtitle: 'AI预测未来消费走势',
+          color: Colors.blue,
+          page: const SpendingPredictionPage(),
+        ),
+        const SizedBox(height: 12),
+
+        // 可行建议
+        _buildInsightCard(
+          context, theme,
+          icon: Icons.tips_and_updates,
+          title: '可行建议',
+          subtitle: '个性化理财优化建议',
+          color: Colors.green,
+          page: const ActionableAdvicePage(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInsightCard(BuildContext context, ThemeData theme, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required Widget page,
+  }) {
+    return Card(
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color.withAlpha(30),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => page),
+        ),
+      ),
+    );
+  }
+}
+
+// ==================== Tab 6: 专项分析 ====================
+
+class _SpecialAnalysisTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // 钱龄分析
+        _buildAnalysisSection(context, theme, '钱龄分析', Icons.monetization_on, Colors.amber, [
+          _AnalysisItem(title: '钱龄详情', page: const MoneyAgePage()),
+          _AnalysisItem(title: '影响因素', page: const MoneyAgeInfluencePage()),
+          _AnalysisItem(title: '钱龄进阶', page: const MoneyAgeProgressPage()),
+          _AnalysisItem(title: 'FIFO资源池', page: const MoneyAgeResourcePoolPage()),
+        ]),
+        const SizedBox(height: 16),
+
+        // 健康评估
+        _buildAnalysisSection(context, theme, '健康评估', Icons.favorite, Colors.red, [
+          _AnalysisItem(title: '财务健康仪表盘', page: const FinancialHealthDashboardPage()),
+          _AnalysisItem(title: '目标达成', page: const GoalAchievementDashboardPage()),
+          _AnalysisItem(title: '预算健康', page: const BudgetHealthPage()),
+          _AnalysisItem(title: '小金库健康', page: const VaultHealthPage()),
+        ]),
+        const SizedBox(height: 16),
+
+        // 其他专项
+        _buildAnalysisSection(context, theme, '更多分析', Icons.analytics, Colors.indigo, [
+          _AnalysisItem(title: '位置分析', page: const LocationAnalysisPage()),
+          _AnalysisItem(title: '资产概览', page: const AssetOverviewPage()),
+          _AnalysisItem(title: 'AI学习报告', page: const AILearningReportPage()),
+          _AnalysisItem(title: 'AI学习曲线', page: const AILearningCurvePage()),
+          _AnalysisItem(title: '家庭排行榜', page: const FamilyLeaderboardPage()),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildAnalysisSection(BuildContext context, ThemeData theme,
+      String title, IconData icon, Color color, List<_AnalysisItem> items) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 20),
+                const SizedBox(width: 8),
+                Text(title, style: theme.textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: items.map((item) => ActionChip(
+                label: Text(item.title),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => item.page),
+                ),
+              )).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AnalysisItem {
+  final String title;
+  final Widget page;
+
+  _AnalysisItem({required this.title, required this.page});
+}
+
+// ==================== 通用组件 ====================
+
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _StatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 16, color: theme.hintColor),
+                const SizedBox(width: 4),
+                Text(label, style: theme.textTheme.bodySmall),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(value, style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickAccessItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickAccessItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Icon(icon, color: theme.colorScheme.primary),
+            const SizedBox(height: 4),
+            Text(label, style: theme.textTheme.bodySmall),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryItem extends StatelessWidget {
+  final String category;
+  final double amount;
+  final double total;
+  final bool showPercentage;
+  final VoidCallback? onTap;
+
+  const _CategoryItem({
+    required this.category,
+    required this.amount,
+    required this.total,
+    this.showPercentage = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final percentage = total > 0 ? (amount / total * 100) : 0.0;
+    final categoryData = DefaultCategories.findById(category);
+    final categoryColor = categoryData?.color ?? theme.colorScheme.primary;
+    final categoryIcon = categoryData?.icon ?? Icons.category;
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        backgroundColor: categoryColor.withAlpha(30),
+        child: Icon(
+          categoryIcon,
+          color: categoryColor,
+          size: 20,
+        ),
+      ),
+      title: Text(categoryData?.name ?? category),
+      subtitle: showPercentage
+        ? LinearProgressIndicator(
+            value: percentage / 100,
+            backgroundColor: theme.colorScheme.surfaceContainerHighest,
+          )
+        : null,
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text('¥${amount.toStringAsFixed(0)}', style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          )),
+          if (showPercentage)
+            Text('${percentage.toStringAsFixed(1)}%', style: theme.textTheme.bodySmall),
+        ],
+      ),
+      onTap: onTap,
+    );
+  }
+}

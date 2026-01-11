@@ -120,6 +120,11 @@ class FloatingBallService {
 }
 
 /// 悬浮球Widget（用于应用内显示）
+/// 特性：
+/// - 默认位置在右下角
+/// - 可手动拖动
+/// - 拖动结束后自动吸附到屏幕边缘
+/// - 自动避开底部导航栏和FAB按钮区域
 class FloatingBallWidget extends StatefulWidget {
   final VoidCallback onTap;
 
@@ -132,54 +137,171 @@ class FloatingBallWidget extends StatefulWidget {
   State<FloatingBallWidget> createState() => _FloatingBallWidgetState();
 }
 
-class _FloatingBallWidgetState extends State<FloatingBallWidget> {
-  Offset _position = const Offset(300, 500);
+class _FloatingBallWidgetState extends State<FloatingBallWidget>
+    with SingleTickerProviderStateMixin {
+  Offset? _position;
   FloatingBallState _state = FloatingBallState.normal;
+  bool _isDragging = false;
+  late AnimationController _animationController;
+  Animation<Offset>? _snapAnimation;
+
+  // 悬浮球尺寸
+  static const double _ballSize = 50.0;
+  static const double _ballSizeExpanded = 60.0;
+
+  // 安全边距
+  static const double _edgePadding = 16.0;
+  static const double _bottomNavHeight = 80.0;  // 底部导航栏高度
+  static const double _fabAreaHeight = 100.0;   // FAB按钮区域高度
+  static const double _fabAreaWidth = 120.0;    // FAB按钮区域宽度
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _animationController.addListener(() {
+      if (_snapAnimation != null) {
+        setState(() {
+          _position = _snapAnimation!.value;
+        });
+      }
+    });
+
     FloatingBallService().onStateChanged.listen((state) {
-      setState(() => _state = state);
+      if (mounted) {
+        setState(() => _state = state);
+      }
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      left: _position.dx,
-      top: _position.dy,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onPanUpdate: (details) {
-          setState(() {
-            _position += details.delta;
-          });
-        },
-        child: _buildBall(),
-      ),
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  /// 获取默认位置（右下角，避开导航栏）
+  Offset _getDefaultPosition(Size screenSize) {
+    return Offset(
+      screenSize.width - _ballSize - _edgePadding,
+      screenSize.height - _ballSize - _bottomNavHeight - _fabAreaHeight - _edgePadding,
     );
   }
 
-  Widget _buildBall() {
-    final size = _state == FloatingBallState.amountDetected ? 60.0 : 50.0;
+  /// 计算吸附后的位置
+  Offset _calculateSnapPosition(Offset currentPos, Size screenSize) {
+    final double centerX = currentPos.dx + _ballSize / 2;
+    final double screenCenterX = screenSize.width / 2;
 
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: _getBallColor(),
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    // 计算安全区域边界
+    final double minY = MediaQuery.of(context).padding.top + _edgePadding;
+    final double maxY = screenSize.height - _ballSize - _bottomNavHeight - _edgePadding;
+
+    // 根据位置决定吸附到左边还是右边
+    double targetX;
+    if (centerX < screenCenterX) {
+      // 吸附到左边
+      targetX = _edgePadding;
+    } else {
+      // 吸附到右边
+      targetX = screenSize.width - _ballSize - _edgePadding;
+    }
+
+    // Y坐标限制在安全范围内
+    double targetY = currentPos.dy.clamp(minY, maxY);
+
+    // 避开底部中间的FAB区域
+    final fabCenterX = screenSize.width / 2;
+    final fabLeft = fabCenterX - _fabAreaWidth / 2;
+    final fabRight = fabCenterX + _fabAreaWidth / 2;
+    final fabTop = screenSize.height - _bottomNavHeight - _fabAreaHeight;
+
+    // 如果悬浮球在FAB区域附近，将其移到FAB区域上方
+    if (targetY > fabTop - _ballSize &&
+        targetX + _ballSize > fabLeft &&
+        targetX < fabRight) {
+      targetY = fabTop - _ballSize - _edgePadding;
+    }
+
+    return Offset(targetX, targetY);
+  }
+
+  /// 执行吸附动画
+  void _snapToEdge(Size screenSize) {
+    if (_position == null) return;
+
+    final targetPos = _calculateSnapPosition(_position!, screenSize);
+
+    _snapAnimation = Tween<Offset>(
+      begin: _position,
+      end: targetPos,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutBack,
+    ));
+
+    _animationController.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+
+    // 初始化位置（首次渲染时）
+    _position ??= _getDefaultPosition(screenSize);
+
+    final currentSize = _state == FloatingBallState.amountDetected
+        ? _ballSizeExpanded
+        : _ballSize;
+
+    return Positioned(
+      left: _position!.dx,
+      top: _position!.dy,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onPanStart: (_) {
+          setState(() => _isDragging = true);
+          _animationController.stop();
+        },
+        onPanUpdate: (details) {
+          setState(() {
+            final newX = (_position!.dx + details.delta.dx).clamp(
+              0.0,
+              screenSize.width - currentSize,
+            );
+            final newY = (_position!.dy + details.delta.dy).clamp(
+              MediaQuery.of(context).padding.top,
+              screenSize.height - currentSize - _bottomNavHeight,
+            );
+            _position = Offset(newX, newY);
+          });
+        },
+        onPanEnd: (_) {
+          setState(() => _isDragging = false);
+          _snapToEdge(screenSize);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: currentSize,
+          height: currentSize,
+          decoration: BoxDecoration(
+            color: _getBallColor(),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(_isDragging ? 0.3 : 0.2),
+                blurRadius: _isDragging ? 12 : 8,
+                offset: Offset(0, _isDragging ? 4 : 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Center(
-        child: _getBallContent(),
+          child: Center(
+            child: _getBallContent(),
+          ),
+        ),
       ),
     );
   }

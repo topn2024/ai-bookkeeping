@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 
 import '../models/resource_pool.dart';
 import '../services/money_age_level_service.dart';
 import '../theme/app_theme.dart';
 import '../providers/money_age_provider.dart';
 import '../providers/ledger_context_provider.dart';
+import '../providers/budget_provider.dart';
+import '../models/budget.dart' as budget_model;
 
 /// 钱龄详情页
 /// 原型设计 2.01：钱龄详情 Money Age Detail
@@ -31,16 +35,14 @@ class MoneyAgePage extends ConsumerWidget {
     }
 
     final dashboardAsync = ref.watch(moneyAgeDashboardProvider(bookId));
+    // 本地钱龄数据作为备用
+    final localMoneyAge = ref.watch(moneyAgeProvider);
 
     return dashboardAsync.when(
       data: (dashboard) {
-        if (dashboard == null) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('钱龄分析')),
-            body: const Center(child: Text('暂无钱龄数据')),
-          );
-        }
-        return _buildContent(context, theme, dashboard, ref);
+        // 如果 API 返回 null，使用本地计算的钱龄数据
+        final effectiveDashboard = dashboard ?? _createDashboardFromLocal(localMoneyAge);
+        return _buildContent(context, theme, effectiveDashboard, ref);
       },
       loading: () => Scaffold(
         appBar: AppBar(title: const Text('钱龄分析')),
@@ -474,6 +476,26 @@ class MoneyAgePage extends ConsumerWidget {
 
   // ========== 辅助方法 ==========
 
+  /// 从本地 MoneyAge 创建 MoneyAgeDashboard
+  /// 用于 API 返回 null 时的降级方案
+  MoneyAgeDashboard _createDashboardFromLocal(budget_model.MoneyAge localMoneyAge) {
+    final days = localMoneyAge.days;
+    final healthLevel = days >= 30 ? 'good' : (days >= 14 ? 'normal' : (days >= 7 ? 'warning' : 'danger'));
+
+    return MoneyAgeDashboard(
+      avgMoneyAge: days.toDouble(),
+      medianMoneyAge: days,
+      currentHealthLevel: healthLevel,
+      healthCount: days >= 14 ? 1 : 0,
+      warningCount: days >= 7 && days < 14 ? 1 : 0,
+      dangerCount: days < 7 ? 1 : 0,
+      totalResourcePools: 1,
+      activeResourcePools: 1,
+      totalRemainingAmount: localMoneyAge.totalBalance,
+      trendData: [],
+    );
+  }
+
   Color _getLevelColor(MoneyAgeLevel level) {
     switch (level) {
       case MoneyAgeLevel.danger:
@@ -859,20 +881,64 @@ class MoneyAgeUpgradePage extends StatelessWidget {
 
 /// 钱龄历史趋势页
 /// 原型设计 2.03：钱龄历史趋势
-class MoneyAgeHistoryPage extends StatefulWidget {
+class MoneyAgeHistoryPage extends ConsumerStatefulWidget {
   const MoneyAgeHistoryPage({super.key});
 
   @override
-  State<MoneyAgeHistoryPage> createState() => _MoneyAgeHistoryPageState();
+  ConsumerState<MoneyAgeHistoryPage> createState() => _MoneyAgeHistoryPageState();
 }
 
-class _MoneyAgeHistoryPageState extends State<MoneyAgeHistoryPage> {
+class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
   int _selectedPeriod = 1; // 默认近30天
   final List<String> _periods = ['近7天', '近30天', '近3月', '今年'];
+
+  /// 根据选择的周期获取天数
+  int _getDaysForPeriod() {
+    switch (_selectedPeriod) {
+      case 0: return 7;
+      case 1: return 30;
+      case 2: return 90;
+      case 3: return 365;
+      default: return 30;
+    }
+  }
+
+  /// 从 dashboard.trendData 生成 DailyMoneyAge 列表
+  List<DailyMoneyAge> _getTrendData(MoneyAgeDashboard? dashboard) {
+    if (dashboard == null || dashboard.trendData.isEmpty) {
+      return [];
+    }
+
+    final days = _getDaysForPeriod();
+    final result = <DailyMoneyAge>[];
+
+    for (final item in dashboard.trendData.take(days)) {
+      final dateStr = item['date'] as String?;
+      final avgAge = (item['avg_age'] as num?)?.toInt() ?? 0;
+
+      if (dateStr != null && avgAge > 0) {
+        try {
+          final date = DateTime.parse(dateStr);
+          result.add(DailyMoneyAge(date: date, averageAge: avgAge));
+        } catch (_) {
+          // 跳过无效日期
+        }
+      }
+    }
+
+    return result;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final ledgerContext = ref.watch(ledgerContextProvider);
+    final bookId = ledgerContext.currentLedger?.id;
+
+    // 获取钱龄数据
+    final dashboardAsync = bookId != null
+        ? ref.watch(moneyAgeDashboardProvider(bookId))
+        : const AsyncValue<MoneyAgeDashboard?>.data(null);
 
     return Scaffold(
       body: SafeArea(
@@ -883,17 +949,24 @@ class _MoneyAgeHistoryPageState extends State<MoneyAgeHistoryPage> {
             // 周期选择器
             _buildPeriodSelector(context, theme),
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // 图表区域
-                    _buildChartPlaceholder(context, theme),
-                    // 统计摘要
-                    _buildStatsSummary(context, theme),
-                    // 每日记录
-                    _buildDailyRecords(context, theme),
-                  ],
-                ),
+              child: dashboardAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Center(child: Text('加载失败: $error')),
+                data: (dashboard) {
+                  final trendData = _getTrendData(dashboard);
+                  return SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        // 图表区域
+                        _buildTrendChart(context, theme, trendData),
+                        // 统计摘要
+                        _buildStatsSummary(context, theme, trendData),
+                        // 每日记录
+                        _buildDailyRecords(context, theme, trendData),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -961,35 +1034,196 @@ class _MoneyAgeHistoryPageState extends State<MoneyAgeHistoryPage> {
     );
   }
 
-  Widget _buildChartPlaceholder(BuildContext context, ThemeData theme) {
+  /// 真实的钱龄趋势图
+  Widget _buildTrendChart(BuildContext context, ThemeData theme, List<DailyMoneyAge> trendData) {
+    if (trendData.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.all(16),
+        height: 200,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Center(
+          child: Text(
+            '暂无趋势数据',
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
+
+    // 按日期排序（旧到新）
+    final sortedData = List<DailyMoneyAge>.from(trendData)
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    // 生成折线图数据点
+    final spots = sortedData.asMap().entries.map((entry) {
+      return FlSpot(entry.key.toDouble(), entry.value.averageAge.toDouble());
+    }).toList();
+
+    // 计算Y轴范围
+    final ages = sortedData.map((d) => d.averageAge).toList();
+    final minAge = ages.reduce((a, b) => a < b ? a : b);
+    final maxAge = ages.reduce((a, b) => a > b ? a : b);
+    final yMin = (minAge - 5).clamp(0, 1000).toDouble();
+    final yMax = (maxAge + 10).toDouble();
+
     return Container(
       margin: const EdgeInsets.all(16),
-      height: 200,
+      padding: const EdgeInsets.all(16),
+      height: 220,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.show_chart,
-              size: 48,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '钱龄变化趋势',
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
             ),
-            const SizedBox(height: 8),
-            Text(
-              '钱龄变化趋势图',
-              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: LineChart(
+              LineChartData(
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: AppColors.success,
+                    barWidth: 2.5,
+                    dotData: FlDotData(
+                      show: sortedData.length <= 15,
+                      getDotPainter: (spot, percent, barData, index) {
+                        return FlDotCirclePainter(
+                          radius: 3,
+                          color: AppColors.success,
+                          strokeWidth: 1.5,
+                          strokeColor: Colors.white,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: AppColors.success.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ],
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= sortedData.length) {
+                          return const SizedBox.shrink();
+                        }
+                        // 只显示部分日期
+                        if (sortedData.length <= 7 ||
+                            index == 0 ||
+                            index == sortedData.length - 1 ||
+                            index % (sortedData.length ~/ 4) == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              DateFormat('M/d').format(sortedData[index].date),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                      reservedSize: 22,
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          '${value.toInt()}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        );
+                      },
+                      reservedSize: 30,
+                    ),
+                  ),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: (yMax - yMin) / 4,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                borderData: FlBorderData(show: false),
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (spots) {
+                      return spots.map((spot) {
+                        final index = spot.spotIndex;
+                        if (index < 0 || index >= sortedData.length) {
+                          return null;
+                        }
+                        return LineTooltipItem(
+                          '${DateFormat('M月d日').format(sortedData[index].date)}\n${spot.y.toInt()}天',
+                          TextStyle(
+                            color: theme.colorScheme.onPrimary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      }).toList();
+                    },
+                  ),
+                ),
+                minY: yMin,
+                maxY: yMax,
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildStatsSummary(BuildContext context, ThemeData theme) {
+  Widget _buildStatsSummary(BuildContext context, ThemeData theme, List<DailyMoneyAge> trendData) {
+    // 计算真实统计数据
+    int avgAge = 0;
+    int maxAge = 0;
+    int minAge = 0;
+
+    if (trendData.isNotEmpty) {
+      final ages = trendData.map((d) => d.averageAge).toList();
+      avgAge = (ages.reduce((a, b) => a + b) / ages.length).round();
+      maxAge = ages.reduce((a, b) => a > b ? a : b);
+      minAge = ages.reduce((a, b) => a < b ? a : b);
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -1007,9 +1241,9 @@ class _MoneyAgeHistoryPageState extends State<MoneyAgeHistoryPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildSummaryItem('平均钱龄', '42', AppColors.success),
-          _buildSummaryItem('最高', '48', null),
-          _buildSummaryItem('最低', '35', null),
+          _buildSummaryItem('平均钱龄', trendData.isEmpty ? '--' : '$avgAge', AppColors.success),
+          _buildSummaryItem('最高', trendData.isEmpty ? '--' : '$maxAge', null),
+          _buildSummaryItem('最低', trendData.isEmpty ? '--' : '$minAge', null),
         ],
       ),
     );
@@ -1035,7 +1269,26 @@ class _MoneyAgeHistoryPageState extends State<MoneyAgeHistoryPage> {
     );
   }
 
-  Widget _buildDailyRecords(BuildContext context, ThemeData theme) {
+  Widget _buildDailyRecords(BuildContext context, ThemeData theme, List<DailyMoneyAge> trendData) {
+    if (trendData.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: Text(
+            '暂无每日记录',
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
+
+    // 按日期降序排列（最新的在前）
+    final sortedData = List<DailyMoneyAge>.from(trendData)
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    // 只显示最近10条
+    final displayData = sortedData.take(10).toList();
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1046,9 +1299,36 @@ class _MoneyAgeHistoryPageState extends State<MoneyAgeHistoryPage> {
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
-          _buildDayRecord(theme, '今天', '1月2日', 42, 2),
-          _buildDayRecord(theme, '昨天', '1月1日', 40, 0),
-          _buildDayRecord(theme, '12月31日', '周二', 40, -3),
+          ...displayData.asMap().entries.map((entry) {
+            final index = entry.key;
+            final data = entry.value;
+            final now = DateTime.now();
+            final today = DateTime(now.year, now.month, now.day);
+            final yesterday = today.subtract(const Duration(days: 1));
+            final dataDate = DateTime(data.date.year, data.date.month, data.date.day);
+
+            String title;
+            String subtitle;
+
+            if (dataDate == today) {
+              title = '今天';
+              subtitle = DateFormat('M月d日').format(data.date);
+            } else if (dataDate == yesterday) {
+              title = '昨天';
+              subtitle = DateFormat('M月d日').format(data.date);
+            } else {
+              title = DateFormat('M月d日').format(data.date);
+              subtitle = DateFormat('EEEE', 'zh_CN').format(data.date);
+            }
+
+            // 计算与前一天的变化
+            int change = 0;
+            if (index < displayData.length - 1) {
+              change = data.averageAge - displayData[index + 1].averageAge;
+            }
+
+            return _buildDayRecord(theme, title, subtitle, data.averageAge, change);
+          }),
         ],
       ),
     );

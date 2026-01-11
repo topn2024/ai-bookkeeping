@@ -11,7 +11,7 @@ import '../widgets/app_update_dialog.dart';
 import '../l10n/l10n.dart';
 import '../providers/ledger_context_provider.dart';
 import 'home_page.dart';
-import 'trends_page.dart';
+import 'analysis_center_page.dart';
 import 'budget_center_page.dart';
 import 'profile_page.dart';
 import 'add_transaction_page.dart';
@@ -22,7 +22,7 @@ import 'image_recognition_page.dart';
 /// 原型设计 1.01-1.05：5个底部导航主页面
 /// 反重力设计：玻璃态底部导航 + 悬浮FAB + L4阴影
 /// - 首页（仪表盘）
-/// - 趋势（趋势分析）
+/// - 分析（数据分析中心）
 /// - 预算（预算中心）
 /// - 我的（个人中心）
 class MainNavigation extends ConsumerStatefulWidget {
@@ -40,7 +40,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
 
   final List<Widget> _pages = const [
     HomePage(),
-    TrendsPage(),
+    AnalysisCenterPage(),
     BudgetCenterPage(),
     ProfilePage(),
   ];
@@ -149,9 +149,9 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
           label: context.l10n.home,
         ),
         GlassBottomNavItem(
-          icon: Icons.insights_outlined,
-          activeIcon: Icons.insights,
-          label: context.l10n.trends,
+          icon: Icons.analytics_outlined,
+          activeIcon: Icons.analytics,
+          label: context.l10n.trends, // 分析中心
         ),
         // FAB 占位
         const GlassBottomNavItem(
