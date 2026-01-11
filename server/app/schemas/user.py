@@ -82,3 +82,30 @@ class ResetPasswordResponse(BaseModel):
     """Schema for reset password response."""
     success: bool
     message: str
+
+
+class SendSmsCodeRequest(BaseModel):
+    """Schema for sending SMS verification code."""
+    phone: str = Field(..., pattern=r"^1[3-9]\d{9}$", description="手机号（11位）")
+    scene: str = Field(
+        default="login",
+        pattern=r"^(login|register|reset_password)$",
+        description="使用场景：login（登录）| register（注册）| reset_password（重置密码）"
+    )
+
+
+class SendSmsCodeResponse(BaseModel):
+    """Schema for send SMS code response."""
+    success: bool
+    message: str
+    expires_in: int = Field(default=600, description="验证码有效期（秒）")
+
+
+class SmsLoginRequest(BaseModel):
+    """Schema for SMS verification code login."""
+    phone: str = Field(..., pattern=r"^1[3-9]\d{9}$", description="手机号（11位）")
+    code: str = Field(..., min_length=6, max_length=6, description="6位数字验证码")
+    auto_register: bool = Field(
+        default=True,
+        description="如果用户不存在，是否自动注册"
+    )

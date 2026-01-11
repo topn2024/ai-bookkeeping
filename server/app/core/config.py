@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = "AI Bookkeeping"
     SMTP_USE_TLS: bool = True
 
+    # Aliyun SMS (阿里云短信服务)
+    ALIYUN_ACCESS_KEY_ID: str = ""  # Required for SMS
+    ALIYUN_ACCESS_KEY_SECRET: str = ""  # Required for SMS
+    ALIYUN_SMS_SIGN_NAME: str = "AI智能记账"  # SMS signature name
+    ALIYUN_SMS_TEMPLATE_CODE: str = ""  # SMS template code for verification
+    ALIYUN_SMS_REGION: str = "cn-hangzhou"  # Default region
+
     # Logging
     LOG_LEVEL: str = "INFO"
 

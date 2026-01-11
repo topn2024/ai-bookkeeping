@@ -1,0 +1,5 @@
+# 自动发布脚本依赖
+# 安装: pip install -r requirements-release.txt
+
+requests>=2.31.0
+bsdiff4>=1.2.0
