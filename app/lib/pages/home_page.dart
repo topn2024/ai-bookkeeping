@@ -6,12 +6,12 @@ import '../providers/transaction_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/budget_provider.dart';
 import '../providers/gamification_provider.dart';
+import '../providers/home_page_text_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
 import '../widgets/budget_alert_widget.dart';
 import '../widgets/swipeable_transaction_item.dart';
-import '../services/home_page_text_service.dart';
 import 'transaction_list_page.dart';
 import 'transaction_detail_page.dart';
 import 'add_transaction_page.dart';
@@ -47,6 +47,30 @@ class _HomePageState extends ConsumerState<HomePage> {
     final colors = ref.themeColors;
     final balance = monthlyIncome - monthlyExpense;
 
+    // 获取用户ID并更新文案Provider
+    final authState = ref.watch(authProvider);
+    final userId = authState.user?.id;
+
+    // 计算数据并更新文案上下文
+    final lastMonthBalance = ref.watch(lastMonthBalanceProvider);
+    final growth = balance > 0 && lastMonthBalance > 0
+        ? ((balance - lastMonthBalance) / lastMonthBalance * 100)
+        : 0.0;
+    final streakStats = ref.watch(gamificationProvider);
+    final moneyAgeData = ref.watch(moneyAgeProvider);
+    final trendDays = moneyAgeData.trend == 'up' ? 5 : (moneyAgeData.trend == 'down' ? -5 : 0);
+
+    // 更新文案Provider的上下文（支持千人千面和定期刷新）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(homePageTextProvider.notifier).setUserId(userId);
+      ref.read(homePageTextProvider.notifier).updateContext(
+        growth: growth,
+        streakDays: streakStats.currentStreak,
+        trendDays: trendDays,
+        trend: moneyAgeData.trend ?? 'stable',
+      );
+    });
+
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
@@ -75,11 +99,15 @@ class _HomePageState extends ConsumerState<HomePage> {
     double balance,
     ThemeColors colors,
   ) {
-    final greeting = _getGreeting();
+    // 从Provider获取动态文案（支持千人千面和定期刷新）
+    final textState = ref.watch(homePageTextProvider);
+    final greeting = textState.greeting;
+    final balanceGrowthText = textState.balanceGrowthText;
+
     final authState = ref.watch(authProvider);
     final userName = authState.user?.nickname ?? authState.user?.email?.split('@').first ?? '';
 
-    // 计算同比增长
+    // 计算同比增长（仅用于图标显示）
     final lastMonthBalance = ref.watch(lastMonthBalanceProvider);
     final growth = balance > 0 && lastMonthBalance > 0
         ? ((balance - lastMonthBalance) / lastMonthBalance * 100)
@@ -174,9 +202,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            balance > 0 && lastMonthBalance > 0
-                                ? HomePageTextService.getBalanceGrowthText(growth)
-                                : HomePageTextService.getNoGrowthDataText(),
+                            balanceGrowthText,
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.white.withValues(alpha: 0.9),
@@ -293,6 +319,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       return const SizedBox.shrink();
     }
 
+    // 从Provider获取动态文案（支持千人千面和定期刷新）
+    final textState = ref.watch(homePageTextProvider);
+
     return Container(
           margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           padding: const EdgeInsets.all(16),
@@ -323,7 +352,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      HomePageTextService.getStreakCelebrationText(consecutiveDays),
+                      textState.streakCelebrationText,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -332,7 +361,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      HomePageTextService.getStreakEncouragementText(consecutiveDays),
+                      textState.streakEncouragementText,
                       style: TextStyle(
                         fontSize: 13,
                         color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
@@ -351,6 +380,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildMoneyAgeCard(BuildContext context, ThemeData theme, WidgetRef ref) {
     final moneyAgeData = ref.watch(moneyAgeProvider);
     final moneyAge = moneyAgeData.days;
+
+    // 从Provider获取动态文案（支持千人千面和定期刷新）
+    final textState = ref.watch(homePageTextProvider);
 
     // 根据钱龄天数确定等级
     String level;
@@ -483,7 +515,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  HomePageTextService.getMoneyAgeTrendText(trendDays, moneyAgeData.trend ?? 'stable'),
+                  textState.moneyAgeTrendText,
                   style: TextStyle(
                     fontSize: 12,
                     color: trendDays >= 0 ? AppColors.success : AppColors.warning,
@@ -887,8 +919,4 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  /// 获取问候语（使用动态文案服务）
-  HomeGreeting _getGreeting() {
-    return HomePageTextService.getTimeGreeting();
-  }
 }
