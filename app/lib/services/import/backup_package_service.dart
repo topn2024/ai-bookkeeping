@@ -168,7 +168,7 @@ class BackupPackageService {
         if (file.isFile) {
           final data = file.content as List<int>;
           final extractPath = '${extractDir.path}/$filename';
-          await File(extractPath)
+          File(extractPath)
             ..createSync(recursive: true)
             ..writeAsBytesSync(data);
         }

@@ -103,43 +103,46 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   /// 单击：手动记账
   /// 长按：语音记账
   Widget _buildCenterButton(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        // 单击进入手动记账
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AddTransactionPage()),
-        );
-      },
-      onLongPress: () {
-        // 长按进入语音助手（小记）
-        setState(() => _currentIndex = 2);  // 切换到小记页面
-      },
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppTheme.primaryColor,
-              AppTheme.primaryColor.withValues(alpha: 0.85),
+    return Transform.translate(
+      offset: const Offset(0, 8),  // 向下偏移
+      child: GestureDetector(
+        onTap: () {
+          // 单击进入手动记账
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddTransactionPage()),
+          );
+        },
+        onLongPress: () {
+          // 长按进入语音助手（小记）
+          setState(() => _currentIndex = 2);  // 切换到小记页面
+        },
+        child: Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppTheme.primaryColor,
+                AppTheme.primaryColor.withValues(alpha: 0.85),
+              ],
+            ),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryColor.withValues(alpha: 0.4),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
             ],
           ),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primaryColor.withValues(alpha: 0.35),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.add,
-          color: Colors.white,
-          size: 28,
+          child: const Icon(
+            Icons.add,
+            color: Colors.white,
+            size: 32,
+          ),
         ),
       ),
     );
