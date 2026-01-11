@@ -3,6 +3,41 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+/// 数据不足警告
+class AnomalyDataInsufficiency {
+  final AnomalyType checkType;
+  final String message;
+  final int currentDataCount;
+  final int requiredDataCount;
+
+  const AnomalyDataInsufficiency({
+    required this.checkType,
+    required this.message,
+    required this.currentDataCount,
+    required this.requiredDataCount,
+  });
+}
+
+/// 异常检测结果
+class AnomalyDetectionResult {
+  final List<AnomalyAlert> alerts;
+  final List<AnomalyDataInsufficiency> dataInsufficiencies;
+
+  const AnomalyDetectionResult({
+    required this.alerts,
+    required this.dataInsufficiencies,
+  });
+
+  bool get hasDataInsufficiency => dataInsufficiencies.isNotEmpty;
+
+  String get summaryMessage {
+    if (dataInsufficiencies.isEmpty) {
+      return '完成${alerts.length}项异常检测';
+    }
+    return '完成${alerts.length}项异常检测，${dataInsufficiencies.length}项检测因数据不足跳过';
+  }
+}
+
 /// 交易异常检测服务
 ///
 /// 功能：
@@ -21,12 +56,13 @@ class AnomalyDetectionService {
   })  : _transactionRepo = transactionRepo,
         _preferencesRepo = preferencesRepo ?? InMemoryPreferencesRepository();
 
-  /// 检测异常交易
-  Future<List<AnomalyAlert>> detectAnomalies(
+  /// 检测异常交易（包含数据不足信息）
+  Future<AnomalyDetectionResult> detectAnomaliesWithInfo(
     AnomalyTransaction newTx, {
     String? userId,
   }) async {
     final alerts = <AnomalyAlert>[];
+    final dataInsufficiencies = <AnomalyDataInsufficiency>[];
 
     // 获取用户个性化偏好（如有）
     UserAnomalyPreferences? prefs;
@@ -35,21 +71,30 @@ class AnomalyDetectionService {
     }
 
     // ===== 检测1: 金额异常（基于分类历史） =====
-    final amountAlert = await _detectAmountAnomaly(newTx, prefs);
-    if (amountAlert != null) {
-      alerts.add(amountAlert);
+    final amountResult = await _detectAmountAnomalyWithInfo(newTx, prefs);
+    if (amountResult.alert != null) {
+      alerts.add(amountResult.alert!);
+    }
+    if (amountResult.insufficiency != null) {
+      dataInsufficiencies.add(amountResult.insufficiency!);
     }
 
     // ===== 检测2: 时间异常 =====
-    final timeAlert = await _detectTimeAnomaly(newTx, prefs);
-    if (timeAlert != null) {
-      alerts.add(timeAlert);
+    final timeResult = await _detectTimeAnomalyWithInfo(newTx, prefs);
+    if (timeResult.alert != null) {
+      alerts.add(timeResult.alert!);
+    }
+    if (timeResult.insufficiency != null) {
+      dataInsufficiencies.add(timeResult.insufficiency!);
     }
 
     // ===== 检测3: 频率异常 =====
-    final frequencyAlert = await _detectFrequencyAnomaly(newTx, prefs);
-    if (frequencyAlert != null) {
-      alerts.add(frequencyAlert);
+    final frequencyResult = await _detectFrequencyAnomalyWithInfo(newTx, prefs);
+    if (frequencyResult.alert != null) {
+      alerts.add(frequencyResult.alert!);
+    }
+    if (frequencyResult.insufficiency != null) {
+      dataInsufficiencies.add(frequencyResult.insufficiency!);
     }
 
     // ===== 检测4: 重复交易嫌疑 =====
@@ -64,8 +109,92 @@ class AnomalyDetectionService {
       alerts.add(locationAlert);
     }
 
-    return alerts;
+    return AnomalyDetectionResult(
+      alerts: alerts,
+      dataInsufficiencies: dataInsufficiencies,
+    );
   }
+
+  /// 检测异常交易（向后兼容）
+  Future<List<AnomalyAlert>> detectAnomalies(
+    AnomalyTransaction newTx, {
+    String? userId,
+  }) async {
+    final result = await detectAnomaliesWithInfo(newTx, userId: userId);
+    return result.alerts;
+  }
+
+  /// 单个检测结果
+  class _DetectionResult {
+    final AnomalyAlert? alert;
+    final AnomalyDataInsufficiency? insufficiency;
+
+    const _DetectionResult({this.alert, this.insufficiency});
+  }
+
+  /// 金额异常检测（包含数据不足信息）
+  Future<_DetectionResult> _detectAmountAnomalyWithInfo(
+    AnomalyTransaction newTx,
+    UserAnomalyPreferences? prefs,
+  ) async {
+    if (newTx.categoryId == null) return const _DetectionResult();
+
+    final categoryHistory = await _transactionRepo.getByCategory(
+      newTx.categoryId!,
+      limit: 50,
+    );
+
+    if (categoryHistory.length < 10) {
+      return _DetectionResult(
+        insufficiency: AnomalyDataInsufficiency(
+          checkType: AnomalyType.unusualAmount,
+          message: '金额异常检测需要至少10笔历史交易（当前${categoryHistory.length}笔）',
+          currentDataCount: categoryHistory.length,
+          requiredDataCount: 10,
+        ),
+      );
+    }
+
+    final alert = await _detectAmountAnomaly(newTx, prefs);
+    return _DetectionResult(alert: alert);
+  }
+
+  /// 时间异常检测（包含数据不足信息）
+  Future<_DetectionResult> _detectTimeAnomalyWithInfo(
+    AnomalyTransaction newTx,
+    UserAnomalyPreferences? prefs,
+  ) async {
+    final alert = await _detectTimeAnomaly(newTx, prefs);
+    return _DetectionResult(alert: alert);
+  }
+
+  /// 频率异常检测（包含数据不足信息）
+  Future<_DetectionResult> _detectFrequencyAnomalyWithInfo(
+    AnomalyTransaction newTx,
+    UserAnomalyPreferences? prefs,
+  ) async {
+    if (newTx.categoryId == null) return const _DetectionResult();
+
+    final categoryHistory = await _transactionRepo.getByCategory(
+      newTx.categoryId!,
+      limit: 50,
+    );
+
+    if (categoryHistory.length < 10) {
+      return _DetectionResult(
+        insufficiency: AnomalyDataInsufficiency(
+          checkType: AnomalyType.unusualFrequency,
+          message: '频率异常检测需要至少10笔历史交易（当前${categoryHistory.length}笔）',
+          currentDataCount: categoryHistory.length,
+          requiredDataCount: 10,
+        ),
+      );
+    }
+
+    final alert = await _detectFrequencyAnomaly(newTx, prefs);
+    return _DetectionResult(alert: alert);
+  }
+
 
   /// 金额异常检测
   Future<AnomalyAlert?> _detectAmountAnomaly(

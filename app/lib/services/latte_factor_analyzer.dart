@@ -117,7 +117,18 @@ class LatteFactorAnalyzer {
         factors: [],
         totalMonthlyImpact: 0,
         totalYearlyImpact: 0,
-        topSuggestion: '您的小额消费控制得很好！',
+        topSuggestion: '暂无小额高频消费数据。继续记账${period}个月后，可分析您的消费习惯并提供节省建议。',
+        potentialYearlySavings: 0,
+      );
+    }
+
+    // 检查数据是否足够进行有意义的分析
+    if (transactions.length < 10) {
+      return LatteFactorReport(
+        factors: [],
+        totalMonthlyImpact: 0,
+        totalYearlyImpact: 0,
+        topSuggestion: '数据较少（当前${transactions.length}笔），建议继续记账至少${period}个月，累积更多数据后可获得更准确的分析。',
         potentialYearlySavings: 0,
       );
     }
