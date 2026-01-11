@@ -493,6 +493,16 @@ class AuthNotifier extends Notifier<AuthState> {
       if (e.response?.statusCode == 404) {
         throw Exception('用户不存在');
       }
+      if (e.response?.statusCode == 500) {
+        final detail = e.response?.data['detail'];
+        if (detail != null) {
+          throw Exception(detail);
+        }
+        throw Exception('服务器错误，请稍后再试');
+      }
+      if (e.response?.statusCode == 503) {
+        throw Exception('服务暂时不可用，请稍后再试');
+      }
       rethrow;
     }
   }

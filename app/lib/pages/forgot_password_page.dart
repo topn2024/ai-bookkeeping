@@ -480,8 +480,9 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('验证码已发送到您的邮箱，请注意查收'),
+              content: Text('验证码已发送到您的邮箱\n请检查收件箱和垃圾邮件箱（有效期10分钟）'),
               backgroundColor: Colors.green,
+              duration: Duration(seconds: 5),
             ),
           );
 
@@ -565,18 +566,75 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
       });
 
       if (success) {
-        setState(() {
-          _currentStep = ResetStep.success;
-        });
+        // 密码重置成功，自动使用新密码登录
+        try {
+          final loginSuccess = await ref.read(authProvider.notifier).login(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+
+          setState(() {
+            _isLoading = false;
+          });
+
+          if (loginSuccess && mounted) {
+            // 登录成功，显示提示并跳转到主页
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('密码重置成功，已自动登录'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+
+            // 延迟一下让用户看到提示，然后跳转到主页
+            await Future.delayed(const Duration(milliseconds: 800));
+            if (mounted) {
+              // 清空导航栈，跳转到主页（因为已经登录成功）
+              Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+            }
+          } else {
+            // 自动登录失败，显示成功页面让用户手动登录
+            setState(() {
+              _currentStep = ResetStep.success;
+            });
+          }
+        } catch (e) {
+          // 自动登录失败，显示成功页面让用户手动登录
+          setState(() {
+            _isLoading = false;
+            _currentStep = ResetStep.success;
+          });
+        }
       } else {
         setState(() {
           _error = '密码重置失败，请稍后再试';
         });
       }
     } catch (e) {
+      String errorMessage = e.toString().replaceAll('Exception: ', '');
+
+      // 针对特定错误提供更详细的提示
+      if (errorMessage.contains('Invalid') && errorMessage.contains('reset code')) {
+        errorMessage = '验证码错误。请检查：\n'
+            '• 邮箱中的验证码是否输入正确\n'
+            '• 验证码是否已过期（有效期10分钟）\n'
+            '• 是否使用了正确的邮箱地址';
+      } else if (errorMessage.contains('expired')) {
+        errorMessage = '验证码已过期，请重新发送验证码';
+      } else if (errorMessage.contains('User not found')) {
+        errorMessage = '该邮箱未注册，请检查邮箱地址是否正确';
+      } else if (errorMessage.contains('Failed to reset password')) {
+        errorMessage = '密码重置失败，请稍后重试或联系客服';
+      } else if (errorMessage.contains('服务器错误') || errorMessage.contains('服务暂时不可用')) {
+        // 保持原有的错误信息
+      } else if (errorMessage.isEmpty) {
+        errorMessage = '密码重置失败，请检查网络连接后重试';
+      }
+
       setState(() {
         _isLoading = false;
-        _error = e.toString().replaceAll('Exception: ', '');
+        _error = errorMessage;
       });
     }
   }
