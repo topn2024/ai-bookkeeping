@@ -168,9 +168,8 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
         ),
         // 中间占位（给FAB留空间）
         const GlassBottomNavItem(
-          icon: Icons.add,
-          activeIcon: Icons.add,
           label: '',
+          isPlaceholder: true,
         ),
         // 小记宠物助手
         const GlassBottomNavItem(

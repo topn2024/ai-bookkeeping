@@ -475,7 +475,7 @@ class AliCloudASRService {
         tokenInfo = await _tokenService.getToken();
       } on VoiceTokenException catch (e) {
         throw ASRException(
-          'Token获取失败: ${e.message ?? '未知错误'}',
+          'Token获取失败: ${e.message}',
           errorCode: ASRErrorCode.tokenFailed,
         );
       }
@@ -603,7 +603,7 @@ class AliCloudASRService {
         tokenInfo = await _tokenService.getToken();
       } on VoiceTokenException catch (e) {
         throw ASRException(
-          'Token获取失败: ${e.message ?? '未知错误'}',
+          'Token获取失败: ${e.message}',
           errorCode: ASRErrorCode.tokenFailed,
         );
       }

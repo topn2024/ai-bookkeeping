@@ -178,8 +178,13 @@ class _GlassNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 占位项（给FAB留空间）
+    if (item.icon == null || item.isPlaceholder) {
+      return const SizedBox(width: 56);  // FAB宽度的占位
+    }
+
     final color = isSelected ? selectedColor : unselectedColor;
-    final icon = isSelected ? item.activeIcon : item.icon;
+    final icon = isSelected ? (item.activeIcon ?? item.icon) : item.icon;
 
     return GestureDetector(
       onTap: onTap,
@@ -225,14 +230,16 @@ class _GlassNavItem extends StatelessWidget {
 
 /// 玻璃态导航项数据
 class GlassBottomNavItem {
-  final IconData icon;
-  final IconData activeIcon;
+  final IconData? icon;
+  final IconData? activeIcon;
   final String label;
+  final bool isPlaceholder;  // 是否是占位项（给FAB留空间）
 
   const GlassBottomNavItem({
-    required this.icon,
-    required this.activeIcon,
+    this.icon,
+    this.activeIcon,
     required this.label,
+    this.isPlaceholder = false,
   });
 }
 

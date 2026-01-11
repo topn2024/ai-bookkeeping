@@ -83,27 +83,39 @@ class UserBehaviorData {
     // 使用天数贡献
     if (daysUsed >= 30) {
       score += 25;
-    } else if (daysUsed >= 14) score += 20;
-    else if (daysUsed >= 7) score += 15;
+    } else if (daysUsed >= 14) {
+      score += 20;
+    } else if (daysUsed >= 7) {
+      score += 15;
+    }
 
     // 交易数量贡献
     if (transactionCount >= 50) {
       score += 25;
-    } else if (transactionCount >= 20) score += 20;
-    else if (transactionCount >= 10) score += 15;
+    } else if (transactionCount >= 20) {
+      score += 20;
+    } else if (transactionCount >= 10) {
+      score += 15;
+    }
 
     // 正向操作贡献
     if (positiveActionCount >= 30) {
       score += 25;
-    } else if (positiveActionCount >= 15) score += 20;
-    else if (positiveActionCount >= 5) score += 15;
+    } else if (positiveActionCount >= 15) {
+      score += 20;
+    } else if (positiveActionCount >= 5) {
+      score += 15;
+    }
 
     // 会话时长贡献
     if (averageSessionDuration != null) {
       if (averageSessionDuration! >= 300) {
         score += 25; // 5分钟+
-      } else if (averageSessionDuration! >= 120) score += 20; // 2分钟+
-      else if (averageSessionDuration! >= 60) score += 15; // 1分钟+
+      } else if (averageSessionDuration! >= 120) {
+        score += 20; // 2分钟+
+      } else if (averageSessionDuration! >= 60) {
+        score += 15; // 1分钟+
+      }
     }
 
     // 错误扣分

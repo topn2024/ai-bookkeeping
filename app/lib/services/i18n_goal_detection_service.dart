@@ -1,4 +1,3 @@
-import '../l10n/app_localizations.dart';
 import '../core/formatting/formatting_service.dart';
 import 'category_localization_service.dart';
 
