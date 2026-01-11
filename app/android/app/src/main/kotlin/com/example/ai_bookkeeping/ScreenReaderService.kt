@@ -2,8 +2,11 @@ package com.example.ai_bookkeeping
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.accessibilityservice.GestureDescription
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Path
+import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -14,7 +17,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.concurrent.Executor
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * 无障碍服务 - 屏幕内容读取器
@@ -455,6 +459,328 @@ class ScreenReaderService : AccessibilityService() {
             e.printStackTrace()
             null
         }
+    }
+
+    // ==================== 自动化功能 ====================
+
+    /**
+     * 启动应用
+     * @param packageName 应用包名
+     * @return 是否成功启动
+     */
+    fun launchApp(packageName: String): Boolean {
+        return try {
+            val intent = applicationContext.packageManager.getLaunchIntentForPackage(packageName)
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                applicationContext.startActivity(intent)
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * 获取当前前台应用包名
+     */
+    fun getCurrentPackageName(): String {
+        return rootInActiveWindow?.packageName?.toString() ?: ""
+    }
+
+    /**
+     * 通过文本查找并点击元素
+     * @param text 要查找的文本
+     * @return 是否成功点击
+     */
+    fun clickElementByText(text: String): Boolean {
+        val rootNode = rootInActiveWindow ?: return false
+
+        try {
+            val nodes = rootNode.findAccessibilityNodeInfosByText(text)
+            for (node in nodes) {
+                if (tryClickNode(node)) {
+                    return true
+                }
+            }
+            return false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        } finally {
+            rootNode.recycle()
+        }
+    }
+
+    /**
+     * 通过视图ID查找并点击元素
+     * @param viewId 视图资源ID
+     * @return 是否成功点击
+     */
+    fun clickElementById(viewId: String): Boolean {
+        val rootNode = rootInActiveWindow ?: return false
+
+        try {
+            val nodes = rootNode.findAccessibilityNodeInfosByViewId(viewId)
+            for (node in nodes) {
+                if (tryClickNode(node)) {
+                    return true
+                }
+            }
+            return false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        } finally {
+            rootNode.recycle()
+        }
+    }
+
+    /**
+     * 尝试点击节点
+     * 优先点击自身，如果不可点击则点击父节点
+     */
+    private fun tryClickNode(node: AccessibilityNodeInfo): Boolean {
+        // 尝试点击自身
+        if (node.isClickable) {
+            return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+
+        // 尝试点击父节点
+        var parent = node.parent
+        var depth = 0
+        while (parent != null && depth < 5) {
+            if (parent.isClickable) {
+                val result = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                parent.recycle()
+                return result
+            }
+            val temp = parent.parent
+            parent.recycle()
+            parent = temp
+            depth++
+        }
+        parent?.recycle()
+
+        // 最后尝试通过坐标点击
+        return clickNodeByCoordinates(node)
+    }
+
+    /**
+     * 通过坐标点击节点
+     */
+    private fun clickNodeByCoordinates(node: AccessibilityNodeInfo): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return false
+        }
+
+        val rect = Rect()
+        node.getBoundsInScreen(rect)
+
+        val centerX = rect.centerX().toFloat()
+        val centerY = rect.centerY().toFloat()
+
+        return performClick(centerX, centerY)
+    }
+
+    /**
+     * 在指定坐标执行点击
+     * @param x X坐标
+     * @param y Y坐标
+     * @return 是否成功
+     */
+    fun performClick(x: Float, y: Float): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return false
+        }
+
+        val path = Path()
+        path.moveTo(x, y)
+
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 100))
+            .build()
+
+        return dispatchGestureSync(gesture)
+    }
+
+    /**
+     * 执行滑动手势
+     * @param startX 起始X坐标
+     * @param startY 起始Y坐标
+     * @param endX 结束X坐标
+     * @param endY 结束Y坐标
+     * @param duration 持续时间（毫秒）
+     * @return 是否成功
+     */
+    fun performSwipe(startX: Float, startY: Float, endX: Float, endY: Float, duration: Long = 300): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return false
+        }
+
+        val path = Path()
+        path.moveTo(startX, startY)
+        path.lineTo(endX, endY)
+
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, duration))
+            .build()
+
+        return dispatchGestureSync(gesture)
+    }
+
+    /**
+     * 向下滑动（用于滚动列表）
+     * @param screenHeight 屏幕高度，用于计算滑动距离
+     * @return 是否成功
+     */
+    fun scrollDown(screenHeight: Int = 2000): Boolean {
+        val centerX = 540f  // 假设屏幕宽度1080
+        val startY = screenHeight * 0.7f
+        val endY = screenHeight * 0.3f
+        return performSwipe(centerX, startY, centerX, endY, 400)
+    }
+
+    /**
+     * 向上滑动
+     */
+    fun scrollUp(screenHeight: Int = 2000): Boolean {
+        val centerX = 540f
+        val startY = screenHeight * 0.3f
+        val endY = screenHeight * 0.7f
+        return performSwipe(centerX, startY, centerX, endY, 400)
+    }
+
+    /**
+     * 同步执行手势
+     */
+    private fun dispatchGestureSync(gesture: GestureDescription): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return false
+        }
+
+        val latch = CountDownLatch(1)
+        var success = false
+
+        dispatchGesture(gesture, object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                success = true
+                latch.countDown()
+            }
+
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                success = false
+                latch.countDown()
+            }
+        }, null)
+
+        try {
+            latch.await(3, TimeUnit.SECONDS)
+        } catch (e: InterruptedException) {
+            return false
+        }
+
+        return success
+    }
+
+    /**
+     * 等待元素出现
+     * @param text 要等待的文本
+     * @param timeout 超时时间（毫秒）
+     * @return 是否找到元素
+     */
+    fun waitForElement(text: String, timeout: Long = 5000): Boolean {
+        val startTime = System.currentTimeMillis()
+
+        while (System.currentTimeMillis() - startTime < timeout) {
+            val rootNode = rootInActiveWindow
+            if (rootNode != null) {
+                try {
+                    val nodes = rootNode.findAccessibilityNodeInfosByText(text)
+                    if (nodes.isNotEmpty()) {
+                        return true
+                    }
+                } catch (e: Exception) {
+                    // 忽略
+                } finally {
+                    rootNode.recycle()
+                }
+            }
+
+            try {
+                Thread.sleep(200)
+            } catch (e: InterruptedException) {
+                return false
+            }
+        }
+
+        return false
+    }
+
+    /**
+     * 等待特定应用出现在前台
+     * @param packageName 包名
+     * @param timeout 超时时间（毫秒）
+     * @return 是否成功
+     */
+    fun waitForApp(packageName: String, timeout: Long = 5000): Boolean {
+        val startTime = System.currentTimeMillis()
+
+        while (System.currentTimeMillis() - startTime < timeout) {
+            if (getCurrentPackageName() == packageName) {
+                return true
+            }
+
+            try {
+                Thread.sleep(200)
+            } catch (e: InterruptedException) {
+                return false
+            }
+        }
+
+        return false
+    }
+
+    /**
+     * 检查元素是否存在
+     * @param text 要查找的文本
+     * @return 是否存在
+     */
+    fun elementExists(text: String): Boolean {
+        val rootNode = rootInActiveWindow ?: return false
+
+        return try {
+            val nodes = rootNode.findAccessibilityNodeInfosByText(text)
+            nodes.isNotEmpty()
+        } catch (e: Exception) {
+            false
+        } finally {
+            rootNode.recycle()
+        }
+    }
+
+    /**
+     * 执行返回操作
+     */
+    fun performBack(): Boolean {
+        return performGlobalAction(GLOBAL_ACTION_BACK)
+    }
+
+    /**
+     * 回到桌面
+     */
+    fun performHome(): Boolean {
+        return performGlobalAction(GLOBAL_ACTION_HOME)
+    }
+
+    /**
+     * 打开最近任务
+     */
+    fun performRecents(): Boolean {
+        return performGlobalAction(GLOBAL_ACTION_RECENTS)
     }
 }
 

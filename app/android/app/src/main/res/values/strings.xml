@@ -3,4 +3,11 @@
     <string name="app_name">小记</string>
     <string name="accessibility_service_description">启用此服务后，您可以通过语音指令读取微信、支付宝等应用的账单信息，快速完成记账。\n\n此服务仅在您主动使用语音记账功能时读取屏幕内容，不会在后台收集任何信息。</string>
     <string name="accessibility_service_label">小记 - 智能记账助手</string>
+
+    <!-- 桌面小组件 -->
+    <string name="widget_quick_add_description">快捷语音记账入口，点击即可开始语音记账</string>
+    <string name="widget_stats_description">显示今日消费统计，支持快捷记账</string>
+
+    <!-- 通知监听服务 -->
+    <string name="notification_listener_description">监听支付通知，自动识别消费金额</string>
 </resources>

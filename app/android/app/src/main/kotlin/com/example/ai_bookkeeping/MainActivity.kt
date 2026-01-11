@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Parcelable
 import android.provider.Settings
+import android.view.KeyEvent
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -13,18 +14,28 @@ import java.io.File
 import java.io.FileOutputStream
 
 class MainActivity : FlutterActivity() {
+
+    private var gestureWakeHandler: GestureWakeHandler? = null
     companion object {
         private const val CHANNEL = "com.example.ai_bookkeeping/bspatch"
         private const val SHARE_CHANNEL = "com.example.ai_bookkeeping/share"
         private const val SHARE_EVENT_CHANNEL = "com.example.ai_bookkeeping/share_events"
         private const val SCREEN_READER_CHANNEL = "com.example.ai_bookkeeping/screen_reader"
+        private const val DEEP_LINK_CHANNEL = "com.example.ai_bookkeeping/deep_link"
+        private const val DEEP_LINK_EVENT_CHANNEL = "com.example.ai_bookkeeping/deep_link_events"
     }
 
     private var sharedImages: ArrayList<String>? = null
     private var eventSink: EventChannel.EventSink? = null
+    private var deepLinkEventSink: EventChannel.EventSink? = null
+    private var pendingDeepLink: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // 初始化手势唤醒处理器
+        gestureWakeHandler = GestureWakeHandler(this)
+        gestureWakeHandler?.registerWith(flutterEngine)
 
         // 处理分享接收的MethodChannel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SHARE_CHANNEL).setMethodCallHandler { call, result ->
@@ -133,11 +144,266 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
+                // ==================== 自动化功能 ====================
+                "launchApp" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val packageName = call.argument<String>("packageName")
+                    if (packageName.isNullOrEmpty()) {
+                        result.error("INVALID_ARGS", "packageName is required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val success = service.launchApp(packageName)
+                    result.success(success)
+                }
+                "getCurrentPackageName" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    result.success(service.getCurrentPackageName())
+                }
+                "clickElement" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val text = call.argument<String>("text")
+                    if (text.isNullOrEmpty()) {
+                        result.error("INVALID_ARGS", "text is required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    Thread {
+                        val success = service.clickElementByText(text)
+                        runOnUiThread {
+                            result.success(success)
+                        }
+                    }.start()
+                }
+                "clickElementById" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val viewId = call.argument<String>("viewId")
+                    if (viewId.isNullOrEmpty()) {
+                        result.error("INVALID_ARGS", "viewId is required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    Thread {
+                        val success = service.clickElementById(viewId)
+                        runOnUiThread {
+                            result.success(success)
+                        }
+                    }.start()
+                }
+                "performClick" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val x = call.argument<Double>("x")?.toFloat()
+                    val y = call.argument<Double>("y")?.toFloat()
+                    if (x == null || y == null) {
+                        result.error("INVALID_ARGS", "x and y are required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    Thread {
+                        val success = service.performClick(x, y)
+                        runOnUiThread {
+                            result.success(success)
+                        }
+                    }.start()
+                }
+                "performSwipe" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val startX = call.argument<Double>("startX")?.toFloat()
+                    val startY = call.argument<Double>("startY")?.toFloat()
+                    val endX = call.argument<Double>("endX")?.toFloat()
+                    val endY = call.argument<Double>("endY")?.toFloat()
+                    val duration = call.argument<Int>("duration")?.toLong() ?: 300L
+
+                    if (startX == null || startY == null || endX == null || endY == null) {
+                        result.error("INVALID_ARGS", "startX, startY, endX, endY are required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    Thread {
+                        val success = service.performSwipe(startX, startY, endX, endY, duration)
+                        runOnUiThread {
+                            result.success(success)
+                        }
+                    }.start()
+                }
+                "scrollDown" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val screenHeight = call.argument<Int>("screenHeight") ?: 2000
+
+                    Thread {
+                        val success = service.scrollDown(screenHeight)
+                        runOnUiThread {
+                            result.success(success)
+                        }
+                    }.start()
+                }
+                "scrollUp" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val screenHeight = call.argument<Int>("screenHeight") ?: 2000
+
+                    Thread {
+                        val success = service.scrollUp(screenHeight)
+                        runOnUiThread {
+                            result.success(success)
+                        }
+                    }.start()
+                }
+                "waitForElement" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val text = call.argument<String>("text")
+                    val timeout = call.argument<Int>("timeout")?.toLong() ?: 5000L
+
+                    if (text.isNullOrEmpty()) {
+                        result.error("INVALID_ARGS", "text is required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    Thread {
+                        val found = service.waitForElement(text, timeout)
+                        runOnUiThread {
+                            result.success(found)
+                        }
+                    }.start()
+                }
+                "waitForApp" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val packageName = call.argument<String>("packageName")
+                    val timeout = call.argument<Int>("timeout")?.toLong() ?: 5000L
+
+                    if (packageName.isNullOrEmpty()) {
+                        result.error("INVALID_ARGS", "packageName is required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    Thread {
+                        val found = service.waitForApp(packageName, timeout)
+                        runOnUiThread {
+                            result.success(found)
+                        }
+                    }.start()
+                }
+                "elementExists" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val text = call.argument<String>("text")
+                    if (text.isNullOrEmpty()) {
+                        result.error("INVALID_ARGS", "text is required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    result.success(service.elementExists(text))
+                }
+                "performBack" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    result.success(service.performBack())
+                }
+                "performHome" -> {
+                    val service = ScreenReaderService.instance
+                    if (service == null) {
+                        result.error("SERVICE_NOT_ENABLED", "无障碍服务未启用", null)
+                        return@setMethodCallHandler
+                    }
+
+                    result.success(service.performHome())
+                }
                 else -> {
                     result.notImplemented()
                 }
             }
         }
+
+        // 深度链接 MethodChannel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DEEP_LINK_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getInitialLink" -> {
+                    result.success(pendingDeepLink)
+                    pendingDeepLink = null
+                }
+                "clearPendingLink" -> {
+                    pendingDeepLink = null
+                    result.success(true)
+                }
+                else -> {
+                    result.notImplemented()
+                }
+            }
+        }
+
+        // 深度链接 EventChannel
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, DEEP_LINK_EVENT_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    deepLinkEventSink = events
+                    // 如果有待处理的深度链接，立即发送
+                    pendingDeepLink?.let { link ->
+                        deepLinkEventSink?.success(link)
+                    }
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    deepLinkEventSink = null
+                }
+            }
+        )
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -214,6 +480,21 @@ class MainActivity : FlutterActivity() {
         handleShareIntent(intent)
     }
 
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        gestureWakeHandler?.onKeyDown(keyCode, event)
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        gestureWakeHandler?.onKeyUp(keyCode, event)
+        return super.onKeyUp(keyCode, event)
+    }
+
+    override fun onDestroy() {
+        gestureWakeHandler?.dispose()
+        super.onDestroy()
+    }
+
     private fun handleShareIntent(intent: Intent?) {
         if (intent == null) return
 
@@ -227,6 +508,29 @@ class MainActivity : FlutterActivity() {
                 if (intent.type?.startsWith("image/") == true) {
                     handleSendMultipleImages(intent)
                 }
+            }
+            Intent.ACTION_VIEW -> {
+                handleDeepLink(intent)
+            }
+        }
+    }
+
+    /**
+     * 处理深度链接
+     */
+    private fun handleDeepLink(intent: Intent) {
+        val uri = intent.data ?: return
+
+        // 检查是否是我们的深度链接
+        if (uri.scheme == "aibook") {
+            val deepLink = uri.toString()
+
+            // 如果 Flutter 已经就绪，直接发送事件
+            if (deepLinkEventSink != null) {
+                deepLinkEventSink?.success(deepLink)
+            } else {
+                // 否则保存待处理的深度链接
+                pendingDeepLink = deepLink
             }
         }
     }
