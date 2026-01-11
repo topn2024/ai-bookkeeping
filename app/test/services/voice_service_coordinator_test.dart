@@ -121,6 +121,7 @@ void main() {
         // Setup delete service mock
         final mockDeleteResult = DeleteResult.success(
           deletedRecords: [],
+          canRecover: true,
           message: '删除成功',
         );
         when(mockDeleteService.processDeleteRequest(
@@ -173,7 +174,29 @@ void main() {
           enableHaptic: anyNamed('enableHaptic'),
         )).thenAnswer((_) async => {});
 
-        final mockModifyResult = ModifyResult.success();
+        final testRecord = TransactionRecord(
+          id: '1',
+          amount: 30.0,
+          category: '餐饮',
+          date: DateTime.now(),
+        );
+        final updatedRecord = TransactionRecord(
+          id: '1',
+          amount: 40.0,
+          category: '餐饮',
+          date: DateTime.now(),
+        );
+        final mockModifyResult = ModifyResult.success(
+          originalRecord: testRecord,
+          updatedRecord: updatedRecord,
+          modifications: [
+            FieldModification(
+              field: ModifyField.amount,
+              newValue: 40.0,
+              rawText: '40元',
+            ),
+          ],
+        );
         when(mockModifyService.processModifyRequest(
           any,
           queryCallback: anyNamed('queryCallback'),
@@ -212,10 +235,9 @@ void main() {
 
         final mockNavigationResult = NavigationResult(
           success: true,
-          message: '正在打开设置页面',
         );
-        when(mockNavigationService.handleNavigationCommand(any))
-            .thenAnswer((_) async => mockNavigationResult);
+        when(mockNavigationService.parseNavigation(any))
+            .thenReturn(mockNavigationResult);
 
         when(mockFeedbackSystem.provideFeedback(
           message: anyNamed('message'),
@@ -226,7 +248,7 @@ void main() {
         final result = await coordinator.processVoiceCommand('打开设置页面');
 
         expect(result, isNotNull);
-        verify(mockNavigationService.handleNavigationCommand('打开设置页面')).called(1);
+        verify(mockNavigationService.parseNavigation('打开设置页面')).called(1);
       });
 
       test('应该正确处理未知命令', () async {
@@ -295,7 +317,7 @@ void main() {
         )).thenAnswer((_) async => {});
 
         // Mock delete service to require clarification
-        final mockDeleteResult = DeleteResult.needsClarification(
+        final mockDeleteResult = DeleteResult.needClarification(
           candidates: [],
           prompt: '请选择要删除的记录',
         );
@@ -333,16 +355,29 @@ void main() {
         )).thenAnswer((_) async => {});
 
         // Mock modify service to require confirmation
-        final mockModifyResult = ModifyResult.needsConfirmation(
-          ModificationPreview(
-            originalRecord: TransactionRecord(
-              id: '1',
-              amount: 30.0,
-              category: '餐饮',
-              date: DateTime.now(),
-              type: 'expense',
-            ),
-            modifiedFields: {'amount': 35.0},
+        final originalRecord = TransactionRecord(
+          id: '1',
+          amount: 30.0,
+          category: '餐饮',
+          date: DateTime.now(),
+        );
+        final previewRecord = TransactionRecord(
+          id: '1',
+          amount: 35.0,
+          category: '餐饮',
+          date: DateTime.now(),
+        );
+        final mockModifyResult = ModifyResult.needConfirmation(
+          preview: ModifyPreview(
+            originalRecord: originalRecord,
+            modifications: [
+              FieldModification(
+                field: ModifyField.amount,
+                newValue: 35.0,
+                rawText: '35元',
+              ),
+            ],
+            previewRecord: previewRecord,
           ),
         );
         when(mockModifyService.processModifyRequest(
@@ -518,147 +553,5 @@ void main() {
       expect(coordinator.hasActiveSession, isFalse);
       expect(coordinator.commandHistory, isEmpty);
     });
-  });
-}
-
-// Helper classes for testing
-class DeleteResult {
-  final bool isSuccess;
-  final bool needsClarification;
-  final bool needsConfirmation;
-  final List<TransactionRecord>? deletedRecords;
-  final String? message;
-  final List<TransactionRecord>? candidates;
-  final String? prompt;
-
-  DeleteResult({
-    required this.isSuccess,
-    this.needsClarification = false,
-    this.needsConfirmation = false,
-    this.deletedRecords,
-    this.message,
-    this.candidates,
-    this.prompt,
-  });
-
-  factory DeleteResult.success({
-    List<TransactionRecord>? deletedRecords,
-    String? message,
-  }) {
-    return DeleteResult(
-      isSuccess: true,
-      deletedRecords: deletedRecords,
-      message: message,
-    );
-  }
-
-  factory DeleteResult.needsClarification({
-    List<TransactionRecord>? candidates,
-    String? prompt,
-  }) {
-    return DeleteResult(
-      isSuccess: false,
-      needsClarification: true,
-      candidates: candidates,
-      prompt: prompt,
-    );
-  }
-
-  factory DeleteResult.needsConfirmation({
-    List<TransactionRecord>? candidates,
-    String? prompt,
-  }) {
-    return DeleteResult(
-      isSuccess: false,
-      needsConfirmation: true,
-      candidates: candidates,
-      prompt: prompt,
-    );
-  }
-
-  String generateFeedbackText() {
-    if (isSuccess) return message ?? '删除成功';
-    if (needsClarification) return prompt ?? '请选择要删除的记录';
-    if (needsConfirmation) return prompt ?? '请确认删除';
-    return '删除失败';
-  }
-}
-
-class ModifyResult {
-  final bool isSuccess;
-  final bool needsClarification;
-  final bool needsConfirmation;
-  final ModificationPreview? preview;
-
-  ModifyResult({
-    required this.isSuccess,
-    this.needsClarification = false,
-    this.needsConfirmation = false,
-    this.preview,
-  });
-
-  factory ModifyResult.success([ModificationPreview? preview]) {
-    return ModifyResult(isSuccess: true, preview: preview);
-  }
-
-  factory ModifyResult.needsConfirmation(ModificationPreview preview) {
-    return ModifyResult(
-      isSuccess: false,
-      needsConfirmation: true,
-      preview: preview,
-    );
-  }
-
-  String generateFeedbackText() {
-    if (isSuccess) return '修改成功';
-    if (needsConfirmation) return preview?.generatePreviewText() ?? '请确认修改';
-    return '修改失败';
-  }
-}
-
-class ModificationPreview {
-  final TransactionRecord originalRecord;
-  final Map<String, dynamic> modifiedFields;
-
-  ModificationPreview({
-    required this.originalRecord,
-    required this.modifiedFields,
-  });
-
-  String generatePreviewText() {
-    return '将要修改: ${modifiedFields.keys.join(', ')}';
-  }
-}
-
-class NavigationResult {
-  final bool success;
-  final String? message;
-
-  NavigationResult({required this.success, this.message});
-}
-
-class TransactionRecord {
-  final String id;
-  final double amount;
-  final String? category;
-  final String? subCategory;
-  final String? merchant;
-  final String? description;
-  final DateTime date;
-  final String? account;
-  final List<String>? tags;
-  final String type;
-
-  TransactionRecord({
-    required this.id,
-    required this.amount,
-    this.category,
-    this.subCategory,
-    this.merchant,
-    this.description,
-    required this.date,
-    this.account,
-    this.tags,
-    required this.type,
   });
 }

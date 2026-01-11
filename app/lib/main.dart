@@ -12,6 +12,7 @@ import 'providers/onboarding_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/generated/app_localizations.dart' as gen;
 import 'core/logger.dart';
+import 'core/di/service_locator.dart';
 import 'services/cleanup_scheduler.dart';
 import 'services/app_config_service.dart';
 import 'services/http_service.dart';
@@ -46,6 +47,14 @@ void main() async {
 
   // Log app startup
   logger.info('Application started', tag: 'App');
+
+  // Initialize service locator (dependency injection)
+  try {
+    await initServiceLocator();
+    logger.info('Service locator initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize service locator: $e', tag: 'App');
+  }
 
   // Initialize app configuration from server
   try {

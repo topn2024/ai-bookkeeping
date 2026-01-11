@@ -37,6 +37,9 @@ dependencies:
   flutter_riverpod: ^2.5.1
   riverpod: ^2.5.1
 
+  # Dependency Injection
+  get_it: ^8.0.3
+
   # UI components
   cupertino_icons: ^1.0.8
   fl_chart: ^1.1.1

@@ -52,6 +52,15 @@ class MockTTSService extends _i1.Mock implements _i2.TTSService {
           as _i3.Stream<_i2.TTSSpeakingState>);
 
   @override
+  bool get isStreamingMode =>
+      (super.noSuchMethod(
+            Invocation.getter(#isStreamingMode),
+            returnValue: false,
+            returnValueForMissingStub: false,
+          )
+          as bool);
+
+  @override
   _i2.TTSSettings get currentSettings =>
       (super.noSuchMethod(
             Invocation.getter(#currentSettings),
@@ -76,9 +85,47 @@ class MockTTSService extends _i1.Mock implements _i2.TTSService {
           as _i3.Future<void>);
 
   @override
-  _i3.Future<void> speak(String? text, {bool? interrupt = true}) =>
+  _i3.Future<void> enableStreamingMode() =>
       (super.noSuchMethod(
-            Invocation.method(#speak, [text], {#interrupt: interrupt}),
+            Invocation.method(#enableStreamingMode, []),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
+
+  @override
+  void disableStreamingMode() => super.noSuchMethod(
+    Invocation.method(#disableStreamingMode, []),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  _i3.Future<void> speak(
+    String? text, {
+    bool? interrupt = true,
+    bool? forceStreaming,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #speak,
+              [text],
+              {#interrupt: interrupt, #forceStreaming: forceStreaming},
+            ),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
+
+  @override
+  void resetStreamingFailCount() => super.noSuchMethod(
+    Invocation.method(#resetStreamingFailCount, []),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  _i3.Future<void> speakStreaming(String? text, {bool? interrupt = true}) =>
+      (super.noSuchMethod(
+            Invocation.method(#speakStreaming, [text], {#interrupt: interrupt}),
             returnValue: _i3.Future<void>.value(),
             returnValueForMissingStub: _i3.Future<void>.value(),
           )
@@ -148,6 +195,17 @@ class MockTTSService extends _i1.Mock implements _i2.TTSService {
   _i3.Future<void> stop() =>
       (super.noSuchMethod(
             Invocation.method(#stop, []),
+            returnValue: _i3.Future<void>.value(),
+            returnValueForMissingStub: _i3.Future<void>.value(),
+          )
+          as _i3.Future<void>);
+
+  @override
+  _i3.Future<void> fadeOutAndStop({
+    Duration? duration = const Duration(milliseconds: 100),
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#fadeOutAndStop, [], {#duration: duration}),
             returnValue: _i3.Future<void>.value(),
             returnValueForMissingStub: _i3.Future<void>.value(),
           )

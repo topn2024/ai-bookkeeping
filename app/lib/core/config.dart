@@ -6,6 +6,7 @@
 
 import 'package:flutter/foundation.dart';
 import '../services/http_service.dart';
+import 'config/config.dart';
 
 /// Application configuration
 class AppConfig {
@@ -20,12 +21,8 @@ class AppConfig {
   bool _zhipuAvailable = false;
   bool _initialized = false;
 
-  /// Backend API URL (compile-time constant)
-  /// 默认使用生产服务器地址
-  String get apiBaseUrl => const String.fromEnvironment(
-        'API_BASE_URL',
-        defaultValue: 'https://160.202.238.29/api/v1',
-      );
+  /// Backend API URL - 使用集中化配置
+  String get apiBaseUrl => ApiEndpoints.apiBaseUrl;
 
   /// Get Qwen API Key (compile-time only for security)
   String get qwenApiKey {
