@@ -6,7 +6,6 @@ import 'package:permission_handler/permission_handler.dart';
 import '../pages/voice_chat_page.dart';
 import '../providers/global_voice_assistant_provider.dart';
 import '../services/global_voice_assistant_manager.dart';
-import '../theme/app_theme.dart';
 import 'waveform_animation.dart';
 
 /// 全局悬浮球组件
@@ -179,7 +178,8 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
   List<Color> _getBallColors(FloatingBallState state) {
     switch (state) {
       case FloatingBallState.idle:
-        return [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha:0.8)];
+        // 小狐狸橙色主题
+        return [const Color(0xFFFF8C00), const Color(0xFFFF6B00)];
       case FloatingBallState.recording:
         return [Colors.red, Colors.red.shade400];
       case FloatingBallState.processing:
@@ -197,7 +197,8 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
   Color _getShadowColor(FloatingBallState state) {
     switch (state) {
       case FloatingBallState.idle:
-        return AppTheme.primaryColor.withValues(alpha:0.4);
+        // 小狐狸橙色阴影
+        return const Color(0xFFFF8C00).withValues(alpha: 0.4);
       case FloatingBallState.recording:
         return Colors.red.withValues(alpha:0.5);
       case FloatingBallState.processing:
@@ -215,10 +216,9 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
   Widget _buildBallContent(FloatingBallState state) {
     switch (state) {
       case FloatingBallState.idle:
-        return const Icon(
-          Icons.mic,
-          color: Colors.white,
-          size: 24,
+        return const Text(
+          '🦊',
+          style: TextStyle(fontSize: 28),
         );
 
       case FloatingBallState.recording:
