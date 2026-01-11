@@ -44,7 +44,7 @@ class VaultOverviewPage extends ConsumerWidget {
                                 if (vaultState.hasUnallocated)
                                   _buildUnallocatedBanner(
                                       context, theme, vaultState),
-                                _buildVaultList(context, theme, vaultState),
+                                _buildVaultList(context, theme, vaultState, ref),
                                 const SizedBox(height: 20),
                               ],
                             ),
@@ -127,7 +127,7 @@ class VaultOverviewPage extends ConsumerWidget {
             ),
           ),
           GestureDetector(
-            onTap: () => _navigateToCreate(context),
+            onTap: () => _navigateToCreate(context, ref),
             child: Container(
               width: 40,
               height: 40,
@@ -287,7 +287,7 @@ class VaultOverviewPage extends ConsumerWidget {
 
   /// 小金库列表
   Widget _buildVaultList(
-      BuildContext context, ThemeData theme, BudgetVaultState state) {
+      BuildContext context, ThemeData theme, BudgetVaultState state, WidgetRef ref) {
     final vaults = state.vaults.where((v) => v.isEnabled).toList();
 
     if (vaults.isEmpty) {
@@ -315,7 +315,7 @@ class VaultOverviewPage extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () => _navigateToCreate(context),
+              onPressed: () => _navigateToCreate(context, ref),
               child: const Text('创建第一个小金库'),
             ),
           ],
@@ -543,7 +543,7 @@ class VaultOverviewPage extends ConsumerWidget {
     );
   }
 
-  Future<void> _navigateToCreate(BuildContext context) async {
+  Future<void> _navigateToCreate(BuildContext context, WidgetRef ref) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(

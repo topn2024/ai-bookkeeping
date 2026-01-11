@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
@@ -281,24 +282,8 @@ class _TrendAnalysisTab extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              // 图表占位
-              Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.show_chart, size: 48, color: theme.hintColor),
-                      const SizedBox(height: 8),
-                      Text('点击查看详细趋势', style: TextStyle(color: theme.hintColor)),
-                    ],
-                  ),
-                ),
-              ),
+              // 消费趋势图表
+              _buildMiniTrendChart(context, theme, transactions),
               const SizedBox(height: 12),
               Text(
                 '本月支出 ¥${monthlyExpense.toStringAsFixed(0)}',
@@ -1134,6 +1119,87 @@ class _CategoryItem extends StatelessWidget {
         ],
       ),
       onTap: onTap,
+    );
+  }
+
+  /// 构建迷你趋势图表
+  Widget _buildMiniTrendChart(BuildContext context, ThemeData theme, List<Transaction> transactions) {
+    // 计算每日支出
+    final expenseByDay = <String, double>{};
+    final range = _getDateRange();
+
+    for (final tx in transactions) {
+      if (tx.type == TransactionType.expense) {
+        final key = '${tx.date.year}-${tx.date.month}-${tx.date.day}';
+        expenseByDay[key] = (expenseByDay[key] ?? 0) + tx.amount;
+      }
+    }
+
+    if (expenseByDay.isEmpty) {
+      return Container(
+        height: 200,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.show_chart, size: 48, color: theme.hintColor),
+              const SizedBox(height: 8),
+              Text('暂无消费数据', style: TextStyle(color: theme.hintColor)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 按日期排序
+    final sortedEntries = expenseByDay.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    // 准备图表数据点
+    final spots = <FlSpot>[];
+    for (int i = 0; i < sortedEntries.length; i++) {
+      spots.add(FlSpot(i.toDouble(), sortedEntries[i].value));
+    }
+
+    // 计算最大值用于Y轴
+    final maxY = sortedEntries.map((e) => e.value).reduce((a, b) => a > b ? a : b);
+
+    return Container(
+      height: 200,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: LineChart(
+        LineChartData(
+          gridData: FlGridData(show: false),
+          titlesData: FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
+          minX: 0,
+          maxX: (spots.length - 1).toDouble(),
+          minY: 0,
+          maxY: maxY * 1.2,
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              color: theme.colorScheme.primary,
+              barWidth: 3,
+              isStrokeCapRound: true,
+              dotData: FlDotData(show: spots.length <= 7),
+              belowBarData: BarAreaData(
+                show: true,
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
