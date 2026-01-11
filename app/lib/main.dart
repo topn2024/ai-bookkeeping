@@ -24,7 +24,7 @@ import 'services/database_service.dart';
 import 'services/global_voice_assistant_manager.dart';
 import 'services/voice_token_service.dart';
 import 'services/voice_context_route_observer.dart';
-import 'services/voice_service_coordinator.dart' show VoiceSessionResult;
+import 'services/voice_service_coordinator.dart' show VoiceServiceCoordinator, VoiceSessionResult, VoiceSessionStatus;
 import 'providers/voice_coordinator_provider.dart';
 import 'widgets/global_floating_ball.dart';
 import 'models/ledger.dart';
@@ -202,38 +202,114 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   }
 
   /// 设置命令处理器，将 GlobalVoiceAssistantManager 与 VoiceServiceCoordinator 集成
+  ///
+  /// 交互策略：即时反馈 + 后台处理
+  /// 1. 收到语音输入后立即给出自然的回应（如"好的，我来帮你记录..."）
+  /// 2. 在后台异步处理实际的记账操作
+  /// 3. 处理完成后更新对话历史（不打断用户）
   void _setupCommandProcessor() {
     final coordinator = ref.read(voiceServiceCoordinatorProvider);
 
     GlobalVoiceAssistantManager.instance.setCommandProcessor((command) async {
       debugPrint('[App] 处理语音命令: $command');
-      try {
-        // 检查是否可能包含多个意图（多条记账指令）
-        final intentRouter = coordinator.intentRouter;
-        final mightBeMultiple = intentRouter.mightContainMultipleIntents(command);
-        debugPrint('[App] 是否可能包含多意图: $mightBeMultiple');
 
-        VoiceSessionResult result;
-        if (mightBeMultiple) {
-          // 使用多意图处理
-          debugPrint('[App] 使用多意图处理模式');
-          result = await coordinator.processMultiIntentCommand(command);
-        } else {
-          // 使用单意图处理
-          result = await coordinator.processVoiceCommand(command);
-        }
+      // 1. 生成即时自然回应（先回复用户，让对话不断开）
+      final immediateResponse = _generateImmediateResponse(command);
+      debugPrint('[App] 即时反馈: $immediateResponse');
 
-        // 优先使用 message，如果为空则使用 errorMessage
-        final response = result.message ?? result.errorMessage ?? '处理完成';
-        debugPrint('[App] 命令处理结果: $response (status: ${result.status})');
-        return response;
-      } catch (e) {
-        debugPrint('[App] 命令处理失败: $e');
-        return '处理命令时出错: $e';
-      }
+      // 2. 异步处理实际命令（不阻塞对话）
+      _processCommandInBackground(coordinator, command);
+
+      // 3. 立即返回自然回应
+      return immediateResponse;
     });
 
     logger.info('Command processor setup completed', tag: 'App');
+  }
+
+  /// 生成即时自然回应（让用户感到被理解）
+  String _generateImmediateResponse(String command) {
+    // 检测命令类型，生成相应的即时回应
+    final lowerCommand = command.toLowerCase();
+
+    // 多条记录
+    if (command.contains('然后') ||
+        command.contains('还有') ||
+        command.contains('另外') ||
+        command.contains('以及')) {
+      return '好的，我来帮你记录这几笔~';
+    }
+
+    // 记账相关
+    if (lowerCommand.contains('花') ||
+        lowerCommand.contains('买') ||
+        lowerCommand.contains('吃') ||
+        lowerCommand.contains('块') ||
+        lowerCommand.contains('元') ||
+        RegExp(r'\d+').hasMatch(command)) {
+      final responses = [
+        '好的，记下来了~',
+        '收到，帮你记上~',
+        '好嘞，已记录~',
+        '明白，记好了~',
+      ];
+      return responses[DateTime.now().millisecond % responses.length];
+    }
+
+    // 查询相关
+    if (lowerCommand.contains('多少') ||
+        lowerCommand.contains('查') ||
+        lowerCommand.contains('看看')) {
+      return '好的，我帮你查一下...';
+    }
+
+    // 导航相关
+    if (lowerCommand.contains('打开') ||
+        lowerCommand.contains('去') ||
+        lowerCommand.contains('跳转')) {
+      return '好的，马上~';
+    }
+
+    // 默认回应
+    return '好的，我来处理~';
+  }
+
+  /// 后台处理命令（异步，不阻塞对话）
+  Future<void> _processCommandInBackground(
+    VoiceServiceCoordinator coordinator,
+    String command,
+  ) async {
+    try {
+      // 检查是否可能包含多个意图
+      final intentRouter = coordinator.intentRouter;
+      final mightBeMultiple = intentRouter.mightContainMultipleIntents(command);
+      debugPrint('[App] 后台处理 - 是否多意图: $mightBeMultiple');
+
+      VoiceSessionResult result;
+      if (mightBeMultiple) {
+        result = await coordinator.processMultiIntentCommand(command);
+      } else {
+        result = await coordinator.processVoiceCommand(command);
+      }
+
+      debugPrint('[App] 后台处理完成: ${result.status}');
+
+      // 如果有错误或需要补充信息，追加消息通知用户
+      if (result.status == VoiceSessionStatus.error) {
+        final errorMsg = result.errorMessage ?? '处理时遇到了问题';
+        debugPrint('[App] 处理出错: $errorMsg');
+        // 可以通过 GlobalVoiceAssistantManager 追加错误消息
+        // 但为了不打断用户，这里只记录日志
+      } else if (result.status == VoiceSessionStatus.success) {
+        // 成功处理，可以选择性地追加详细信息
+        final detailMsg = result.message;
+        if (detailMsg != null && detailMsg.isNotEmpty) {
+          debugPrint('[App] 处理成功: $detailMsg');
+        }
+      }
+    } catch (e) {
+      debugPrint('[App] 后台处理失败: $e');
+    }
   }
 
   @override

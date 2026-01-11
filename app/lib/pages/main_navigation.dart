@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../widgets/glass_components.dart';
 import '../services/app_upgrade_service.dart';
 import '../services/secure_storage_service.dart';
+import '../services/global_voice_assistant_manager.dart';
+import '../providers/global_voice_assistant_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_update_dialog.dart';
 import '../l10n/l10n.dart';
@@ -27,9 +31,21 @@ class MainNavigation extends ConsumerStatefulWidget {
   ConsumerState<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends ConsumerState<MainNavigation> {
+class _MainNavigationState extends ConsumerState<MainNavigation>
+    with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   bool _hasCheckedUpdate = false;
+  bool _isRecording = false;
+  bool _hasPermission = false;
+  late AnimationController _pulseController;
+  OverlayEntry? _recordingOverlay;
+
+  // 录音自动停止配置
+  static const int _maxRecordingSeconds = 15;  // 最大录音时长
+  Timer? _recordingTimer;
+  Timer? _countdownTimer;
+  int _remainingSeconds = _maxRecordingSeconds;
+  VoidCallback? _voiceStateListener;
 
   // 页面列表（不包含中间的+按钮）
   late final List<Widget> _pages;
@@ -37,6 +53,10 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
     _pages = [
       const HomePage(),
       const AnalysisCenterPage(),
@@ -46,7 +66,25 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowUpdate();
       _initializeLedgerContext();
+      _checkMicrophonePermission();
     });
+  }
+
+  /// 检查麦克风权限
+  Future<void> _checkMicrophonePermission() async {
+    final status = await Permission.microphone.status;
+    setState(() {
+      _hasPermission = status.isGranted;
+    });
+  }
+
+  /// 请求麦克风权限
+  Future<bool> _requestMicrophonePermission() async {
+    final status = await Permission.microphone.request();
+    setState(() {
+      _hasPermission = status.isGranted;
+    });
+    return status.isGranted;
   }
 
   /// 返回首页
@@ -70,6 +108,27 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
     } catch (e) {
       debugPrint('Failed to initialize ledger context in MainNavigation: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    _recordingTimer?.cancel();
+    _countdownTimer?.cancel();
+    _removeRecordingOverlay();
+
+    // 移除语音状态监听器
+    if (_voiceStateListener != null) {
+      try {
+        final voiceManager = ref.read(globalVoiceAssistantProvider);
+        voiceManager.removeListener(_voiceStateListener!);
+      } catch (_) {
+        // 忽略清理错误
+      }
+      _voiceStateListener = null;
+    }
+
+    super.dispose();
   }
 
   Future<void> _checkAndShowUpdate() async {
@@ -110,7 +169,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
 
   /// 中间的+按钮
   /// 单击：手动记账
-  /// 长按：语音记账（底部浮层）
+  /// 长按：直接开始语音录音
   Widget _buildCenterButton(BuildContext context) {
     return Transform.translate(
       offset: const Offset(0, 8),  // 向下偏移
@@ -122,49 +181,216 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
             MaterialPageRoute(builder: (_) => const AddTransactionPage()),
           );
         },
-        onLongPress: () {
-          // 长按显示底部语音录入浮层
-          _showVoiceRecordingSheet(context);
+        onLongPressStart: (_) {
+          // 长按直接开始录音
+          _startRecording();
         },
-        child: Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppTheme.primaryColor,
-                AppTheme.primaryColor.withValues(alpha: 0.85),
-              ],
-            ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primaryColor.withValues(alpha: 0.4),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
+        onLongPressEnd: (_) {
+          // 松开结束录音
+          _stopRecording();
+        },
+        onLongPressCancel: () {
+          // 取消录音
+          _stopRecording();
+        },
+        child: AnimatedBuilder(
+          animation: _pulseController,
+          builder: (context, child) {
+            final isRecording = _isRecording;
+            return Container(
+              width: isRecording ? 72 : 64,
+              height: isRecording ? 72 : 64,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isRecording
+                      ? [AppTheme.expenseColor, AppTheme.expenseColor.withValues(alpha: 0.85)]
+                      : [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.85)],
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: (isRecording ? AppTheme.expenseColor : AppTheme.primaryColor)
+                        .withValues(alpha: 0.4),
+                    blurRadius: isRecording ? 24 : 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: const Icon(
-            Icons.add,
-            color: Colors.white,
-            size: 32,
-          ),
+              child: Icon(
+                isRecording ? Icons.mic : Icons.add,
+                color: Colors.white,
+                size: isRecording ? 36 : 32,
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  /// 显示语音录入底部浮层
-  void _showVoiceRecordingSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => const VoiceRecordingSheet(),
+  /// 开始录音
+  Future<void> _startRecording() async {
+    // 检查权限
+    if (!_hasPermission) {
+      final granted = await _requestMicrophonePermission();
+      if (!granted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('需要麦克风权限才能使用语音功能'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    setState(() {
+      _isRecording = true;
+      _remainingSeconds = _maxRecordingSeconds;
+    });
+    _pulseController.repeat();
+    _showRecordingOverlay();
+
+    // 启动倒计时
+    _startCountdown();
+
+    // 启动自动停止计时器
+    _recordingTimer = Timer(
+      Duration(seconds: _maxRecordingSeconds),
+      () {
+        if (_isRecording) {
+          _stopRecording(reason: '已达到最大录音时长');
+        }
+      },
     );
+
+    // 使用 GlobalVoiceAssistantManager 开始录音
+    try {
+      final voiceManager = ref.read(globalVoiceAssistantProvider);
+
+      // 监听状态变化
+      _voiceStateListener = () {
+        if (!_isRecording) return;
+
+        final state = voiceManager.ballState;
+        if (state == FloatingBallState.processing) {
+          // 录音结束，正在处理
+          _removeRecordingOverlay();
+        } else if (state == FloatingBallState.success || state == FloatingBallState.error) {
+          // 处理完成
+          setState(() => _isRecording = false);
+          _pulseController.stop();
+          _pulseController.reset();
+        }
+      };
+      voiceManager.addListener(_voiceStateListener!);
+
+      await voiceManager.startRecording();
+    } catch (e) {
+      debugPrint('启动语音识别失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('语音服务启动失败: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      _stopRecording();
+    }
+  }
+
+  /// 启动倒计时
+  void _startCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!_isRecording) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _remainingSeconds--;
+      });
+      _updateOverlay();
+
+      // 最后3秒提示
+      if (_remainingSeconds <= 3 && _remainingSeconds > 0) {
+        // 可以添加震动反馈
+      }
+    });
+  }
+
+  /// 停止录音
+  Future<void> _stopRecording({String? reason}) async {
+    if (!_isRecording) return;
+
+    // 取消计时器
+    _recordingTimer?.cancel();
+    _countdownTimer?.cancel();
+
+    setState(() {
+      _isRecording = false;
+    });
+    _pulseController.stop();
+    _pulseController.reset();
+    _removeRecordingOverlay();
+
+    // 移除状态监听器并停止语音识别
+    try {
+      final voiceManager = ref.read(globalVoiceAssistantProvider);
+
+      // 移除监听器
+      if (_voiceStateListener != null) {
+        voiceManager.removeListener(_voiceStateListener!);
+        _voiceStateListener = null;
+      }
+
+      await voiceManager.stopRecording();
+    } catch (e) {
+      debugPrint('停止语音识别失败: $e');
+    }
+
+    // 显示提示（如果有特定原因）
+    if (mounted && reason != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(reason),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+    // 处理结果会通过 GlobalVoiceAssistantManager 的状态更新和TTS播报反馈给用户
+  }
+
+  /// 更新浮层显示
+  void _updateOverlay() {
+    _recordingOverlay?.markNeedsBuild();
+  }
+
+  /// 显示录音状态浮层
+  void _showRecordingOverlay() {
+    _removeRecordingOverlay();
+
+    _recordingOverlay = OverlayEntry(
+      builder: (context) => _RecordingOverlay(
+        animation: _pulseController,
+        remainingSeconds: _remainingSeconds,
+        maxSeconds: _maxRecordingSeconds,
+        errorMessage: null,
+      ),
+    );
+
+    Overlay.of(context).insert(_recordingOverlay!);
+  }
+
+  /// 移除录音状态浮层
+  void _removeRecordingOverlay() {
+    _recordingOverlay?.remove();
+    _recordingOverlay = null;
   }
 
   /// 底部导航栏
@@ -209,186 +435,215 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   }
 }
 
-/// 语音录入底部浮层
-class VoiceRecordingSheet extends StatefulWidget {
-  const VoiceRecordingSheet({super.key});
+/// 录音状态浮层（长按+号时显示）
+class _RecordingOverlay extends StatelessWidget {
+  final Animation<double> animation;
+  final int remainingSeconds;
+  final int maxSeconds;
+  final String? errorMessage;
 
-  @override
-  State<VoiceRecordingSheet> createState() => _VoiceRecordingSheetState();
-}
-
-class _VoiceRecordingSheetState extends State<VoiceRecordingSheet>
-    with SingleTickerProviderStateMixin {
-  bool _isRecording = false;
-  late AnimationController _pulseController;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  void _toggleRecording() {
-    setState(() {
-      _isRecording = !_isRecording;
-      if (_isRecording) {
-        _pulseController.repeat();
-      } else {
-        _pulseController.stop();
-        _pulseController.reset();
-        // 模拟器提示
-        _showSimulatorHint();
-      }
-    });
-  }
-
-  void _showSimulatorHint() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('语音识别需要真机环境'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
+  const _RecordingOverlay({
+    required this.animation,
+    required this.remainingSeconds,
+    required this.maxSeconds,
+    this.errorMessage,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-      child: SafeArea(
+    final isWarning = remainingSeconds <= 3;
+    final progress = remainingSeconds / maxSeconds;
+
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.5),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // 拖动条
+            // 倒计时显示
             Container(
-              width: 40,
-              height: 4,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+                color: isWarning
+                    ? Colors.orange.withValues(alpha: 0.2)
+                    : Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.timer_outlined,
+                    size: 18,
+                    color: isWarning ? Colors.orange : Colors.white70,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${remainingSeconds}s',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isWarning ? Colors.orange : Colors.white,
+                    ),
+                  ),
+                ],
               ),
             ),
+
             const SizedBox(height: 24),
 
-            // 标题
+            // 波浪动画
+            AnimatedBuilder(
+              animation: animation,
+              builder: (context, child) {
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // 外层波浪
+                    Container(
+                      width: 140 + (animation.value * 40),
+                      height: 140 + (animation.value * 40),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: (isWarning ? Colors.orange : AppTheme.expenseColor)
+                            .withValues(alpha: 0.1 * (1 - animation.value)),
+                      ),
+                    ),
+                    // 中层波浪
+                    Container(
+                      width: 120 + (animation.value * 25),
+                      height: 120 + (animation.value * 25),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: (isWarning ? Colors.orange : AppTheme.expenseColor)
+                            .withValues(alpha: 0.15 * (1 - animation.value)),
+                      ),
+                    ),
+                    // 内层波浪
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: (isWarning ? Colors.orange : AppTheme.expenseColor)
+                            .withValues(alpha: 0.1),
+                      ),
+                    ),
+                    // 进度环
+                    SizedBox(
+                      width: 96,
+                      height: 96,
+                      child: CircularProgressIndicator(
+                        value: progress,
+                        strokeWidth: 3,
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isWarning ? Colors.orange : Colors.white,
+                        ),
+                      ),
+                    ),
+                    // 麦克风图标
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: isWarning
+                              ? [Colors.orange, Colors.orange.withValues(alpha: 0.85)]
+                              : [AppTheme.expenseColor, AppTheme.expenseColor.withValues(alpha: 0.85)],
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isWarning ? Colors.orange : AppTheme.expenseColor)
+                                .withValues(alpha: 0.4),
+                            blurRadius: 24,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.mic,
+                        color: Colors.white,
+                        size: 40,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+
+            const SizedBox(height: 32),
+
+            // 提示文字
             Text(
-              _isRecording ? '正在聆听...' : '按住说话',
+              isWarning ? '即将自动停止...' : '正在聆听...',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: _isRecording ? AppTheme.expenseColor : AppTheme.textPrimaryColor,
+                color: isWarning ? Colors.orange : Colors.white,
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              _isRecording ? '松开结束录音' : '长按麦克风开始语音记账',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppTheme.textSecondaryColor,
-              ),
-            ),
-            const SizedBox(height: 32),
 
-            // 语音按钮
-            GestureDetector(
-              onTapDown: (_) => _toggleRecording(),
-              onTapUp: (_) {
-                if (_isRecording) _toggleRecording();
-              },
-              onTapCancel: () {
-                if (_isRecording) _toggleRecording();
-              },
-              child: AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) {
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // 波浪效果
-                      if (_isRecording) ...[
-                        Container(
-                          width: 120 + (_pulseController.value * 30),
-                          height: 120 + (_pulseController.value * 30),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppTheme.expenseColor.withValues(
-                              alpha: 0.1 * (1 - _pulseController.value),
-                            ),
-                          ),
-                        ),
-                        Container(
-                          width: 100 + (_pulseController.value * 15),
-                          height: 100 + (_pulseController.value * 15),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppTheme.expenseColor.withValues(
-                              alpha: 0.15 * (1 - _pulseController.value),
-                            ),
-                          ),
-                        ),
-                      ],
-                      // 主按钮
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: _isRecording
-                                ? [AppTheme.expenseColor, AppTheme.expenseColor.withValues(alpha: 0.85)]
-                                : [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.85)],
-                          ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: (_isRecording ? AppTheme.expenseColor : AppTheme.primaryColor)
-                                  .withValues(alpha: 0.35),
-                              blurRadius: 20,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          _isRecording ? Icons.mic : Icons.mic_none,
-                          color: Colors.white,
-                          size: 40,
-                        ),
-                      ),
-                    ],
-                  );
-                },
+            // 错误提示或正常提示
+            if (errorMessage != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.warning_amber, size: 16, color: Colors.orange),
+                    const SizedBox(width: 6),
+                    Text(
+                      errorMessage!,
+                      style: const TextStyle(fontSize: 13, color: Colors.orange),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Text(
+                '松开结束录音',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
               ),
-            ),
+
             const SizedBox(height: 24),
 
-            // 提示文字
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.lightbulb_outline, size: 16, color: AppTheme.textSecondaryColor),
-                const SizedBox(width: 4),
-                Text(
-                  '试试说"午餐花了35元"',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.textSecondaryColor,
+            // 示例提示
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline,
+                    size: 16,
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Text(
+                    '试试说"午餐花了35元"',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
