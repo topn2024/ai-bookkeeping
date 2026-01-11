@@ -543,13 +543,18 @@ class VaultOverviewPage extends ConsumerWidget {
     );
   }
 
-  void _navigateToCreate(BuildContext context) {
-    Navigator.push(
+  Future<void> _navigateToCreate(BuildContext context) async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => const VaultCreatePage(),
       ),
     );
+
+    // Force refresh if vault was created successfully
+    if (result == true) {
+      await ref.read(budgetVaultProvider.notifier).refresh();
+    }
   }
 
   void _showDepositDialog(BuildContext context, WidgetRef ref) {
