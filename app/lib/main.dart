@@ -28,6 +28,7 @@ import 'services/voice_service_coordinator.dart' show VoiceServiceCoordinator, V
 import 'providers/voice_coordinator_provider.dart';
 import 'widgets/global_floating_ball.dart';
 import 'models/ledger.dart';
+import 'services/voice_navigation_executor.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -280,6 +281,13 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     String command,
   ) async {
     try {
+      // 先检查是否是导航命令
+      if (_isNavigationCommand(command)) {
+        final navResult = await VoiceNavigationExecutor.instance.executeNavigation(command);
+        debugPrint('[App] 导航执行结果: $navResult');
+        return;
+      }
+
       // 检查是否可能包含多个意图
       final intentRouter = coordinator.intentRouter;
       final mightBeMultiple = intentRouter.mightContainMultipleIntents(command);
@@ -310,6 +318,17 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('[App] 后台处理失败: $e');
     }
+  }
+
+  /// 检查是否是导航命令
+  bool _isNavigationCommand(String command) {
+    final navigationKeywords = ['打开', '去', '跳转', '进入', '查看', '看看'];
+    final targetKeywords = ['设置', '首页', '主页', '预算', '报表', '统计', '储蓄', '钱龄', '分析'];
+
+    final hasNavigationKeyword = navigationKeywords.any((k) => command.contains(k));
+    final hasTargetKeyword = targetKeywords.any((k) => command.contains(k));
+
+    return hasNavigationKeyword && hasTargetKeyword;
   }
 
   @override
@@ -369,6 +388,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     return MaterialApp(
       title: l10n.appName,
       debugShowCheckedModeBanner: false,
+      navigatorKey: VoiceNavigationExecutor.instance.navigatorKey,
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: themeNotifier.themeMode,

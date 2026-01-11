@@ -6,6 +6,7 @@ import '../widgets/glass_components.dart';
 import '../services/app_upgrade_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/global_voice_assistant_manager.dart';
+import '../services/voice_navigation_executor.dart';
 import '../providers/global_voice_assistant_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_update_dialog.dart';
@@ -67,6 +68,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
       _checkAndShowUpdate();
       _initializeLedgerContext();
       _checkMicrophonePermission();
+      _setupVoiceNavigationExecutor();
     });
   }
 
@@ -90,6 +92,30 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
   /// 返回首页
   void _goToHome() {
     setState(() => _currentIndex = 0);
+  }
+
+  /// 设置语音导航执行器
+  void _setupVoiceNavigationExecutor() {
+    // 设置标签切换器，允许语音导航切换底部标签
+    VoiceNavigationExecutor.instance.setTabSwitcher((index) {
+      if (mounted) {
+        setState(() {
+          // 将语音导航索引映射到底部导航索引
+          // 语音导航: 0=首页, 1=报表, 2=预算, 3=储蓄, 4=钱龄
+          // 底部导航: 0=首页, 1=分析, 2=小记, 3=我的
+          switch (index) {
+            case 0: // 首页
+              _currentIndex = 0;
+              break;
+            case 1: // 报表/分析
+              _currentIndex = 1;
+              break;
+            default:
+              _currentIndex = 0;
+          }
+        });
+      }
+    });
   }
 
   /// 初始化账本上下文
@@ -116,6 +142,9 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
     _recordingTimer?.cancel();
     _countdownTimer?.cancel();
     _removeRecordingOverlay();
+
+    // 清理语音导航执行器
+    VoiceNavigationExecutor.instance.setTabSwitcher(null);
 
     // 移除语音状态监听器
     if (_voiceStateListener != null) {

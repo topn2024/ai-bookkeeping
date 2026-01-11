@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import '../pages/settings/settings_page.dart';
-import '../pages/reports/reports_page.dart';
-import '../pages/budget/budget_page.dart';
-import '../pages/savings_goal/savings_goal_page.dart';
-import '../pages/money_age/money_age_page.dart';
-import '../pages/main_navigation.dart';
+import '../pages/settings_page.dart';
+import '../pages/analysis_center_page.dart';
+import '../pages/budget_center_page.dart';
+import '../pages/savings_goal_page.dart';
+import '../pages/money_age_page.dart';
 import 'voice_navigation_service.dart';
 
 /// 语音导航执行器
@@ -23,16 +22,8 @@ class VoiceNavigationExecutor {
   /// 导航服务
   final VoiceNavigationService _navigationService = VoiceNavigationService();
 
-  /// 当前上下文（用于底部导航切换等场景）
-  BuildContext? _currentContext;
-
   /// MainNavigation 状态回调（用于切换底部导航标签）
   void Function(int index)? _tabSwitcher;
-
-  /// 设置当前上下文
-  void setContext(BuildContext context) {
-    _currentContext = context;
-  }
 
   /// 设置标签切换器
   void setTabSwitcher(void Function(int index)? switcher) {
@@ -130,12 +121,13 @@ class VoiceNavigationExecutor {
       '/settings': () => const SettingsPage(),
       '/settings/general': () => const SettingsPage(),
 
-      // 统计报表
-      '/reports': () => const ReportsPage(),
-      '/statistics': () => const ReportsPage(),
+      // 统计报表/分析
+      '/reports': () => const AnalysisCenterPage(),
+      '/statistics': () => const AnalysisCenterPage(),
+      '/analysis': () => const AnalysisCenterPage(),
 
       // 预算
-      '/budget': () => const BudgetPage(),
+      '/budget': () => const BudgetCenterPage(),
 
       // 储蓄目标
       '/savings': () => const SavingsGoalPage(),
