@@ -794,38 +794,12 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     _pulseController.stop();
     _pulseController.reset();
 
-    // 模拟语音处理
-    _simulateVoiceProcessing(coordinator);
-  }
-
-  // 模拟语音处理（在实际应用中这里应该连接真实的语音识别）
-  Future<void> _simulateVoiceProcessing(VoiceServiceCoordinator coordinator) async {
-    const testCommands = [
-      '删除昨天的午餐',
-      '把咖啡的金额改成25元',
-      '查看本月的支出',
-      '添加一笔打车费用30元',
-      '打开设置页面',
-    ];
-
-    final randomCommand = testCommands[DateTime.now().microsecond % testCommands.length];
-
+    // 在模拟器上提示用户使用文字输入
     _addMessage(ChatMessage(
-      type: MessageType.user,
-      content: randomCommand,
+      type: MessageType.assistant,
+      content: '语音识别需要真机环境。\n\n请在下方输入框中输入您的指令，例如：\n• 删除昨天的午餐\n• 把咖啡改成25元\n• 查看本月支出',
       timestamp: DateTime.now(),
     ));
-
-    // 延迟处理以模拟真实的语音识别过程
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    await coordinator.processVoiceCommand(randomCommand);
-
-    // 获取语音服务的处理结果并添加到聊天
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // Note: VoiceServiceCoordinator handles feedback internally through VoiceFeedbackSystem
-    // The coordinator will manage session state and navigation automatically
   }
 
   void _addMessage(ChatMessage message) {

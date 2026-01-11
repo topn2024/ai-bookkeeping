@@ -511,8 +511,16 @@ class _VoiceMoneyAgePageState extends ConsumerState<VoiceMoneyAgePage> {
     });
 
     if (!_isRecording) {
-      // 模拟语音识别结果
-      _sendMessage('如何提升钱龄？');
+      // 在模拟器上提示用户使用文字输入
+      setState(() {
+        _messages.add(MoneyAgeChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          type: MoneyAgeChatType.assistant,
+          content: '语音识别需要真机环境。\n\n请在下方输入框中输入您的问题，例如：\n• 如何提升钱龄？\n• 我的钱龄是多少？',
+          timestamp: DateTime.now(),
+        ));
+      });
+      _scrollToBottom();
     }
   }
 
