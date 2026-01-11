@@ -2,8 +2,9 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite/sqflite.dart';
-import 'http_service.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
+import '../core/contracts/i_http_service.dart';
 
 /// Backup metadata
 class BackupInfo {
@@ -129,8 +130,10 @@ class RestoreResult {
 /// Cloud backup service
 class BackupService {
   static final BackupService _instance = BackupService._internal();
-  final HttpService _http = HttpService();
-  final DatabaseService _db = DatabaseService();
+
+  /// 通过服务定位器获取依赖
+  IHttpService get _http => sl<IHttpService>();
+  IDatabaseService get _db => sl<IDatabaseService>();
 
   factory BackupService() => _instance;
 

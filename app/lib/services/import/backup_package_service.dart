@@ -4,7 +4,8 @@ import 'package:archive/archive_io.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 
-import '../database_service.dart';
+import '../../core/di/service_locator.dart';
+import '../../core/contracts/i_database_service.dart';
 import '../gamification_service.dart';
 import 'import_learning_service.dart';
 
@@ -12,17 +13,17 @@ import 'import_learning_service.dart';
 /// 设计文档第11章：批量导入导出 - 备份包格式
 /// 支持完整数据打包导出和导入，包含交易、学习数据、习惯、位置等
 class BackupPackageService {
-  final DatabaseService _db;
+  final IDatabaseService _db;
   final GamificationService _gamification;
   final ImportLearningService _learning;
 
   BackupPackageService({
-    DatabaseService? databaseService,
+    IDatabaseService? databaseService,
     GamificationService? gamificationService,
     ImportLearningService? learningService,
-  })  : _db = databaseService ?? DatabaseService(),
-        _gamification = gamificationService ?? GamificationService(databaseService ?? DatabaseService()),
-        _learning = learningService ?? ImportLearningService(databaseService: databaseService ?? DatabaseService());
+  })  : _db = databaseService ?? sl<IDatabaseService>(),
+        _gamification = gamificationService ?? GamificationService(databaseService ?? sl<IDatabaseService>()),
+        _learning = learningService ?? ImportLearningService(databaseService: databaseService ?? sl<IDatabaseService>());
 
   /// 创建完整备份包
   /// 返回备份包文件路径

@@ -1,16 +1,17 @@
+import '../../core/di/service_locator.dart';
+import '../../core/contracts/i_database_service.dart';
 import '../money_age_rebuild_service.dart';
-import '../database_service.dart';
 import 'batch_import_service.dart';
 
 /// Service to trigger money age recalculation after import (第11章导入后钱龄自动重算)
 class ImportMoneyAgeIntegration {
-  final DatabaseService _databaseService;
+  final IDatabaseService _databaseService;
   final MoneyAgeRebuildService _moneyAgeRebuildService;
 
   ImportMoneyAgeIntegration({
-    DatabaseService? databaseService,
+    IDatabaseService? databaseService,
     MoneyAgeRebuildService? moneyAgeRebuildService,
-  })  : _databaseService = databaseService ?? DatabaseService(),
+  })  : _databaseService = databaseService ?? sl<IDatabaseService>(),
         _moneyAgeRebuildService = moneyAgeRebuildService ?? MoneyAgeRebuildService();
 
   /// Execute import with automatic money age recalculation

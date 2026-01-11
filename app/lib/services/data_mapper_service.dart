@@ -8,12 +8,15 @@ import '../models/category.dart';
 import '../models/ledger.dart';
 import '../models/budget.dart';
 import '../utils/date_utils.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 
 /// Data mapping service for converting between local and server data formats
 class DataMapperService {
   static final DataMapperService _instance = DataMapperService._internal();
-  final DatabaseService _db = DatabaseService();
+
+  /// 通过服务定位器获取数据库服务
+  IDatabaseService get _db => sl<IDatabaseService>();
 
   factory DataMapperService() => _instance;
   DataMapperService._internal();

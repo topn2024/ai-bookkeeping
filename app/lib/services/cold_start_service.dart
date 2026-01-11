@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../models/transaction.dart';
 
 /// 冷启动服务
@@ -7,7 +8,7 @@ import '../models/transaction.dart';
 /// 处理第一次使用app时的配置问题
 /// 核心原则：先用起来，再配置
 class ColdStartService {
-  final DatabaseService _db;
+  final IDatabaseService _db;
 
   ColdStartService(this._db);
 
@@ -256,8 +257,7 @@ class ColdStartState {
 
 /// Provider
 final coldStartServiceProvider = Provider<ColdStartService>((ref) {
-  final db = DatabaseService();
-  return ColdStartService(db);
+  return ColdStartService(sl<IDatabaseService>());
 });
 
 /// 冷启动状态Provider

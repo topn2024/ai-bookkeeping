@@ -2,9 +2,10 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/sync.dart' as sync_models;
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
+import '../core/contracts/i_http_service.dart';
 import 'server_sync_service.dart';
-import 'http_service.dart';
-import 'database_service.dart';
 
 /// 自动同步服务
 ///
@@ -18,8 +19,10 @@ class AutoSyncService {
   AutoSyncService._internal();
 
   final ServerSyncService _serverSync = ServerSyncService();
-  final HttpService _http = HttpService();
-  final DatabaseService _db = DatabaseService();
+
+  /// 通过服务定位器获取依赖
+  IHttpService get _http => sl<IHttpService>();
+  IDatabaseService get _db => sl<IDatabaseService>();
 
   // 同步状态
   bool _isInitialized = false;

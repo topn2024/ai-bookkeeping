@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 
 /// 离线洞察预生成服务
 ///
@@ -13,7 +14,8 @@ class OfflineInsightService {
   factory OfflineInsightService() => _instance;
   OfflineInsightService._internal();
 
-  final DatabaseService _db = DatabaseService();
+  /// 通过服务定位器获取数据库服务
+  IDatabaseService get _db => sl<IDatabaseService>();
   Timer? _generateTimer;
   bool _isGenerating = false;
 

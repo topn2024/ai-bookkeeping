@@ -2,7 +2,8 @@ import 'package:sqflite/sqflite.dart' hide Transaction;
 
 import '../models/resource_pool.dart';
 import '../models/transaction.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import 'money_age_calculator.dart';
 import '../core/logger.dart';
 
@@ -103,7 +104,7 @@ class DirtyPoolMarker {
 /// - 支出交易消耗资源池
 /// - 修改/删除交易需要重新计算受影响的资源池
 class ResourcePoolManager {
-  final DatabaseService _db;
+  final IDatabaseService _db;
   final MoneyAgeCalculator _calculator;
   final Logger _logger = Logger();
 
@@ -120,9 +121,9 @@ class ResourcePoolManager {
   bool _needsFullRebuild = false;
 
   ResourcePoolManager({
-    DatabaseService? database,
+    IDatabaseService? database,
     MoneyAgeCalculator? calculator,
-  })  : _db = database ?? DatabaseService(),
+  })  : _db = database ?? sl<IDatabaseService>(),
         _calculator = calculator ?? MoneyAgeCalculator();
 
   /// 获取计算器实例

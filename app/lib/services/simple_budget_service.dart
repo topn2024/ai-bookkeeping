@@ -1,7 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/widgets.dart' show IconData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../models/transaction.dart';
 import '../models/budget.dart' as model;
 
@@ -9,7 +10,7 @@ import '../models/budget.dart' as model;
 ///
 /// 核心原则：智能默认，无需配置
 class SimpleBudgetService {
-  final DatabaseService _db;
+  final IDatabaseService _db;
 
   SimpleBudgetService(this._db);
 
@@ -228,6 +229,5 @@ class SimpleBudgetStatus {
 
 /// Provider
 final simpleBudgetServiceProvider = Provider<SimpleBudgetService>((ref) {
-  final db = DatabaseService();
-  return SimpleBudgetService(db);
+  return SimpleBudgetService(sl<IDatabaseService>());
 });

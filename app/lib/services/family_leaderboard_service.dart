@@ -1,7 +1,8 @@
 import '../models/family_leaderboard.dart';
 import '../models/member.dart';
 import '../models/transaction.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 
 /// 家庭排行榜服务
 class FamilyLeaderboardService {
@@ -9,6 +10,9 @@ class FamilyLeaderboardService {
       FamilyLeaderboardService._internal();
   factory FamilyLeaderboardService() => _instance;
   FamilyLeaderboardService._internal();
+
+  /// 通过服务定位器获取数据库服务
+  IDatabaseService get _db => sl<IDatabaseService>();
 
   // 排行榜缓存
   final Map<String, FamilyLeaderboard> _leaderboardCache = {};
@@ -95,7 +99,7 @@ class FamilyLeaderboardService {
     required LeaderboardPeriod period,
   }) async {
     try {
-      final db = await DatabaseService().database;
+      final db = await _db.database;
 
       // 计算时间范围
       final now = DateTime.now();

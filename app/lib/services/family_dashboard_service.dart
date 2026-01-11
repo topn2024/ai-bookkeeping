@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/family_dashboard.dart';
 import '../models/member.dart';
 import '../models/transaction.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 
 /// 家庭看板服务
 class FamilyDashboardService {
@@ -10,6 +11,9 @@ class FamilyDashboardService {
       FamilyDashboardService._internal();
   factory FamilyDashboardService() => _instance;
   FamilyDashboardService._internal();
+
+  /// 通过服务定位器获取数据库服务
+  IDatabaseService get _db => sl<IDatabaseService>();
 
   /// 获取家庭看板数据
   Future<FamilyDashboardData> getDashboardData({
@@ -50,7 +54,7 @@ class FamilyDashboardService {
     List<LedgerMember> members,
   ) async {
     try {
-      final db = await DatabaseService().database;
+      final db = await _db.database;
 
       // 解析期间（格式：YYYY-MM）
       final periodDate = DateTime.parse('$period-01');
@@ -123,7 +127,7 @@ class FamilyDashboardService {
     List<LedgerMember> members,
   ) async {
     try {
-      final db = await DatabaseService().database;
+      final db = await _db.database;
 
       // 解析期间
       final periodDate = DateTime.parse('$period-01');
@@ -209,7 +213,7 @@ class FamilyDashboardService {
     String period,
   ) async {
     try {
-      final db = await DatabaseService().database;
+      final db = await _db.database;
 
       // 解析期间
       final periodDate = DateTime.parse('$period-01');
@@ -295,7 +299,7 @@ class FamilyDashboardService {
     String period,
   ) async {
     try {
-      final db = await DatabaseService().database;
+      final db = await _db.database;
 
       // 解析期间
       final periodDate = DateTime.parse('$period-01');

@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:uuid/uuid.dart';
-import 'database_service.dart';
-import 'http_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
+import '../core/contracts/i_http_service.dart';
 import 'data_mapper_service.dart';
 import '../core/logger.dart';
 
@@ -78,8 +79,10 @@ class SyncResult {
 class ServerSyncService {
   static final ServerSyncService _instance = ServerSyncService._internal();
 
-  final DatabaseService _db = DatabaseService();
-  final HttpService _http = HttpService();
+  /// 通过服务定位器获取依赖
+  IDatabaseService get _db => sl<IDatabaseService>();
+  IHttpService get _http => sl<IHttpService>();
+
   final DataMapperService _mapper = DataMapperService();
   final _uuid = const Uuid();
   final Logger _logger = Logger();

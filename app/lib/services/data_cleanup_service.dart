@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 
 /// Cleanup result summary
 class CleanupResult {
@@ -64,7 +65,8 @@ class CleanupConfig {
 class DataCleanupService {
   static final DataCleanupService _instance = DataCleanupService._internal();
 
-  final DatabaseService _db = DatabaseService();
+  /// 通过服务定位器获取数据库服务
+  IDatabaseService get _db => sl<IDatabaseService>();
   final CleanupConfig _config;
 
   factory DataCleanupService({CleanupConfig? config}) {

@@ -1,7 +1,8 @@
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
 import '../../models/category.dart';
-import '../database_service.dart';
+import '../../core/di/service_locator.dart';
+import '../../core/contracts/i_database_service.dart';
 import '../ai_service.dart';
 import '../location_service.dart';
 
@@ -10,15 +11,15 @@ import '../location_service.dart';
 /// Layer 2: Feature match (amount + date + description similarity)
 /// Layer 3: Semantic match (AI judgment + location + family cross-validation)
 class EnhancedDuplicateScorer {
-  final DatabaseService _databaseService;
+  final IDatabaseService _databaseService;
   final AIService? _aiService;
   final LocationService? _locationService;
 
   EnhancedDuplicateScorer({
-    DatabaseService? databaseService,
+    IDatabaseService? databaseService,
     AIService? aiService,
     LocationService? locationService,
-  })  : _databaseService = databaseService ?? DatabaseService(),
+  })  : _databaseService = databaseService ?? sl<IDatabaseService>(),
         _aiService = aiService,
         _locationService = locationService;
 

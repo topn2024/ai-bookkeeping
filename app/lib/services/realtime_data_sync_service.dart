@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 
 /// 数据变更类型
 enum DataChangeType {
@@ -139,7 +140,7 @@ class DataSubscriptionConfig {
 /// ```
 class RealtimeDataSyncService extends ChangeNotifier {
   /// 数据库服务
-  final DatabaseService _db;
+  final IDatabaseService _db;
 
   /// 变更事件流控制器
   final StreamController<DataChangeEvent> _changeController =
@@ -167,8 +168,8 @@ class RealtimeDataSyncService extends ChangeNotifier {
   int _changeSequence = 0;
 
   RealtimeDataSyncService({
-    DatabaseService? databaseService,
-  }) : _db = databaseService ?? DatabaseService();
+    IDatabaseService? databaseService,
+  }) : _db = databaseService ?? sl<IDatabaseService>();
 
   /// 获取变更事件流
   Stream<DataChangeEvent> get changeStream => _changeController.stream;

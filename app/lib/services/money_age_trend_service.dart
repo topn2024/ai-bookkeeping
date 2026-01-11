@@ -2,7 +2,8 @@ import 'dart:math';
 
 import '../models/resource_pool.dart';
 import '../models/transaction.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../core/logger.dart';
 
 /// 趋势方向
@@ -190,7 +191,7 @@ class AnomalyEvent {
 /// 4. 异常检测
 /// 5. 目标达成预测
 class MoneyAgeTrendService {
-  final DatabaseService _db;
+  final IDatabaseService _db;
   final Logger _logger = Logger();
 
   /// 趋势变化阈值（超过此值认为有变化）
@@ -199,8 +200,8 @@ class MoneyAgeTrendService {
   /// 异常检测标准差倍数
   static const double anomalyStdDevMultiplier = 2.0;
 
-  MoneyAgeTrendService({DatabaseService? database})
-      : _db = database ?? DatabaseService();
+  MoneyAgeTrendService({IDatabaseService? database})
+      : _db = database ?? sl<IDatabaseService>();
 
   /// 分析最近N天的趋势
   Future<TrendAnalysis> analyzeTrend({

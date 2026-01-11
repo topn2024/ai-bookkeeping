@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'database_service.dart';
-import 'http_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
+import '../core/contracts/i_http_service.dart';
 import 'data_mapper_service.dart';
 
 /// Queue operation types
@@ -42,8 +43,10 @@ class RetryConfig {
 class OfflineQueueService {
   static final OfflineQueueService _instance = OfflineQueueService._internal();
 
-  final DatabaseService _db = DatabaseService();
-  final HttpService _http = HttpService();
+  /// 通过服务定位器获取依赖
+  IDatabaseService get _db => sl<IDatabaseService>();
+  IHttpService get _http => sl<IHttpService>();
+
   final DataMapperService _mapper = DataMapperService();
   final Connectivity _connectivity = Connectivity();
   RetryConfig _retryConfig = const RetryConfig();
@@ -90,6 +93,7 @@ class OfflineQueueService {
     if (_isOnline && !wasOnline) {
       unawaited(processQueue().catchError((e) {
         // 网络恢复后队列处理失败，静默处理（队列会在下次机会重试）
+        return ProcessResult(success: false, processed: 0, failed: 0, message: e.toString());
       }));
     }
   }

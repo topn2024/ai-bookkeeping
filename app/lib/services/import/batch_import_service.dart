@@ -4,7 +4,8 @@ import 'package:uuid/uuid.dart';
 import '../../models/import_batch.dart';
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
-import '../database_service.dart';
+import '../../core/di/service_locator.dart';
+import '../../core/contracts/i_database_service.dart';
 import 'bill_format_detector.dart';
 import 'bill_parser.dart';
 import 'wechat_bill_parser.dart';
@@ -55,7 +56,7 @@ class BatchImportResult {
 
 /// Service to handle batch import of bill files
 class BatchImportService {
-  final DatabaseService _databaseService;
+  final IDatabaseService _databaseService;
   final BillFormatDetector _formatDetector;
   final DuplicateScorer _duplicateScorer;
   final Uuid _uuid = const Uuid();
@@ -66,11 +67,11 @@ class BatchImportService {
   String? _lastFileName;
 
   BatchImportService({
-    DatabaseService? databaseService,
-  })  : _databaseService = databaseService ?? DatabaseService(),
+    IDatabaseService? databaseService,
+  })  : _databaseService = databaseService ?? sl<IDatabaseService>(),
         _formatDetector = BillFormatDetector(),
         _duplicateScorer = DuplicateScorer(
-          databaseService: databaseService,
+          databaseService: databaseService ?? sl<IDatabaseService>(),
         );
 
   /// Get last format detection result

@@ -1,20 +1,21 @@
 import 'dart:convert';
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
-import '../database_service.dart';
+import '../../core/di/service_locator.dart';
+import '../../core/contracts/i_database_service.dart';
 
 /// 导入自学习优化服务
 /// 设计文档第11.6节：系统集成 - 批量导入学习
 /// 记录用户在导入过程中的分类修正，优化后续导入的分类准确性
 class ImportLearningService {
-  final DatabaseService _db;
+  final IDatabaseService _db;
 
   // 内存缓存
   final Map<String, CategoryLearningRecord> _categoryCache = {};
   final Map<String, MerchantLearningRecord> _merchantCache = {};
 
-  ImportLearningService({DatabaseService? databaseService})
-      : _db = databaseService ?? DatabaseService();
+  ImportLearningService({IDatabaseService? databaseService})
+      : _db = databaseService ?? sl<IDatabaseService>();
 
   /// 初始化，加载学习数据到内存
   Future<void> initialize() async {

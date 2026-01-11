@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import 'offline_capability_service.dart';
 import 'vector_clock.dart';
 
@@ -17,7 +18,8 @@ class FamilyOfflineStorageService {
   factory FamilyOfflineStorageService() => _instance;
   FamilyOfflineStorageService._internal();
 
-  final DatabaseService _db = DatabaseService();
+  /// 通过服务定位器获取数据库服务
+  IDatabaseService get _db => sl<IDatabaseService>();
   final OfflineCapabilityService _offlineService = OfflineCapabilityService();
   StreamSubscription<NetworkStatusInfo>? _statusSubscription;
 
@@ -281,7 +283,8 @@ class SyncConflictService {
   factory SyncConflictService() => _instance;
   SyncConflictService._internal();
 
-  final DatabaseService _db = DatabaseService();
+  /// 通过服务定位器获取数据库服务
+  IDatabaseService get _db => sl<IDatabaseService>();
 
   final _conflictController = StreamController<ConflictEvent>.broadcast();
 

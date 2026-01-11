@@ -1,15 +1,16 @@
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
 import '../../models/category.dart';
-import '../database_service.dart';
+import '../../core/di/service_locator.dart';
+import '../../core/contracts/i_database_service.dart';
 
 /// Service to calculate duplicate scores between import candidates and existing transactions
 class DuplicateScorer {
-  final DatabaseService _databaseService;
+  final IDatabaseService _databaseService;
 
   DuplicateScorer({
-    DatabaseService? databaseService,
-  })  : _databaseService = databaseService ?? DatabaseService();
+    IDatabaseService? databaseService,
+  })  : _databaseService = databaseService ?? sl<IDatabaseService>();
 
   /// Check all candidates for duplicates
   Future<void> checkDuplicates(

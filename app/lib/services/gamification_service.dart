@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'database_service.dart';
+import '../core/contracts/i_database_service.dart';
 
 /// 成就类型
 enum AchievementType {
@@ -187,7 +187,7 @@ class UserLevel {
 /// - 积分与等级
 /// - 挑战任务
 class GamificationService {
-  final DatabaseService _db;
+  final IDatabaseService _db;
 
   // 预定义成就
   static final List<Achievement> _achievements = [

@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'http_service.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
+import '../core/contracts/i_http_service.dart';
 import 'offline_capability_service.dart';
 
 /// 云端校验自动纠错服务
@@ -17,8 +18,9 @@ class CloudVerificationService {
   factory CloudVerificationService() => _instance;
   CloudVerificationService._internal();
 
-  final HttpService _http = HttpService();
-  final DatabaseService _db = DatabaseService();
+  /// 通过服务定位器获取依赖
+  IHttpService get _http => sl<IHttpService>();
+  IDatabaseService get _db => sl<IDatabaseService>();
   final OfflineCapabilityService _offlineService = OfflineCapabilityService();
 
   final _verificationController = StreamController<VerificationResult>.broadcast();

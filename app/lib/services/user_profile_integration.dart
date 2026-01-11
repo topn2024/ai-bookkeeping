@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'user_profile_service.dart';
 import 'user_profile_scheduler.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import '../models/transaction.dart' as model;
 
 /// 用户画像系统集成服务
@@ -142,13 +143,13 @@ class UserProfileIntegration {
 // ==================== Riverpod Providers ====================
 
 /// 数据库服务 Provider
-final _databaseServiceProvider = Provider<DatabaseService>((ref) {
-  return DatabaseService();
+final _databaseServiceProvider = Provider<IDatabaseService>((ref) {
+  return sl<IDatabaseService>();
 });
 
 /// 交易数据源实现
 class DatabaseTransactionDataSource implements TransactionDataSource {
-  final DatabaseService _db;
+  final IDatabaseService _db;
 
   DatabaseTransactionDataSource(this._db);
 
@@ -204,7 +205,7 @@ class _StubUserActivityDataSource implements UserActivityDataSource {
 
 /// 存根实现：用户画像仓储
 class _StubUserProfileRepository implements UserProfileRepository {
-  final DatabaseService _db;
+  final IDatabaseService _db;
   _StubUserProfileRepository(this._db);
 
   @override

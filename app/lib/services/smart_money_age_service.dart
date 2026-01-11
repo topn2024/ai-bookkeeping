@@ -2,7 +2,8 @@ import 'package:sqflite/sqflite.dart';
 
 import '../models/resource_pool.dart';
 import '../models/transaction.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import 'money_age_level_service.dart';
 import 'money_age_trend_service.dart';
 import '../core/logger.dart';
@@ -278,7 +279,7 @@ class GoalAnalysis {
 /// 4. 目标达成预测
 /// 5. 风险预警
 class SmartMoneyAgeService {
-  final DatabaseService _db;
+  final IDatabaseService _db;
   final MoneyAgeLevelService _levelService;
   final MoneyAgeTrendService _trendService;
   final Logger _logger = Logger();
@@ -293,10 +294,10 @@ class SmartMoneyAgeService {
   static const int suggestionCacheHours = 6;
 
   SmartMoneyAgeService({
-    DatabaseService? database,
+    IDatabaseService? database,
     MoneyAgeLevelService? levelService,
     MoneyAgeTrendService? trendService,
-  })  : _db = database ?? DatabaseService(),
+  })  : _db = database ?? sl<IDatabaseService>(),
         _levelService = levelService ?? MoneyAgeLevelService(),
         _trendService = trendService ?? MoneyAgeTrendService();
 

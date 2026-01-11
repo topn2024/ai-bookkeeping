@@ -4,7 +4,8 @@ import 'package:sqflite/sqflite.dart' hide Transaction;
 
 import '../models/resource_pool.dart';
 import '../models/transaction.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 import 'money_age_calculator.dart';
 import '../core/logger.dart';
 
@@ -247,7 +248,7 @@ class RebuildConfig {
 /// 4. 支持过滤条件（日期范围、账本、账户）
 /// 5. 可配置的批处理以避免阻塞UI
 class MoneyAgeRebuildService {
-  final DatabaseService _db;
+  final IDatabaseService _db;
   final Logger _logger = Logger();
 
   /// 重建进度流控制器
@@ -259,8 +260,8 @@ class MoneyAgeRebuildService {
   /// 是否请求取消
   bool _cancelRequested = false;
 
-  MoneyAgeRebuildService({DatabaseService? database})
-      : _db = database ?? DatabaseService();
+  MoneyAgeRebuildService({IDatabaseService? database})
+      : _db = database ?? sl<IDatabaseService>();
 
   /// 是否正在重建
   bool get isRebuilding => _isRebuilding;

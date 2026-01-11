@@ -21,15 +21,16 @@ import '../models/budget_vault.dart';
 import 'package:flutter/material.dart';
 import 'database_migration_service.dart';
 import '../core/logger.dart';
+import '../core/contracts/i_database_service.dart';
 
-class DatabaseService {
+class DatabaseService implements IDatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
   static Database? _database;
   final DatabaseMigrationService _migrationService = DatabaseMigrationService();
   final Logger _logger = Logger();
 
   // 当前数据库版本
-  static const int currentVersion = 15;
+  static const int currentVersion = 18;
 
   factory DatabaseService() => _instance;
 
@@ -72,9 +73,19 @@ class DatabaseService {
     return await openDatabase(
       path,
       version: currentVersion,
+      onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgradeWithRecovery,
     );
+  }
+
+  /// 数据库配置回调
+  ///
+  /// 在每次打开数据库连接时调用，用于启用外键约束等配置
+  Future<void> _onConfigure(Database db) async {
+    // 启用外键约束
+    await db.execute('PRAGMA foreign_keys = ON');
+    _logger.debug('Foreign keys enabled', tag: 'DB');
   }
 
   /// 带恢复能力的升级方法
@@ -118,6 +129,7 @@ class DatabaseService {
         isReimbursed INTEGER NOT NULL DEFAULT 0,
         tags TEXT,
         createdAt INTEGER NOT NULL,
+        updatedAt INTEGER,
         source INTEGER NOT NULL DEFAULT 0,
         aiConfidence REAL,
         sourceFileLocalPath TEXT,
@@ -135,7 +147,9 @@ class DatabaseService {
         moneyAgeLevel TEXT,
         resourcePoolId TEXT,
         visibility INTEGER NOT NULL DEFAULT 1,
-        locationJson TEXT
+        locationJson TEXT,
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        deletedAt INTEGER
       )
     ''');
 
@@ -189,7 +203,10 @@ class DatabaseService {
         iconCode INTEGER NOT NULL,
         colorValue INTEGER NOT NULL,
         isDefault INTEGER NOT NULL DEFAULT 0,
-        createdAt INTEGER NOT NULL
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER,
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        deletedAt INTEGER
       )
     ''');
 
@@ -203,7 +220,10 @@ class DatabaseService {
         isExpense INTEGER NOT NULL,
         parentId TEXT,
         sortOrder INTEGER NOT NULL DEFAULT 0,
-        isCustom INTEGER NOT NULL DEFAULT 0
+        isCustom INTEGER NOT NULL DEFAULT 0,
+        updatedAt INTEGER,
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        deletedAt INTEGER
       )
     ''');
 
@@ -216,7 +236,10 @@ class DatabaseService {
         iconCode INTEGER NOT NULL,
         colorValue INTEGER NOT NULL,
         isDefault INTEGER NOT NULL DEFAULT 0,
-        createdAt INTEGER NOT NULL
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER,
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        deletedAt INTEGER
       )
     ''');
 
@@ -233,9 +256,12 @@ class DatabaseService {
         colorValue INTEGER NOT NULL,
         isEnabled INTEGER NOT NULL DEFAULT 1,
         createdAt INTEGER NOT NULL,
+        updatedAt INTEGER,
         budgetType INTEGER NOT NULL DEFAULT 0,
         enableCarryover INTEGER NOT NULL DEFAULT 0,
-        carryoverSurplusOnly INTEGER NOT NULL DEFAULT 1
+        carryoverSurplusOnly INTEGER NOT NULL DEFAULT 1,
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        deletedAt INTEGER
       )
     ''');
 
@@ -280,6 +306,7 @@ class DatabaseService {
         colorValue INTEGER NOT NULL,
         useCount INTEGER NOT NULL DEFAULT 0,
         createdAt INTEGER NOT NULL,
+        updatedAt INTEGER,
         lastUsedAt INTEGER
       )
     ''');
@@ -306,7 +333,8 @@ class DatabaseService {
         nextExecuteAt INTEGER,
         iconCode INTEGER NOT NULL,
         colorValue INTEGER NOT NULL,
-        createdAt INTEGER NOT NULL
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER
       )
     ''');
 
@@ -327,7 +355,8 @@ class DatabaseService {
         bankName TEXT,
         cardNumber TEXT,
         isEnabled INTEGER NOT NULL DEFAULT 1,
-        createdAt INTEGER NOT NULL
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER
       )
     ''');
 
@@ -392,7 +421,8 @@ class DatabaseService {
         isEnabled INTEGER NOT NULL DEFAULT 1,
         lastRemindedAt INTEGER,
         nextReminderDate INTEGER,
-        createdAt INTEGER NOT NULL
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER
       )
     ''');
 
@@ -673,6 +703,49 @@ class DatabaseService {
     await db.execute('CREATE INDEX idx_vault_allocations_vault ON vault_allocations(vaultId)');
     await db.execute('CREATE INDEX idx_vault_transfers_from ON vault_transfers(fromVaultId)');
     await db.execute('CREATE INDEX idx_vault_transfers_to ON vault_transfers(toVaultId)');
+
+    // Create indexes for high-frequency query fields (Phase 1)
+    await db.execute('CREATE INDEX idx_transactions_date ON transactions(date)');
+    await db.execute('CREATE INDEX idx_transactions_ledger ON transactions(ledgerId)');
+    await db.execute('CREATE INDEX idx_transactions_account ON transactions(accountId)');
+    await db.execute('CREATE INDEX idx_transactions_category ON transactions(category)');
+    await db.execute('CREATE INDEX idx_budgets_ledger ON budgets(ledgerId)');
+    await db.execute('CREATE INDEX idx_categories_parent ON categories(parentId)');
+    await db.execute('CREATE INDEX idx_accounts_default ON accounts(isDefault)');
+
+    // Create indexes for soft delete (Phase 2)
+    await db.execute('CREATE INDEX idx_transactions_deleted ON transactions(isDeleted)');
+    await db.execute('CREATE INDEX idx_accounts_deleted ON accounts(isDeleted)');
+    await db.execute('CREATE INDEX idx_categories_deleted ON categories(isDeleted)');
+    await db.execute('CREATE INDEX idx_ledgers_deleted ON ledgers(isDeleted)');
+    await db.execute('CREATE INDEX idx_budgets_deleted ON budgets(isDeleted)');
+
+    // Create active record views (Phase 2.3.6)
+    // These views filter out soft-deleted records for convenient querying
+    await db.execute('''
+      CREATE VIEW active_transactions AS
+      SELECT * FROM transactions WHERE isDeleted = 0
+    ''');
+
+    await db.execute('''
+      CREATE VIEW active_accounts AS
+      SELECT * FROM accounts WHERE isDeleted = 0
+    ''');
+
+    await db.execute('''
+      CREATE VIEW active_categories AS
+      SELECT * FROM categories WHERE isDeleted = 0
+    ''');
+
+    await db.execute('''
+      CREATE VIEW active_ledgers AS
+      SELECT * FROM ledgers WHERE isDeleted = 0
+    ''');
+
+    await db.execute('''
+      CREATE VIEW active_budgets AS
+      SELECT * FROM budgets WHERE isDeleted = 0
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -1132,6 +1205,153 @@ class DatabaseService {
       await db.execute('CREATE INDEX idx_vault_transfers_to ON vault_transfers(toVaultId)');
       await db.execute('CREATE INDEX idx_transactions_vault ON transactions(vaultId)');
     }
+
+    // ==================== 版本16：索引优化和 updatedAt 字段 ====================
+    if (oldVersion < 16) {
+      _logger.info('Migrating to version 16: Adding indexes and updatedAt fields', tag: 'DB');
+
+      // 1. 添加高频查询字段索引
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_ledger ON transactions(ledgerId)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions(accountId)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_budgets_ledger ON budgets(ledgerId)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parentId)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_accounts_default ON accounts(isDefault)');
+
+      // 2. 为缺少 updatedAt 的表添加字段
+      // accounts 表
+      try {
+        await db.execute('ALTER TABLE accounts ADD COLUMN updatedAt INTEGER');
+        await db.execute('UPDATE accounts SET updatedAt = createdAt WHERE updatedAt IS NULL');
+      } catch (e) {
+        _logger.debug('accounts.updatedAt may already exist: $e', tag: 'DB');
+      }
+
+      // categories 表
+      try {
+        await db.execute('ALTER TABLE categories ADD COLUMN updatedAt INTEGER');
+        // categories 没有 createdAt，使用当前时间
+        await db.execute('UPDATE categories SET updatedAt = ${DateTime.now().millisecondsSinceEpoch} WHERE updatedAt IS NULL');
+      } catch (e) {
+        _logger.debug('categories.updatedAt may already exist: $e', tag: 'DB');
+      }
+
+      // ledgers 表
+      try {
+        await db.execute('ALTER TABLE ledgers ADD COLUMN updatedAt INTEGER');
+        await db.execute('UPDATE ledgers SET updatedAt = createdAt WHERE updatedAt IS NULL');
+      } catch (e) {
+        _logger.debug('ledgers.updatedAt may already exist: $e', tag: 'DB');
+      }
+
+      // templates 表
+      try {
+        await db.execute('ALTER TABLE templates ADD COLUMN updatedAt INTEGER');
+        await db.execute('UPDATE templates SET updatedAt = createdAt WHERE updatedAt IS NULL');
+      } catch (e) {
+        _logger.debug('templates.updatedAt may already exist: $e', tag: 'DB');
+      }
+
+      // recurring_transactions 表
+      try {
+        await db.execute('ALTER TABLE recurring_transactions ADD COLUMN updatedAt INTEGER');
+        await db.execute('UPDATE recurring_transactions SET updatedAt = createdAt WHERE updatedAt IS NULL');
+      } catch (e) {
+        _logger.debug('recurring_transactions.updatedAt may already exist: $e', tag: 'DB');
+      }
+
+      // credit_cards 表
+      try {
+        await db.execute('ALTER TABLE credit_cards ADD COLUMN updatedAt INTEGER');
+        await db.execute('UPDATE credit_cards SET updatedAt = createdAt WHERE updatedAt IS NULL');
+      } catch (e) {
+        _logger.debug('credit_cards.updatedAt may already exist: $e', tag: 'DB');
+      }
+
+      // bill_reminders 表
+      try {
+        await db.execute('ALTER TABLE bill_reminders ADD COLUMN updatedAt INTEGER');
+        await db.execute('UPDATE bill_reminders SET updatedAt = createdAt WHERE updatedAt IS NULL');
+      } catch (e) {
+        _logger.debug('bill_reminders.updatedAt may already exist: $e', tag: 'DB');
+      }
+
+      // budgets 表
+      try {
+        await db.execute('ALTER TABLE budgets ADD COLUMN updatedAt INTEGER');
+        await db.execute('UPDATE budgets SET updatedAt = createdAt WHERE updatedAt IS NULL');
+      } catch (e) {
+        _logger.debug('budgets.updatedAt may already exist: $e', tag: 'DB');
+      }
+
+      _logger.info('Version 16 migration completed', tag: 'DB');
+    }
+
+    // ==================== 版本17：软删除支持 ====================
+    if (oldVersion < 17) {
+      _logger.info('Migrating to version 17: Adding soft delete support', tag: 'DB');
+
+      // 为核心业务表添加软删除字段
+      final tablesForSoftDelete = [
+        'transactions',
+        'accounts',
+        'categories',
+        'ledgers',
+        'budgets',
+      ];
+
+      for (final table in tablesForSoftDelete) {
+        try {
+          await db.execute('ALTER TABLE $table ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0');
+          await db.execute('ALTER TABLE $table ADD COLUMN deletedAt INTEGER');
+        } catch (e) {
+          _logger.debug('$table soft delete columns may already exist: $e', tag: 'DB');
+        }
+      }
+
+      // 创建软删除索引以加速查询
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_deleted ON transactions(isDeleted)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_accounts_deleted ON accounts(isDeleted)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_categories_deleted ON categories(isDeleted)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_ledgers_deleted ON ledgers(isDeleted)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_budgets_deleted ON budgets(isDeleted)');
+
+      _logger.info('Version 17 migration completed', tag: 'DB');
+    }
+
+    // ==================== 版本18：活动记录视图与外键支持 ====================
+    if (oldVersion < 18) {
+      _logger.info('Migrating to version 18: Adding active record views and foreign key support', tag: 'DB');
+
+      // 创建活动记录视图（过滤已删除记录）
+      await db.execute('''
+        CREATE VIEW IF NOT EXISTS active_transactions AS
+        SELECT * FROM transactions WHERE isDeleted = 0
+      ''');
+
+      await db.execute('''
+        CREATE VIEW IF NOT EXISTS active_accounts AS
+        SELECT * FROM accounts WHERE isDeleted = 0
+      ''');
+
+      await db.execute('''
+        CREATE VIEW IF NOT EXISTS active_categories AS
+        SELECT * FROM categories WHERE isDeleted = 0
+      ''');
+
+      await db.execute('''
+        CREATE VIEW IF NOT EXISTS active_ledgers AS
+        SELECT * FROM ledgers WHERE isDeleted = 0
+      ''');
+
+      await db.execute('''
+        CREATE VIEW IF NOT EXISTS active_budgets AS
+        SELECT * FROM budgets WHERE isDeleted = 0
+      ''');
+
+      _logger.info('Version 18 migration completed', tag: 'DB');
+    }
   }
 
   // ==================== 事务支持 ====================
@@ -1229,9 +1449,13 @@ class DatabaseService {
     return result;
   }
 
-  Future<List<model.Transaction>> getTransactions() async {
+  Future<List<model.Transaction>> getTransactions({bool includeDeleted = false}) async {
     final db = await database;
-    final maps = await db.query('transactions', orderBy: 'date DESC');
+    final maps = await db.query(
+      'transactions',
+      where: includeDeleted ? null : 'isDeleted = 0',
+      orderBy: 'date DESC',
+    );
 
     final transactions = <model.Transaction>[];
     for (final map in maps) {
@@ -1389,9 +1613,12 @@ class DatabaseService {
     });
   }
 
-  Future<List<Account>> getAccounts() async {
+  Future<List<Account>> getAccounts({bool includeDeleted = false}) async {
     final db = await database;
-    final maps = await db.query('accounts');
+    final maps = await db.query(
+      'accounts',
+      where: includeDeleted ? null : 'isDeleted = 0',
+    );
     return maps.map((map) => Account(
       id: map['id'] as String,
       name: map['name'] as String,
@@ -1441,9 +1668,13 @@ class DatabaseService {
     });
   }
 
-  Future<List<Category>> getCategories() async {
+  Future<List<Category>> getCategories({bool includeDeleted = false}) async {
     final db = await database;
-    final maps = await db.query('categories', orderBy: 'sortOrder ASC');
+    final maps = await db.query(
+      'categories',
+      where: includeDeleted ? null : 'isDeleted = 0',
+      orderBy: 'sortOrder ASC',
+    );
     return maps.map((map) => Category(
       id: map['id'] as String,
       name: map['name'] as String,
@@ -1493,9 +1724,12 @@ class DatabaseService {
     });
   }
 
-  Future<List<Ledger>> getLedgers() async {
+  Future<List<Ledger>> getLedgers({bool includeDeleted = false}) async {
     final db = await database;
-    final maps = await db.query('ledgers');
+    final maps = await db.query(
+      'ledgers',
+      where: includeDeleted ? null : 'isDeleted = 0',
+    );
     return maps.map((map) => Ledger(
       id: map['id'] as String,
       name: map['name'] as String,
@@ -1511,11 +1745,11 @@ class DatabaseService {
   /// Get the default ledger, or the first ledger if none is marked as default
   Future<Ledger?> getDefaultLedger() async {
     final db = await database;
-    // First try to find the default ledger
-    var maps = await db.query('ledgers', where: 'isDefault = 1', limit: 1);
+    // First try to find the default ledger (excluding deleted)
+    var maps = await db.query('ledgers', where: 'isDefault = 1 AND isDeleted = 0', limit: 1);
     if (maps.isEmpty) {
-      // Fall back to first ledger
-      maps = await db.query('ledgers', limit: 1);
+      // Fall back to first ledger (excluding deleted)
+      maps = await db.query('ledgers', where: 'isDeleted = 0', limit: 1);
     }
     if (maps.isEmpty) return null;
 
@@ -1573,9 +1807,12 @@ class DatabaseService {
     });
   }
 
-  Future<List<Budget>> getBudgets() async {
+  Future<List<Budget>> getBudgets({bool includeDeleted = false}) async {
     final db = await database;
-    final maps = await db.query('budgets');
+    final maps = await db.query(
+      'budgets',
+      where: includeDeleted ? null : 'isDeleted = 0',
+    );
     return maps.map((map) => Budget(
       id: map['id'] as String,
       name: map['name'] as String,
@@ -2393,6 +2630,7 @@ class DatabaseService {
   // ==================== Sync Queue CRUD ====================
 
   /// Add operation to sync queue
+  @override
   Future<int> enqueueSyncOperation({
     required String id,
     required String entityType,
@@ -2425,6 +2663,7 @@ class DatabaseService {
   }
 
   /// Update sync queue item status
+  @override
   Future<int> updateSyncQueueStatus(
     String id, {
     required int status,
@@ -2719,6 +2958,7 @@ class DatabaseService {
   }
 
   /// Find transaction by external ID and source (for deduplication)
+  @override
   Future<model.Transaction?> findTransactionByExternalId(
     String externalId,
     model.ExternalSource externalSource,
@@ -2781,6 +3021,7 @@ class DatabaseService {
 
   /// Find potential duplicate transactions for deduplication
   /// Returns transactions within the date range with matching amount
+  @override
   Future<List<model.Transaction>> findPotentialDuplicates({
     required DateTime date,
     required double amount,
@@ -3181,21 +3422,27 @@ class DatabaseService {
   // ═══════════════════════════════════════════════════════════════
 
   /// 获取所有交易（别名）
+  @override
   Future<List<model.Transaction>> getAllTransactions() => getTransactions();
 
   /// 获取所有账户（别名）
+  @override
   Future<List<Account>> getAllAccounts() => getAccounts();
 
   /// 获取所有预算（别名）
+  @override
   Future<List<Budget>> getAllBudgets() => getBudgets();
 
   /// 获取所有储蓄目标（别名）
+  @override
   Future<List<savings.SavingsGoal>> getAllSavingsGoals() => getSavingsGoals();
 
   /// 获取所有周期性交易（别名）
+  @override
   Future<List<RecurringTransaction>> getAllRecurringTransactions() => getRecurringTransactions();
 
   /// 获取所有模板（别名）
+  @override
   Future<List<TransactionTemplate>> getAllTemplates() => getTemplates();
 
   /// 获取自定义分类
@@ -3276,6 +3523,118 @@ class DatabaseService {
     return transactions.first;
   }
 
+  /// 高级交易查询（支持多条件过滤）
+  @override
+  Future<List<model.Transaction>> queryTransactions({
+    DateTime? startDate,
+    DateTime? endDate,
+    String? category,
+    String? merchant,
+    double? minAmount,
+    double? maxAmount,
+    String? description,
+    String? account,
+    List<String>? tags,
+    int limit = 50,
+  }) async {
+    final db = await database;
+
+    final whereConditions = <String>[];
+    final whereArgs = <dynamic>[];
+
+    // 时间范围过滤
+    if (startDate != null) {
+      whereConditions.add('date >= ?');
+      whereArgs.add(startDate.millisecondsSinceEpoch);
+    }
+    if (endDate != null) {
+      whereConditions.add('date <= ?');
+      whereArgs.add(endDate.millisecondsSinceEpoch);
+    }
+
+    // 分类过滤
+    if (category != null && category.isNotEmpty) {
+      whereConditions.add('(category LIKE ? OR sub_category LIKE ?)');
+      whereArgs.add('%$category%');
+      whereArgs.add('%$category%');
+    }
+
+    // 商家过滤
+    if (merchant != null && merchant.isNotEmpty) {
+      whereConditions.add('merchant LIKE ?');
+      whereArgs.add('%$merchant%');
+    }
+
+    // 金额范围过滤
+    if (minAmount != null) {
+      whereConditions.add('amount >= ?');
+      whereArgs.add(minAmount);
+    }
+    if (maxAmount != null) {
+      whereConditions.add('amount <= ?');
+      whereArgs.add(maxAmount);
+    }
+
+    // 描述过滤
+    if (description != null && description.isNotEmpty) {
+      whereConditions.add('description LIKE ?');
+      whereArgs.add('%$description%');
+    }
+
+    // 账户过滤
+    if (account != null && account.isNotEmpty) {
+      whereConditions.add('account LIKE ?');
+      whereArgs.add('%$account%');
+    }
+
+    // 标签过滤
+    if (tags != null && tags.isNotEmpty) {
+      final tagConditions = tags.map((_) => 'tags LIKE ?').join(' OR ');
+      whereConditions.add('($tagConditions)');
+      for (final tag in tags) {
+        whereArgs.add('%$tag%');
+      }
+    }
+
+    final whereClause = whereConditions.isEmpty ? null : whereConditions.join(' AND ');
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'transactions',
+      where: whereClause,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+      orderBy: 'date DESC',
+      limit: limit,
+    );
+
+    final transactions = <model.Transaction>[];
+    for (final map in maps) {
+      // 获取分账信息
+      final splits = await getTransactionSplits(map['id'] as String);
+
+      transactions.add(model.Transaction(
+        id: map['id'] as String,
+        type: model.TransactionType.values[map['type'] as int? ?? 0],
+        amount: map['amount'] as double,
+        category: map['category'] as String? ?? '',
+        subcategory: map['sub_category'] as String?,
+        rawMerchant: map['merchant'] as String?,
+        note: map['description'] as String?,
+        date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
+        accountId: map['account'] as String? ?? '',
+        tags: (map['tags'] as String?)?.split(',').where((tag) => tag.isNotEmpty).toList() ?? [],
+        splits: splits,
+        createdAt: map['created_at'] != null ?
+          DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int) :
+          DateTime.now(),
+        updatedAt: map['updated_at'] != null ?
+          DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
+          DateTime.now(),
+      ));
+    }
+
+    return transactions;
+  }
+
   /// 获取钱龄统计
   Future<Map<String, dynamic>> getMoneyAgeStats() async {
     return {};
@@ -3302,6 +3661,7 @@ class DatabaseService {
   }
 
   /// 查找家庭重复交易
+  @override
   Future<List<Map<String, dynamic>>> findFamilyDuplicates({
     required String ledgerId,
     required DateTime date,
@@ -3333,5 +3693,354 @@ class DatabaseService {
   /// 保存预算
   Future<void> saveBudget(Budget budget) async {
     await updateBudget(budget);
+  }
+
+  // ==================== 软删除支持 ====================
+
+  /// 软删除交易记录
+  Future<int> softDeleteTransaction(String id) async {
+    final db = await database;
+    return await db.update(
+      'transactions',
+      {
+        'isDeleted': 1,
+        'deletedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 软删除账户
+  Future<int> softDeleteAccount(String id) async {
+    final db = await database;
+    return await db.update(
+      'accounts',
+      {
+        'isDeleted': 1,
+        'deletedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 软删除分类
+  Future<int> softDeleteCategory(String id) async {
+    final db = await database;
+    return await db.update(
+      'categories',
+      {
+        'isDeleted': 1,
+        'deletedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 软删除账本
+  Future<int> softDeleteLedger(String id) async {
+    final db = await database;
+    return await db.update(
+      'ledgers',
+      {
+        'isDeleted': 1,
+        'deletedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 软删除预算
+  Future<int> softDeleteBudget(String id) async {
+    final db = await database;
+    return await db.update(
+      'budgets',
+      {
+        'isDeleted': 1,
+        'deletedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 恢复软删除的交易记录
+  Future<int> restoreTransaction(String id) async {
+    final db = await database;
+    return await db.update(
+      'transactions',
+      {'isDeleted': 0, 'deletedAt': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 恢复软删除的账户
+  Future<int> restoreAccount(String id) async {
+    final db = await database;
+    return await db.update(
+      'accounts',
+      {'isDeleted': 0, 'deletedAt': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 恢复软删除的分类
+  Future<int> restoreCategory(String id) async {
+    final db = await database;
+    return await db.update(
+      'categories',
+      {'isDeleted': 0, 'deletedAt': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 恢复软删除的账本
+  Future<int> restoreLedger(String id) async {
+    final db = await database;
+    return await db.update(
+      'ledgers',
+      {'isDeleted': 0, 'deletedAt': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 恢复软删除的预算
+  Future<int> restoreBudget(String id) async {
+    final db = await database;
+    return await db.update(
+      'budgets',
+      {'isDeleted': 0, 'deletedAt': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 永久删除已软删除且超过保留期的记录
+  ///
+  /// [retentionDays] 保留天数，默认30天
+  Future<Map<String, int>> purgeDeletedRecords({int retentionDays = 30}) async {
+    final db = await database;
+    final cutoffTime = DateTime.now()
+        .subtract(Duration(days: retentionDays))
+        .millisecondsSinceEpoch;
+
+    final results = <String, int>{};
+
+    results['transactions'] = await db.delete(
+      'transactions',
+      where: 'isDeleted = 1 AND deletedAt < ?',
+      whereArgs: [cutoffTime],
+    );
+
+    results['accounts'] = await db.delete(
+      'accounts',
+      where: 'isDeleted = 1 AND deletedAt < ?',
+      whereArgs: [cutoffTime],
+    );
+
+    results['categories'] = await db.delete(
+      'categories',
+      where: 'isDeleted = 1 AND deletedAt < ?',
+      whereArgs: [cutoffTime],
+    );
+
+    results['ledgers'] = await db.delete(
+      'ledgers',
+      where: 'isDeleted = 1 AND deletedAt < ?',
+      whereArgs: [cutoffTime],
+    );
+
+    results['budgets'] = await db.delete(
+      'budgets',
+      where: 'isDeleted = 1 AND deletedAt < ?',
+      whereArgs: [cutoffTime],
+    );
+
+    _logger.info('Purged deleted records: $results', tag: 'DB');
+    return results;
+  }
+
+  // ==================== 数据完整性检测 ====================
+
+  /// 检测孤儿数据
+  ///
+  /// 返回各类孤儿数据的统计
+  Future<Map<String, List<String>>> detectOrphanData() async {
+    final db = await database;
+    final orphans = <String, List<String>>{};
+
+    // 1. 检测 transactions 中无效的 accountId
+    final orphanTransactionsByAccount = await db.rawQuery('''
+      SELECT t.id FROM transactions t
+      LEFT JOIN accounts a ON t.accountId = a.id
+      WHERE a.id IS NULL AND t.isDeleted = 0
+    ''');
+    if (orphanTransactionsByAccount.isNotEmpty) {
+      orphans['transactions_invalid_account'] =
+          orphanTransactionsByAccount.map((m) => m['id'] as String).toList();
+    }
+
+    // 2. 检测 transactions 中无效的 ledgerId
+    final orphanTransactionsByLedger = await db.rawQuery('''
+      SELECT t.id FROM transactions t
+      LEFT JOIN ledgers l ON t.ledgerId = l.id
+      WHERE l.id IS NULL AND t.ledgerId != 'default' AND t.isDeleted = 0
+    ''');
+    if (orphanTransactionsByLedger.isNotEmpty) {
+      orphans['transactions_invalid_ledger'] =
+          orphanTransactionsByLedger.map((m) => m['id'] as String).toList();
+    }
+
+    // 3. 检测 budgets 中无效的 ledgerId
+    final orphanBudgetsByLedger = await db.rawQuery('''
+      SELECT b.id FROM budgets b
+      LEFT JOIN ledgers l ON b.ledgerId = l.id
+      WHERE l.id IS NULL AND b.isDeleted = 0
+    ''');
+    if (orphanBudgetsByLedger.isNotEmpty) {
+      orphans['budgets_invalid_ledger'] =
+          orphanBudgetsByLedger.map((m) => m['id'] as String).toList();
+    }
+
+    // 3.5 检测 budgets 中无效的 categoryId
+    final orphanBudgetsByCategory = await db.rawQuery('''
+      SELECT b.id FROM budgets b
+      LEFT JOIN categories c ON b.categoryId = c.id
+      WHERE b.categoryId IS NOT NULL AND c.id IS NULL AND b.isDeleted = 0
+    ''');
+    if (orphanBudgetsByCategory.isNotEmpty) {
+      orphans['budgets_invalid_category'] =
+          orphanBudgetsByCategory.map((m) => m['id'] as String).toList();
+    }
+
+    // 4. 检测 categories 中无效的 parentId（自引用）
+    final orphanCategoriesByParent = await db.rawQuery('''
+      SELECT c.id FROM categories c
+      LEFT JOIN categories p ON c.parentId = p.id
+      WHERE c.parentId IS NOT NULL AND p.id IS NULL AND c.isDeleted = 0
+    ''');
+    if (orphanCategoriesByParent.isNotEmpty) {
+      orphans['categories_invalid_parent'] =
+          orphanCategoriesByParent.map((m) => m['id'] as String).toList();
+    }
+
+    // 5. 检测 transaction_splits 中无效的 transactionId
+    final orphanSplits = await db.rawQuery('''
+      SELECT ts.id FROM transaction_splits ts
+      LEFT JOIN transactions t ON ts.transactionId = t.id
+      WHERE t.id IS NULL
+    ''');
+    if (orphanSplits.isNotEmpty) {
+      orphans['transaction_splits_invalid_transaction'] =
+          orphanSplits.map((m) => m['id'] as String).toList();
+    }
+
+    // 6. 检测 savings_deposits 中无效的 goalId
+    final orphanDeposits = await db.rawQuery('''
+      SELECT sd.id FROM savings_deposits sd
+      LEFT JOIN savings_goals sg ON sd.goalId = sg.id
+      WHERE sg.id IS NULL
+    ''');
+    if (orphanDeposits.isNotEmpty) {
+      orphans['savings_deposits_invalid_goal'] =
+          orphanDeposits.map((m) => m['id'] as String).toList();
+    }
+
+    // 7. 检测 debt_payments 中无效的 debtId
+    final orphanPayments = await db.rawQuery('''
+      SELECT dp.id FROM debt_payments dp
+      LEFT JOIN debts d ON dp.debtId = d.id
+      WHERE d.id IS NULL
+    ''');
+    if (orphanPayments.isNotEmpty) {
+      orphans['debt_payments_invalid_debt'] =
+          orphanPayments.map((m) => m['id'] as String).toList();
+    }
+
+    if (orphans.isNotEmpty) {
+      _logger.warning('Detected orphan data: $orphans', tag: 'DB');
+    }
+
+    return orphans;
+  }
+
+  /// 清理孤儿数据
+  ///
+  /// 删除所有检测到的孤儿记录
+  Future<Map<String, int>> cleanupOrphanData() async {
+    final db = await database;
+    final results = <String, int>{};
+
+    // 清理无效的 transaction_splits
+    results['transaction_splits'] = await db.rawDelete('''
+      DELETE FROM transaction_splits WHERE id IN (
+        SELECT ts.id FROM transaction_splits ts
+        LEFT JOIN transactions t ON ts.transactionId = t.id
+        WHERE t.id IS NULL
+      )
+    ''');
+
+    // 清理无效的 savings_deposits
+    results['savings_deposits'] = await db.rawDelete('''
+      DELETE FROM savings_deposits WHERE id IN (
+        SELECT sd.id FROM savings_deposits sd
+        LEFT JOIN savings_goals sg ON sd.goalId = sg.id
+        WHERE sg.id IS NULL
+      )
+    ''');
+
+    // 清理无效的 debt_payments
+    results['debt_payments'] = await db.rawDelete('''
+      DELETE FROM debt_payments WHERE id IN (
+        SELECT dp.id FROM debt_payments dp
+        LEFT JOIN debts d ON dp.debtId = d.id
+        WHERE d.id IS NULL
+      )
+    ''');
+
+    _logger.info('Cleaned up orphan data: $results', tag: 'DB');
+    return results;
+  }
+
+  /// 获取数据库统计信息
+  Future<Map<String, dynamic>> getDatabaseStats() async {
+    final db = await database;
+    final stats = <String, dynamic>{};
+
+    // 记录数统计
+    final tables = [
+      'transactions', 'accounts', 'categories', 'ledgers', 'budgets',
+      'templates', 'recurring_transactions', 'credit_cards', 'savings_goals',
+      'bill_reminders', 'investment_accounts', 'debts',
+    ];
+
+    for (final table in tables) {
+      try {
+        final result = await db.rawQuery('SELECT COUNT(*) as count FROM $table');
+        stats['${table}_count'] = result.first['count'];
+
+        // 统计软删除数量（如果表支持）
+        if (['transactions', 'accounts', 'categories', 'ledgers', 'budgets'].contains(table)) {
+          final deletedResult = await db.rawQuery(
+            'SELECT COUNT(*) as count FROM $table WHERE isDeleted = 1'
+          );
+          stats['${table}_deleted_count'] = deletedResult.first['count'];
+        }
+      } catch (e) {
+        stats['${table}_count'] = 'error';
+      }
+    }
+
+    // 数据库版本
+    stats['version'] = currentVersion;
+
+    return stats;
   }
 }

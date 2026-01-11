@@ -5,9 +5,10 @@ import 'package:uuid/uuid.dart';
 import '../../models/import_batch.dart';
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
+import '../../core/di/service_locator.dart';
+import '../../core/contracts/i_database_service.dart';
 import '../voice_recognition_engine.dart';
 import '../ai_service.dart';
-import '../database_service.dart';
 import 'batch_import_service.dart';
 
 /// 语音批量导入服务
@@ -16,7 +17,7 @@ import 'batch_import_service.dart';
 class VoiceBatchImportService {
   final VoiceRecognitionEngine _voiceEngine;
   final AIService _aiService;
-  final DatabaseService _databaseService;
+  final IDatabaseService _databaseService;
   final Uuid _uuid = const Uuid();
 
   // 当前批量导入会话
@@ -25,10 +26,10 @@ class VoiceBatchImportService {
   VoiceBatchImportService({
     VoiceRecognitionEngine? voiceEngine,
     AIService? aiService,
-    DatabaseService? databaseService,
+    IDatabaseService? databaseService,
   })  : _voiceEngine = voiceEngine ?? VoiceRecognitionEngine(),
         _aiService = aiService ?? AIService(),
-        _databaseService = databaseService ?? DatabaseService();
+        _databaseService = databaseService ?? sl<IDatabaseService>();
 
   /// 开始语音批量导入会话
   Future<VoiceBatchSession> startSession({

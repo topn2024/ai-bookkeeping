@@ -4,7 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/sync.dart';
-import 'database_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 
 /// 同步服务抽象类
 abstract class CloudSyncService {
@@ -175,7 +176,8 @@ class WebDAVSyncService extends CloudSyncService {
 
 /// 备份恢复服务
 class BackupRestoreService {
-  final DatabaseService _db = DatabaseService();
+  /// 通过服务定位器获取数据库服务
+  IDatabaseService get _db => sl<IDatabaseService>();
 
   /// 创建完整备份
   Future<BackupData> createBackup() async {

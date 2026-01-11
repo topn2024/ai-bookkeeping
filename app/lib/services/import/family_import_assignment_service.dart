@@ -1,5 +1,6 @@
 import '../../models/import_candidate.dart';
-import '../database_service.dart';
+import '../../core/di/service_locator.dart';
+import '../../core/contracts/i_database_service.dart';
 
 /// Simple Member class for family import assignment
 class Member {
@@ -20,11 +21,11 @@ class Member {
 
 /// Service for assigning imported transactions to family members (第11章家庭成员导入分配)
 class FamilyImportAssignmentService {
-  final DatabaseService _databaseService;
+  final IDatabaseService _databaseService;
 
   FamilyImportAssignmentService({
-    DatabaseService? databaseService,
-  }) : _databaseService = databaseService ?? DatabaseService();
+    IDatabaseService? databaseService,
+  }) : _databaseService = databaseService ?? sl<IDatabaseService>();
 
   /// Get family members for assignment
   Future<List<Member>> getFamilyMembers(String ledgerId) async {
