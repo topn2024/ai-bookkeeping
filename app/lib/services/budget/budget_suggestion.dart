@@ -163,4 +163,50 @@ abstract class BudgetSuggestionStrategy {
   ///
   /// 例如位置策略需要定位权限
   Future<bool> isAvailable();
+
+  /// 获取数据不足原因（当策略不可用时）
+  ///
+  /// 返回 null 表示策略可用或不需要额外数据
+  Future<String?> getDataInsufficiencyReason() async {
+    return null;
+  }
 }
+
+/// 数据不足警告
+class DataInsufficiencyWarning {
+  /// 策略来源
+  final BudgetSuggestionSource source;
+
+  /// 策略名称
+  final String strategyName;
+
+  /// 不足原因
+  final String reason;
+
+  const DataInsufficiencyWarning({
+    required this.source,
+    required this.strategyName,
+    required this.reason,
+  });
+}
+
+/// 预算建议结果（包含建议和数据不足警告）
+class BudgetSuggestionResult {
+  /// 预算建议列表
+  final List<BudgetSuggestion> suggestions;
+
+  /// 数据不足警告列表
+  final List<DataInsufficiencyWarning> warnings;
+
+  const BudgetSuggestionResult({
+    required this.suggestions,
+    required this.warnings,
+  });
+
+  /// 是否有数据不足警告
+  bool get hasWarnings => warnings.isNotEmpty;
+
+  /// 是否所有策略都不可用
+  bool get allStrategiesUnavailable => suggestions.isEmpty && warnings.isNotEmpty;
+}
+

@@ -93,6 +93,44 @@ enum SuggestionSource {
   custom,
 }
 
+/// 数据不足的分类信息
+class InsufficientDataCategory {
+  final String categoryId;
+  final String categoryName;
+  final int transactionCount;
+  final int requiredCount;
+
+  const InsufficientDataCategory({
+    required this.categoryId,
+    required this.categoryName,
+    required this.transactionCount,
+    required this.requiredCount,
+  });
+
+  String get message => '$categoryName需要至少$requiredCount笔交易才能生成建议（当前$transactionCount笔）';
+}
+
+/// 预算建议结果
+class SmartBudgetResult {
+  final List<BudgetSuggestion> suggestions;
+  final List<InsufficientDataCategory> insufficientDataCategories;
+
+  const SmartBudgetResult({
+    required this.suggestions,
+    required this.insufficientDataCategories,
+  });
+
+  bool get hasInsufficientData => insufficientDataCategories.isNotEmpty;
+
+  String get summaryMessage {
+    if (insufficientDataCategories.isEmpty) {
+      return '已为${suggestions.length}个分类生成预算建议';
+    }
+    return '已为${suggestions.length}个分类生成预算建议，${insufficientDataCategories.length}个分类数据不足';
+  }
+}
+
+
 /// 分类消费统计
 class CategorySpendingStats {
   final String categoryId;
@@ -149,19 +187,12 @@ class SmartBudgetService {
 
   SmartBudgetService(this._db);
 
-  /// 生成预算建议
-  Future<List<BudgetSuggestion>> generateBudgetSuggestions({
+  /// 生成预算建议（包含数据不足信息）
+  Future<SmartBudgetResult> generateBudgetSuggestionsWithInfo({
     bool forceRefresh = false,
   }) async {
-    // 检查缓存
-    if (!forceRefresh &&
-        _cachedSuggestions != null &&
-        _cacheTime != null &&
-        DateTime.now().difference(_cacheTime!).inMinutes < _cacheValidityMinutes) {
-      return _cachedSuggestions!;
-    }
-
     final suggestions = <BudgetSuggestion>[];
+    final insufficientDataCategories = <InsufficientDataCategory>[];
 
     // 获取最近3个月的消费数据
     final threeMonthsAgo = DateTime.now().subtract(const Duration(days: 90));
@@ -191,7 +222,16 @@ class SmartBudgetService {
       final categoryId = entry.key;
       final stats = entry.value;
 
-      if (stats.amounts.length < 3) continue; // 数据不足跳过
+      if (stats.amounts.length < 3) {
+        // 记录数据不足的分类
+        insufficientDataCategories.add(InsufficientDataCategory(
+          categoryId: categoryId,
+          categoryName: stats.categoryName,
+          transactionCount: stats.amounts.length,
+          requiredCount: 3,
+        ));
+        continue;
+      }
 
       // 计算统计指标
       final median = _calculateMedian(stats.amounts);
@@ -242,7 +282,26 @@ class SmartBudgetService {
     _cachedSuggestions = suggestions;
     _cacheTime = DateTime.now();
 
-    return suggestions;
+    return SmartBudgetResult(
+      suggestions: suggestions,
+      insufficientDataCategories: insufficientDataCategories,
+    );
+  }
+
+  /// 生成预算建议（向后兼容）
+  Future<List<BudgetSuggestion>> generateBudgetSuggestions({
+    bool forceRefresh = false,
+  }) async {
+    // 检查缓存
+    if (!forceRefresh &&
+        _cachedSuggestions != null &&
+        _cacheTime != null &&
+        DateTime.now().difference(_cacheTime!).inMinutes < _cacheValidityMinutes) {
+      return _cachedSuggestions!;
+    }
+
+    final result = await generateBudgetSuggestionsWithInfo(forceRefresh: forceRefresh);
+    return result.suggestions;
   }
 
   /// 获取特定分类的预算建议

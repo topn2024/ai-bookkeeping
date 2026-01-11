@@ -35,7 +35,64 @@ class BudgetSuggestionEngine {
     BudgetSuggestionSource.custom: 1.0,
   };
 
-  /// 获取聚合预算建议
+  /// 获取聚合预算建议（包含数据不足警告）
+  ///
+  /// 并行执行所有策略，然后合并同一分类的建议
+  /// [categoryIds] 限定分类列表
+  /// [context] 上下文信息
+  Future<BudgetSuggestionResult> getSuggestionsWithWarnings({
+    List<String>? categoryIds,
+    Map<String, dynamic>? context,
+  }) async {
+    final warnings = <DataInsufficiencyWarning>[];
+
+    // 并行执行所有可用策略
+    final results = await Future.wait(
+      _strategies.map((strategy) async {
+        try {
+          // 检查策略是否可用
+          if (!await strategy.isAvailable()) {
+            // 获取数据不足原因
+            final reason = await strategy.getDataInsufficiencyReason();
+            if (reason != null) {
+              warnings.add(DataInsufficiencyWarning(
+                source: strategy.sourceType,
+                strategyName: strategy.name,
+                reason: reason,
+              ));
+            }
+            return <BudgetSuggestion>[];
+          }
+
+          return await strategy.getSuggestions(
+            categoryIds: categoryIds,
+            context: context,
+          );
+        } catch (e) {
+          // 策略执行失败时记录警告
+          warnings.add(DataInsufficiencyWarning(
+            source: strategy.sourceType,
+            strategyName: strategy.name,
+            reason: '策略执行失败，请稍后重试',
+          ));
+          return <BudgetSuggestion>[];
+        }
+      }),
+    );
+
+    // 扁平化结果
+    final allSuggestions = results.expand((list) => list).toList();
+
+    // 合并同一分类的建议
+    final mergedSuggestions = _mergeSuggestions(allSuggestions);
+
+    return BudgetSuggestionResult(
+      suggestions: mergedSuggestions,
+      warnings: warnings,
+    );
+  }
+
+  /// 获取聚合预算建议（向后兼容）
   ///
   /// 并行执行所有策略，然后合并同一分类的建议
   /// [categoryIds] 限定分类列表
@@ -44,43 +101,11 @@ class BudgetSuggestionEngine {
     List<String>? categoryIds,
     Map<String, dynamic>? context,
   }) async {
-    // 并行执行所有可用策略
-    final results = await Future.wait(
-      _strategies.map((strategy) => _executeStrategy(
-            strategy,
-            categoryIds: categoryIds,
-            context: context,
-          )),
+    final result = await getSuggestionsWithWarnings(
+      categoryIds: categoryIds,
+      context: context,
     );
-
-    // 扁平化结果
-    final allSuggestions = results.expand((list) => list).toList();
-
-    // 合并同一分类的建议
-    return _mergeSuggestions(allSuggestions);
-  }
-
-  /// 执行单个策略（带错误处理）
-  Future<List<BudgetSuggestion>> _executeStrategy(
-    BudgetSuggestionStrategy strategy, {
-    List<String>? categoryIds,
-    Map<String, dynamic>? context,
-  }) async {
-    try {
-      // 检查策略是否可用
-      if (!await strategy.isAvailable()) {
-        return [];
-      }
-
-      return await strategy.getSuggestions(
-        categoryIds: categoryIds,
-        context: context,
-      );
-    } catch (e) {
-      // 策略执行失败时忽略，继续处理其他策略
-      // 生产环境应该记录日志
-      return [];
-    }
+    return result.suggestions;
   }
 
   /// 合并同一分类的建议
