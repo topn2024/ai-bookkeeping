@@ -1,57 +1,10 @@
-import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
-import '../models/transaction.dart';
-import '../models/category.dart';
-import '../models/budget.dart';
-import '../providers/transaction_provider.dart';
-import '../providers/budget_provider.dart';
-import '../extensions/category_extensions.dart';
-
-/// 聊天消息类型
-enum ChatMessageType {
-  user,
-  assistant,
-  system,
-}
-
-/// 聊天消息
-class ChatMessage {
-  final String id;
-  final ChatMessageType type;
-  final String content;
-  final DateTime timestamp;
-  final Map<String, dynamic>? metadata;
-  final bool isLoading;
-
-  ChatMessage({
-    required this.id,
-    required this.type,
-    required this.content,
-    required this.timestamp,
-    this.metadata,
-    this.isLoading = false,
-  });
-
-  ChatMessage copyWith({
-    String? content,
-    bool? isLoading,
-    Map<String, dynamic>? metadata,
-  }) {
-    return ChatMessage(
-      id: id,
-      type: type,
-      content: content ?? this.content,
-      timestamp: timestamp,
-      metadata: metadata ?? this.metadata,
-      isLoading: isLoading ?? this.isLoading,
-    );
-  }
-}
+import '../providers/global_voice_assistant_provider.dart';
+import '../services/global_voice_assistant_manager.dart';
 
 /// 6.12 连续对话记账页面
 /// 支持多轮对话的语音记账交互
@@ -62,37 +15,21 @@ class VoiceChatPage extends ConsumerStatefulWidget {
   ConsumerState<VoiceChatPage> createState() => _VoiceChatPageState();
 }
 
-class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
-    with TickerProviderStateMixin {
-  final List<ChatMessage> _messages = [];
+class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
-
-  bool _isRecording = false;
-  // ignore: unused_field
-  bool _isProcessing = false;
-  late AnimationController _waveController;
-  final List<double> _waveHeights = List.generate(12, (_) => 0.3);
 
   @override
   void initState() {
     super.initState();
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-    );
-
-    // 添加欢迎消息
-    _addSystemMessage('欢迎使用语音记账助手！\n您可以直接说出消费内容，我会帮您记录。');
-
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _addAssistantMessage('您好！我是您的记账小助手 😊\n\n试试说"午餐35块"或者"打车去公司花了20块钱"');
+    // 滚动到底部
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
     });
   }
 
   @override
   void dispose() {
-    _waveController.dispose();
     _scrollController.dispose();
     _textController.dispose();
     super.dispose();
@@ -101,6 +38,15 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // 使用共享的对话历史
+    final messages = ref.watch(conversationHistoryProvider);
+    final manager = ref.watch(globalVoiceAssistantProvider);
+    final ballState = manager.ballState;
+
+    // 当消息变化时滚动到底部
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
+    });
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
@@ -122,20 +68,19 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
               ),
             ),
             Text(
-              l10n.continuousChat,
+              _getStatusText(ballState, l10n),
               style: TextStyle(
                 fontSize: 12,
-                color: AppTheme.textSecondaryColor,
+                color: _getStatusColor(ballState),
               ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.history),
-            onPressed: () {
-              Navigator.pushNamed(context, '/voice-history');
-            },
+            icon: const Icon(Icons.delete_outline),
+            tooltip: '清除对话',
+            onPressed: () => _confirmClearHistory(),
           ),
         ],
       ),
@@ -143,19 +88,21 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
         children: [
           // 消息列表
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                return _buildMessageBubble(_messages[index]);
-              },
-            ),
+            child: messages.isEmpty
+                ? _buildEmptyState(l10n)
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      return _buildMessageBubble(messages[index]);
+                    },
+                  ),
           ),
           // 快捷问题
           _buildQuickQuestions(l10n),
           // 输入区域
-          _buildInputArea(l10n),
+          _buildInputArea(l10n, ballState),
         ],
       ),
     );
@@ -391,7 +338,10 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
   }
 
   /// 构建输入区域
-  Widget _buildInputArea(AppLocalizations l10n) {
+  Widget _buildInputArea(AppLocalizations l10n, FloatingBallState ballState) {
+    final isRecording = ballState == FloatingBallState.recording;
+    final isProcessing = ballState == FloatingBallState.processing;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -414,6 +364,7 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
                 ),
                 child: TextField(
                   controller: _textController,
+                  enabled: !isRecording && !isProcessing,
                   decoration: InputDecoration(
                     hintText: l10n.typeOrSpeak,
                     hintStyle: TextStyle(
@@ -435,40 +386,51 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
               ),
             ),
             const SizedBox(width: 12),
-            // 语音按钮
+            // 语音按钮 - 使用共享的录音功能
             GestureDetector(
-              onTapDown: (_) => _startRecording(),
-              onTapUp: (_) => _stopRecording(),
-              onTapCancel: () => _stopRecording(),
+              onTap: () => _toggleRecording(ballState),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: _isRecording ? 64 : 48,
-                height: _isRecording ? 64 : 48,
+                width: isRecording ? 64 : 48,
+                height: isRecording ? 64 : 48,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: _isRecording
+                    colors: isRecording
                         ? [AppTheme.errorColor, AppTheme.errorColor.withValues(alpha: 0.8)]
-                        : [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.8)],
+                        : isProcessing
+                            ? [Colors.orange, Colors.orange.withValues(alpha: 0.8)]
+                            : [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.8)],
                   ),
-                  borderRadius: BorderRadius.circular(_isRecording ? 32 : 24),
+                  borderRadius: BorderRadius.circular(isRecording ? 32 : 24),
                   boxShadow: [
                     BoxShadow(
-                      color: (_isRecording
+                      color: (isRecording
                               ? AppTheme.errorColor
-                              : AppTheme.primaryColor)
+                              : isProcessing
+                                  ? Colors.orange
+                                  : AppTheme.primaryColor)
                           .withValues(alpha: 0.4),
-                      blurRadius: _isRecording ? 20 : 12,
+                      blurRadius: isRecording ? 20 : 12,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: Icon(
-                  _isRecording ? Icons.stop : Icons.mic,
-                  color: Colors.white,
-                  size: _isRecording ? 28 : 24,
-                ),
+                child: isProcessing
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Icon(
+                        isRecording ? Icons.stop : Icons.mic,
+                        color: Colors.white,
+                        size: isRecording ? 28 : 24,
+                      ),
               ),
             ),
           ],
@@ -477,165 +439,22 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
     );
   }
 
-  /// 添加系统消息
-  void _addSystemMessage(String content) {
-    setState(() {
-      _messages.add(ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        type: ChatMessageType.system,
-        content: content,
-        timestamp: DateTime.now(),
-      ));
-    });
-    _scrollToBottom();
-  }
-
-  /// 添加助手消息
-  void _addAssistantMessage(String content, {Map<String, dynamic>? metadata}) {
-    setState(() {
-      _messages.add(ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        type: ChatMessageType.assistant,
-        content: content,
-        timestamp: DateTime.now(),
-        metadata: metadata,
-      ));
-    });
-    _scrollToBottom();
-  }
-
-  /// 添加用户消息
-  void _addUserMessage(String content, {Map<String, dynamic>? metadata}) {
-    setState(() {
-      _messages.add(ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        type: ChatMessageType.user,
-        content: content,
-        timestamp: DateTime.now(),
-        metadata: metadata,
-      ));
-    });
-    _scrollToBottom();
-  }
-
-  /// 发送消息
+  /// 发送消息 - 使用共享的管理器
   void _sendMessage(String text) {
     if (text.isEmpty) return;
-
-    _addUserMessage(text);
-    _processMessage(text);
+    ref.read(globalVoiceAssistantProvider).sendTextMessage(text);
   }
 
-  /// 处理消息
-  Future<void> _processMessage(String text) async {
-    setState(() => _isProcessing = true);
-
-    // 添加加载消息
-    final loadingId = DateTime.now().millisecondsSinceEpoch.toString();
-    setState(() {
-      _messages.add(ChatMessage(
-        id: loadingId,
-        type: ChatMessageType.assistant,
-        content: '',
-        timestamp: DateTime.now(),
-        isLoading: true,
-      ));
-    });
-    _scrollToBottom();
-
-    // 模拟处理延迟
-    await Future.delayed(const Duration(seconds: 1));
-
-    // 移除加载消息
-    setState(() {
-      _messages.removeWhere((m) => m.id == loadingId);
-    });
-
-    // 模拟AI响应
-    final response = _simulateAIResponse(text);
-    _addAssistantMessage(response['message']!, metadata: response['metadata'] as Map<String, dynamic>?);
-
-    setState(() => _isProcessing = false);
-  }
-
-  /// 模拟AI响应
-  Map<String, dynamic> _simulateAIResponse(String input) {
-    // 简单的关键词匹配模拟
-    final amountMatch = RegExp(r'(\d+(?:\.\d+)?)\s*(?:块|元)?').firstMatch(input);
-
-    if (amountMatch != null) {
-      final amount = double.tryParse(amountMatch.group(1)!) ?? 0;
-      String category = '其他';
-
-      if (input.contains('餐') || input.contains('饭') || input.contains('吃')) {
-        category = '餐饮';
-      } else if (input.contains('车') || input.contains('打车') || input.contains('地铁')) {
-        category = '交通';
-      } else if (input.contains('买') || input.contains('购')) {
-        category = '购物';
-      }
-
-      return {
-        'message': '好的，已帮您记录这笔支出 ✅\n\n金额：¥${amount.toStringAsFixed(2)}\n分类：$category\n\n还有其他要记的吗？',
-        'metadata': {
-          'amount': amount.toStringAsFixed(2),
-          'category': category,
-        },
-      };
-    }
-
-    if (input.contains('花了多少') || input.contains('支出')) {
-      return _generateSpendingResponse();
-    }
-
-    if (input.contains('钱龄')) {
-      return _generateMoneyAgeResponse();
-    }
-
-    return {
-      'message': '抱歉，我没有完全理解您的意思 😅\n\n您可以试试：\n• "午餐35块"\n• "打车20元"\n• "今天花了多少钱"',
-      'metadata': null,
-    };
-  }
-
-  /// 开始录音
-  void _startRecording() {
+  /// 切换录音状态 - 使用共享的管理器
+  void _toggleRecording(FloatingBallState currentState) {
     HapticFeedback.mediumImpact();
-    setState(() => _isRecording = true);
-    _startWaveAnimation();
-  }
+    final manager = ref.read(globalVoiceAssistantProvider);
 
-  /// 停止录音
-  void _stopRecording() {
-    if (!_isRecording) return;
-
-    setState(() => _isRecording = false);
-    _stopWaveAnimation();
-
-    // 模拟语音识别结果
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _sendMessage('午餐花了35块');
-    });
-  }
-
-  /// 开始波形动画
-  void _startWaveAnimation() {
-    _waveController.repeat();
-    _waveController.addListener(() {
-      if (_waveController.value >= 0.95 && _isRecording) {
-        setState(() {
-          for (int i = 0; i < _waveHeights.length; i++) {
-            _waveHeights[i] = 0.2 + Random().nextDouble() * 0.6;
-          }
-        });
-      }
-    });
-  }
-
-  /// 停止波形动画
-  void _stopWaveAnimation() {
-    _waveController.stop();
-    _waveController.reset();
+    if (currentState == FloatingBallState.idle) {
+      manager.startRecording();
+    } else if (currentState == FloatingBallState.recording) {
+      manager.stopRecording();
+    }
   }
 
   /// 滚动到底部
@@ -651,112 +470,95 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
     });
   }
 
-  /// 生成支出查询响应（使用真实数据）
-  Map<String, dynamic> _generateSpendingResponse() {
-    final transactions = ref.read(transactionProvider);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-
-    // 今日支出
-    final todayExpenses = transactions.where((t) =>
-        t.type == TransactionType.expense &&
-        t.date.year == today.year &&
-        t.date.month == today.month &&
-        t.date.day == today.day).toList();
-
-    // 昨日支出
-    final yesterdayExpenses = transactions.where((t) =>
-        t.type == TransactionType.expense &&
-        t.date.year == yesterday.year &&
-        t.date.month == yesterday.month &&
-        t.date.day == yesterday.day).toList();
-
-    final todayTotal = todayExpenses.fold<double>(0, (sum, t) => sum + t.amount);
-    final yesterdayTotal = yesterdayExpenses.fold<double>(0, (sum, t) => sum + t.amount);
-
-    // 按分类汇总
-    final categoryTotals = <String, double>{};
-    for (final t in todayExpenses) {
-      categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
-    }
-
-    // 排序并生成分类明细
-    final sortedCategories = categoryTotals.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    final categoryDetails = sortedCategories.take(3).map((e) {
-      final category = DefaultCategories.findById(e.key);
-      final emoji = _getCategoryEmoji(e.key);
-      return '$emoji ${category?.localizedName ?? e.key} ¥${e.value.toStringAsFixed(2)}';
-    }).join('\n');
-
-    // 与昨日比较
-    String comparison = '';
-    if (yesterdayTotal > 0) {
-      final diff = yesterdayTotal - todayTotal;
-      if (diff > 0) {
-        comparison = '\n\n比昨天少花了 ¥${diff.toStringAsFixed(2)} 呢！';
-      } else if (diff < 0) {
-        comparison = '\n\n比昨天多花了 ¥${(-diff).toStringAsFixed(2)}';
-      }
-    }
-
-    if (todayExpenses.isEmpty) {
-      return {
-        'message': '今天还没有支出记录哦！\n\n开始记录您的第一笔支出吧 ✨',
-        'metadata': null,
-      };
-    }
-
-    return {
-      'message': '今天您一共支出了 ¥${todayTotal.toStringAsFixed(2)}，包括：\n\n$categoryDetails$comparison',
-      'metadata': null,
-    };
+  /// 确认清除历史
+  void _confirmClearHistory() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('清除对话'),
+        content: const Text('确定要清除所有对话记录吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              ref.read(globalVoiceAssistantProvider).clearHistory();
+              Navigator.pop(context);
+            },
+            child: const Text('清除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
-  /// 生成钱龄查询响应（使用真实数据）
-  Map<String, dynamic> _generateMoneyAgeResponse() {
-    final moneyAge = ref.read(moneyAgeProvider);
-    final avgAge = moneyAge.days;
-    final level = moneyAge.statusText;
-
-    String levelEmoji;
-    switch (moneyAge.status) {
-      case MoneyAgeStatus.excellent:
-        levelEmoji = '🌟';
-        break;
-      case MoneyAgeStatus.good:
-        levelEmoji = '✨';
-        break;
-      case MoneyAgeStatus.fair:
-        levelEmoji = '📊';
-        break;
-      case MoneyAgeStatus.poor:
-        levelEmoji = '💪';
-        break;
+  /// 获取状态文本
+  String _getStatusText(FloatingBallState state, AppLocalizations l10n) {
+    switch (state) {
+      case FloatingBallState.idle:
+        return l10n.continuousChat;
+      case FloatingBallState.recording:
+        return '正在录音...';
+      case FloatingBallState.processing:
+        return '处理中...';
+      case FloatingBallState.success:
+        return '完成';
+      case FloatingBallState.error:
+        return '出错了';
+      case FloatingBallState.hidden:
+        return '';
     }
-
-    return {
-      'message': '您当前的钱龄是 $avgAge天，处于"$level"水平 $levelEmoji\n\n这意味着您花的钱平均是$avgAge天前赚的。\n\n想了解如何提升钱龄吗？',
-      'metadata': null,
-    };
   }
 
-  /// 获取分类对应的emoji
-  String _getCategoryEmoji(String categoryId) {
-    final emojiMap = {
-      'food': '🍜',
-      'transport': '🚗',
-      'shopping': '🛒',
-      'entertainment': '🎮',
-      'medical': '💊',
-      'education': '📚',
-      'housing': '🏠',
-      'utilities': '💡',
-      'communication': '📱',
-      'other': '📋',
-    };
-    return emojiMap[categoryId] ?? '📋';
+  /// 获取状态颜色
+  Color _getStatusColor(FloatingBallState state) {
+    switch (state) {
+      case FloatingBallState.idle:
+        return AppTheme.textSecondaryColor;
+      case FloatingBallState.recording:
+        return Colors.red;
+      case FloatingBallState.processing:
+        return Colors.orange;
+      case FloatingBallState.success:
+        return Colors.green;
+      case FloatingBallState.error:
+        return Colors.red;
+      case FloatingBallState.hidden:
+        return Colors.transparent;
+    }
+  }
+
+  /// 构建空状态
+  Widget _buildEmptyState(AppLocalizations l10n) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 64,
+            color: AppTheme.textSecondaryColor.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '开始对话吧！',
+            style: TextStyle(
+              fontSize: 18,
+              color: AppTheme.textSecondaryColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '点击麦克风按钮或输入文字',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTheme.textSecondaryColor.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

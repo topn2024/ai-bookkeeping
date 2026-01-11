@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/transaction_provider.dart';
+import '../providers/budget_provider.dart';
+import '../models/transaction.dart';
+import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 
 /// 6.20 语音智能客服页面
 /// 提供全方位的语音交互帮助，解答用户关于记账、预算、钱龄等问题
@@ -341,26 +346,21 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
   }
 
   void _handleQuickAction(String action) {
+    final l10n = AppLocalizations.of(context);
     _addUserMessage(action);
 
-    // 模拟回复
     Future.delayed(const Duration(milliseconds: 800), () {
       String response;
-      switch (action) {
-        case '快速记账':
-          response = '好的，请告诉我您要记录的消费内容。\n\n比如："午餐花了35块"或者"打车去公司20元"';
-          break;
-        case '查看统计':
-          response = '📊 本月消费统计\n\n总支出：¥3,280.50\n总收入：¥8,000.00\n\n支出分布：\n🍜 餐饮 28%\n🚗 交通 15%\n🛒 购物 35%\n🎬 娱乐 12%\n📦 其他 10%\n\n比上月减少了 12%，继续保持！';
-          break;
-        case '预算查询':
-          response = '💰 本月预算情况\n\n总预算：¥5,000\n已使用：¥2,819.50 (56%)\n剩余：¥2,180.50\n\n⚠️ 购物预算已用 81%，建议控制';
-          break;
-        case '获取建议':
-          response = '💡 根据您的消费习惯，我有以下建议：\n\n1. 餐饮支出偏高，可以考虑多做家常菜\n2. 交通费用稳定，保持良好\n3. 建议设置购物冷静期，减少冲动消费\n4. 可以考虑每月固定存款500元\n\n需要我帮您设置预算提醒吗？';
-          break;
-        default:
-          response = '好的，我来帮您处理这个问题。';
+      if (action == l10n.quickBookkeep) {
+        response = '好的，请告诉我您要记录的消费内容。\n\n比如："午餐花了35块"或者"打车去公司20元"';
+      } else if (action == l10n.viewStats) {
+        response = _generateStatsResponse();
+      } else if (action == l10n.budgetQuery) {
+        response = _generateBudgetResponse();
+      } else if (action == l10n.getSuggestion) {
+        response = _generateSuggestionResponse();
+      } else {
+        response = '好的，我来帮您处理这个问题。';
       }
 
       _addAssistantMessage(response);
@@ -379,13 +379,13 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
   }
 
   String _generateResponse(String input) {
-    // 简单的关键词匹配
+    // 简单的关键词匹配 - 使用真实数据
     if (input.contains('多少') || input.contains('花了')) {
-      return '让我帮您查一下...\n\n今天您一共花了 ¥128.50\n\n包括：\n🍜 餐饮 ¥45.00\n🚗 交通 ¥38.50\n🛒 购物 ¥45.00';
+      return _generateSpendingResponse();
     }
 
     if (input.contains('预算') || input.contains('还剩')) {
-      return '本月预算还剩 ¥2,180.50\n\n按照目前的消费速度，到月底预算刚好够用 ✨';
+      return _generateBudgetResponse();
     }
 
     if (input.contains('帮') || input.contains('记')) {
@@ -393,6 +393,201 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
     }
 
     return '好的，我已经收到您的问题。\n\n请问您是想要：\n1. 记一笔账\n2. 查看消费统计\n3. 获取省钱建议\n\n请告诉我您的需求~';
+  }
+
+  /// 生成今日支出回复 - 使用真实数据
+  String _generateSpendingResponse() {
+    final transactions = ref.read(transactionProvider);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // 过滤今日支出
+    final todayExpenses = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.date.year == today.year &&
+        t.date.month == today.month &&
+        t.date.day == today.day).toList();
+
+    if (todayExpenses.isEmpty) {
+      return '让我帮您查一下...\n\n今天您还没有消费记录 🎉\n\n继续保持节俭的习惯！';
+    }
+
+    // 计算总支出
+    final totalSpent = todayExpenses.fold<double>(0, (sum, t) => sum + t.amount);
+
+    // 按分类汇总
+    final categoryTotals = <String, double>{};
+    for (final t in todayExpenses) {
+      categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
+    }
+
+    // 按金额排序，取前3个分类
+    final sortedCategories = categoryTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final topCategories = sortedCategories.take(3);
+
+    // 生成分类明细
+    final categoryDetails = topCategories.map((entry) {
+      final category = DefaultCategories.findById(entry.key);
+      final emoji = _getCategoryEmoji(entry.key);
+      final name = category?.localizedName ?? entry.key;
+      return '$emoji $name ¥${entry.value.toStringAsFixed(2)}';
+    }).join('\n');
+
+    return '让我帮您查一下...\n\n今天您一共花了 ¥${totalSpent.toStringAsFixed(2)}\n\n包括：\n$categoryDetails';
+  }
+
+  /// 生成预算回复 - 使用真实数据
+  String _generateBudgetResponse() {
+    final budgets = ref.read(budgetProvider);
+    final monthlyExpense = ref.read(monthlyExpenseProvider);
+
+    // 计算总预算
+    final totalBudget = budgets
+        .where((b) => b.isEnabled)
+        .fold<double>(0, (sum, b) => sum + b.amount);
+
+    if (totalBudget == 0) {
+      return '您还没有设置预算 📝\n\n建议您设置月度预算，更好地管理消费哦！';
+    }
+
+    final remaining = totalBudget - monthlyExpense;
+    final now = DateTime.now();
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final remainingDays = daysInMonth - now.day + 1;
+    final dailyAllowance = remaining > 0 ? remaining / remainingDays : 0;
+
+    String advice;
+    if (remaining <= 0) {
+      advice = '本月预算已超支，建议控制消费 ⚠️';
+    } else if (remaining < totalBudget * 0.2) {
+      advice = '预算剩余不多，请注意控制开支 💡';
+    } else {
+      advice = '按照目前的消费速度，到月底预算充足 ✨';
+    }
+
+    return '本月预算还剩 ¥${remaining.toStringAsFixed(2)}\n\n每日可用约 ¥${dailyAllowance.toStringAsFixed(0)}\n\n$advice';
+  }
+
+  /// 生成本月统计回复 - 使用真实数据
+  String _generateStatsResponse() {
+    final transactions = ref.read(transactionProvider);
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+
+    // 过滤本月交易
+    final monthlyTransactions = transactions.where((t) =>
+        t.date.isAfter(monthStart.subtract(const Duration(days: 1)))).toList();
+
+    final expenses = monthlyTransactions.where((t) => t.type == TransactionType.expense);
+    final incomes = monthlyTransactions.where((t) => t.type == TransactionType.income);
+
+    final totalExpense = expenses.fold<double>(0, (sum, t) => sum + t.amount);
+    final totalIncome = incomes.fold<double>(0, (sum, t) => sum + t.amount);
+
+    if (totalExpense == 0 && totalIncome == 0) {
+      return '📊 本月消费统计\n\n本月暂无交易记录\n\n开始记录您的第一笔账吧！';
+    }
+
+    // 按分类汇总支出
+    final categoryTotals = <String, double>{};
+    for (final t in expenses) {
+      categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
+    }
+
+    // 按金额排序，取前5个分类
+    final sortedCategories = categoryTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final topCategories = sortedCategories.take(5);
+
+    // 生成分类明细
+    final categoryDetails = topCategories.map((entry) {
+      final category = DefaultCategories.findById(entry.key);
+      final emoji = _getCategoryEmoji(entry.key);
+      final name = category?.localizedName ?? entry.key;
+      final percent = totalExpense > 0 ? (entry.value / totalExpense * 100).round() : 0;
+      return '$emoji $name $percent%';
+    }).join('\n');
+
+    return '📊 本月消费统计\n\n总支出：¥${totalExpense.toStringAsFixed(2)}\n总收入：¥${totalIncome.toStringAsFixed(2)}\n\n支出分布：\n$categoryDetails';
+  }
+
+  /// 生成建议回复 - 基于真实消费数据
+  String _generateSuggestionResponse() {
+    final transactions = ref.read(transactionProvider);
+    final budgets = ref.read(budgetProvider);
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+
+    // 过滤本月支出
+    final monthlyExpenses = transactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.date.isAfter(monthStart.subtract(const Duration(days: 1)))).toList();
+
+    if (monthlyExpenses.isEmpty) {
+      return '💡 您本月还没有消费记录\n\n建议：\n1. 开始记录日常消费\n2. 设置月度预算目标\n3. 养成记账习惯';
+    }
+
+    final suggestions = <String>[];
+
+    // 按分类汇总
+    final categoryTotals = <String, double>{};
+    for (final t in monthlyExpenses) {
+      categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
+    }
+
+    // 找出支出最高的分类
+    final sortedCategories = categoryTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    if (sortedCategories.isNotEmpty) {
+      final topCategory = sortedCategories.first;
+      final category = DefaultCategories.findById(topCategory.key);
+      final name = category?.localizedName ?? topCategory.key;
+      suggestions.add('$name支出较高（¥${topCategory.value.toStringAsFixed(0)}），可以关注一下');
+    }
+
+    // 检查预算使用情况
+    for (final budget in budgets.where((b) => b.isEnabled)) {
+      final categoryId = budget.categoryId;
+      if (categoryId == null) continue;
+
+      final spent = categoryTotals[categoryId] ?? 0;
+      final percent = budget.amount > 0 ? spent / budget.amount : 0;
+      if (percent > 0.8) {
+        final category = DefaultCategories.findById(categoryId);
+        final name = category?.localizedName ?? categoryId;
+        suggestions.add('$name预算已用${(percent * 100).round()}%，建议控制');
+      }
+    }
+
+    // 通用建议
+    if (suggestions.length < 3) {
+      suggestions.add('坚持记账，了解消费习惯');
+    }
+
+    final numberedSuggestions = suggestions.asMap().entries
+        .map((e) => '${e.key + 1}. ${e.value}')
+        .join('\n');
+
+    return '💡 根据您的消费习惯，我有以下建议：\n\n$numberedSuggestions';
+  }
+
+  /// 获取分类对应的emoji
+  String _getCategoryEmoji(String categoryId) {
+    const emojiMap = {
+      'food': '🍜',
+      'transport': '🚗',
+      'shopping': '🛒',
+      'entertainment': '🎬',
+      'housing': '🏠',
+      'medical': '🏥',
+      'education': '📚',
+      'travel': '✈️',
+      'utilities': '💡',
+      'clothing': '👔',
+    };
+    return emojiMap[categoryId] ?? '📝';
   }
 
   void _addUserMessage(String content) {

@@ -21,6 +21,9 @@ import 'services/auto_sync_service.dart';
 import 'services/multimodal_wakeup_service.dart';
 import 'services/secure_storage_service.dart';
 import 'services/database_service.dart';
+import 'services/global_voice_assistant_manager.dart';
+import 'services/voice_context_route_observer.dart';
+import 'widgets/global_floating_ball.dart';
 import 'models/ledger.dart';
 
 void main() async {
@@ -107,6 +110,14 @@ void main() async {
     logger.warning('Failed to initialize default ledger: $e', tag: 'App');
   }
 
+  // Initialize global voice assistant
+  try {
+    await GlobalVoiceAssistantManager.instance.initialize();
+    logger.info('Global voice assistant initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize global voice assistant: $e', tag: 'App');
+  }
+
   // Check for app updates (non-blocking)
   AppUpgradeService().checkUpdate().then((result) {
     if (result.hasUpdate) {
@@ -160,6 +171,9 @@ class MyApp extends ConsumerStatefulWidget {
 }
 
 class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
+  // 路由观察器
+  final _voiceContextRouteObserver = VoiceContextRouteObserver();
+
   @override
   void initState() {
     super.initState();
@@ -233,6 +247,15 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         GlobalCupertinoLocalizations.delegate,
         AppLocalizationsDelegate(localeState.effectiveLanguage),
       ],
+      navigatorObservers: [
+        _voiceContextRouteObserver,
+      ],
+      builder: (context, child) {
+        // 包装全局悬浮球
+        return GlobalFloatingBallOverlay(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: onboardingState.isCompleted
           ? const MainNavigation()
           : const OnboardingFlowPage(),

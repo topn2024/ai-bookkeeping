@@ -17,6 +17,7 @@ import 'location_service_settings_page.dart';
 import 'membership_page.dart';
 import 'accessibility_settings_page.dart';
 import 'ai_learning_curve_page.dart';
+import 'voice_assistant_settings_page.dart';
 import 'home_layout_page.dart';
 import 'data_management_page.dart';
 import 'app_lock_settings_page.dart';
@@ -192,6 +193,19 @@ class SystemSettingsPage extends ConsumerWidget {
               ref,
               children: [
                 _buildMenuItem(
+                  icon: Icons.mic,
+                  iconColor: AppTheme.primaryColor,
+                  title: '语音助手设置',
+                  subtitle: '悬浮球、语音交互配置',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const VoiceAssistantSettingsPage()),
+                    );
+                  },
+                ),
+                _buildDivider(),
+                _buildMenuItem(
                   icon: Icons.translate,
                   iconColor: const Color(0xFFE91E63),
                   title: 'AI语言设置',
@@ -206,7 +220,7 @@ class SystemSettingsPage extends ConsumerWidget {
                 _buildDivider(),
                 _buildMenuItem(
                   icon: Icons.trending_up,
-                  iconColor: AppTheme.primaryColor,
+                  iconColor: const Color(0xFF4CAF50),
                   title: 'AI学习成长',
                   subtitle: '查看AI准确率提升',
                   onTap: () {
