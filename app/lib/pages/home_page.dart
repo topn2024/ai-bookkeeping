@@ -11,6 +11,7 @@ import '../models/category.dart';
 import '../extensions/category_extensions.dart';
 import '../widgets/budget_alert_widget.dart';
 import '../widgets/swipeable_transaction_item.dart';
+import '../services/home_page_text_service.dart';
 import 'transaction_list_page.dart';
 import 'transaction_detail_page.dart';
 import 'add_transaction_page.dart';
@@ -173,9 +174,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            isPositiveGrowth
-                                ? '太棒了！较上月提升 ${growth.toStringAsFixed(1)}% 💪'
-                                : '较上月下降 ${(-growth).toStringAsFixed(1)}%',
+                            balance > 0 && lastMonthBalance > 0
+                                ? HomePageTextService.getBalanceGrowthText(growth)
+                                : HomePageTextService.getNoGrowthDataText(),
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.white.withValues(alpha: 0.9),
@@ -322,7 +323,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '太棒了！连续记账$consecutiveDays天！',
+                      HomePageTextService.getStreakCelebrationText(consecutiveDays),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -331,7 +332,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '继续保持！',
+                      HomePageTextService.getStreakEncouragementText(consecutiveDays),
                       style: TextStyle(
                         fontSize: 13,
                         color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
@@ -476,16 +477,16 @@ class _HomePageState extends ConsumerState<HomePage> {
             Row(
               children: [
                 Icon(
-                  Icons.trending_up,
+                  trendDays >= 0 ? Icons.trending_up : Icons.trending_down,
                   size: 16,
-                  color: AppColors.success,
+                  color: trendDays >= 0 ? AppColors.success : AppColors.warning,
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '较上月提升$trendDays天',
+                  HomePageTextService.getMoneyAgeTrendText(trendDays, moneyAgeData.trend),
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.success,
+                    color: trendDays >= 0 ? AppColors.success : AppColors.warning,
                   ),
                 ),
               ],
@@ -886,52 +887,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  /// 获取问候语
-  _Greeting _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour >= 5 && hour < 12) {
-      return _Greeting(
-        emoji: '☀️',
-        text: '早安，美好的一天开始了',
-        motivation: '今天也要加油哦！',
-      );
-    } else if (hour >= 12 && hour < 14) {
-      return _Greeting(
-        emoji: '🌤️',
-        text: '中午好，记得吃午饭',
-        motivation: '休息一下再继续！',
-      );
-    } else if (hour >= 14 && hour < 18) {
-      return _Greeting(
-        emoji: '⛅',
-        text: '下午好，保持好心情',
-        motivation: '继续加油！',
-      );
-    } else if (hour >= 18 && hour < 22) {
-      return _Greeting(
-        emoji: '🌙',
-        text: '晚上好，辛苦了一天',
-        motivation: '好好放松一下！',
-      );
-    } else {
-      return _Greeting(
-        emoji: '🌟',
-        text: '夜深了，注意休息',
-        motivation: '早点休息哦！',
-      );
-    }
+  /// 获取问候语（使用动态文案服务）
+  HomeGreeting _getGreeting() {
+    return HomePageTextService.getTimeGreeting();
   }
-}
-
-/// 问候语数据模型
-class _Greeting {
-  final String emoji;
-  final String text;
-  final String motivation;
-
-  _Greeting({
-    required this.emoji,
-    required this.text,
-    required this.motivation,
-  });
 }
