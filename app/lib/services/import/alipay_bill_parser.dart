@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:csv/csv.dart';
+import 'package:flutter/foundation.dart';
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
 import 'bill_format_detector.dart';
@@ -26,10 +26,14 @@ class AlipayBillParser extends BillParser {
     '商品名称': 'note',
     '金额（元）': 'amount',
     '金额(元)': 'amount',
+    '金额': 'amount',  // Without unit
     '收/支': 'direction',
+    '收支': 'direction',  // Alternative without slash
     '交易状态': 'status',
     '服务费（元）': 'fee',
+    '服务费(元)': 'fee',  // Half-width parentheses
     '成功退款（元）': 'refund',
+    '成功退款(元)': 'refund',  // Half-width parentheses
     '备注': 'remark',
     '资金状态': 'fundStatus',
     '交易订单号': 'externalId',
@@ -109,6 +113,9 @@ class AlipayBillParser extends BillParser {
         }
       }
 
+      debugPrint('[AlipayBillParser] Headers found: $headers');
+      debugPrint('[AlipayBillParser] Column mapping: $columnIndex');
+
       // Validate required columns
       if (!columnIndex.containsKey('date') || !columnIndex.containsKey('amount')) {
         return BillParseResult(
@@ -149,6 +156,8 @@ class AlipayBillParser extends BillParser {
           errors.add('第 ${i + dataStartIndex + 1} 行解析失败: $e');
         }
       }
+
+      debugPrint('[AlipayBillParser] Parse complete: ${rows.length - 1} total rows, ${candidates.length} candidates, ${errors.length} errors');
 
       return BillParseResult(
         candidates: candidates,
@@ -206,15 +215,27 @@ class AlipayBillParser extends BillParser {
 
     // Parse date
     final dateStr = getValue('date');
-    if (dateStr == null) return null;
+    if (dateStr == null) {
+      debugPrint('[AlipayBillParser] Row $index skipped: date is null');
+      return null;
+    }
     final date = parseDate(dateStr);
-    if (date == null) return null;
+    if (date == null) {
+      debugPrint('[AlipayBillParser] Row $index skipped: date parse failed for "$dateStr"');
+      return null;
+    }
 
     // Parse amount
     final amountStr = getValue('amount');
-    if (amountStr == null) return null;
+    if (amountStr == null) {
+      debugPrint('[AlipayBillParser] Row $index skipped: amount is null');
+      return null;
+    }
     final amount = parseAmount(amountStr);
-    if (amount <= 0) return null;
+    if (amount <= 0) {
+      debugPrint('[AlipayBillParser] Row $index skipped: amount <= 0 for "$amountStr" (parsed: $amount)');
+      return null;
+    }
 
     // Get status
     final status = getValue('status') ?? '';
@@ -225,11 +246,13 @@ class AlipayBillParser extends BillParser {
         status.contains('关闭') ||
         status.contains('失败') ||
         fundStatus.contains('未到账')) {
+      debugPrint('[AlipayBillParser] Row $index skipped: pending/failed status "$status" / "$fundStatus"');
       return null;
     }
 
     // Skip refunds (handled separately)
     if (status.contains('退款成功') || status.contains('已退款')) {
+      debugPrint('[AlipayBillParser] Row $index skipped: refund status "$status"');
       return null;
     }
 
@@ -242,6 +265,10 @@ class AlipayBillParser extends BillParser {
       type = TransactionType.expense;
     } else if (direction.contains('收入') || direction.contains('+')) {
       type = TransactionType.income;
+    } else if (direction.contains('不计收支') || direction == '/' || direction.isEmpty) {
+      // Not counted as income/expense - skip
+      debugPrint('[AlipayBillParser] Row $index skipped: direction is "$direction" (not counted)');
+      return null;
     } else if (transactionType.contains('收入') ||
         transactionType.contains('转入') ||
         transactionType.contains('退款')) {

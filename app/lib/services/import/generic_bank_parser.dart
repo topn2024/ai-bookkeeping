@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:excel/excel.dart';
+import 'package:flutter/foundation.dart';
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
 import 'bill_format_detector.dart';
@@ -53,6 +53,7 @@ class GenericBankParser extends BillParser {
     '记账日期': 'date',
     '交易时间': 'date',
     '日期': 'date',
+    '时间': 'date',
     'Date': 'date',
     'Transaction Date': 'date',
 
@@ -61,18 +62,25 @@ class GenericBankParser extends BillParser {
     '金额': 'amount',
     '发生额': 'amount',
     '交易金额(元)': 'amount',
+    '交易金额（元）': 'amount',
+    '金额(元)': 'amount',
+    '金额（元）': 'amount',
     'Amount': 'amount',
 
     // Income/Expense columns
     '收入': 'income',
     '收入金额': 'income',
     '贷方金额': 'income',
+    '贷方发生额': 'income',
     '存入': 'income',
+    '存入金额': 'income',
     'Credit': 'income',
     '支出': 'expense',
     '支出金额': 'expense',
     '借方金额': 'expense',
+    '借方发生额': 'expense',
     '取出': 'expense',
+    '支取金额': 'expense',
     'Debit': 'expense',
 
     // Description columns
@@ -81,6 +89,7 @@ class GenericBankParser extends BillParser {
     '备注': 'note',
     '交易说明': 'note',
     '用途': 'note',
+    '附言': 'note',
     'Description': 'note',
     'Remarks': 'note',
 
@@ -88,8 +97,10 @@ class GenericBankParser extends BillParser {
     '对方户名': 'merchant',
     '交易对方': 'merchant',
     '对方账户': 'merchant',
+    '对方账号': 'merchant',
     '收款方': 'merchant',
     '付款方': 'merchant',
+    '对方名称': 'merchant',
     'Payee': 'merchant',
     'Counterparty': 'merchant',
 
@@ -98,17 +109,21 @@ class GenericBankParser extends BillParser {
     '流水号': 'externalId',
     '交易序号': 'externalId',
     '凭证号': 'externalId',
+    '交易单号': 'externalId',
     'Reference': 'externalId',
     'Transaction ID': 'externalId',
 
     // Balance
     '余额': 'balance',
     '账户余额': 'balance',
+    '本次余额': 'balance',
     'Balance': 'balance',
 
     // Type
     '交易类型': 'transactionType',
     '收支类型': 'direction',
+    '收/支': 'direction',
+    '收支': 'direction',
     '类型': 'direction',
     'Type': 'direction',
   };
@@ -326,6 +341,8 @@ class GenericBankParser extends BillParser {
         columnIndex[mappedName] = i;
       }
     }
+    debugPrint('[GenericBankParser] Headers found: $headers');
+    debugPrint('[GenericBankParser] Column mapping: $columnIndex');
     return columnIndex;
   }
 

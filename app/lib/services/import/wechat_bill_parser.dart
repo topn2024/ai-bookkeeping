@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:csv/csv.dart';
+import 'package:flutter/foundation.dart';
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
 import 'bill_format_detector.dart';
@@ -21,9 +21,13 @@ class WechatBillParser extends BillParser {
     '交易对方': 'merchant',
     '商品': 'note',
     '收/支': 'direction',
+    '收支': 'direction',  // Alternative without slash
     '金额(元)': 'amount',
+    '金额（元）': 'amount',  // Full-width parentheses
+    '金额': 'amount',  // Without unit
     '支付方式': 'paymentMethod',
     '当前状态': 'status',
+    '交易状态': 'status',  // Alternative name
     '交易单号': 'externalId',
     '商户单号': 'merchantOrderId',
     '备注': 'remark',
@@ -97,6 +101,9 @@ class WechatBillParser extends BillParser {
         }
       }
 
+      debugPrint('[WechatBillParser] Headers found: $headers');
+      debugPrint('[WechatBillParser] Column mapping: $columnIndex');
+
       // Validate required columns
       if (!columnIndex.containsKey('date') ||
           !columnIndex.containsKey('amount') ||
@@ -131,6 +138,8 @@ class WechatBillParser extends BillParser {
           errors.add('第 ${i + dataStartIndex + 1} 行解析失败: $e');
         }
       }
+
+      debugPrint('[WechatBillParser] Parse complete: ${rows.length - 1} total rows, ${candidates.length} candidates, ${errors.length} errors');
 
       return BillParseResult(
         candidates: candidates,
@@ -188,15 +197,27 @@ class WechatBillParser extends BillParser {
 
     // Parse date
     final dateStr = getValue('date');
-    if (dateStr == null) return null;
+    if (dateStr == null) {
+      debugPrint('[WechatBillParser] Row $index skipped: date is null');
+      return null;
+    }
     final date = parseDate(dateStr);
-    if (date == null) return null;
+    if (date == null) {
+      debugPrint('[WechatBillParser] Row $index skipped: date parse failed for "$dateStr"');
+      return null;
+    }
 
     // Parse amount
     final amountStr = getValue('amount');
-    if (amountStr == null) return null;
+    if (amountStr == null) {
+      debugPrint('[WechatBillParser] Row $index skipped: amount is null');
+      return null;
+    }
     final amount = parseAmount(amountStr);
-    if (amount <= 0) return null;
+    if (amount <= 0) {
+      debugPrint('[WechatBillParser] Row $index skipped: amount <= 0 for "$amountStr" (parsed: $amount)');
+      return null;
+    }
 
     // Determine transaction type
     final direction = getValue('direction') ?? '';
@@ -206,6 +227,7 @@ class WechatBillParser extends BillParser {
     if (status.contains('已退款') ||
         status.contains('退款成功') ||
         status.contains('已全额退款')) {
+      debugPrint('[WechatBillParser] Row $index skipped: refund status "$status"');
       return null;
     }
 
@@ -215,11 +237,13 @@ class WechatBillParser extends BillParser {
       type = TransactionType.expense;
     } else if (direction.contains('收入')) {
       type = TransactionType.income;
-    } else if (direction == '/') {
-      // Transfer or other - treat as expense for now
-      type = TransactionType.expense;
+    } else if (direction == '/' || direction.contains('不计收支') || direction.isEmpty) {
+      // Transfer or not counted - skip these
+      debugPrint('[WechatBillParser] Row $index skipped: direction is "$direction" (transfer/not counted)');
+      return null;
     } else {
       // Unknown direction, skip
+      debugPrint('[WechatBillParser] Row $index skipped: unknown direction "$direction"');
       return null;
     }
 
