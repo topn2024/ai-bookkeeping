@@ -483,7 +483,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  HomePageTextService.getMoneyAgeTrendText(trendDays, moneyAgeData.trend),
+                  HomePageTextService.getMoneyAgeTrendText(trendDays, moneyAgeData.trend ?? 'stable'),
                   style: TextStyle(
                     fontSize: 12,
                     color: trendDays >= 0 ? AppColors.success : AppColors.warning,
