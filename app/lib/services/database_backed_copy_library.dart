@@ -1,4 +1,6 @@
 /// 数据库支持的预生成文案库
+library;
+
 import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'dart:convert';

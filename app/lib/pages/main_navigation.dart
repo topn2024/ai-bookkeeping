@@ -88,13 +88,16 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    // 小记页面（index=2）不显示底部导航栏
+    final isVoiceAssistantPage = _currentIndex == 2;
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
         children: _pages,
       ),
-      bottomNavigationBar: _buildBottomNavBar(context),
-      floatingActionButton: _buildCenterButton(context),
+      bottomNavigationBar: isVoiceAssistantPage ? null : _buildBottomNavBar(context),
+      floatingActionButton: isVoiceAssistantPage ? null : _buildCenterButton(context),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }

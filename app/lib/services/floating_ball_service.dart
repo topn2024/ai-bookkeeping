@@ -129,9 +129,9 @@ class FloatingBallWidget extends StatefulWidget {
   final VoidCallback onTap;
 
   const FloatingBallWidget({
-    Key? key,
+    super.key,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   State<FloatingBallWidget> createState() => _FloatingBallWidgetState();

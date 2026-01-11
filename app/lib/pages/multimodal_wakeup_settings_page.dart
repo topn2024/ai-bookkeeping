@@ -8,7 +8,7 @@ import 'main_navigation.dart';
 
 /// 多模态唤醒设置页面
 class MultimodalWakeUpSettingsPage extends StatefulWidget {
-  const MultimodalWakeUpSettingsPage({Key? key}) : super(key: key);
+  const MultimodalWakeUpSettingsPage({super.key});
 
   @override
   State<MultimodalWakeUpSettingsPage> createState() => _MultimodalWakeUpSettingsPageState();
