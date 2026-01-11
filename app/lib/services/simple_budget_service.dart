@@ -203,7 +203,7 @@ class SimpleBudget {
       return '系统建议的预算（可以修改）';
     }
 
-    return '基于最近${basedOnMonths}个月的花费';
+    return '基于最近$basedOnMonths个月的花费';
   }
 }
 

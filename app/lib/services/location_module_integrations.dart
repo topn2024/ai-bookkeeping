@@ -686,7 +686,7 @@ class VoiceLocationQueryService {
       currentPosition: position,
     );
 
-    return '在${city.name}，${categoryName}的建议金额是'
+    return '在${city.name}，$categoryName的建议金额是'
         '¥${suggestion.suggestedMin.toStringAsFixed(0)}'
         ' 到 '
         '¥${suggestion.suggestedMax.toStringAsFixed(0)}，'

@@ -56,8 +56,8 @@ class LinkageIntegrationService {
     Widget? detailPage,
   }) async {
     await linkageService.drillDown(
-      id: 'moneyage_${level}_${startDate.millisecondsSinceEpoch}',
-      title: '${level}钱龄详情',
+      id: 'moneyage_$level_${startDate.millisecondsSinceEpoch}',
+      title: '$level钱龄详情',
       filterValue: {
         'moneyAgeLevel': level,
         'startDate': startDate,
@@ -234,7 +234,7 @@ class LinkageIntegrationService {
     Widget? detailPage,
   }) async {
     await linkageService.drillDown(
-      id: 'habit_${habitType}_${date.millisecondsSinceEpoch}',
+      id: 'habit_$habitType_${date.millisecondsSinceEpoch}',
       title: '习惯打卡详情',
       filterValue: {
         'habitType': habitType,

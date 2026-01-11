@@ -387,7 +387,7 @@ class GoalAchievementService {
       if (currentStreak >= targetStreak) {
         status = '已达成';
       } else {
-        status = '连续${currentStreak}天';
+        status = '连续$currentStreak天';
         if (currentStreak < 7) {
           tip = '坚持每日记账，培养好习惯';
         } else {

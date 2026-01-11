@@ -1138,7 +1138,7 @@ class EnhancedEntityExtractor extends EntityExtractor {
       if (quantity != null) {
         entities.add(NLUEntity(
           type: EntityType.description,
-          value: '${quantity}${match.group(2)}',
+          value: '$quantity${match.group(2)}',
           confidence: 0.85,
           startIndex: match.start,
           endIndex: match.end,

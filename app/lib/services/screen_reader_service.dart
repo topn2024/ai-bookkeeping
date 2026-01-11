@@ -820,7 +820,7 @@ class VoiceScreenRecognitionResult {
         if (hasMultipleBills) {
           // 多笔账单反馈
           final totalText = totalAmount.toStringAsFixed(2);
-          return '识别到${billCount}笔交易，总金额$totalText元。是否全部记录？';
+          return '识别到$billCount笔交易，总金额$totalText元。是否全部记录？';
         } else {
           // 单笔账单反馈
           final bill = billInfo!;
@@ -831,7 +831,7 @@ class VoiceScreenRecognitionResult {
 
       case VoiceScreenRecognitionStatus.lowConfidence:
         if (hasMultipleBills) {
-          return '可能识别到${billCount}笔交易，但不太确定。请确认是否正确？';
+          return '可能识别到$billCount笔交易，但不太确定。请确认是否正确？';
         } else {
           final bill = billInfo!;
           final amountText = bill.amount != null ? '${bill.amount!.toStringAsFixed(2)}元' : '金额未知';
@@ -856,7 +856,7 @@ class VoiceScreenRecognitionResult {
     }
 
     final buffer = StringBuffer();
-    buffer.write('识别到${billCount}笔交易：');
+    buffer.write('识别到$billCount笔交易：');
 
     for (var i = 0; i < allBills.length && i < 5; i++) {
       final bill = allBills[i];

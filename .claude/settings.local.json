@@ -722,7 +722,9 @@
       "Bash(expect -c '\nspawn ssh -o StrictHostKeyChecking=no root@160.202.238.29\nexpect \"\"password:\"\"\nsend \"\"65QLkJ0CogNI\\\\r\"\"\nexpect \"\"# \"\"\nsend \"\"cat >> /root/ai-bookkeeping/server/.env << ''''EOF''''\n\n# SMTP Email \\(QQ邮箱\\)\nSMTP_HOST=smtp.qq.com\nSMTP_PORT=465\nSMTP_USER=17377896@qq.com\nSMTP_PASSWORD=ohgwqszfqtuvbhbh\nSMTP_FROM_EMAIL=17377896@qq.com\nSMTP_FROM_NAME=AI智能记账\nSMTP_USE_TLS=false\nEOF\n\\\\r\"\"\nexpect \"\"# \"\"\nsend \"\"exit\\\\r\"\"\nexpect eof\n')",
       "Bash(expect -c '\nspawn ssh -o StrictHostKeyChecking=no root@160.202.238.29\nexpect \"\"password:\"\"\nsend \"\"65QLkJ0CogNI\\\\r\"\"\nexpect \"\"# \"\"\nsend \"\"find /root -name \\\\\"\".env\\\\\"\" 2>/dev/null\\\\r\"\"\nexpect \"\"# \"\"\nsend \"\"exit\\\\r\"\"\nexpect eof\n')",
       "Bash(expect:*)",
-      "Bash(sshpass -p:*)"
+      "Bash(sshpass -p:*)",
+      "Bash(for file in goal_achievement_service.dart linkage_integration_service.dart location_business_services.dart location_enhanced_budget_service.dart location_module_integrations.dart location_privacy_guard.dart nlu_engine.dart screen_reader_service.dart simple_budget_service.dart)",
+      "Bash(do grep:*)"
     ]
   }
 }

@@ -142,7 +142,7 @@ class LocalizedAmountService {
 
   String _generateReasoning(String categoryName, CityTier tier, String? cityName) {
     final city = cityName ?? tier.displayName;
-    return '基于$city的消费水平，${categoryName}类目建议金额';
+    return '基于$city的消费水平，$categoryName类目建议金额';
   }
 }
 

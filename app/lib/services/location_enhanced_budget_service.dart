@@ -585,7 +585,7 @@ class LocationEnhancedBudgetService {
       buffer.write('，考虑到您当前处于异地，预算适当放宽20%');
     }
 
-    buffer.write('，为${categoryName}类目推荐的预算范围');
+    buffer.write('，为$categoryName类目推荐的预算范围');
 
     return buffer.toString();
   }
