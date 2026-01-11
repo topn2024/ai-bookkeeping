@@ -158,7 +158,7 @@ class VoiceTokenService {
           e.type == DioExceptionType.receiveTimeout) {
         throw VoiceTokenException('网络超时，请检查网络连接');
       }
-      throw VoiceTokenException('获取Token失败: ${e.message}');
+      throw VoiceTokenException('获取Token失败: ${e.message ?? '未知错误'}');
     }
   }
 

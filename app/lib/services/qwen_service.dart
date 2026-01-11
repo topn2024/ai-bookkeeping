@@ -1340,7 +1340,7 @@ $_categoryPrompt
       case DioExceptionType.connectionError:
         return '网络连接失败';
       default:
-        return '网络错误: ${e.message}';
+        return '网络错误: ${e.message ?? '请稍后重试'}';
     }
   }
 }

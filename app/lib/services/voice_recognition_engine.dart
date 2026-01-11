@@ -441,7 +441,7 @@ class AliCloudASRService {
         return ASRException('网络连接失败，请检查网络设置',
             errorCode: ASRErrorCode.noConnection);
       default:
-        return ASRException('网络错误: ${e.message}',
+        return ASRException('网络错误: ${e.message ?? '请稍后重试'}',
             errorCode: ASRErrorCode.unknown);
     }
   }
@@ -475,7 +475,7 @@ class AliCloudASRService {
         tokenInfo = await _tokenService.getToken();
       } on VoiceTokenException catch (e) {
         throw ASRException(
-          'Token获取失败: ${e.message}',
+          'Token获取失败: ${e.message ?? '未知错误'}',
           errorCode: ASRErrorCode.tokenFailed,
         );
       }
@@ -603,7 +603,7 @@ class AliCloudASRService {
         tokenInfo = await _tokenService.getToken();
       } on VoiceTokenException catch (e) {
         throw ASRException(
-          'Token获取失败: ${e.message}',
+          'Token获取失败: ${e.message ?? '未知错误'}',
           errorCode: ASRErrorCode.tokenFailed,
         );
       }
