@@ -645,7 +645,7 @@ class _ImageRecognitionPageState extends ConsumerState<ImageRecognitionPage> {
           Expanded(
             child: ListView.separated(
               itemCount: transactions.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final tx = transactions[index];
                 return ListTile(

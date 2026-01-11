@@ -367,7 +367,7 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: expenses.length.clamp(0, 5),
-              separatorBuilder: (_, __) => Divider(
+              separatorBuilder: (_, _) => Divider(
                 height: 1,
                 indent: 56,
                 color: theme.colorScheme.outlineVariant,

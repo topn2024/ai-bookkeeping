@@ -360,7 +360,7 @@ class InviteFriendPage extends ConsumerWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: invites.length,
-              separatorBuilder: (_, __) => Divider(
+              separatorBuilder: (_, _) => Divider(
                 height: 1,
                 indent: 56,
                 color: theme.colorScheme.outlineVariant,

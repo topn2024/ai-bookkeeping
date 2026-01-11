@@ -466,14 +466,14 @@ class _IntentSample {
 
 /// 意图数据收集器
 class IntentDataCollector {
-  final List<_CollectedIntentData> _data = [];
+  final List<CollectedIntentData> _data = [];
 
   Future<void> collect(
     String input,
     IntentRecognitionResult result,
     IntentSource source,
   ) async {
-    _data.add(_CollectedIntentData(
+    _data.add(CollectedIntentData(
       input: input,
       result: result,
       source: source,
@@ -486,18 +486,18 @@ class IntentDataCollector {
     }
   }
 
-  List<_CollectedIntentData> getRecentData({int limit = 100}) {
+  List<CollectedIntentData> getRecentData({int limit = 100}) {
     return _data.reversed.take(limit).toList();
   }
 }
 
-class _CollectedIntentData {
+class CollectedIntentData {
   final String input;
   final IntentRecognitionResult result;
   final IntentSource source;
   final DateTime timestamp;
 
-  _CollectedIntentData({
+  CollectedIntentData({
     required this.input,
     required this.result,
     required this.source,

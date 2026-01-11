@@ -543,7 +543,7 @@ class _SmartDirectoryDiscoveryPageState
       if (result != null && result.files.isNotEmpty) {
         // 直接导入选中的文件
         final firstFile = result.files.first;
-        if (firstFile.path != null) {
+        if (firstFile.path != null && context.mounted) {
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -556,9 +556,11 @@ class _SmartDirectoryDiscoveryPageState
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('选择文件失败: $e')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('选择文件失败: $e')),
+        );
+      }
     }
   }
 

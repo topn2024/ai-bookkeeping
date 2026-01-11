@@ -237,7 +237,7 @@ class AccessibleErrorService {
     _activeErrors[error.id] = error;
     _notifyListeners();
 
-    if (_autoAnnounce) {
+    if (autoAnnounce) {
       _announceError(error);
     }
   }
@@ -300,7 +300,7 @@ class AccessibleErrorService {
     _formErrors[formId] = {for (var e in errors) e.context?.fieldId ?? e.id: e};
     _notifyListeners();
 
-    if (_autoAnnounce && errors.isNotEmpty) {
+    if (autoAnnounce && errors.isNotEmpty) {
       _announceFormErrors(formId, errors);
     }
   }
@@ -311,7 +311,7 @@ class AccessibleErrorService {
 
     if (error != null) {
       _formErrors[formId]![fieldId] = error;
-      if (_autoAnnounce) {
+      if (autoAnnounce) {
         _announceError(error);
       }
     } else {

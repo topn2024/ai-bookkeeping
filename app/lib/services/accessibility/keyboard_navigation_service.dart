@@ -177,9 +177,6 @@ class KeyboardNavigationService {
   factory KeyboardNavigationService() => _instance;
   KeyboardNavigationService._internal();
 
-  /// 是否启用键盘导航
-  bool _enabled = true;
-
   /// 快捷键注册表
   final Map<String, KeyboardShortcut> _shortcuts = {};
 
@@ -447,7 +444,7 @@ class KeyboardNavigationService {
 
   /// 处理按键事件
   KeyEventResult handleKeyEvent(KeyEvent event) {
-    if (!_enabled) {
+    if (!enabled) {
       return KeyEventResult.ignored;
     }
 

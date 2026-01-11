@@ -606,7 +606,7 @@ class _DownloadCacheDialogState extends State<_DownloadCacheDialog> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: _cacheFiles.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final file = _cacheFiles[index];
                     final name = file['name'] as String;
