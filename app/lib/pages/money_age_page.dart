@@ -40,7 +40,7 @@ class MoneyAgePage extends ConsumerWidget {
             body: const Center(child: Text('暂无钱龄数据')),
           );
         }
-        return _buildContent(context, theme, dashboard as MoneyAgeDashboard, ref);
+        return _buildContent(context, theme, dashboard, ref);
       },
       loading: () => Scaffold(
         appBar: AppBar(title: const Text('钱龄分析')),

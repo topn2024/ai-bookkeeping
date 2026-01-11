@@ -499,13 +499,14 @@ class CityLocation {
 /// 异地消费检测服务
 class CrossRegionSpendingService {
   final CityLocationService _cityService;
-  final SharedPreferences _prefs;
+  // ignore: unused_field
+  final SharedPreferences __prefs;
 
   CrossRegionSpendingService({
     required CityLocationService cityService,
     required SharedPreferences prefs,
   })  : _cityService = cityService,
-        _prefs = prefs;
+        __prefs = prefs;
 
   /// 检测当前是否为异地消费
   Future<CrossRegionResult> detectCrossRegion() async {

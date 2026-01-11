@@ -28,7 +28,7 @@ class FloatingBallService {
   Stream<void> get onClicked => _clickController.stream;
 
   FloatingBallState _currentState = FloatingBallState.normal;
-  bool _isEnabled = false;
+  bool _isEnabled = true;  // 默认启用悬浮球
   String? _detectedAmount;
 
   /// 初始化

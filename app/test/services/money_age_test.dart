@@ -243,6 +243,7 @@ void main() {
 /// Mock 钱龄计算器
 class MockMoneyAgeCalculator {
   final List<IncomeRecord> _incomes = [];
+  // ignore: unused_field
   double _availableBalance = 0;
 
   void addIncome({required double amount, required DateTime date}) {

@@ -34,7 +34,7 @@ class MoneyAgeDashboardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final _ = Theme.of(context);
     final levelService = MoneyAgeLevelService();
     final levelDetails = levelService.getLevelDetails(stats.averageAge);
     final stageProgress = levelService.getStageProgress(stats.averageAge);

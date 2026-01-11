@@ -5,7 +5,6 @@ import 'location_service.dart' hide CityTier, CityTierExtension, CityInfo, CityL
   CityLocationService, UserHomeLocationService, CrossRegionSpendingService, CrossRegionResult;
 import 'location_data_services.dart' hide CityTier, CityTierExtension, CityInfo, CityLocation;
 import 'location_business_services.dart';
-import 'localized_budget_service.dart' hide CityTier, CityTierExtension, LocalizedBudgetService;
 import 'geofence_background_service.dart';
 
 /// 位置增强预算服务
@@ -354,7 +353,7 @@ class LocationEnhancedBudgetService {
 
     // 1. 检查地理围栏警报
     if (_geofenceService != null) {
-      final geofences = _geofenceService!.activeGeofences;
+      final geofences = _geofenceService.activeGeofences;
 
       for (final geofence in geofences) {
         final centerPosition = Position(
@@ -366,7 +365,7 @@ class LocationEnhancedBudgetService {
 
         if (distance <= geofence.radius) {
           // 在围栏内，检查相关类目预算
-          final categoryId = geofence.metadata?['categoryId'] as String?;
+          final categoryId = geofence.metadata['categoryId'] as String?;
           if (categoryId != null) {
             final budget = categoryBudgets[categoryId] ?? 0.0;
             final spending = categorySpending[categoryId] ?? 0.0;
@@ -447,7 +446,7 @@ class LocationEnhancedBudgetService {
 
     // 4. 地理围栏建议
     if (_geofenceService != null) {
-      final geofences = _geofenceService!.activeGeofences;
+      final geofences = _geofenceService.activeGeofences;
       if (geofences.isEmpty) {
         suggestions.add('建议设置地理围栏，在进入高消费区域时自动提醒');
       }

@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/transaction.dart';
 import '../services/gamification_service.dart';
 import 'transaction_provider.dart';
 

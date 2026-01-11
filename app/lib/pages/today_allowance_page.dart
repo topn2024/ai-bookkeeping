@@ -6,8 +6,6 @@ import '../theme/app_theme.dart';
 import '../theme/antigravity_shadows.dart';
 import '../widgets/glass_components.dart';
 import '../widgets/antigravity_animations.dart';
-import '../l10n/l10n.dart';
-import '../models/category.dart';
 import '../models/transaction.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/budget_provider.dart';

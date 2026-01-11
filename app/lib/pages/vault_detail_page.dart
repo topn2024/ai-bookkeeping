@@ -26,6 +26,7 @@ class VaultDetailPage extends ConsumerStatefulWidget {
 class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
   final List<VaultTransaction> _transactions = [];
   double _monthlyDeposit = 0;
+  // ignore: unused_field
   bool _isLoading = true;
 
   @override
@@ -244,6 +245,7 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
 
   void _showTransferDialog(BuildContext context) {
     final amountController = TextEditingController();
+    // ignore: unused_local_variable
     String? selectedVaultId;
 
     showDialog(

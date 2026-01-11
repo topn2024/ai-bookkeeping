@@ -1,6 +1,5 @@
 import '../models/transaction.dart' as model;
 import '../services/database_service.dart';
-import '../services/voice/entity_disambiguation_service.dart';
 
 /// 数据库服务的语音查询扩展
 extension VoiceQueryExtension on DatabaseService {

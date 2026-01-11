@@ -321,7 +321,7 @@ class BudgetAlertService {
     if (!_config.enabled || !vault.isEnabled) return [];
 
     final alerts = <BudgetAlert>[];
-    final now = DateTime.now();
+    final _ = DateTime.now();
 
     // 1. 检查超支
     if (vault.isOverSpent) {

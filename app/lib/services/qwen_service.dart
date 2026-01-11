@@ -1079,7 +1079,8 @@ $_categoryPrompt
     }
   }
 
-  String _getAudioMimeType(String extension) {
+  // ignore: unused_element
+  String __getAudioMimeType(String extension) {
     switch (extension) {
       case 'mp3':
         return 'audio/mpeg';

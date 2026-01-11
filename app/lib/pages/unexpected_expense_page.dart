@@ -286,7 +286,7 @@ class _FundingSourceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isEnabled = onTap != null;
+    final _ = onTap != null;
     return GestureDetector(
       onTap: onTap,
       child: Container(

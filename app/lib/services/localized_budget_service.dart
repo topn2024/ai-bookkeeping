@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models/common_types.dart' show CityTier, CityTierExtension;
+import '../models/common_types.dart' show CityTier;
 export '../models/common_types.dart' show CityTier, CityTierExtension, AmountRange;
 
 /// 城市位置信息（本地化预算专用）

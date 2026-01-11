@@ -186,7 +186,6 @@ class SearchLearningData extends LearningData {
               : LearningDataSource.userImplicitBehavior,
         );
 
-  @override
   double get qualityScore {
     var score = 0.0;
     // 用户有点击行为
@@ -714,9 +713,10 @@ class SearchLearningService
 
 /// 搜索协同学习服务
 class SearchCollaborativeLearningService {
-  final SearchLearningService _learningService;
+  // ignore: unused_field
+  final SearchLearningService __learningService;
 
-  SearchCollaborativeLearningService(this._learningService);
+  SearchCollaborativeLearningService(SearchLearningService learningService) : __learningService = learningService;
 
   /// 上报搜索模式（隐私保护）
   Future<void> reportSearchPattern(SearchRule rule) async {

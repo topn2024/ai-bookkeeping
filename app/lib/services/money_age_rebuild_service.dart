@@ -585,7 +585,8 @@ class MoneyAgeRebuildService {
   }
 
   /// 保存重建结果信息
-  Future<void> _saveRebuildInfo(RebuildResult result) async {
+  // ignore: unused_element
+  Future<void> __saveRebuildInfo(RebuildResult result) async {
     try {
       final db = await _db.database;
 

@@ -63,6 +63,7 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
   final TextEditingController _textController = TextEditingController();
 
   bool _isRecording = false;
+  // ignore: unused_field
   bool _isProcessing = false;
   late AnimationController _waveController;
   final List<double> _waveHeights = List.generate(12, (_) => 0.3);

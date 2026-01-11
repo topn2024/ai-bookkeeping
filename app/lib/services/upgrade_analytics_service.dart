@@ -94,7 +94,8 @@ class UpgradeAnalyticsService {
 
   // 下载开始时间（用于计算下载耗时）
   DateTime? _downloadStartTime;
-  int? _targetVersionCode;
+  // ignore: unused_field
+  int? __targetVersionCode;
   String? _targetVersionName;
 
   // 上次上报进度（避免重复上报）
@@ -231,7 +232,7 @@ class UpgradeAnalyticsService {
   void onDownloadStart(String targetVersion, int targetVersionCode) {
     _downloadStartTime = DateTime.now();
     _targetVersionName = targetVersion;
-    _targetVersionCode = targetVersionCode;
+    __targetVersionCode = targetVersionCode;
     _lastReportedProgress = 0;
 
     trackEvent(

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
 import 'offline_capability_service.dart';
@@ -24,6 +23,7 @@ class FamilyOfflineStorageService {
   StreamSubscription<NetworkStatusInfo>? _statusSubscription;
 
   /// 暂存键前缀
+  // ignore: unused_field
   static const String _storagePrefix = 'family_offline_';
 
   /// 初始化服务

@@ -23,6 +23,7 @@ class _FinancialCommitmentPageState
     // 不再加载mock数据，显示空状态让用户自己添加承诺
   }
 
+  // ignore: unused_element
   void _addCommitment(Commitment commitment) {
     setState(() {
       _commitments.add(commitment);

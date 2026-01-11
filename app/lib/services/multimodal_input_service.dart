@@ -388,7 +388,6 @@ class ImageRecognitionEngine {
       case ImageType.bankStatement:
         return await _ocrService.recognize(image);
       case ImageType.general:
-      default:
         return await _ocrService.recognize(image);
     }
   }

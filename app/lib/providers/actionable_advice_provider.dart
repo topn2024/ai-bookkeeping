@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/resource_pool.dart';
 import '../pages/actionable_advice_page.dart';
 import '../services/advice_service.dart';
 import 'budget_provider.dart';

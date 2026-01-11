@@ -21,6 +21,7 @@ class RecognitionQuickAdjustWidget extends StatefulWidget {
 
 class _RecognitionQuickAdjustWidgetState extends State<RecognitionQuickAdjustWidget> {
   late RecognitionResult _result;
+  // ignore: unused_field
   final bool _isEditing = false;
 
   @override

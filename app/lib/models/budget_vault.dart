@@ -454,7 +454,7 @@ class BudgetVault {
       'isEnabled': isEnabled ? 1 : 0,
       'sortOrder': sortOrder,
       'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt?.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
       'allocationType': allocationType.name,
       'targetAllocation': targetAllocation,
       'targetPercentage': targetPercentage,

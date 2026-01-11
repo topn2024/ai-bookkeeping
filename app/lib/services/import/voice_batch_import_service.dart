@@ -207,6 +207,7 @@ class VoiceBatchImportService {
     );
 
     // 常见的交易动词
+    // ignore: unused_local_variable
     final expenseVerbs = ['花', '买', '支付', '消费', '用了', '刷了', '付'];
     final incomeVerbs = ['收', '进账', '到账', '收入', '工资'];
 

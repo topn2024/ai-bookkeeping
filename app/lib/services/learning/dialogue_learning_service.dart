@@ -118,7 +118,6 @@ class DialogueLearningData extends LearningData {
               : LearningDataSource.userImplicitBehavior,
         );
 
-  @override
   double get qualityScore {
     var score = 0.0;
     // 任务完成
@@ -292,7 +291,8 @@ class DialogueLearningService
 
   // 配置
   static const int _minSamplesForRule = 3;
-  static const double _minConfidenceThreshold = 0.6;
+  // ignore: unused_field
+  static const double __minConfidenceThreshold = 0.6;
 
   // 状态
   final bool _isEnabled = true;
@@ -725,7 +725,7 @@ class DialogueFailureAnalyzer {
 
   /// 分析对话失败原因
   Future<DialogueFailureAnalysis> analyzeFailures(String userId) async {
-    final status = await _learningService.getStatus();
+    final _ = await _learningService.getStatus();
     // 这里应该从服务获取失败样本，简化实现
     return DialogueFailureAnalysis(
       commonFailurePoints: [],
@@ -765,9 +765,10 @@ class FailurePoint {
 
 /// 对话协同学习服务
 class DialogueCollaborativeLearningService {
-  final DialogueLearningService _learningService;
+  // ignore: unused_field
+  final DialogueLearningService __learningService;
 
-  DialogueCollaborativeLearningService(this._learningService);
+  DialogueCollaborativeLearningService(DialogueLearningService learningService) : __learningService = learningService;
 
   /// 上报成功对话模式（隐私保护）
   Future<void> reportSuccessfulDialogue(DialogueRule rule) async {

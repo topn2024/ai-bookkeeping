@@ -12,10 +12,8 @@ import '../models/budget.dart';
 import '../models/savings_goal.dart';
 import '../models/recurring_transaction.dart';
 import '../models/template.dart';
-import '../models/category.dart';
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
-import 'gamification_service.dart';
 
 /// 备份包导出服务
 /// 设计文档第11.5节：数据导出功能矩阵（2.0增强版）

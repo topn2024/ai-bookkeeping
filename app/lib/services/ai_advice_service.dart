@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import '../core/api_client.dart';
 
 /// AI建议服务 - 调用后端AI生成的各类建议

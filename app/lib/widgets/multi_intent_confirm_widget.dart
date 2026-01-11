@@ -328,7 +328,7 @@ class MultiIntentConfirmWidget extends StatelessWidget {
   }
 
   Widget _buildActionButtons(BuildContext context) {
-    final theme = Theme.of(context);
+    final _ = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),

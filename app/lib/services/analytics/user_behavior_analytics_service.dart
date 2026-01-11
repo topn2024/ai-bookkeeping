@@ -405,7 +405,9 @@ class UserBehaviorAnalyticsService {
 
   // 配置
   bool _enabled = true;
+  // ignore: unused_field
   bool _autoTrackPageView = true;
+  // ignore: unused_field
   bool _autoTrackAppLifecycle = true;
   final Set<String> _excludedEvents = {};
 

@@ -1,11 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:sqflite/sqflite.dart';
 import '../core/contracts/i_database_service.dart';
 import 'financial_health_score_service.dart';
-import '../models/resource_pool.dart';
-import '../models/budget_vault.dart';
-import '../models/savings_goal.dart' as savings;
 
 /// 目标类型
 enum GoalType {

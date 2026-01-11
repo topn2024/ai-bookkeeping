@@ -427,6 +427,7 @@ class FamilyBudgetService {
 
     // 检查小金库成员配额
     if (config != null && config.memberQuotas.containsKey(memberId)) {
+      // ignore: unused_local_variable
       final vaultQuota = config.memberQuotas[memberId]!;
       // 需要追踪该成员在该小金库的消费，这里简化处理
     }

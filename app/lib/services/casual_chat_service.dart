@@ -331,6 +331,7 @@ class CasualChatService {
 
   CasualChatResponse _handleGeneral(UserProfile? profile) {
     final todaySpending = profile?.spendingBehavior.monthlyAverage ?? 0;
+    // ignore: unused_local_variable
     final dailyAvg = todaySpending / 30;
 
     final responses = [

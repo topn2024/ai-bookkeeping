@@ -919,6 +919,7 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
   }
 
   /// 保留底部弹窗详情供长按使用
+  // ignore: unused_element
   void _showTransactionQuickActions(Transaction transaction) {
     final category = DefaultCategories.findById(transaction.category);
     final isExpense = transaction.type == TransactionType.expense;

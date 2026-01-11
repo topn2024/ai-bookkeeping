@@ -13,6 +13,7 @@ import 'database_service.dart';
 /// - 手动冲突解决：并发修改时提供用户选择
 class CrdtSyncService {
   final WebSocketService _wsService;
+  // ignore: unused_field
   final DatabaseService _db;
   final String deviceId;
 

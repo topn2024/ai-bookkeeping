@@ -143,7 +143,8 @@ class AnomalyPatternMiningService {
 
   // 配置
   static const int _minSamplesForPattern = 5;
-  static const double _minConfidence = 0.7;
+  // ignore: unused_field
+  static const double __minConfidence = 0.7;
 
   AnomalyPatternMiningService({AnomalySampleStore? sampleStore})
       : _sampleStore = sampleStore ?? InMemoryAnomalySampleStore();
@@ -475,7 +476,8 @@ class InMemoryAnomalySampleStore implements AnomalySampleStore {
 
 /// 异常检测协同学习服务
 class AnomalyCollaborativeLearningService {
-  final AnomalyPatternMiningService _miningService;
+  // ignore: unused_field
+  final AnomalyPatternMiningService __miningService;
   final GlobalAnomalyPatternAggregator _aggregator;
   final String _currentUserId;
 
@@ -483,7 +485,7 @@ class AnomalyCollaborativeLearningService {
     required AnomalyPatternMiningService miningService,
     GlobalAnomalyPatternAggregator? aggregator,
     String? currentUserId,
-  })  : _miningService = miningService,
+  })  : __miningService = miningService,
         _aggregator = aggregator ?? GlobalAnomalyPatternAggregator(),
         _currentUserId = currentUserId ?? 'anonymous';
 

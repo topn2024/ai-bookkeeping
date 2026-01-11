@@ -1,10 +1,7 @@
-import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 
 import 'package:ai_bookkeeping/services/voice_recognition_engine.dart';
 import 'package:ai_bookkeeping/services/voice_token_service.dart';
@@ -15,7 +12,6 @@ import 'package:ai_bookkeeping/services/voice_token_service.dart';
   MockSpec<NetworkChecker>(),
   MockSpec<VoiceTokenService>(),
 ])
-import 'voice_recognition_engine_test.mocks.dart';
 
 void main() {
   group('VoiceRecognitionEngine Tests', () {

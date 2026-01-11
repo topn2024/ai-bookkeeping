@@ -18,6 +18,7 @@ class VoiceInvitePage extends ConsumerStatefulWidget {
 }
 
 class _VoiceInvitePageState extends ConsumerState<VoiceInvitePage> {
+  // ignore: unused_field
   final int _currentStep = 2; // 当前在第2步（邀请家人）
 
   @override

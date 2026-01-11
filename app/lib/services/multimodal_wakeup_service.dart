@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'voice_wake_word_service.dart';
 import 'gesture_wake_service.dart';
 import 'home_screen_widget_service.dart';
+import 'deep_link_service.dart';
 
 /// 唤醒入口类型
 enum WakeUpEntryType {
@@ -14,6 +15,7 @@ enum WakeUpEntryType {
   wearableDevice,     // 可穿戴设备
   paymentNotification,// 支付通知
   locationTrigger,    // 位置触发
+  deepLink,           // 深度链接
 }
 
 /// 唤醒事件
@@ -42,6 +44,7 @@ class MultimodalWakeUpService {
 
   final VoiceWakeWordService _voiceWakeService = VoiceWakeWordService();
   final GestureWakeService _gestureWakeService = GestureWakeService();
+  final DeepLinkService _deepLinkService = DeepLinkService();
 
   /// 统一的唤醒事件流
   final StreamController<MultimodalWakeUpEvent> _wakeUpController =
@@ -50,6 +53,7 @@ class MultimodalWakeUpService {
 
   StreamSubscription<WakeUpEvent>? _voiceWakeSubscription;
   StreamSubscription<GestureWakeType>? _gestureWakeSubscription;
+  StreamSubscription<DeepLinkData>? _deepLinkSubscription;
 
   /// 初始化所有唤醒入口
   Future<void> initialize() async {
@@ -58,6 +62,7 @@ class MultimodalWakeUpService {
     // 初始化各个服务
     await _voiceWakeService.initialize();
     await _gestureWakeService.initialize();
+    await _deepLinkService.initialize();
 
     // 监听语音唤醒
     _voiceWakeSubscription = _voiceWakeService.onWakeUp.listen((event) {
@@ -79,6 +84,20 @@ class MultimodalWakeUpService {
         timestamp: DateTime.now(),
         metadata: {
           'gestureType': gestureType.name,
+        },
+      ));
+    });
+
+    // 监听深度链接
+    _deepLinkSubscription = _deepLinkService.onDeepLink.listen((linkData) {
+      debugPrint('DeepLink received: ${linkData.type} - ${linkData.rawUri}');
+      _wakeUpController.add(MultimodalWakeUpEvent(
+        entryType: WakeUpEntryType.deepLink,
+        timestamp: DateTime.now(),
+        metadata: {
+          'linkType': linkData.type.name,
+          'rawUri': linkData.rawUri,
+          'parameters': linkData.parameters,
         },
       ));
     });
@@ -127,11 +146,16 @@ class MultimodalWakeUpService {
   /// 获取手势唤醒服务
   GestureWakeService get gestureWakeService => _gestureWakeService;
 
+  /// 获取深度链接服务
+  DeepLinkService get deepLinkService => _deepLinkService;
+
   void dispose() {
     _voiceWakeSubscription?.cancel();
     _gestureWakeSubscription?.cancel();
+    _deepLinkSubscription?.cancel();
     _voiceWakeService.dispose();
     _gestureWakeService.dispose();
+    _deepLinkService.dispose();
     _wakeUpController.close();
   }
 }

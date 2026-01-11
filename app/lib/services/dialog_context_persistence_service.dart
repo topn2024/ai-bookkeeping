@@ -134,7 +134,6 @@ class DialogContextPersistenceService {
         return '请补充查询条件';
 
       case PersistedConversationState.idle:
-      default:
         return '有什么可以帮您的？';
     }
   }

@@ -468,7 +468,7 @@ class LinkageIntegrationService {
     Widget? detailPage,
   }) async {
     // 先应用筛选条件
-    for (final entry in filters.entries) {
+    for (final _ in filters.entries) {
       // 将filter转换为FilterCondition并添加
       // TODO: 根据filter类型创建对应的FilterCondition
     }

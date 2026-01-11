@@ -233,7 +233,7 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
                 child: _buildFactorItem(
                   theme,
                   emoji: '💰',
-                  title: t.category ?? '收入',
+                  title: t.category,
                   subtitle: '$dateStr ¥${t.amount.toStringAsFixed(0)}',
                   effect: effect,
                   isPositive: true,
@@ -292,7 +292,7 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
                 child: _buildFactorItem(
                   theme,
                   emoji: _getCategoryEmoji(t.category),
-                  title: t.category ?? '支出',
+                  title: t.category,
                   subtitle: '$dateStr ¥${t.amount.toStringAsFixed(0)}',
                   effect: effect,
                   isPositive: false,

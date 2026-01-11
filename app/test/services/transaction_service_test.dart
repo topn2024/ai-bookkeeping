@@ -650,6 +650,7 @@ void main() {
   });
 
   group('交易过滤测试', () {
+    // ignore: unused_local_variable
     late List<Transaction> transactions;
 
     setUp(() {

@@ -519,6 +519,7 @@ class InMemoryCollaborativeCacheManager implements CollaborativeCacheManager {
 /// 持久化缓存管理器
 class PersistentCollaborativeCacheManager implements CollaborativeCacheManager {
   final CacheStorageWrapper _storage;
+  // ignore: unused_field
   final Duration _cacheExpiry;
 
   static const String _rulesKey = 'collaborative_rules_cache';

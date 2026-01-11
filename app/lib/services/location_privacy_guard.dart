@@ -66,7 +66,7 @@ class LocationPrivacyGuard {
     required LocationPurpose purpose,
     required String description,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
+    final _ = await SharedPreferences.getInstance();
 
     // 记录权限请求
     await _logPermissionRequest(purpose, description);

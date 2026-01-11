@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 
 import '../models/common_types.dart';
 import 'location_service.dart' hide CityTier, CityTierExtension, CityInfo, CityLocation,
@@ -353,11 +352,12 @@ class SavingSuggestion {
 /// 省钱建议服务
 /// 对应设计文档第14.8节
 class SavingSuggestionService {
-  final CityLocationService _cityService;
+  // ignore: unused_field
+  final CityLocationService __cityService;
 
   SavingSuggestionService({
     CityLocationService? cityService,
-  }) : _cityService = cityService ?? CityLocationService();
+  }) : __cityService = cityService ?? CityLocationService();
 
   /// 生成省钱建议
   Future<List<SavingSuggestion>> generateSuggestions({

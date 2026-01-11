@@ -170,12 +170,14 @@ class SelfLearningBudgetService {
   final List<UserFeedback> _feedbacks = [];
 
   // 历史执行数据
-  final List<_MonthlyExecution> _executionHistory = [];
+  // ignore: unused_field
+  final List<_MonthlyExecution> __executionHistory = [];
 
   // 学习参数
   static const double _learningRate = 0.1; // 学习率
   static const int _minSamplesForLearning = 3; // 最小学习样本数
-  static const double _confidenceThreshold = 0.6; // 置信度阈值
+  // ignore: unused_field
+  static const double __confidenceThreshold = 0.6; // 置信度阈值
 
   SelfLearningBudgetService(this._db, this._vaultRepo);
 

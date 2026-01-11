@@ -23,7 +23,7 @@ class OfflineStatusBar extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final theme = Theme.of(context);
+    final _ = Theme.of(context);
     final isWeak = status.status == NetworkStatus.weak;
 
     return Material(

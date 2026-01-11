@@ -318,6 +318,7 @@ class AdaptiveBudgetService {
     final history = await _getSpendingHistory(vaultId, months: 6);
     if (history.isEmpty) return null;
 
+    // ignore: unused_local_variable
     final avgSpending = history.reduce((a, b) => a + b) / history.length;
 
     // 2. 检查是否持续超支或结余

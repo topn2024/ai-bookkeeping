@@ -302,7 +302,7 @@ class CategoryLearningAdapter
   @override
   Future<PredictionResult<CategoryRule>> predict(dynamic input) async {
     final transaction = input as TransactionInput;
-    final startTime = DateTime.now();
+    final _ = DateTime.now();
 
     // 1. 查找匹配的用户规则（优先级最高）
     final userRules = _rules.where((r) => r.source == RuleSource.userLearned).toList()

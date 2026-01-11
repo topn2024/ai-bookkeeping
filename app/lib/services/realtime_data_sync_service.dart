@@ -140,7 +140,8 @@ class DataSubscriptionConfig {
 /// ```
 class RealtimeDataSyncService extends ChangeNotifier {
   /// 数据库服务
-  final IDatabaseService _db;
+  // ignore: unused_field
+  final IDatabaseService __db;
 
   /// 变更事件流控制器
   final StreamController<DataChangeEvent> _changeController =
@@ -169,7 +170,7 @@ class RealtimeDataSyncService extends ChangeNotifier {
 
   RealtimeDataSyncService({
     IDatabaseService? databaseService,
-  }) : _db = databaseService ?? sl<IDatabaseService>();
+  }) : __db = databaseService ?? sl<IDatabaseService>();
 
   /// 获取变更事件流
   Stream<DataChangeEvent> get changeStream => _changeController.stream;

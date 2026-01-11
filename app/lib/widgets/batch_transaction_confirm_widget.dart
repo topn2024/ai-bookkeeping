@@ -31,6 +31,7 @@ class _BatchTransactionConfirmWidgetState extends State<BatchTransactionConfirmW
     _selectedIndices = Set.from(List.generate(_transactions.length, (i) => i));
   }
 
+  // ignore: unused_element
   double get _totalAmount =>
       _transactions.fold(0.0, (sum, t) => sum + t.amount);
 

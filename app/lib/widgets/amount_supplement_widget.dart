@@ -250,7 +250,7 @@ class _AmountSupplementWidgetState extends State<AmountSupplementWidget> {
   }
 
   Widget _buildAmountInput(BuildContext context) {
-    final theme = Theme.of(context);
+    final _ = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

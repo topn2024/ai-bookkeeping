@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/voice_coordinator_provider.dart';
 import '../services/voice_service_coordinator.dart';
-import '../services/voice/multi_intent_models.dart';
 import '../widgets/multi_intent_confirm_widget.dart';
 import '../widgets/amount_supplement_widget.dart';
 import '../theme/app_theme.dart';
@@ -40,6 +39,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   late AnimationController _pulseController;
   late AnimationController _waveController;
   bool _hasPermission = false;
+  // ignore: unused_field
   bool _isLoadingHistory = true;
 
   @override
@@ -293,7 +293,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     VoiceServiceCoordinator coordinator,
   ) {
     final sessionState = coordinator.sessionState;
-    final intentType = coordinator.currentIntentType;
+    final _ = coordinator.currentIntentType;
 
     if (sessionState == VoiceSessionState.idle) return const SizedBox.shrink();
 
@@ -828,6 +828,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     // The coordinator will manage session state and navigation automatically
   }
 
+  // ignore: unused_element
   String _generateMockResponse(String command) {
     if (command.contains('删除')) {
       return '好的，我找到了相关记录。请确认要删除的项目：\n• 昨天 12:30 午餐 ¥35.00\n\n请说"确认"删除，或"取消"操作。';
@@ -864,6 +865,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     });
   }
 
+  // ignore: unused_element
   void _navigateToRoute(String route) {
     if (!mounted) return;
 

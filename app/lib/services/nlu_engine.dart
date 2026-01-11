@@ -1094,7 +1094,8 @@ class EnhancedEntityExtractor extends EntityExtractor {
   };
 
   /// 货币单位
-  static const Map<String, double> _currencyUnits = {
+  // ignore: unused_field
+  static const Map<String, double> __currencyUnits = {
     '元': 1,
     '块': 1,
     '毛': 0.1,

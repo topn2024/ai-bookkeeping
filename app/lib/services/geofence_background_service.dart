@@ -663,6 +663,7 @@ class FlutterGeofenceNativeChannel implements GeofenceNativeChannel {
   // 实际实现需要使用 MethodChannel
   // static const MethodChannel _channel = MethodChannel('geofence_service');
 
+  // ignore: unused_field
   void Function(Map<String, dynamic>)? _eventCallback;
 
   @override

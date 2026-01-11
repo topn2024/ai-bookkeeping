@@ -354,6 +354,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
     );
   }
 
+  // ignore: unused_element
   void _showComingSoon(BuildContext context, String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$feature 功能即将上线')),

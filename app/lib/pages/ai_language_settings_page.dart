@@ -17,6 +17,7 @@ class AILanguageSettingsPage extends ConsumerStatefulWidget {
 class _AILanguageSettingsPageState
     extends ConsumerState<AILanguageSettingsPage> {
   String _aiReplyLanguage = 'follow_app';
+  // ignore: unused_field
   final String _voiceRecognitionLanguage = 'auto';
 
   @override

@@ -46,6 +46,7 @@ class CircuitBreaker {
   CircuitState _state = CircuitState.closed;
   int _failureCount = 0;
   int _halfOpenAttempts = 0;
+  // ignore: unused_field
   DateTime? _lastFailure;
   DateTime? _openedAt;
 

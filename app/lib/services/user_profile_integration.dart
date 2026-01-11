@@ -205,8 +205,9 @@ class _StubUserActivityDataSource implements UserActivityDataSource {
 
 /// 存根实现：用户画像仓储
 class _StubUserProfileRepository implements UserProfileRepository {
-  final IDatabaseService _db;
-  _StubUserProfileRepository(this._db);
+  // ignore: unused_field
+  final IDatabaseService __db;
+  _StubUserProfileRepository(IDatabaseService db) : __db = db;
 
   @override
   Future<UserProfile?> get(String userId) async => null;

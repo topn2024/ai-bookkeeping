@@ -160,11 +160,9 @@ class TransactionVaultLinker {
     }
 
     // 1. 优先检查分类-小金库映射
-    if (transaction.categoryId != null) {
-      final mappingResult = await _suggestByMapping(transaction.categoryId!);
-      if (mappingResult != null) {
-        return mappingResult;
-      }
+    final mappingResult = await _suggestByMapping(transaction.categoryId);
+    if (mappingResult != null) {
+      return mappingResult;
     }
 
     // 2. 基于历史记录智能推荐
@@ -275,10 +273,8 @@ class TransactionVaultLinker {
     final args = <dynamic>[];
 
     // 同分类
-    if (transaction.categoryId != null) {
-      conditions.add('categoryId = ?');
-      args.add(transaction.categoryId);
-    }
+    conditions.add('categoryId = ?');
+    args.add(transaction.categoryId);
 
     // 相似金额（±30%）
     conditions.add('amount BETWEEN ? AND ?');
@@ -419,9 +415,9 @@ class TransactionVaultLinker {
     );
 
     // 更新分类映射的使用次数
-    if (transaction.categoryId != null) {
+    if (transaction.vaultId != null) {
       await _updateMappingUseCount(
-        transaction.categoryId!,
+        transaction.categoryId,
         transaction.vaultId!,
       );
     }

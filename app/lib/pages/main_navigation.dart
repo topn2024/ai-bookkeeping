@@ -6,6 +6,7 @@ import '../widgets/glass_components.dart';
 import '../widgets/antigravity_animations.dart';
 import '../services/app_upgrade_service.dart';
 import '../services/secure_storage_service.dart';
+import '../services/floating_ball_service.dart';
 import '../widgets/app_update_dialog.dart';
 import '../l10n/l10n.dart';
 import '../providers/ledger_context_provider.dart';
@@ -35,6 +36,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   int _currentIndex = 0;
   bool _hasCheckedUpdate = false;
   bool _isFabExpanded = false;
+  bool _showFloatingBall = true;  // 默认显示悬浮球
 
   final List<Widget> _pages = const [
     HomePage(),
@@ -46,6 +48,17 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   @override
   void initState() {
     super.initState();
+    _showFloatingBall = FloatingBallService().isEnabled;
+
+    // 监听悬浮球状态变化
+    FloatingBallService().onStateChanged.listen((state) {
+      if (mounted) {
+        setState(() {
+          _showFloatingBall = state != FloatingBallState.hidden;
+        });
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowUpdate();
       _initializeLedgerContext();
@@ -88,14 +101,33 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
+    return Stack(
+      children: [
+        Scaffold(
+          body: IndexedStack(
+            index: _currentIndex,
+            children: _pages,
+          ),
+          bottomNavigationBar: _buildAntigravityBottomNav(context),
+          floatingActionButton: _buildAntigravityFab(context),
+          floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        ),
+        // 应用内悬浮球
+        if (_showFloatingBall)
+          FloatingBallWidget(
+            onTap: () => _openVoiceAssistant(context),
+          ),
+      ],
+    );
+  }
+
+  /// 打开语音助手
+  void _openVoiceAssistant(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const EnhancedVoiceAssistantPage(),
       ),
-      bottomNavigationBar: _buildAntigravityBottomNav(context),
-      floatingActionButton: _buildAntigravityFab(context),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 

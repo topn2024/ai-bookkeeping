@@ -258,7 +258,7 @@ class SocialComparisonService {
     }
 
     final avgIncome = monthlyStats['avgIncome'] as double;
-    final avgExpense = monthlyStats['avgExpense'] as double;
+    final _ = monthlyStats['avgExpense'] as double;
 
     // 简单的画像推断逻辑
     if (avgIncome < 3000) {

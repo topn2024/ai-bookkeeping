@@ -5,7 +5,8 @@ import 'dart:convert';
 /// 统计语音/拍照/手动各场景的记账耗时
 class ScenarioTimingService {
   static const String _keyTimingHistory = 'scenario_timing_history';
-  static const String _keyDailyStats = 'scenario_daily_stats';
+  // ignore: unused_field
+  static const String __keyDailyStats = 'scenario_daily_stats';
 
   SharedPreferences? _prefs;
 

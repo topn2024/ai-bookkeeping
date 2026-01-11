@@ -205,6 +205,7 @@ class EnhancedDuplicateScorer {
     }
 
     // Determine match layer
+    // ignore: unused_local_variable
     DuplicateMatchLayer matchLayer;
     if (score >= 85) {
       matchLayer = DuplicateMatchLayer.feature;

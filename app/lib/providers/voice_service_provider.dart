@@ -125,9 +125,11 @@ enum VoiceSessionType {
 
 /// 语音交互状态通知器
 class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
+  // ignore: unused_field
   final EntityDisambiguationService _entityService;
   final VoiceDeleteService _deleteService;
   final VoiceModifyService _modifyService;
+  // ignore: unused_field
   final VoiceRecognitionEngine _recognitionEngine;
   final TTSService _ttsService;
   final IDatabaseService _databaseService;
@@ -468,12 +470,8 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
     var transactions = await _databaseService.getTransactions();
 
     // 应用过滤条件
-    if (conditions.startDate != null) {
-      transactions = transactions.where((t) => t.date.isAfter(conditions.startDate!.subtract(const Duration(days: 1)))).toList();
-    }
-    if (conditions.endDate != null) {
-      transactions = transactions.where((t) => t.date.isBefore(conditions.endDate!.add(const Duration(days: 1)))).toList();
-    }
+    transactions = transactions.where((t) => t.date.isAfter(conditions.startDate.subtract(const Duration(days: 1)))).toList();
+    transactions = transactions.where((t) => t.date.isBefore(conditions.endDate.add(const Duration(days: 1)))).toList();
     if (conditions.categoryHint != null) {
       transactions = transactions.where((t) => t.category.contains(conditions.categoryHint!)).toList();
     }
@@ -486,8 +484,8 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
     if (conditions.amountMax != null) {
       transactions = transactions.where((t) => t.amount <= conditions.amountMax!).toList();
     }
-    if (conditions.limit != null && conditions.limit! > 0) {
-      transactions = transactions.take(conditions.limit!).toList();
+    if (conditions.limit > 0) {
+      transactions = transactions.take(conditions.limit).toList();
     }
 
     // 转换为TransactionRecord格式

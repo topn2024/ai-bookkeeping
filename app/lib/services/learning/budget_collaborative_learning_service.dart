@@ -161,7 +161,8 @@ class SeasonalTrend {
 class BudgetCollaborativeLearningService {
   final GlobalBudgetInsightsAggregator _aggregator;
   final BudgetPatternReporter _reporter;
-  final String _currentUserId;
+  // ignore: unused_field
+  final String __currentUserId;
 
   BudgetCollaborativeLearningService({
     GlobalBudgetInsightsAggregator? aggregator,
@@ -169,7 +170,7 @@ class BudgetCollaborativeLearningService {
     String? currentUserId,
   })  : _aggregator = aggregator ?? GlobalBudgetInsightsAggregator(),
         _reporter = reporter ?? InMemoryBudgetPatternReporter(),
-        _currentUserId = currentUserId ?? 'anonymous';
+        __currentUserId = currentUserId ?? 'anonymous';
 
   /// 上报预算模式（隐私保护）
   Future<void> reportBudgetPattern(BudgetLearningSample sample) async {

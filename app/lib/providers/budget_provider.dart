@@ -290,7 +290,7 @@ final zeroBasedBudgetProvider =
 /// 月度预算总额Provider
 final monthlyBudgetProvider = Provider<double>((ref) {
   final budgets = ref.watch(budgetProvider);
-  final now = DateTime.now();
+  final _ = DateTime.now();
   return budgets
       .where((b) => b.period == BudgetPeriod.monthly)
       .fold(0.0, (sum, b) => sum + b.amount);

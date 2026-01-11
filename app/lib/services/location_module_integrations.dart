@@ -6,8 +6,6 @@ import 'location_data_services.dart' hide CityTier, CityTierExtension, CityInfo,
 import 'location_business_services.dart';
 import '../models/common_types.dart';
 import 'ai_service.dart';
-import 'voice_service_coordinator.dart';
-import 'learning/habit_learning_service.dart';
 import 'family_privacy_service.dart';
 import '../models/member.dart';
 
@@ -247,13 +245,14 @@ class RegionalSpendingStats {
 /// 提供消费热力图、区域分析等可视化数据
 class LocationVisualizationService {
   final CityLocationService _cityService;
-  final CrossRegionSpendingService _crossRegionService;
+  // ignore: unused_field
+  final CrossRegionSpendingService __crossRegionService;
 
   LocationVisualizationService({
     CityLocationService? cityService,
     CrossRegionSpendingService? crossRegionService,
   })  : _cityService = cityService ?? CityLocationService(),
-        _crossRegionService = crossRegionService ?? CrossRegionSpendingService();
+        __crossRegionService = crossRegionService ?? CrossRegionSpendingService();
 
   /// 生成消费热力图数据
   Future<List<LocationHeatmapPoint>> generateHeatmapData({
@@ -339,7 +338,7 @@ class LocationVisualizationService {
     final stats = <RegionalSpendingStats>[];
 
     for (final entry in cityGroups.entries) {
-      final cityCode = entry.key;
+      final _ = entry.key;
       final txList = entry.value;
 
       if (txList.isEmpty) continue;
@@ -468,9 +467,11 @@ extension LocationSharingLevelExtension on LocationSharingLevel {
 /// 家庭位置共享服务
 /// 管理家庭成员间的位置信息共享
 class FamilyLocationSharingService {
-  final FamilyPrivacyService _privacyService;
+  // ignore: unused_field
+  final FamilyPrivacyService __privacyService;
   final CityLocationService _cityService;
-  final UserHomeLocationService _homeService;
+  // ignore: unused_field
+  final UserHomeLocationService __homeService;
 
   // 成员位置共享设置存储
   final Map<String, FamilyLocationSharingSettings> _sharingSettings = {};
@@ -479,9 +480,9 @@ class FamilyLocationSharingService {
     FamilyPrivacyService? privacyService,
     CityLocationService? cityService,
     UserHomeLocationService? homeService,
-  })  : _privacyService = privacyService ?? FamilyPrivacyService(),
+  })  : __privacyService = privacyService ?? FamilyPrivacyService(),
         _cityService = cityService ?? CityLocationService(),
-        _homeService = homeService ?? UserHomeLocationService();
+        __homeService = homeService ?? UserHomeLocationService();
 
   /// 更新位置共享设置
   Future<FamilyLocationSharingSettings> updateSharingSettings({
