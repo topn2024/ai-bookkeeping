@@ -566,7 +566,25 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   /// 预算概览
   /// 原型设计：预算类目进度条列表
+  /// 数据来源：budgetProvider（预算设置）+ monthlyExpenseByCategoryProvider（本月分类支出）
   Widget _buildBudgetOverview(BuildContext context, ThemeData theme) {
+    final budgets = ref.watch(budgetProvider);
+    final categorySpending = ref.watch(monthlyExpenseByCategoryProvider);
+
+    // 过滤出已启用的分类预算，并按已花费百分比排序（高的在前）
+    final activeBudgets = budgets
+        .where((b) => b.isEnabled && b.amount > 0 && b.categoryId != null)
+        .map((b) {
+          final spent = categorySpending[b.categoryId!] ?? 0.0;
+          final percent = (spent / b.amount * 100).clamp(0, 999).toInt();
+          return (budget: b, spent: spent, percent: percent);
+        })
+        .toList()
+      ..sort((a, b) => b.percent.compareTo(a.percent));
+
+    // 最多显示3个预算
+    final displayBudgets = activeBudgets.take(3).toList();
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
       child: Column(
@@ -590,27 +608,42 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
           const SizedBox(height: 8),
-          _buildBudgetItem(
-            context,
-            theme,
-            name: '餐饮',
-            icon: Icons.restaurant,
-            iconColor: const Color(0xFFFF7043),
-            spent: 1580,
-            budget: 2000,
-            percent: 79,
-          ),
-          const SizedBox(height: 12),
-          _buildBudgetItem(
-            context,
-            theme,
-            name: '交通',
-            icon: Icons.directions_bus,
-            iconColor: const Color(0xFF87CEFA),
-            spent: 320,
-            budget: 800,
-            percent: 40,
-          ),
+          if (displayBudgets.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(
+                  '暂无预算设置',
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
+            )
+          else
+            ...displayBudgets.asMap().entries.map((entry) {
+              final index = entry.key;
+              final item = entry.value;
+              final categoryId = item.budget.categoryId!;
+              final category = DefaultCategories.findById(categoryId);
+              final categoryName = category?.localizedName ?? categoryId;
+
+              return Padding(
+                padding: EdgeInsets.only(top: index > 0 ? 12 : 0),
+                child: _buildBudgetItem(
+                  context,
+                  theme,
+                  name: categoryName,
+                  icon: category?.icon ?? Icons.category,
+                  iconColor: category?.color ?? Colors.grey,
+                  spent: item.spent,
+                  budget: item.budget.amount,
+                  percent: item.percent,
+                ),
+              );
+            }),
         ],
       ),
     );
