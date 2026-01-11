@@ -910,6 +910,7 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
     }
 
     final days = _getDaysForPeriod();
+    final levelService = MoneyAgeLevelService();
     final result = <DailyMoneyAge>[];
 
     for (final item in dashboard.trendData.take(days)) {
@@ -919,7 +920,8 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
       if (dateStr != null && avgAge > 0) {
         try {
           final date = DateTime.parse(dateStr);
-          result.add(DailyMoneyAge(date: date, averageAge: avgAge));
+          final level = levelService.determineLevel(avgAge);
+          result.add(DailyMoneyAge(date: date, averageAge: avgAge, level: level));
         } catch (_) {
           // 跳过无效日期
         }
