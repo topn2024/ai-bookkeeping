@@ -30,14 +30,17 @@ class HttpService implements IHttpService {
   factory HttpService() => _instance;
 
   /// 设置升级需求回调
+  @override
   void setUpgradeRequiredCallback(Function(dynamic data) callback) {
     _onUpgradeRequired = callback;
   }
 
   /// 获取当前 API 版本
+  @override
   String get currentApiVersion => apiVersion;
 
   /// 获取服务器要求的最低版本
+  @override
   String? get serverMinVersion => _serverMinVersion;
 
   HttpService._internal() {
@@ -45,6 +48,7 @@ class HttpService implements IHttpService {
   }
 
   /// 获取当前 API 基础 URL
+  @override
   String get baseUrl {
     if (_configService.isInitialized) {
       return _configService.config.apiBaseUrl;
@@ -141,6 +145,7 @@ class HttpService implements IHttpService {
   }
 
   /// 初始化：从安全存储加载Token
+  @override
   Future<void> initialize() async {
     if (_initialized) return;
     _authToken = await _secureStorage.getAuthToken();
@@ -202,6 +207,7 @@ class HttpService implements IHttpService {
   }
 
   /// 设置认证Token（同时保存到安全存储）
+  @override
   Future<void> setAuthToken(String? token) async {
     _authToken = token;
     if (token != null) {
@@ -212,6 +218,7 @@ class HttpService implements IHttpService {
   }
 
   /// 设置Token（带刷新Token）
+  @override
   Future<void> setTokens({
     required String accessToken,
     String? refreshToken,
@@ -223,38 +230,46 @@ class HttpService implements IHttpService {
   }
 
   /// 清除所有Token（登出时调用）
+  @override
   Future<void> clearTokens() async {
     _authToken = null;
     await _secureStorage.clearOnLogout();
   }
 
   /// 检查是否有有效Token
+  @override
   Future<bool> hasValidToken() async {
     final token = _authToken ?? await _secureStorage.getAuthToken();
     return token != null && token.isNotEmpty;
   }
 
+  @override
   Future<Response> get(String path, {Map<String, dynamic>? queryParams}) async {
     return await _dio.get(path, queryParameters: queryParams);
   }
 
+  @override
   Future<Response> post(String path, {dynamic data}) async {
     return await _dio.post(path, data: data);
   }
 
+  @override
   Future<Response> put(String path, {dynamic data}) async {
     return await _dio.put(path, data: data);
   }
 
+  @override
   Future<Response> patch(String path, {dynamic data}) async {
     return await _dio.patch(path, data: data);
   }
 
+  @override
   Future<Response> delete(String path) async {
     return await _dio.delete(path);
   }
 
   /// 上传图片文件
+  @override
   Future<Response> uploadImage(String path, File imageFile) async {
     final fileName = imageFile.path.split('/').last;
     final formData = FormData.fromMap({
@@ -274,6 +289,7 @@ class HttpService implements IHttpService {
   }
 
   /// 上传Base64图片
+  @override
   Future<Response> uploadBase64Image(String path, String base64Image) async {
     return await _dio.post(path, data: {
       'image_base64': base64Image,

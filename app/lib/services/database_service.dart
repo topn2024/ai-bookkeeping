@@ -36,6 +36,7 @@ class DatabaseService implements IDatabaseService {
 
   DatabaseService._internal();
 
+  @override
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
@@ -1366,6 +1367,7 @@ class DatabaseService implements IDatabaseService {
   ///   await db.updateAccount(toAccount);
   /// });
   /// ```
+  @override
   Future<T> runInTransaction<T>(Future<T> Function() action) async {
     final db = await database;
     return await db.transaction((txn) async {
@@ -1392,6 +1394,7 @@ class DatabaseService implements IDatabaseService {
   ///   }
   /// });
   /// ```
+  @override
   Future<List<Object?>> runBatch(void Function(Batch batch) operations) async {
     final db = await database;
     final batch = db.batch();
@@ -1400,6 +1403,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   // Transaction CRUD
+  @override
   Future<int> insertTransaction(model.Transaction transaction) async {
     final db = await database;
     final result = await db.insert('transactions', {
@@ -1449,6 +1453,7 @@ class DatabaseService implements IDatabaseService {
     return result;
   }
 
+  @override
   Future<List<model.Transaction>> getTransactions({bool includeDeleted = false}) async {
     final db = await database;
     final maps = await db.query(
@@ -1513,6 +1518,7 @@ class DatabaseService implements IDatabaseService {
     return transactions;
   }
 
+  @override
   Future<int> updateTransaction(model.Transaction transaction) async {
     final db = await database;
 
@@ -1567,6 +1573,7 @@ class DatabaseService implements IDatabaseService {
     return result;
   }
 
+  @override
   Future<int> deleteTransaction(String id) async {
     final db = await database;
     // Splits will be deleted automatically due to CASCADE
@@ -1574,11 +1581,13 @@ class DatabaseService implements IDatabaseService {
   }
 
   // Transaction Split CRUD
+  @override
   Future<int> insertTransactionSplit(TransactionSplit split) async {
     final db = await database;
     return await db.insert('transaction_splits', split.toMap());
   }
 
+  @override
   Future<List<TransactionSplit>> getTransactionSplits(String transactionId) async {
     final db = await database;
     final maps = await db.query(
@@ -1589,6 +1598,7 @@ class DatabaseService implements IDatabaseService {
     return maps.map((map) => TransactionSplit.fromMap(map)).toList();
   }
 
+  @override
   Future<int> deleteTransactionSplits(String transactionId) async {
     final db = await database;
     return await db.delete(
@@ -1599,6 +1609,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   // Account CRUD
+  @override
   Future<int> insertAccount(Account account) async {
     final db = await database;
     return await db.insert('accounts', {
@@ -1613,6 +1624,7 @@ class DatabaseService implements IDatabaseService {
     });
   }
 
+  @override
   Future<List<Account>> getAccounts({bool includeDeleted = false}) async {
     final db = await database;
     final maps = await db.query(
@@ -1631,6 +1643,7 @@ class DatabaseService implements IDatabaseService {
     )).toList();
   }
 
+  @override
   Future<int> updateAccount(Account account) async {
     final db = await database;
     return await db.update(
@@ -1648,12 +1661,14 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteAccount(String id) async {
     final db = await database;
     return await db.delete('accounts', where: 'id = ?', whereArgs: [id]);
   }
 
   // Category CRUD
+  @override
   Future<int> insertCategory(Category category) async {
     final db = await database;
     return await db.insert('categories', {
@@ -1668,6 +1683,7 @@ class DatabaseService implements IDatabaseService {
     });
   }
 
+  @override
   Future<List<Category>> getCategories({bool includeDeleted = false}) async {
     final db = await database;
     final maps = await db.query(
@@ -1687,6 +1703,7 @@ class DatabaseService implements IDatabaseService {
     )).toList();
   }
 
+  @override
   Future<int> updateCategory(Category category) async {
     final db = await database;
     return await db.update(
@@ -1705,12 +1722,14 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteCategory(String id) async {
     final db = await database;
     return await db.delete('categories', where: 'id = ?', whereArgs: [id]);
   }
 
   // Ledger CRUD
+  @override
   Future<int> insertLedger(Ledger ledger) async {
     final db = await database;
     return await db.insert('ledgers', {
@@ -1724,6 +1743,7 @@ class DatabaseService implements IDatabaseService {
     });
   }
 
+  @override
   Future<List<Ledger>> getLedgers({bool includeDeleted = false}) async {
     final db = await database;
     final maps = await db.query(
@@ -1743,6 +1763,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Get the default ledger, or the first ledger if none is marked as default
+  @override
   Future<Ledger?> getDefaultLedger() async {
     final db = await database;
     // First try to find the default ledger (excluding deleted)
@@ -1766,6 +1787,7 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> updateLedger(Ledger ledger) async {
     final db = await database;
     return await db.update(
@@ -1782,12 +1804,14 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteLedger(String id) async {
     final db = await database;
     return await db.delete('ledgers', where: 'id = ?', whereArgs: [id]);
   }
 
   // Budget CRUD
+  @override
   Future<int> insertBudget(Budget budget) async {
     final db = await database;
     return await db.insert('budgets', {
@@ -1807,6 +1831,7 @@ class DatabaseService implements IDatabaseService {
     });
   }
 
+  @override
   Future<List<Budget>> getBudgets({bool includeDeleted = false}) async {
     final db = await database;
     final maps = await db.query(
@@ -1830,6 +1855,7 @@ class DatabaseService implements IDatabaseService {
     )).toList();
   }
 
+  @override
   Future<int> updateBudget(Budget budget) async {
     final db = await database;
     return await db.update(
@@ -1852,17 +1878,20 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteBudget(String id) async {
     final db = await database;
     return await db.delete('budgets', where: 'id = ?', whereArgs: [id]);
   }
 
   // Budget Carryover CRUD
+  @override
   Future<int> insertBudgetCarryover(BudgetCarryover carryover) async {
     final db = await database;
     return await db.insert('budget_carryovers', carryover.toMap());
   }
 
+  @override
   Future<List<BudgetCarryover>> getBudgetCarryovers(String budgetId) async {
     final db = await database;
     final maps = await db.query(
@@ -1874,6 +1903,7 @@ class DatabaseService implements IDatabaseService {
     return maps.map((map) => BudgetCarryover.fromMap(map)).toList();
   }
 
+  @override
   Future<BudgetCarryover?> getBudgetCarryoverForMonth(
       String budgetId, int year, int month) async {
     final db = await database;
@@ -1886,17 +1916,20 @@ class DatabaseService implements IDatabaseService {
     return BudgetCarryover.fromMap(maps.first);
   }
 
+  @override
   Future<int> deleteBudgetCarryover(String id) async {
     final db = await database;
     return await db.delete('budget_carryovers', where: 'id = ?', whereArgs: [id]);
   }
 
   // Zero-Based Allocation CRUD
+  @override
   Future<int> insertZeroBasedAllocation(ZeroBasedAllocation allocation) async {
     final db = await database;
     return await db.insert('zero_based_allocations', allocation.toMap());
   }
 
+  @override
   Future<List<ZeroBasedAllocation>> getZeroBasedAllocations(String budgetId) async {
     final db = await database;
     final maps = await db.query(
@@ -1908,6 +1941,7 @@ class DatabaseService implements IDatabaseService {
     return maps.map((map) => ZeroBasedAllocation.fromMap(map)).toList();
   }
 
+  @override
   Future<ZeroBasedAllocation?> getZeroBasedAllocationForMonth(
       String budgetId, int year, int month) async {
     final db = await database;
@@ -1920,6 +1954,7 @@ class DatabaseService implements IDatabaseService {
     return ZeroBasedAllocation.fromMap(maps.first);
   }
 
+  @override
   Future<int> updateZeroBasedAllocation(ZeroBasedAllocation allocation) async {
     final db = await database;
     return await db.update(
@@ -1930,12 +1965,14 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteZeroBasedAllocation(String id) async {
     final db = await database;
     return await db.delete('zero_based_allocations', where: 'id = ?', whereArgs: [id]);
   }
 
   // Template CRUD
+  @override
   Future<int> insertTemplate(TransactionTemplate template) async {
     final db = await database;
     return await db.insert('templates', {
@@ -1955,6 +1992,7 @@ class DatabaseService implements IDatabaseService {
     });
   }
 
+  @override
   Future<List<TransactionTemplate>> getTemplates() async {
     final db = await database;
     final maps = await db.query('templates', orderBy: 'useCount DESC, lastUsedAt DESC');
@@ -1977,6 +2015,7 @@ class DatabaseService implements IDatabaseService {
     )).toList();
   }
 
+  @override
   Future<int> updateTemplate(TransactionTemplate template) async {
     final db = await database;
     return await db.update(
@@ -1999,11 +2038,13 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteTemplate(String id) async {
     final db = await database;
     return await db.delete('templates', where: 'id = ?', whereArgs: [id]);
   }
 
+  @override
   Future<void> incrementTemplateUseCount(String id) async {
     final db = await database;
     await db.rawUpdate('''
@@ -2014,6 +2055,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   // Recurring Transaction CRUD
+  @override
   Future<int> insertRecurringTransaction(RecurringTransaction recurring) async {
     final db = await database;
     return await db.insert('recurring_transactions', {
@@ -2040,6 +2082,7 @@ class DatabaseService implements IDatabaseService {
     });
   }
 
+  @override
   Future<List<RecurringTransaction>> getRecurringTransactions() async {
     final db = await database;
     final maps = await db.query('recurring_transactions');
@@ -2073,6 +2116,7 @@ class DatabaseService implements IDatabaseService {
     )).toList();
   }
 
+  @override
   Future<int> updateRecurringTransaction(RecurringTransaction recurring) async {
     final db = await database;
     return await db.update(
@@ -2102,23 +2146,27 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteRecurringTransaction(String id) async {
     final db = await database;
     return await db.delete('recurring_transactions', where: 'id = ?', whereArgs: [id]);
   }
 
   // Credit Card CRUD
+  @override
   Future<int> insertCreditCard(CreditCard card) async {
     final db = await database;
     return await db.insert('credit_cards', card.toMap());
   }
 
+  @override
   Future<List<CreditCard>> getCreditCards() async {
     final db = await database;
     final maps = await db.query('credit_cards', orderBy: 'createdAt DESC');
     return maps.map((map) => CreditCard.fromMap(map)).toList();
   }
 
+  @override
   Future<int> updateCreditCard(CreditCard card) async {
     final db = await database;
     return await db.update(
@@ -2129,23 +2177,27 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteCreditCard(String id) async {
     final db = await database;
     return await db.delete('credit_cards', where: 'id = ?', whereArgs: [id]);
   }
 
   // Savings Goal CRUD
+  @override
   Future<int> insertSavingsGoal(savings.SavingsGoal goal) async {
     final db = await database;
     return await db.insert('savings_goals', goal.toMap());
   }
 
+  @override
   Future<List<savings.SavingsGoal>> getSavingsGoals() async {
     final db = await database;
     final maps = await db.query('savings_goals', orderBy: 'createdAt DESC');
     return maps.map((map) => savings.SavingsGoal.fromMap(map)).toList();
   }
 
+  @override
   Future<int> updateSavingsGoal(savings.SavingsGoal goal) async {
     final db = await database;
     return await db.update(
@@ -2156,6 +2208,7 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteSavingsGoal(String id) async {
     final db = await database;
     // Deposits will be deleted automatically due to CASCADE
@@ -2163,11 +2216,13 @@ class DatabaseService implements IDatabaseService {
   }
 
   // Savings Deposit CRUD
+  @override
   Future<int> insertSavingsDeposit(savings.SavingsDeposit deposit) async {
     final db = await database;
     return await db.insert('savings_deposits', deposit.toMap());
   }
 
+  @override
   Future<List<savings.SavingsDeposit>> getSavingsDeposits(String goalId) async {
     final db = await database;
     final maps = await db.query(
@@ -2179,23 +2234,27 @@ class DatabaseService implements IDatabaseService {
     return maps.map((map) => savings.SavingsDeposit.fromMap(map)).toList();
   }
 
+  @override
   Future<int> deleteSavingsDeposit(String id) async {
     final db = await database;
     return await db.delete('savings_deposits', where: 'id = ?', whereArgs: [id]);
   }
 
   // Bill Reminder CRUD
+  @override
   Future<int> insertBillReminder(BillReminder reminder) async {
     final db = await database;
     return await db.insert('bill_reminders', reminder.toMap());
   }
 
+  @override
   Future<List<BillReminder>> getBillReminders() async {
     final db = await database;
     final maps = await db.query('bill_reminders', orderBy: 'dayOfMonth ASC');
     return maps.map((map) => BillReminder.fromMap(map)).toList();
   }
 
+  @override
   Future<int> updateBillReminder(BillReminder reminder) async {
     final db = await database;
     return await db.update(
@@ -2206,12 +2265,14 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteBillReminder(String id) async {
     final db = await database;
     return await db.delete('bill_reminders', where: 'id = ?', whereArgs: [id]);
   }
 
   // Investment Account CRUD
+  @override
   Future<int> insertInvestmentAccount(InvestmentAccount investment) async {
     final db = await database;
     return await db.insert('investment_accounts', {
@@ -2228,6 +2289,7 @@ class DatabaseService implements IDatabaseService {
     });
   }
 
+  @override
   Future<List<InvestmentAccount>> getInvestmentAccounts() async {
     final db = await database;
     final maps = await db.query('investment_accounts', orderBy: 'createdAt DESC');
@@ -2248,6 +2310,7 @@ class DatabaseService implements IDatabaseService {
     }).toList();
   }
 
+  @override
   Future<int> updateInvestmentAccount(InvestmentAccount investment) async {
     final db = await database;
     return await db.update(
@@ -2267,23 +2330,27 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteInvestmentAccount(String id) async {
     final db = await database;
     return await db.delete('investment_accounts', where: 'id = ?', whereArgs: [id]);
   }
 
   // Debt CRUD
+  @override
   Future<int> insertDebt(Debt debt) async {
     final db = await database;
     return await db.insert('debts', debt.toMap());
   }
 
+  @override
   Future<List<Debt>> getDebts() async {
     final db = await database;
     final maps = await db.query('debts', orderBy: 'createdAt DESC');
     return maps.map((map) => Debt.fromMap(map)).toList();
   }
 
+  @override
   Future<int> updateDebt(Debt debt) async {
     final db = await database;
     return await db.update(
@@ -2294,6 +2361,7 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteDebt(String id) async {
     final db = await database;
     // Payments will be deleted automatically due to CASCADE
@@ -2301,11 +2369,13 @@ class DatabaseService implements IDatabaseService {
   }
 
   // Debt Payment CRUD
+  @override
   Future<int> insertDebtPayment(DebtPayment payment) async {
     final db = await database;
     return await db.insert('debt_payments', payment.toMap());
   }
 
+  @override
   Future<List<DebtPayment>> getDebtPayments(String debtId) async {
     final db = await database;
     final maps = await db.query(
@@ -2317,23 +2387,27 @@ class DatabaseService implements IDatabaseService {
     return maps.map((map) => DebtPayment.fromMap(map)).toList();
   }
 
+  @override
   Future<int> deleteDebtPayment(String id) async {
     final db = await database;
     return await db.delete('debt_payments', where: 'id = ?', whereArgs: [id]);
   }
 
   // Ledger Member CRUD
+  @override
   Future<int> insertLedgerMember(LedgerMember member) async {
     final db = await database;
     return await db.insert('ledger_members', member.toMap());
   }
 
+  @override
   Future<List<LedgerMember>> getLedgerMembers() async {
     final db = await database;
     final maps = await db.query('ledger_members', orderBy: 'joinedAt DESC');
     return maps.map((map) => LedgerMember.fromMap(map)).toList();
   }
 
+  @override
   Future<List<LedgerMember>> getLedgerMembersForLedger(String ledgerId) async {
     final db = await database;
     final maps = await db.query(
@@ -2345,6 +2419,7 @@ class DatabaseService implements IDatabaseService {
     return maps.map((map) => LedgerMember.fromMap(map)).toList();
   }
 
+  @override
   Future<int> updateLedgerMember(LedgerMember member) async {
     final db = await database;
     return await db.update(
@@ -2355,23 +2430,27 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteLedgerMember(String id) async {
     final db = await database;
     return await db.delete('ledger_members', where: 'id = ?', whereArgs: [id]);
   }
 
   // Member Invite CRUD
+  @override
   Future<int> insertMemberInvite(MemberInvite invite) async {
     final db = await database;
     return await db.insert('member_invites', invite.toMap());
   }
 
+  @override
   Future<List<MemberInvite>> getMemberInvites() async {
     final db = await database;
     final maps = await db.query('member_invites', orderBy: 'createdAt DESC');
     return maps.map((map) => MemberInvite.fromMap(map)).toList();
   }
 
+  @override
   Future<MemberInvite?> getMemberInviteByCode(String code) async {
     final db = await database;
     final maps = await db.query(
@@ -2383,6 +2462,7 @@ class DatabaseService implements IDatabaseService {
     return MemberInvite.fromMap(maps.first);
   }
 
+  @override
   Future<int> updateMemberInvite(MemberInvite invite) async {
     final db = await database;
     return await db.update(
@@ -2393,23 +2473,27 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteMemberInvite(String id) async {
     final db = await database;
     return await db.delete('member_invites', where: 'id = ?', whereArgs: [id]);
   }
 
   // Member Budget CRUD
+  @override
   Future<int> insertMemberBudget(MemberBudget budget) async {
     final db = await database;
     return await db.insert('member_budgets', budget.toMap());
   }
 
+  @override
   Future<List<MemberBudget>> getMemberBudgets() async {
     final db = await database;
     final maps = await db.query('member_budgets', orderBy: 'createdAt DESC');
     return maps.map((map) => MemberBudget.fromMap(map)).toList();
   }
 
+  @override
   Future<List<MemberBudget>> getMemberBudgetsForLedger(String ledgerId) async {
     final db = await database;
     final maps = await db.query(
@@ -2420,6 +2504,7 @@ class DatabaseService implements IDatabaseService {
     return maps.map((map) => MemberBudget.fromMap(map)).toList();
   }
 
+  @override
   Future<MemberBudget?> getMemberBudgetForMember(String memberId) async {
     final db = await database;
     final maps = await db.query(
@@ -2431,6 +2516,7 @@ class DatabaseService implements IDatabaseService {
     return MemberBudget.fromMap(maps.first);
   }
 
+  @override
   Future<int> updateMemberBudget(MemberBudget budget) async {
     final db = await database;
     return await db.update(
@@ -2441,23 +2527,27 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteMemberBudget(String id) async {
     final db = await database;
     return await db.delete('member_budgets', where: 'id = ?', whereArgs: [id]);
   }
 
   // Expense Approval CRUD
+  @override
   Future<int> insertExpenseApproval(ExpenseApproval approval) async {
     final db = await database;
     return await db.insert('expense_approvals', approval.toMap());
   }
 
+  @override
   Future<List<ExpenseApproval>> getExpenseApprovals() async {
     final db = await database;
     final maps = await db.query('expense_approvals', orderBy: 'createdAt DESC');
     return maps.map((map) => ExpenseApproval.fromMap(map)).toList();
   }
 
+  @override
   Future<List<ExpenseApproval>> getExpenseApprovalsForLedger(String ledgerId) async {
     final db = await database;
     final maps = await db.query(
@@ -2469,6 +2559,7 @@ class DatabaseService implements IDatabaseService {
     return maps.map((map) => ExpenseApproval.fromMap(map)).toList();
   }
 
+  @override
   Future<List<ExpenseApproval>> getPendingApprovalsForLedger(String ledgerId) async {
     final db = await database;
     final maps = await db.query(
@@ -2480,6 +2571,7 @@ class DatabaseService implements IDatabaseService {
     return maps.map((map) => ExpenseApproval.fromMap(map)).toList();
   }
 
+  @override
   Future<int> updateExpenseApproval(ExpenseApproval approval) async {
     final db = await database;
     return await db.update(
@@ -2490,12 +2582,14 @@ class DatabaseService implements IDatabaseService {
     );
   }
 
+  @override
   Future<int> deleteExpenseApproval(String id) async {
     final db = await database;
     return await db.delete('expense_approvals', where: 'id = ?', whereArgs: [id]);
   }
 
   // Initialize default data
+  @override
   Future<void> initializeDefaultData() async {
     final db = await database;
 
@@ -2525,6 +2619,7 @@ class DatabaseService implements IDatabaseService {
   // ==================== Sync Metadata CRUD ====================
 
   /// Insert or update sync metadata for an entity
+  @override
   Future<int> upsertSyncMetadata({
     required String entityType,
     required String localId,
@@ -2558,6 +2653,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Get sync metadata for a specific entity
+  @override
   Future<Map<String, dynamic>?> getSyncMetadata(String entityType, String localId) async {
     final db = await database;
     final maps = await db.query(
@@ -2569,6 +2665,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Get all entities pending sync
+  @override
   Future<List<Map<String, dynamic>>> getPendingSyncMetadata() async {
     final db = await database;
     return await db.query(
@@ -2580,6 +2677,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Get all synced entities older than a given date (for cleanup)
+  @override
   Future<List<Map<String, dynamic>>> getSyncedEntitiesOlderThan(
     String entityType,
     int cutoffTimestamp,
@@ -2593,6 +2691,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Update sync status after successful sync
+  @override
   Future<int> updateSyncStatus(
     String entityType,
     String localId, {
@@ -2618,6 +2717,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Delete sync metadata
+  @override
   Future<int> deleteSyncMetadata(String entityType, String localId) async {
     final db = await database;
     return await db.delete(
@@ -2652,6 +2752,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Get pending sync operations
+  @override
   Future<List<Map<String, dynamic>>> getPendingSyncQueue() async {
     final db = await database;
     return await db.query(
@@ -2684,6 +2785,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Delete completed sync queue items
+  @override
   Future<int> deleteCompletedSyncQueue() async {
     final db = await database;
     return await db.delete(
@@ -2694,6 +2796,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Clear all sync queue
+  @override
   Future<int> clearSyncQueue() async {
     final db = await database;
     return await db.delete('sync_queue');
@@ -2702,6 +2805,7 @@ class DatabaseService implements IDatabaseService {
   // ==================== ID Mapping CRUD ====================
 
   /// Insert ID mapping
+  @override
   Future<int> insertIdMapping({
     required String entityType,
     required String localId,
@@ -2723,6 +2827,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Get server ID by local ID
+  @override
   Future<String?> getServerIdByLocalId(String entityType, String localId) async {
     final db = await database;
     final maps = await db.query(
@@ -2735,6 +2840,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Get local ID by server ID
+  @override
   Future<String?> getLocalIdByServerId(String entityType, String serverId) async {
     final db = await database;
     final maps = await db.query(
@@ -2747,6 +2853,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Get all ID mappings for an entity type
+  @override
   Future<List<Map<String, dynamic>>> getIdMappings(String entityType) async {
     final db = await database;
     return await db.query(
@@ -2757,6 +2864,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Delete ID mapping
+  @override
   Future<int> deleteIdMapping(String entityType, String localId) async {
     final db = await database;
     return await db.delete(
@@ -2769,6 +2877,7 @@ class DatabaseService implements IDatabaseService {
   // ==================== Sync Statistics ====================
 
   /// Get sync statistics
+  @override
   Future<Map<String, int>> getSyncStatistics() async {
     final db = await database;
 
@@ -2802,6 +2911,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Get last sync time
+  @override
   Future<DateTime?> getLastSyncTime() async {
     final db = await database;
     final result = await db.rawQuery(
@@ -2814,12 +2924,14 @@ class DatabaseService implements IDatabaseService {
   // ==================== Import Batch CRUD ====================
 
   /// Insert import batch
+  @override
   Future<int> insertImportBatch(ImportBatch batch) async {
     final db = await database;
     return await db.insert('import_batches', batch.toMap());
   }
 
   /// Get all import batches
+  @override
   Future<List<ImportBatch>> getImportBatches() async {
     final db = await database;
     final maps = await db.query('import_batches', orderBy: 'createdAt DESC');
@@ -2827,6 +2939,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Get import batch by ID
+  @override
   Future<ImportBatch?> getImportBatch(String id) async {
     final db = await database;
     final maps = await db.query(
@@ -2839,6 +2952,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Get active import batches (not revoked)
+  @override
   Future<List<ImportBatch>> getActiveImportBatches() async {
     final db = await database;
     final maps = await db.query(
@@ -2851,6 +2965,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Update import batch
+  @override
   Future<int> updateImportBatch(ImportBatch batch) async {
     final db = await database;
     return await db.update(
@@ -2862,6 +2977,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Revoke an import batch and delete all associated transactions
+  @override
   Future<void> revokeImportBatch(String batchId) async {
     final db = await database;
     await db.transaction((txn) async {
@@ -2886,12 +3002,14 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Delete import batch (only for testing/cleanup)
+  @override
   Future<int> deleteImportBatch(String id) async {
     final db = await database;
     return await db.delete('import_batches', where: 'id = ?', whereArgs: [id]);
   }
 
   /// Get transactions by import batch ID
+  @override
   Future<List<model.Transaction>> getTransactionsByBatchId(String batchId) async {
     final db = await database;
     final maps = await db.query(
@@ -3095,6 +3213,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// Batch insert transactions (for import)
+  @override
   Future<void> batchInsertTransactions(List<model.Transaction> transactions) async {
     final db = await database;
     final batch = db.batch();
@@ -3166,12 +3285,14 @@ class DatabaseService implements IDatabaseService {
   // ==================== 2.0新增：资源池 CRUD ====================
 
   /// 插入资源池
+  @override
   Future<int> insertResourcePool(ResourcePool pool) async {
     final db = await database;
     return await db.insert('resource_pools', pool.toMap());
   }
 
   /// 更新资源池
+  @override
   Future<int> updateResourcePool(ResourcePool pool) async {
     final db = await database;
     return await db.update(
@@ -3183,12 +3304,14 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 删除资源池
+  @override
   Future<int> deleteResourcePool(String id) async {
     final db = await database;
     return await db.delete('resource_pools', where: 'id = ?', whereArgs: [id]);
   }
 
   /// 获取所有有剩余金额的资源池（按创建时间排序，FIFO）
+  @override
   Future<List<ResourcePool>> getActiveResourcePools() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -3200,6 +3323,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 获取所有资源池
+  @override
   Future<List<ResourcePool>> getAllResourcePools() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -3210,6 +3334,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 根据收入交易ID获取资源池
+  @override
   Future<ResourcePool?> getResourcePoolByIncomeId(String incomeTransactionId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -3222,12 +3347,14 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 插入资源消费记录
+  @override
   Future<int> insertResourceConsumption(ResourceConsumption consumption) async {
     final db = await database;
     return await db.insert('resource_consumptions', consumption.toMap());
   }
 
   /// 批量插入资源消费记录
+  @override
   Future<void> batchInsertResourceConsumptions(List<ResourceConsumption> consumptions) async {
     final db = await database;
     final batch = db.batch();
@@ -3238,6 +3365,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 获取交易的资源消费记录
+  @override
   Future<List<ResourceConsumption>> getConsumptionsByTransaction(String transactionId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -3249,6 +3377,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 获取资源池的消费记录
+  @override
   Future<List<ResourceConsumption>> getConsumptionsByPool(String poolId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -3263,12 +3392,14 @@ class DatabaseService implements IDatabaseService {
   // ==================== 2.0新增：小金库 CRUD ====================
 
   /// 插入小金库
+  @override
   Future<int> insertBudgetVault(BudgetVault vault) async {
     final db = await database;
     return await db.insert('budget_vaults', vault.toMap());
   }
 
   /// 更新小金库
+  @override
   Future<int> updateBudgetVault(BudgetVault vault) async {
     final db = await database;
     return await db.update(
@@ -3280,12 +3411,14 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 删除小金库
+  @override
   Future<int> deleteBudgetVault(String id) async {
     final db = await database;
     return await db.delete('budget_vaults', where: 'id = ?', whereArgs: [id]);
   }
 
   /// 获取账本的所有小金库
+  @override
   Future<List<BudgetVault>> getBudgetVaults({String? ledgerId}) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -3298,6 +3431,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 获取启用的小金库
+  @override
   Future<List<BudgetVault>> getEnabledBudgetVaults({String? ledgerId}) async {
     final db = await database;
     String where = 'isEnabled = 1';
@@ -3316,6 +3450,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 根据ID获取小金库
+  @override
   Future<BudgetVault?> getBudgetVaultById(String id) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -3328,6 +3463,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 根据关联分类获取小金库
+  @override
   Future<BudgetVault?> getBudgetVaultByCategory(String categoryId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -3340,12 +3476,14 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 插入小金库分配记录
+  @override
   Future<int> insertVaultAllocation(VaultAllocation allocation) async {
     final db = await database;
     return await db.insert('vault_allocations', allocation.toMap());
   }
 
   /// 获取小金库的分配记录
+  @override
   Future<List<VaultAllocation>> getVaultAllocations(String vaultId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -3358,12 +3496,14 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 插入小金库调拨记录
+  @override
   Future<int> insertVaultTransfer(VaultTransfer transfer) async {
     final db = await database;
     return await db.insert('vault_transfers', transfer.toMap());
   }
 
   /// 获取小金库的调拨记录
+  @override
   Future<List<VaultTransfer>> getVaultTransfers(String vaultId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -3376,6 +3516,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 更新小金库已分配金额
+  @override
   Future<void> updateVaultAllocatedAmount(String vaultId, double amount) async {
     final db = await database;
     await db.rawUpdate(
@@ -3385,6 +3526,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 更新小金库已花费金额
+  @override
   Future<void> updateVaultSpentAmount(String vaultId, double amount) async {
     final db = await database;
     await db.rawUpdate(
@@ -3394,24 +3536,28 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 执行原始SQL查询
+  @override
   Future<List<Map<String, Object?>>> rawQuery(String sql, [List<Object?>? arguments]) async {
     final db = await database;
     return await db.rawQuery(sql, arguments);
   }
 
   /// 执行原始SQL插入
+  @override
   Future<int> rawInsert(String sql, [List<Object?>? arguments]) async {
     final db = await database;
     return await db.rawInsert(sql, arguments);
   }
 
   /// 执行原始SQL更新
+  @override
   Future<int> rawUpdate(String sql, [List<Object?>? arguments]) async {
     final db = await database;
     return await db.rawUpdate(sql, arguments);
   }
 
   /// 执行原始SQL删除
+  @override
   Future<int> rawDelete(String sql, [List<Object?>? arguments]) async {
     final db = await database;
     return await db.rawDelete(sql, arguments);
@@ -3446,30 +3592,35 @@ class DatabaseService implements IDatabaseService {
   Future<List<TransactionTemplate>> getAllTemplates() => getTemplates();
 
   /// 获取自定义分类
+  @override
   Future<List<Map<String, dynamic>>> getCustomCategories() async {
     final db = await database;
     return await db.query('custom_categories');
   }
 
   /// 获取钱龄资源池数据
+  @override
   Future<List<Map<String, dynamic>>> getMoneyAgePools() async {
     final db = await database;
     return await db.query('money_age_pools');
   }
 
   /// 获取家庭账本数据
+  @override
   Future<List<Map<String, dynamic>>> getFamilyLedgers() async {
     final db = await database;
     return await db.query('family_ledgers');
   }
 
   /// 获取位置记录
+  @override
   Future<List<Map<String, dynamic>>> getLocationRecords() async {
     final db = await database;
     return await db.query('location_records');
   }
 
   /// 获取设置值
+  @override
   Future<dynamic> getSetting(String key) async {
     final db = await database;
     final results = await db.query(
@@ -3482,6 +3633,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 设置值
+  @override
   Future<void> setSetting(String key, dynamic value) async {
     final db = await database;
     await db.insert(
@@ -3510,12 +3662,14 @@ class DatabaseService implements IDatabaseService {
   // =============== 导出服务所需的存根方法 ===============
 
   /// 获取交易总数
+  @override
   Future<int> getTransactionCount() async {
     final transactions = await getTransactions();
     return transactions.length;
   }
 
   /// 获取第一笔交易
+  @override
   Future<model.Transaction?> getFirstTransaction() async {
     final transactions = await getTransactions();
     if (transactions.isEmpty) return null;
@@ -3636,26 +3790,31 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 获取钱龄统计
+  @override
   Future<Map<String, dynamic>> getMoneyAgeStats() async {
     return {};
   }
 
   /// 获取FIFO流动记录
+  @override
   Future<List<Map<String, dynamic>>> getFifoFlowRecords() async {
     return [];
   }
 
   /// 获取钱龄分布
+  @override
   Future<Map<String, int>> getMoneyAgeDistribution() async {
     return {};
   }
 
   /// 获取指定月份的预算
+  @override
   Future<List<Budget>> getBudgetsForMonth(DateTime month) async {
     return getBudgets();
   }
 
   /// 获取指定月份的小金库记录
+  @override
   Future<List<Map<String, dynamic>>> getVaultRecordsForMonth(DateTime month) async {
     return [];
   }
@@ -3671,16 +3830,19 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 根据账本ID获取成员列表
+  @override
   Future<List<Map<String, dynamic>>> getMembersByLedgerId(String ledgerId) async {
     return [];
   }
 
   /// 根据成员获取交易
+  @override
   Future<List<model.Transaction>> getTransactionsByMember(String memberId) async {
     return [];
   }
 
   /// 获取单个预算
+  @override
   Future<Budget?> getBudget(String id) async {
     final budgets = await getBudgets();
     try {
@@ -3691,6 +3853,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 保存预算
+  @override
   Future<void> saveBudget(Budget budget) async {
     await updateBudget(budget);
   }
@@ -3698,6 +3861,7 @@ class DatabaseService implements IDatabaseService {
   // ==================== 软删除支持 ====================
 
   /// 软删除交易记录
+  @override
   Future<int> softDeleteTransaction(String id) async {
     final db = await database;
     return await db.update(
@@ -3712,6 +3876,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 软删除账户
+  @override
   Future<int> softDeleteAccount(String id) async {
     final db = await database;
     return await db.update(
@@ -3726,6 +3891,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 软删除分类
+  @override
   Future<int> softDeleteCategory(String id) async {
     final db = await database;
     return await db.update(
@@ -3740,6 +3906,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 软删除账本
+  @override
   Future<int> softDeleteLedger(String id) async {
     final db = await database;
     return await db.update(
@@ -3754,6 +3921,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 软删除预算
+  @override
   Future<int> softDeleteBudget(String id) async {
     final db = await database;
     return await db.update(
@@ -3768,6 +3936,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 恢复软删除的交易记录
+  @override
   Future<int> restoreTransaction(String id) async {
     final db = await database;
     return await db.update(
@@ -3779,6 +3948,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 恢复软删除的账户
+  @override
   Future<int> restoreAccount(String id) async {
     final db = await database;
     return await db.update(
@@ -3790,6 +3960,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 恢复软删除的分类
+  @override
   Future<int> restoreCategory(String id) async {
     final db = await database;
     return await db.update(
@@ -3801,6 +3972,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 恢复软删除的账本
+  @override
   Future<int> restoreLedger(String id) async {
     final db = await database;
     return await db.update(
@@ -3812,6 +3984,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 恢复软删除的预算
+  @override
   Future<int> restoreBudget(String id) async {
     final db = await database;
     return await db.update(
@@ -3825,6 +3998,7 @@ class DatabaseService implements IDatabaseService {
   /// 永久删除已软删除且超过保留期的记录
   ///
   /// [retentionDays] 保留天数，默认30天
+  @override
   Future<Map<String, int>> purgeDeletedRecords({int retentionDays = 30}) async {
     final db = await database;
     final cutoffTime = DateTime.now()
@@ -3872,6 +4046,7 @@ class DatabaseService implements IDatabaseService {
   /// 检测孤儿数据
   ///
   /// 返回各类孤儿数据的统计
+  @override
   Future<Map<String, List<String>>> detectOrphanData() async {
     final db = await database;
     final orphans = <String, List<String>>{};
@@ -3974,6 +4149,7 @@ class DatabaseService implements IDatabaseService {
   /// 清理孤儿数据
   ///
   /// 删除所有检测到的孤儿记录
+  @override
   Future<Map<String, int>> cleanupOrphanData() async {
     final db = await database;
     final results = <String, int>{};
@@ -4010,6 +4186,7 @@ class DatabaseService implements IDatabaseService {
   }
 
   /// 获取数据库统计信息
+  @override
   Future<Map<String, dynamic>> getDatabaseStats() async {
     final db = await database;
     final stats = <String, dynamic>{};
