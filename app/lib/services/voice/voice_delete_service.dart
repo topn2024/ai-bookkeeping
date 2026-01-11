@@ -531,6 +531,14 @@ class VoiceDeleteService extends ChangeNotifier {
   /// 获取当前待删除的记录数
   int get pendingDeleteCount =>
       _currentSession?.targetRecords?.length ?? 0;
+
+  /// 释放资源
+  @override
+  void dispose() {
+    _currentSession = null;
+    _deleteHistory.clear();
+    super.dispose();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

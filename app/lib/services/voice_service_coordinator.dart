@@ -1383,8 +1383,41 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 释放资源
   @override
   void dispose() {
+    // 释放语音识别引擎
     _recognitionEngine.dispose();
+
+    // 释放TTS服务
     _ttsService.dispose();
+
+    // 释放反馈系统（内部有自己的TTS实例）
+    _feedbackSystem.dispose();
+
+    // 释放打断检测器
+    _bargeInDetector.dispose();
+
+    // 清理命令历史防止内存泄漏
+    _commandHistory.clear();
+
+    // 清理待处理的多意图结果
+    _pendingMultiIntent = null;
+
+    // 释放实体消歧服务
+    _disambiguationService.dispose();
+
+    // 释放删除服务
+    _deleteService.dispose();
+
+    // 释放修改服务
+    _modifyService.dispose();
+
+    // 清理对话上下文
+    _conversationContext.endSession();
+
+    // 注意：以下服务不在此处释放
+    // - _databaseService: 通常由应用级别管理，多处共享
+    // - _navigationService, _intentRouter: 无状态资源需清理
+    // - _screenReaderService, _automationService: 无dispose方法
+
     super.dispose();
   }
 }

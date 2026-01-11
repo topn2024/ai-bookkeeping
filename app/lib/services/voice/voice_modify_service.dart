@@ -685,6 +685,14 @@ class VoiceModifyService extends ChangeNotifier {
 
   /// 当前是否有待处理的修改
   bool get hasPendingModification => _currentSession != null;
+
+  /// 释放资源
+  @override
+  void dispose() {
+    _currentSession = null;
+    _modifyHistory.clear();
+    super.dispose();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -534,6 +534,14 @@ class EntityDisambiguationService extends ChangeNotifier {
 
     return DisambiguationResult.needMoreInfo(references: [], prompt: '没有理解您的选择，请说"第几个"或描述具体特征');
   }
+
+  /// 释放资源
+  @override
+  void dispose() {
+    _currentContext = null;
+    _recentRecords.clear();
+    super.dispose();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
