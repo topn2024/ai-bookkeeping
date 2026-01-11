@@ -273,7 +273,7 @@ class ChartCaptureService {
       text: TextSpan(
         text: config.text,
         style: TextStyle(
-          color: config.color.withOpacity(config.opacity),
+          color: config.color.withValues(alpha: config.opacity),
           fontSize: config.fontSize,
           fontWeight: FontWeight.bold,
         ),

@@ -310,7 +310,7 @@ class DistributedLockService extends ChangeNotifier {
     _initialized = true;
 
     if (kDebugMode) {
-      print('DistributedLockService initialized with ${_config.nodeCount} nodes');
+      debugPrint('DistributedLockService initialized with ${_config.nodeCount} nodes');
     }
   }
 
@@ -612,7 +612,7 @@ class DistributedLockService extends ChangeNotifier {
     if (lock.renewCount >= options.maxRenewCount) {
       _cancelAutoRenew(lock.resource);
       if (kDebugMode) {
-        print('Lock ${lock.resource} max renew count reached');
+        debugPrint('Lock ${lock.resource} max renew count reached');
       }
       return;
     }
@@ -628,7 +628,7 @@ class DistributedLockService extends ChangeNotifier {
       lock.renewCount++;
       _renewals++;
       if (kDebugMode) {
-        print('Lock ${lock.resource} renewed (${lock.renewCount}/${options.maxRenewCount})');
+        debugPrint('Lock ${lock.resource} renewed (${lock.renewCount}/${options.maxRenewCount})');
       }
     } else {
       // 续期失败，锁可能已丢失
@@ -637,7 +637,7 @@ class DistributedLockService extends ChangeNotifier {
       _cancelAutoRenew(lock.resource);
 
       if (kDebugMode) {
-        print('Lock ${lock.resource} renewal failed');
+        debugPrint('Lock ${lock.resource} renewal failed');
       }
     }
   }

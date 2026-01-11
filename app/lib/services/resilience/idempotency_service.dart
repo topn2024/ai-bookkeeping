@@ -249,7 +249,7 @@ class IdempotencyService extends ChangeNotifier {
     _initialized = true;
 
     if (kDebugMode) {
-      print('IdempotencyService initialized with TTL=${_config.defaultTtl}');
+      debugPrint('IdempotencyService initialized with TTL=${_config.defaultTtl}');
     }
   }
 
@@ -375,7 +375,7 @@ class IdempotencyService extends ChangeNotifier {
     final record = _records[idempotencyKey];
     if (record == null) {
       if (kDebugMode) {
-        print('Warning: No record found for idempotency key: $idempotencyKey');
+        debugPrint('Warning: No record found for idempotency key: $idempotencyKey');
       }
       return;
     }
@@ -519,7 +519,7 @@ class IdempotencyService extends ChangeNotifier {
     }
 
     if (expiredKeys.isNotEmpty && kDebugMode) {
-      print('IdempotencyService: Cleaned up ${expiredKeys.length} expired records');
+      debugPrint('IdempotencyService: Cleaned up ${expiredKeys.length} expired records');
     }
   }
 

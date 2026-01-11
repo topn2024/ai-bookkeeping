@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/riverpod.dart';
 
@@ -296,14 +297,14 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
     );
 
     // 检查重复交易
-    print('VoiceProvider: 开始检查重复交易，金额=${transaction.amount}');
+    debugPrint('VoiceProvider: 开始检查重复交易，金额=${transaction.amount}');
     final existingTransactions = await _databaseService.getTransactions();
-    print('VoiceProvider: 获取到${existingTransactions.length}条现有交易');
+    debugPrint('VoiceProvider: 获取到${existingTransactions.length}条现有交易');
     final duplicateCheck = DuplicateDetectionService.checkDuplicate(
       transaction,
       existingTransactions,
     );
-    print('VoiceProvider: 重复检测结果: hasPotentialDuplicate=${duplicateCheck.hasPotentialDuplicate}, score=${duplicateCheck.similarityScore}');
+    debugPrint('VoiceProvider: 重复检测结果: hasPotentialDuplicate=${duplicateCheck.hasPotentialDuplicate}, score=${duplicateCheck.similarityScore}');
 
     if (duplicateCheck.hasPotentialDuplicate) {
       // 发现潜在重复，提示用户并进入确认流程

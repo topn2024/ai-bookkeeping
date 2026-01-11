@@ -373,7 +373,26 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
         throw Exception('录音文件不存在');
       }
 
+      // 验证录音时长（至少0.5秒）
+      if (_recordingDuration.inMilliseconds < 500) {
+        setState(() {
+          _state = 'idle';
+        });
+        _showError('录音时间太短，请说话后再松开按钮');
+        return;
+      }
+
       final audioData = await file.readAsBytes();
+
+      // 验证音频文件大小（至少5KB，排除空白录音）
+      if (audioData.length < 5000) {
+        setState(() {
+          _state = 'idle';
+        });
+        _showError('未检测到语音内容，请对着麦克风说话');
+        return;
+      }
+
       final aiService = AIService();
 
       // 使用多笔交易识别
@@ -383,19 +402,32 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
         setState(() {
           _state = 'idle';
         });
-        _showError(multiResult.errorMessage ?? '识别失败');
+        _showError(multiResult.errorMessage ?? '识别失败，请重新录音');
+        return;
+      }
+
+      // 验证是否有有效的交易记录（必须有金额）
+      final validTransactions = multiResult.transactions.where((t) =>
+        t.amount != null && t.amount! > 0
+      ).toList();
+
+      if (validTransactions.isEmpty) {
+        setState(() {
+          _state = 'idle';
+        });
+        _showError('未能识别出有效的金额信息，请清晰说出金额，例如"午餐花了35元"');
         return;
       }
 
       // 检查是否识别到多笔交易
-      if (multiResult.isMultiple) {
+      if (validTransactions.length > 1) {
         // 多笔交易 -> 跳转到多笔确认页面
         if (mounted) {
           final result = await Navigator.push<bool>(
             context,
             MaterialPageRoute(
               builder: (_) => MultiTransactionConfirmPage(
-                transactions: multiResult.transactions,
+                transactions: validTransactions,
                 audioFilePath: audioPath,
                 recognitionTimestamp: _recognitionTimestamp,
               ),
@@ -413,18 +445,12 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
         }
       } else {
         // 单笔交易 -> 保持原有流程
-        final result = multiResult.first;
+        final result = validTransactions.first;
         setState(() {
           _recognitionResult = result;
-          _state = result != null && result.success ? 'result' : 'idle';
-          if (result != null && result.success) {
-            _populateFieldsFromResult(result);
-          }
+          _state = 'result';
+          _populateFieldsFromResult(result);
         });
-
-        if (result == null || !result.success) {
-          _showError(result?.errorMessage ?? '识别失败');
-        }
       }
     } catch (e) {
       setState(() {

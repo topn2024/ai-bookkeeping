@@ -236,7 +236,7 @@ class VaultAISuggestionPage extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(
                 '记录更多交易后，AI将为您生成个性化预算建议',
-                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7)),
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
                 textAlign: TextAlign.center,
               ),
             ],

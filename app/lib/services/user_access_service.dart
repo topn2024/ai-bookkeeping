@@ -220,7 +220,7 @@ class UserAccessService extends ChangeNotifier {
     _initialized = true;
 
     if (kDebugMode) {
-      print('UserAccessService initialized: ${_session.userType.name}');
+      debugPrint('UserAccessService initialized: ${_session.userType.name}');
     }
   }
 
@@ -254,7 +254,7 @@ class UserAccessService extends ChangeNotifier {
     notifyListeners();
 
     if (kDebugMode) {
-      print('User logged in: $userId');
+      debugPrint('User logged in: $userId');
     }
   }
 
@@ -265,7 +265,7 @@ class UserAccessService extends ChangeNotifier {
     notifyListeners();
 
     if (kDebugMode) {
-      print('User logged out, switched to guest');
+      debugPrint('User logged out, switched to guest');
     }
   }
 

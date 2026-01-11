@@ -126,7 +126,7 @@ class DataSubscriptionConfig {
 /// syncService.subscribe(
 ///   types: {DataChangeType.transaction},
 ///   onDataChanged: (event) {
-///     print('交易数据变更: ${event.affectedIds}');
+///     debugPrint('交易数据变更: ${event.affectedIds}');
 ///     // 刷新UI
 ///   },
 /// );

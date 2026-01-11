@@ -77,7 +77,7 @@ class _AmountSupplementWidgetState extends State<AmountSupplementWidget> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -147,7 +147,7 @@ class _AmountSupplementWidgetState extends State<AmountSupplementWidget> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.orange.withOpacity(0.1),
+        color: Colors.orange.withValues(alpha: 0.1),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Row(
@@ -180,7 +180,7 @@ class _AmountSupplementWidgetState extends State<AmountSupplementWidget> {
         value: widget.incompleteIntents.isEmpty
             ? 1.0
             : (_currentIndex + 1) / widget.incompleteIntents.length,
-        backgroundColor: Colors.grey.withOpacity(0.2),
+        backgroundColor: Colors.grey.withValues(alpha: 0.2),
         valueColor: const AlwaysStoppedAnimation<Color>(Colors.orange),
       ),
     );
@@ -209,7 +209,7 @@ class _AmountSupplementWidgetState extends State<AmountSupplementWidget> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getCategoryColor(intent.category).withOpacity(0.1),
+                  color: _getCategoryColor(intent.category).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(

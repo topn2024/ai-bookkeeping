@@ -509,7 +509,7 @@ class MemoryOptimizationService {
         await callback();
       } catch (e) {
         if (kDebugMode) {
-          print('Cleanup callback failed: $e');
+          debugPrint('Cleanup callback failed: $e');
         }
       }
     }

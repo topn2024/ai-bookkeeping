@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 
 /// 邀请与社交裂变服务
 ///
@@ -440,7 +441,7 @@ class InvitationService {
 
   Future<void> _grantReward(String userId, RewardConfig reward) async {
     // 实际实现中发放奖励
-    print('发放奖励给用户 $userId: ${reward.displayName}');
+    debugPrint('发放奖励给用户 $userId: ${reward.displayName}');
   }
 
   /// 获取用户的邀请码列表

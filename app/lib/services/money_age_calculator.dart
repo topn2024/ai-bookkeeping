@@ -55,7 +55,7 @@ extension ConsumptionStrategyExtension on ConsumptionStrategy {
 /// final calculator = MoneyAgeCalculator();
 /// calculator.processIncome(incomeTransaction);
 /// final result = calculator.processExpense(expenseTransaction);
-/// print('钱龄: ${result.moneyAge} 天');
+/// debugPrint('钱龄: ${result.moneyAge} 天');
 /// ```
 class MoneyAgeCalculator {
   /// 资源池列表（按创建时间排序）

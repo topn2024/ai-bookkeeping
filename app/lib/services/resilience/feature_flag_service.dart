@@ -418,7 +418,7 @@ class FeatureFlagService extends ChangeNotifier {
         _flags.addAll(remoteFlags);
       } catch (e) {
         if (kDebugMode) {
-          print('Failed to load remote feature flags: $e');
+          debugPrint('Failed to load remote feature flags: $e');
         }
       }
 
@@ -598,7 +598,7 @@ class FeatureFlagService extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       if (kDebugMode) {
-        print('Failed to refresh feature flags: $e');
+        debugPrint('Failed to refresh feature flags: $e');
       }
     }
   }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 /// 用户行为分析埋点服务
 ///
@@ -266,9 +267,9 @@ class ConsoleEventProcessor implements EventProcessor {
     if (!enabled) return;
 
     if (verbose) {
-      print('[Analytics] ${jsonEncode(event.toJson())}');
+      debugPrint('[Analytics] ${jsonEncode(event.toJson())}');
     } else {
-      print('[Analytics] ${event.type.name}: ${event.name}');
+      debugPrint('[Analytics] ${event.type.name}: ${event.name}');
     }
   }
 

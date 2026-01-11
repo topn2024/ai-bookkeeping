@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 
@@ -139,7 +140,7 @@ class DuplicateDetectionService {
       reasons.add('金额相同');
     } else {
       // 金额不同，记录差异
-      print('DuplicateDetection: 金额不同 ${newTx.amount} vs ${existingTx.amount}');
+      debugPrint('DuplicateDetection: 金额不同 ${newTx.amount} vs ${existingTx.amount}');
     }
 
     // 3. 类型相同 (+10分)
@@ -150,7 +151,7 @@ class DuplicateDetectionService {
 
     // 4. 分类匹配 (+15分完全相同，+8分同一级分类)
     final categoryScore = _calculateCategoryScore(newTx.category, existingTx.category);
-    print('DuplicateDetection: 分类比对 "${newTx.category}" vs "${existingTx.category}" = $categoryScore分');
+    debugPrint('DuplicateDetection: 分类比对 "${newTx.category}" vs "${existingTx.category}" = $categoryScore分');
     if (categoryScore > 0) {
       score += categoryScore;
       if (categoryScore == 15) {
@@ -186,7 +187,7 @@ class DuplicateDetectionService {
       reasons.add('账户相同');
     }
 
-    print('DuplicateDetection: 总分=$score, 原因=${reasons.join(", ")}');
+    debugPrint('DuplicateDetection: 总分=$score, 原因=${reasons.join(", ")}');
 
     // 判断重复等级
     if (score >= 85) {

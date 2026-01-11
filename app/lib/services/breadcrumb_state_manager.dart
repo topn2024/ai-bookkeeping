@@ -253,7 +253,7 @@ class BreadcrumbState {
 ///
 /// // 监听状态变化
 /// manager.stateStream.listen((state) {
-///   print('面包屑更新: ${state.visibleItems.map((i) => i.label)}');
+///   debugPrint('面包屑更新: ${state.visibleItems.map((i) => i.label)}');
 /// });
 ///
 /// // 处理点击

@@ -368,7 +368,7 @@ class RateLimiterService extends ChangeNotifier {
     _initialized = true;
 
     if (kDebugMode) {
-      print('RateLimiterService initialized with config: '
+      debugPrint('RateLimiterService initialized with config: '
           'global=${_config.globalConfig.capacity}/${_config.globalConfig.refillRate}/s');
     }
   }

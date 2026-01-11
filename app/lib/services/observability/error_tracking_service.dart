@@ -321,7 +321,7 @@ class ErrorTrackingService {
         extras: extras,
       ),
       handled: handled,
-      fingerprint: fingerprint ?? _generateFingerprint(exception, stackTrace),
+      fingerprint: fingerprint ?? _generateFingerdebugPrint(exception, stackTrace),
     );
 
     return await _processEvent(event);
@@ -432,7 +432,7 @@ class ErrorTrackingService {
         await _onReport?.call(event);
       } catch (e) {
         if (kDebugMode) {
-          print('Failed to report error: $e');
+          debugPrint('Failed to report error: $e');
         }
       }
     }
@@ -501,7 +501,7 @@ class ErrorTrackingService {
     return '$timestamp-$_eventIdCounter';
   }
 
-  String _generateFingerprint(dynamic exception, StackTrace? stackTrace) {
+  String _generateFingerdebugPrint(dynamic exception, StackTrace? stackTrace) {
     final buffer = StringBuffer();
     buffer.write(exception.runtimeType.toString());
 

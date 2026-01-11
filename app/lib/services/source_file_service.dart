@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -71,7 +72,7 @@ class SourceFileService {
       await sourceFile.copy(destPath);
       return destPath;
     } catch (e) {
-      print('Error saving image file: $e');
+      debugPrint('Error saving image file: $e');
       return null;
     }
   }
@@ -94,7 +95,7 @@ class SourceFileService {
       await sourceFile.copy(destPath);
       return destPath;
     } catch (e) {
-      print('Error saving audio file: $e');
+      debugPrint('Error saving audio file: $e');
       return null;
     }
   }
@@ -115,7 +116,7 @@ class SourceFileService {
       await file.writeAsBytes(bytes);
       return destPath;
     } catch (e) {
-      print('Error saving image bytes: $e');
+      debugPrint('Error saving image bytes: $e');
       return null;
     }
   }
@@ -136,7 +137,7 @@ class SourceFileService {
       await file.writeAsBytes(bytes);
       return destPath;
     } catch (e) {
-      print('Error saving audio bytes: $e');
+      debugPrint('Error saving audio bytes: $e');
       return null;
     }
   }
@@ -151,7 +152,7 @@ class SourceFileService {
       }
       return false;
     } catch (e) {
-      print('Error deleting file: $e');
+      debugPrint('Error deleting file: $e');
       return false;
     }
   }
@@ -208,7 +209,7 @@ class SourceFileService {
 
       totalSize = imageSize + audioSize;
     } catch (e) {
-      print('Error calculating storage: $e');
+      debugPrint('Error calculating storage: $e');
     }
 
     return SourceFileStorageInfo(
@@ -255,7 +256,7 @@ class SourceFileService {
         }
       }
     } catch (e) {
-      print('Error getting source files: $e');
+      debugPrint('Error getting source files: $e');
     }
 
     return files;
@@ -292,7 +293,7 @@ class SourceFileService {
         }
       }
     } catch (e) {
-      print('Error deleting old files: $e');
+      debugPrint('Error deleting old files: $e');
     }
 
     return deletedCount;
@@ -323,7 +324,7 @@ class SourceFileService {
         }
       }
     } catch (e) {
-      print('Error deleting all files: $e');
+      debugPrint('Error deleting all files: $e');
     }
 
     return deletedCount;

@@ -297,7 +297,7 @@ class _VaultAllocationPageState extends ConsumerState<VaultAllocationPage> {
                     '请先创建小金库后再进行分配',
                     style: TextStyle(
                       fontSize: 13,
-                      color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                     ),
                   ),
                 ],

@@ -292,7 +292,7 @@ class _FloatingBallWidgetState extends State<FloatingBallWidget>
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(_isDragging ? 0.3 : 0.2),
+                color: Colors.black.withValues(alpha: _isDragging ? 0.3 : 0.2),
                 blurRadius: _isDragging ? 12 : 8,
                 offset: Offset(0, _isDragging ? 4 : 2),
               ),

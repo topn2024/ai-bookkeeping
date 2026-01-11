@@ -509,7 +509,7 @@ class MetricsService {
       await _onFlush!(metrics);
     } catch (e) {
       if (kDebugMode) {
-        print('Failed to flush metrics: $e');
+        debugPrint('Failed to flush metrics: $e');
       }
     }
   }

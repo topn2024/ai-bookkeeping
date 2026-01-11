@@ -191,7 +191,7 @@ class ConsoleLogOutput implements LogOutput {
   @override
   void write(LogEntry entry) {
     if (kDebugMode) {
-      print(entry.format(colored: colored, includeContext: includeContext));
+      debugPrint(entry.format(colored: colored, includeContext: includeContext));
     }
   }
 
@@ -344,7 +344,7 @@ class BufferedLogOutput implements LogOutput {
       // 发送失败，将条目放回缓冲区
       // 但只保留最新的条目以防溢出
       if (kDebugMode) {
-        print('Failed to flush logs: $e');
+        debugPrint('Failed to flush logs: $e');
       }
     } finally {
       _isFlushing = false;
@@ -607,7 +607,7 @@ class LoggerService {
         output.write(entry);
       } catch (e) {
         if (kDebugMode) {
-          print('Failed to write log to output: $e');
+          debugPrint('Failed to write log to output: $e');
         }
       }
     }

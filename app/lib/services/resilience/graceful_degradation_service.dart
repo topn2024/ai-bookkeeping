@@ -338,7 +338,7 @@ class GracefulDegradationService extends ChangeNotifier {
       return await operation();
     } catch (e) {
       if (kDebugMode) {
-        print('Operation failed, using fallback: $e');
+        debugPrint('Operation failed, using fallback: $e');
       }
       return fallback();
     }
@@ -506,7 +506,7 @@ class GracefulDegradationService extends ChangeNotifier {
           _activeStrategies.add(strategy.id);
         } catch (e) {
           if (kDebugMode) {
-            print('Failed to execute degradation strategy ${strategy.id}: $e');
+            debugPrint('Failed to execute degradation strategy ${strategy.id}: $e');
           }
         }
       }
@@ -523,7 +523,7 @@ class GracefulDegradationService extends ChangeNotifier {
           _activeStrategies.remove(strategy.id);
         } catch (e) {
           if (kDebugMode) {
-            print('Failed to execute recovery strategy ${strategy.id}: $e');
+            debugPrint('Failed to execute recovery strategy ${strategy.id}: $e');
           }
         }
       }

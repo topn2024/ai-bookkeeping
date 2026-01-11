@@ -383,10 +383,13 @@ class _AboutPageState extends ConsumerState<AboutPage> {
           isForceUpdate: result.isForceUpdate,
         );
       } else {
+        // 检查是否有错误信息
+        final errorMsg = result?.message;
+        final isError = errorMsg != null && errorMsg.contains('失败');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(context.l10n.alreadyLatest),
-            backgroundColor: Colors.green,
+            content: Text(isError ? errorMsg : context.l10n.alreadyLatest),
+            backgroundColor: isError ? Colors.red : Colors.green,
           ),
         );
       }

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../models/transaction.dart';
 import '../providers/transaction_provider.dart';
+import 'transaction_detail_page.dart';
 
 class ReimbursementPage extends ConsumerStatefulWidget {
   const ReimbursementPage({super.key});
@@ -245,6 +246,12 @@ class _ReimbursementPageState extends ConsumerState<ReimbursementPage>
         ],
       ),
       child: ListTile(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TransactionDetailPage(transaction: transaction),
+          ),
+        ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
           padding: const EdgeInsets.all(10),

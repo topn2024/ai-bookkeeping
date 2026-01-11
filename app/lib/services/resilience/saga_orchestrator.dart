@@ -296,7 +296,7 @@ class SagaOrchestrator extends ChangeNotifier {
     _initialized = true;
 
     if (kDebugMode) {
-      print('SagaOrchestrator initialized');
+      debugPrint('SagaOrchestrator initialized');
     }
   }
 
@@ -379,11 +379,11 @@ class SagaOrchestrator extends ChangeNotifier {
       _completedSagas++;
 
       if (kDebugMode) {
-        print('Saga ${instance.id} completed successfully');
+        debugPrint('Saga ${instance.id} completed successfully');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Saga ${instance.id} failed: $e');
+        debugPrint('Saga ${instance.id} failed: $e');
       }
 
       instance.error = e.toString();
@@ -476,7 +476,7 @@ class SagaOrchestrator extends ChangeNotifier {
         }
 
         if (kDebugMode) {
-          print('Step ${step.id} failed (attempt $retryCount): $e');
+          debugPrint('Step ${step.id} failed (attempt $retryCount): $e');
         }
 
         await Future.delayed(step.retryDelay * retryCount);
@@ -541,7 +541,7 @@ class SagaOrchestrator extends ChangeNotifier {
         }
 
         if (kDebugMode) {
-          print('Compensated step ${step.id}');
+          debugPrint('Compensated step ${step.id}');
         }
       } catch (e) {
         compensationSuccess = false;
@@ -555,7 +555,7 @@ class SagaOrchestrator extends ChangeNotifier {
         }
 
         if (kDebugMode) {
-          print('Compensation failed for step ${step.id}: $e');
+          debugPrint('Compensation failed for step ${step.id}: $e');
         }
       }
     }

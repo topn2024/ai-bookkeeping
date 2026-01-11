@@ -212,7 +212,7 @@ class CacheConsistencyService extends ChangeNotifier {
     _initialized = true;
 
     if (kDebugMode) {
-      print('CacheConsistencyService initialized with strategy: ${_config.strategy}');
+      debugPrint('CacheConsistencyService initialized with strategy: ${_config.strategy}');
     }
   }
 
@@ -433,7 +433,7 @@ class CacheConsistencyService extends ChangeNotifier {
     _delayedDeleteTasks[key] = task;
 
     if (kDebugMode) {
-      print('Scheduled delayed delete for key: $key in ${delay.inMilliseconds}ms');
+      debugPrint('Scheduled delayed delete for key: $key in ${delay.inMilliseconds}ms');
     }
   }
 
@@ -443,7 +443,7 @@ class CacheConsistencyService extends ChangeNotifier {
     _deletes++;
 
     if (kDebugMode) {
-      print('Executed delayed delete for key: $key');
+      debugPrint('Executed delayed delete for key: $key');
     }
 
     notifyListeners();
@@ -499,7 +499,7 @@ class CacheConsistencyService extends ChangeNotifier {
     }
 
     if (expiredKeys.isNotEmpty && kDebugMode) {
-      print('CacheConsistencyService: Cleaned up ${expiredKeys.length} expired entries');
+      debugPrint('CacheConsistencyService: Cleaned up ${expiredKeys.length} expired entries');
     }
   }
 
@@ -509,7 +509,7 @@ class CacheConsistencyService extends ChangeNotifier {
       final entry = _writeBuffer.removeFirst();
       // 实际实现中这里会调用数据库写入
       if (kDebugMode) {
-        print('Flushing write buffer entry: ${entry.key}');
+        debugPrint('Flushing write buffer entry: ${entry.key}');
       }
     }
   }

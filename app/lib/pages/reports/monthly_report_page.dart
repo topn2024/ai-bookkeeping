@@ -7,6 +7,7 @@ import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../providers/transaction_provider.dart';
 import '../../extensions/category_extensions.dart';
+import '../category_detail_page.dart';
 
 /// 月度报告页面
 /// 原型设计 7.01：月度报告
@@ -348,7 +349,9 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
                 ? (entry.value / totalExpense * 100).toStringAsFixed(1)
                 : '0.0';
             return _buildCategoryItem(
+              context,
               theme,
+              entry.key,
               category?.icon ?? Icons.help_outline,
               category?.color ?? Colors.grey,
               category?.localizedName ?? entry.key,
@@ -362,16 +365,26 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
   }
 
   Widget _buildCategoryItem(
+    BuildContext context,
     ThemeData theme,
+    String categoryId,
     IconData icon,
     Color color,
     String name,
     double amount,
     String percentage,
   ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CategoryDetailPage(categoryId: categoryId),
+        ),
+      ),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: Row(
         children: [
           Container(
             width: 32,
@@ -411,7 +424,14 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
               ),
             ],
           ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.chevron_right,
+            size: 16,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ],
+        ),
       ),
     );
   }

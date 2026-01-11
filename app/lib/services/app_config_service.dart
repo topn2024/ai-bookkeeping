@@ -19,9 +19,9 @@ class AppConfigService {
 
   // 默认配置 - 使用集中化配置
   static String get _defaultApiBaseUrl => ApiEndpoints.apiBaseUrl;
-  // 生产环境默认启用证书验证（安全优先）
-  // 注意：开发环境如需使用自签名证书，请通过服务器配置下发 skip_certificate_verification: true
-  static const bool _defaultSkipCertVerification = false;
+  // 默认跳过证书验证（服务器使用自签名证书）
+  // 注意：正式环境应使用有效证书并设为 false
+  static const bool _defaultSkipCertVerification = true;
 
   // 缓存的配置
   AppSettingsConfig? _cachedConfig;
@@ -156,7 +156,7 @@ class AppSettingsConfig {
       configVersion: '1.0.0',
       minAppVersion: '1.0.0',
       apiBaseUrl: ApiEndpoints.apiBaseUrl,
-      skipCertificateVerification: false,  // 生产环境默认启用证书验证（安全优先）
+      skipCertificateVerification: true,  // 默认跳过（服务器使用自签名证书）
       aiModels: AIModelConfig.defaults(),
       network: NetworkConfig.defaults(),
       duplicateDetection: DuplicateDetectionConfig.defaults(),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'source_file_service.dart';
 
@@ -73,7 +74,7 @@ class CleanupScheduler {
         success: true,
       );
     } catch (e) {
-      print('Error during cleanup: $e');
+      debugPrint('Error during cleanup: $e');
       return CleanupResult(
         deletedCount: 0,
         freedSpace: 0,
