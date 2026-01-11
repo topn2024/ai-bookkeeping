@@ -18,6 +18,7 @@ class CreditCard {
   final String? cardNumber;      // 卡号后四位
   final bool isEnabled;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 
   CreditCard({
     required this.id,
@@ -35,6 +36,7 @@ class CreditCard {
     this.cardNumber,
     this.isEnabled = true,
     required this.createdAt,
+    this.updatedAt,
   });
 
   /// 可用额度
@@ -108,6 +110,7 @@ class CreditCard {
     String? cardNumber,
     bool? isEnabled,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return CreditCard(
       id: id ?? this.id,
@@ -125,6 +128,7 @@ class CreditCard {
       cardNumber: cardNumber ?? this.cardNumber,
       isEnabled: isEnabled ?? this.isEnabled,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
     );
   }
 
@@ -145,6 +149,7 @@ class CreditCard {
       'cardNumber': cardNumber,
       'isEnabled': isEnabled ? 1 : 0,
       'createdAt': createdAt.millisecondsSinceEpoch,
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
     };
   }
 
@@ -167,6 +172,9 @@ class CreditCard {
       cardNumber: map['cardNumber'],
       isEnabled: map['isEnabled'] == 1,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt']),
+      updatedAt: map['updatedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int)
+          : null,
     );
   }
 

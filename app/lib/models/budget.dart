@@ -106,6 +106,7 @@ class Budget {
   final Color color;
   final bool isEnabled;
   final DateTime createdAt;
+  final DateTime? updatedAt;
   // 新增：预算类型
   final BudgetType budgetType;
   // 新增：是否启用预算结转
@@ -124,6 +125,7 @@ class Budget {
     required this.color,
     this.isEnabled = true,
     required this.createdAt,
+    this.updatedAt,
     this.budgetType = BudgetType.traditional,
     this.enableCarryover = false,
     this.carryoverSurplusOnly = true,
@@ -140,6 +142,7 @@ class Budget {
     Color? color,
     bool? isEnabled,
     DateTime? createdAt,
+    DateTime? updatedAt,
     BudgetType? budgetType,
     bool? enableCarryover,
     bool? carryoverSurplusOnly,
@@ -155,6 +158,7 @@ class Budget {
       color: color ?? this.color,
       isEnabled: isEnabled ?? this.isEnabled,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
       budgetType: budgetType ?? this.budgetType,
       enableCarryover: enableCarryover ?? this.enableCarryover,
       carryoverSurplusOnly: carryoverSurplusOnly ?? this.carryoverSurplusOnly,
@@ -265,6 +269,7 @@ class Budget {
       'color': color.toARGB32(),
       'isEnabled': isEnabled ? 1 : 0,
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
       'budgetType': budgetType.index,
       'enableCarryover': enableCarryover ? 1 : 0,
       'carryoverSurplusOnly': carryoverSurplusOnly ? 1 : 0,
@@ -284,6 +289,9 @@ class Budget {
       color: Color(map['color'] as int),
       isEnabled: map['isEnabled'] == 1,
       createdAt: DateTime.parse(map['createdAt'] as String),
+      updatedAt: map['updatedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int)
+          : null,
       budgetType: map['budgetType'] != null
           ? BudgetType.values[map['budgetType'] as int]
           : BudgetType.traditional,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'currency.dart';
-import '../services/account_localization_service.dart';
 
 /// Color扩展：支持十六进制颜色转换
 extension HexColor on Color {
@@ -34,6 +33,7 @@ class Account {
   final bool isDefault;
   final bool isActive;
   final DateTime createdAt;
+  final DateTime? updatedAt;
   final CurrencyType currency; // 账户货币类型
   final bool isCustom; // 是否为用户自定义账户
 
@@ -47,18 +47,10 @@ class Account {
     this.isDefault = false,
     this.isActive = true,
     required this.createdAt,
+    this.updatedAt,
     this.currency = CurrencyType.cny, // 默认人民币
     this.isCustom = false,
   });
-
-  /// 获取本地化的账户名称
-  ///
-  /// 对于系统默认账户，返回当前语言的翻译
-  /// 对于用户自定义账户，返回原始名称
-  String get localizedName {
-    if (isCustom) return name;
-    return AccountLocalizationService.instance.getAccountName(id, originalName: name);
-  }
 
   Account copyWith({
     String? id,
@@ -69,6 +61,7 @@ class Account {
     Color? color,
     bool? isDefault,
     bool? isActive,
+    DateTime? updatedAt,
     CurrencyType? currency,
     bool? isCustom,
   }) {
@@ -82,6 +75,7 @@ class Account {
       isDefault: isDefault ?? this.isDefault,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
       currency: currency ?? this.currency,
       isCustom: isCustom ?? this.isCustom,
     );
@@ -105,6 +99,7 @@ class Account {
       'isDefault': isDefault ? 1 : 0,
       'isActive': isActive ? 1 : 0,
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
       'currency': currency.name,
       'isCustom': isCustom ? 1 : 0,
     };
@@ -122,6 +117,9 @@ class Account {
       isDefault: map['isDefault'] == 1,
       isActive: map['isActive'] == 1,
       createdAt: DateTime.parse(map['createdAt'] as String),
+      updatedAt: map['updatedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int)
+          : null,
       currency: CurrencyType.values.firstWhere(
         (e) => e.name == map['currency'],
         orElse: () => CurrencyType.cny,

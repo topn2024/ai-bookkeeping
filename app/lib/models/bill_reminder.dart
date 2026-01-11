@@ -42,6 +42,7 @@ class BillReminder {
   final DateTime? lastRemindedAt;
   final DateTime? nextReminderDate;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 
   BillReminder({
     required this.id,
@@ -62,6 +63,7 @@ class BillReminder {
     this.lastRemindedAt,
     this.nextReminderDate,
     required this.createdAt,
+    this.updatedAt,
   });
 
   /// 获取下一个账单日
@@ -167,6 +169,7 @@ class BillReminder {
     DateTime? lastRemindedAt,
     DateTime? nextReminderDate,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return BillReminder(
       id: id ?? this.id,
@@ -187,6 +190,7 @@ class BillReminder {
       lastRemindedAt: lastRemindedAt ?? this.lastRemindedAt,
       nextReminderDate: nextReminderDate ?? this.nextReminderDate,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
     );
   }
 
@@ -211,6 +215,7 @@ class BillReminder {
       'lastRemindedAt': lastRemindedAt?.toIso8601String(),
       'nextReminderDate': nextReminderDate?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
     };
   }
 
@@ -237,6 +242,9 @@ class BillReminder {
       lastRemindedAt: parseDateTimeOrNull(map['lastRemindedAt']),
       nextReminderDate: parseDateTimeOrNull(map['nextReminderDate']),
       createdAt: parseDateTime(map['createdAt']),
+      updatedAt: map['updatedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int)
+          : null,
     );
   }
 }

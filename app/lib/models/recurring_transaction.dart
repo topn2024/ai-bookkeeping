@@ -29,6 +29,7 @@ class RecurringTransaction {
   final IconData icon;
   final Color color;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 
   RecurringTransaction({
     required this.id,
@@ -51,6 +52,7 @@ class RecurringTransaction {
     required this.icon,
     required this.color,
     required this.createdAt,
+    this.updatedAt,
   });
 
   RecurringTransaction copyWith({
@@ -74,6 +76,7 @@ class RecurringTransaction {
     IconData? icon,
     Color? color,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return RecurringTransaction(
       id: id ?? this.id,
@@ -96,6 +99,7 @@ class RecurringTransaction {
       icon: icon ?? this.icon,
       color: color ?? this.color,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
     );
   }
 
@@ -244,6 +248,7 @@ class RecurringTransaction {
       'icon': icon.codePoint,
       'color': color.toARGB32(),
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
     };
   }
 
@@ -270,6 +275,9 @@ class RecurringTransaction {
       icon: IconData(map['icon'] as int, fontFamily: 'MaterialIcons'),
       color: Color(map['color'] as int),
       createdAt: DateTime.parse(map['createdAt'] as String),
+      updatedAt: map['updatedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int)
+          : null,
     );
   }
 }

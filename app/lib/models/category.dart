@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/category_localization_service.dart';
+import '../extensions/category_extensions.dart';
 
 class Category {
   final String id;
@@ -21,20 +21,6 @@ class Category {
     this.sortOrder = 0,
     this.isCustom = false,
   });
-
-  /// 获取本地化的分类名称
-  /// 根据设备区域自动选择语言（中文/英文/日文）
-  String get localizedName {
-    // 自定义分类使用原始名称
-    if (isCustom) return name;
-    return CategoryLocalizationService.instance.getCategoryName(id);
-  }
-
-  /// 获取指定语言的分类名称
-  String getNameForLocale(String locale) {
-    if (isCustom) return name;
-    return CategoryLocalizationService.instance.getCategoryNameForLocale(id, locale);
-  }
 
   Category copyWith({
     String? id,

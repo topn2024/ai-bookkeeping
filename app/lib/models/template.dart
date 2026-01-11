@@ -14,6 +14,7 @@ class TransactionTemplate {
   final Color color;
   final int useCount;
   final DateTime createdAt;
+  final DateTime? updatedAt;
   final DateTime? lastUsedAt;
 
   TransactionTemplate({
@@ -29,6 +30,7 @@ class TransactionTemplate {
     required this.color,
     this.useCount = 0,
     required this.createdAt,
+    this.updatedAt,
     this.lastUsedAt,
   });
 
@@ -45,6 +47,7 @@ class TransactionTemplate {
     Color? color,
     int? useCount,
     DateTime? createdAt,
+    DateTime? updatedAt,
     DateTime? lastUsedAt,
   }) {
     return TransactionTemplate(
@@ -60,6 +63,7 @@ class TransactionTemplate {
       color: color ?? this.color,
       useCount: useCount ?? this.useCount,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
       lastUsedAt: lastUsedAt ?? this.lastUsedAt,
     );
   }
@@ -104,6 +108,7 @@ class TransactionTemplate {
       'color': color.toARGB32(),
       'useCount': useCount,
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
       'lastUsedAt': lastUsedAt?.toIso8601String(),
     };
   }
@@ -123,6 +128,9 @@ class TransactionTemplate {
       color: Color(map['color'] as int),
       useCount: map['useCount'] as int? ?? 0,
       createdAt: DateTime.parse(map['createdAt'] as String),
+      updatedAt: map['updatedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int)
+          : null,
       lastUsedAt: map['lastUsedAt'] != null ? DateTime.parse(map['lastUsedAt'] as String) : null,
     );
   }
