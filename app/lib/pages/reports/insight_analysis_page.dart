@@ -189,9 +189,9 @@ class InsightAnalysisPage extends ConsumerWidget {
     if (usagePercent == 0) {
       content = '暂未设置预算，设置后可查看执行情况';
     } else if (isOverBudget) {
-      content = '餐饮类目已使用${usageInt}%，按当前速度月底将超支¥${projectedOverspend.toStringAsFixed(0)}';
+      content = '餐饮类目已使用$usageInt%，按当前速度月底将超支¥${projectedOverspend.toStringAsFixed(0)}';
     } else {
-      content = '餐饮类目已使用${usageInt}%，预算执行良好';
+      content = '餐饮类目已使用$usageInt%，预算执行良好';
     }
 
     return _InsightCard(

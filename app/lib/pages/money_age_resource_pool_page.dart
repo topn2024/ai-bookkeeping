@@ -450,7 +450,7 @@ class MoneyAgeResourcePoolPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$date · ${ageInDays}天前',
+                      '$date · $ageInDays天前',
                       style: TextStyle(
                         fontSize: 12,
                         color: theme.colorScheme.outline,

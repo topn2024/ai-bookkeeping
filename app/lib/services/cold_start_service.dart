@@ -197,7 +197,7 @@ class SmartConfigSuggestion {
     }
 
     if (confidence == 'high') {
-      return '根据这${basedOnDays}天的花费（日均${dailyAverage.toInt()}元）';
+      return '根据这$basedOnDays天的花费（日均${dailyAverage.toInt()}元）';
     } else if (confidence == 'medium') {
       return '根据最近的花费情况';
     } else {
@@ -246,7 +246,7 @@ class ColdStartState {
     if (isColdStart) {
       return '首次使用，先记几笔试试';
     } else if (!isReadyForConfig) {
-      return '已使用${daysUsed}天，记录${transactionCount}笔';
+      return '已使用$daysUsed天，记录$transactionCount笔';
     } else if (!hasShownSuggestion) {
       return '可以设置预算了';
     } else {

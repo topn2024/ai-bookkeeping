@@ -126,7 +126,7 @@ class VaultAISuggestionPage extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      '基于历史数据 · ${transactionCount}笔交易',
+                      '基于历史数据 · $transactionCount笔交易',
                       style: TextStyle(
                         fontSize: 12,
                         color: theme.colorScheme.onSurfaceVariant,

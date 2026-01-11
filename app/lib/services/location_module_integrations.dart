@@ -714,7 +714,7 @@ class VoiceLocationQueryService {
     final city = await _cityService.identifyCity(position);
     final locationName = city?.name ?? '这里';
 
-    return '您在${locationName}附近500米内共消费了${nearbyTx.length}笔，'
+    return '您在$locationName附近500米内共消费了${nearbyTx.length}笔，'
         '总计¥${totalAmount.toStringAsFixed(2)}';
   }
 

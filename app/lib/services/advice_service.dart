@@ -81,7 +81,7 @@ class AdviceService {
           id: 'money_age_1',
           type: AdviceType.moneyAge,
           title: '钱龄提升机会',
-          description: '钱龄目前 $avgAge天，离目标${targetAge}天还差${targetAge - avgAge}天。减少非必要支出可以提升钱龄。',
+          description: '钱龄目前 $avgAge天，离目标$targetAge天还差${targetAge - avgAge}天。减少非必要支出可以提升钱龄。',
           icon: Icons.schedule,
           color: const Color(0xFF43A047),
           bgColor: const Color(0xFFE8F5E9),
