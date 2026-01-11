@@ -33,6 +33,7 @@ const AlertRules = () => import('@/views/monitor/Alerts.vue')
 const SystemLogs = () => import('@/views/monitor/SystemLogs.vue')
 const AIService = () => import('@/views/monitor/AIService.vue')
 const Diagnostics = () => import('@/views/monitor/Diagnostics.vue')
+const DataQuality = () => import('@/views/monitor/DataQuality.vue')
 
 // Settings
 const SystemSettings = () => import('@/views/settings/System.vue')
@@ -154,6 +155,12 @@ const routes: RouteRecordRaw[] = [
         name: 'Diagnostics',
         component: Diagnostics,
         meta: { title: '诊断报告', icon: 'FirstAidKit', permission: 'monitor:view' },
+      },
+      {
+        path: 'monitor/data-quality',
+        name: 'DataQuality',
+        component: DataQuality,
+        meta: { title: '数据质量', icon: 'DataBoard', permission: 'monitor:data_quality:view' },
       },
       // Settings
       {

@@ -12,6 +12,7 @@ from admin.api.categories import router as categories_router
 from admin.api.backups import router as backups_router
 from admin.api.statistics import router as statistics_router
 from admin.api.monitoring import router as monitoring_router
+from admin.api.data_quality import router as data_quality_router
 from admin.api.settings import router as settings_router
 from admin.api.app_versions import router as app_versions_router
 
@@ -28,5 +29,6 @@ admin_router.include_router(categories_router)
 admin_router.include_router(backups_router)
 admin_router.include_router(statistics_router)
 admin_router.include_router(monitoring_router)
+admin_router.include_router(data_quality_router)
 admin_router.include_router(settings_router)
 admin_router.include_router(app_versions_router)

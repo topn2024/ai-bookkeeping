@@ -530,6 +530,19 @@ class _CategoryAnalysisTab extends ConsumerWidget {
 
   Widget _buildPieChartCard(BuildContext context, ThemeData theme,
       List<Transaction> transactions) {
+    // 计算分类统计数据
+    final expenses = transactions.where((t) => t.type == TransactionType.expense).toList();
+    final categoryTotals = <String, double>{};
+    for (final t in expenses) {
+      categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
+    }
+    final totalExpense = expenses.fold<double>(0, (sum, t) => sum + t.amount);
+    final sortedCategories = categoryTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    // 只取前5个分类
+    final top5Categories = sortedCategories.take(5).toList();
+
     return Card(
       child: InkWell(
         onTap: () => Navigator.push(
@@ -550,26 +563,102 @@ class _CategoryAnalysisTab extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
+              _buildMiniPieChart(context, theme, top5Categories, totalExpense),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 构建迷你饼图
+  Widget _buildMiniPieChart(BuildContext context, ThemeData theme,
+      List<MapEntry<String, double>> categories, double totalExpense) {
+    if (categories.isEmpty || totalExpense == 0) {
+      return Container(
+        height: 200,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.pie_chart, size: 48, color: theme.hintColor),
+              const SizedBox(height: 8),
+              Text('暂无消费数据', style: TextStyle(color: theme.hintColor)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 分类颜色
+    final colors = [
+      const Color(0xFFFF7043),
+      const Color(0xFF42A5F5),
+      const Color(0xFF66BB6A),
+      const Color(0xFFAB47BC),
+      const Color(0xFFFFCA28),
+    ];
+
+    // 生成饼图扇区数据
+    final sections = categories.asMap().entries.map((entry) {
+      final index = entry.key;
+      final categoryEntry = entry.value;
+      final percentage = (categoryEntry.value / totalExpense * 100);
+
+      return PieChartSectionData(
+        value: categoryEntry.value,
+        color: colors[index % colors.length],
+        radius: 60,
+        showTitle: percentage >= 5,
+        title: '${percentage.toStringAsFixed(0)}%',
+        titleStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      );
+    }).toList();
+
+    return Container(
+      height: 200,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          PieChart(
+            PieChartData(
+              sections: sections,
+              centerSpaceRadius: 50,
+              sectionsSpace: 2,
+            ),
+          ),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '总支出',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.hintColor,
                 ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.pie_chart, size: 48, color: theme.hintColor),
-                      const SizedBox(height: 8),
-                      Text('点击查看分类详情', style: TextStyle(color: theme.hintColor)),
-                    ],
-                  ),
+              ),
+              Text(
+                '¥${totalExpense.toStringAsFixed(0)}',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }

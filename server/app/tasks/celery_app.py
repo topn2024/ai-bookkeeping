@@ -34,7 +34,10 @@ celery_app = Celery(
     "ai_bookkeeping",
     broker=broker_url,
     backend=result_backend,
-    include=["app.tasks.integrity_tasks"],
+    include=[
+        "app.tasks.integrity_tasks",
+        "app.tasks.data_quality_tasks",
+    ],
 )
 
 # Celery configuration
@@ -83,17 +86,31 @@ celery_app.conf.update(
             "schedule": crontab(minute=0),
             "options": {"queue": "maintenance"},
         },
+        # Hourly data quality check (at minute 10)
+        "hourly-data-quality-check": {
+            "task": "app.tasks.data_quality_tasks.periodic_data_quality_check",
+            "schedule": crontab(minute=10),  # 每小时第10分钟执行
+            "options": {"queue": "data_quality"},
+        },
+        # Daily cleanup of old check results at 4 AM
+        "daily-check-results-cleanup": {
+            "task": "app.tasks.data_quality_tasks.cleanup_old_check_results",
+            "schedule": crontab(hour=4, minute=0),
+            "options": {"queue": "maintenance"},
+        },
     },
 
     # Task routing
     task_routes={
         "app.tasks.integrity_tasks.*": {"queue": "integrity"},
+        "app.tasks.data_quality_tasks.*": {"queue": "data_quality"},
     },
 
     # Queue configuration
     task_queues={
         "default": {},
         "integrity": {},
+        "data_quality": {},
         "maintenance": {},
     },
     task_default_queue="default",

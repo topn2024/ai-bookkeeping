@@ -30,9 +30,6 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   bool _isLoading = false;
   String? _error;
 
-  // Simulated verification code (in production, this would be sent via email)
-  final String _simulatedCode = '123456';
-
   @override
   void dispose() {
     _emailController.dispose();
@@ -273,26 +270,6 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
             color: AppColors.textSecondary,
           ),
         ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.blue.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.info_outline, color: Colors.blue, size: 20),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '演示模式：验证码为 123456',
-                  style: TextStyle(color: Colors.blue, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-        ),
         const SizedBox(height: 24),
         TextFormField(
           controller: _codeController,
@@ -489,33 +466,38 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
       _error = null;
     });
 
-    // Check if email exists
-    final exists = await ref.read(authProvider.notifier).checkEmailExists(
-      email: _emailController.text.trim(),
-    );
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (!exists) {
-      setState(() {
-        _error = '该邮箱未注册';
-      });
-      return;
-    }
-
-    // Simulate sending verification code
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('验证码已发送到您的邮箱'),
-          backgroundColor: Colors.green,
-        ),
+    try {
+      // 调用后端API发送验证码邮件
+      final success = await ref.read(authProvider.notifier).requestPasswordReset(
+        email: _emailController.text.trim(),
       );
 
       setState(() {
-        _currentStep = ResetStep.enterCode;
+        _isLoading = false;
+      });
+
+      if (success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('验证码已发送到您的邮箱，请注意查收'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          setState(() {
+            _currentStep = ResetStep.enterCode;
+          });
+        }
+      } else {
+        setState(() {
+          _error = '发送验证码失败，请稍后重试';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = e.toString().replaceAll('Exception: ', '');
       });
     }
   }
@@ -523,25 +505,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   Future<void> _handleVerifyCode() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    // Simulate code verification
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (_codeController.text != _simulatedCode) {
-      setState(() {
-        _error = '验证码错误';
-      });
-      return;
-    }
-
+    // 验证码格式正确，进入设置新密码步骤
+    // 实际验证将在提交新密码时进行
     setState(() {
       _currentStep = ResetStep.setPassword;
     });
@@ -550,22 +515,32 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   Future<void> _handleResendCode() async {
     setState(() {
       _isLoading = true;
+      _error = null;
     });
 
-    // Simulate resending code
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('验证码已重新发送'),
-          backgroundColor: Colors.green,
-        ),
+    try {
+      // 重新调用后端API发送验证码邮件
+      final success = await ref.read(authProvider.notifier).requestPasswordReset(
+        email: _emailController.text.trim(),
       );
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('验证码已重新发送到您的邮箱'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
     }
   }
 
@@ -577,24 +552,32 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
       _error = null;
     });
 
-    final success = await ref.read(authProvider.notifier).resetPassword(
-      email: _emailController.text.trim(),
-      newPassword: _passwordController.text,
-    );
+    try {
+      // 调用后端API确认密码重置（包含验证码和新密码）
+      final success = await ref.read(authProvider.notifier).confirmPasswordReset(
+        email: _emailController.text.trim(),
+        code: _codeController.text.trim(),
+        newPassword: _passwordController.text,
+      );
 
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (!success) {
       setState(() {
-        _error = '密码重置失败，请稍后再试';
+        _isLoading = false;
       });
-      return;
-    }
 
-    setState(() {
-      _currentStep = ResetStep.success;
-    });
+      if (success) {
+        setState(() {
+          _currentStep = ResetStep.success;
+        });
+      } else {
+        setState(() {
+          _error = '密码重置失败，请稍后再试';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    }
   }
 }

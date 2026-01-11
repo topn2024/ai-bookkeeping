@@ -454,21 +454,44 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  /// 重置密码
-  Future<bool> resetPassword({
-    required String email,
-    required String newPassword,
-  }) async {
+  /// 请求密码重置（发送验证码到邮箱）
+  Future<bool> requestPasswordReset({required String email}) async {
     try {
       final response = await _http.post('/auth/reset-password', data: {
         'email': email,
-        'new_password': newPassword,
       });
       return response.statusCode == 200;
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) {
-        // API 不存在，功能暂不可用
         throw Exception('密码重置功能暂不可用');
+      }
+      rethrow;
+    }
+  }
+
+  /// 确认密码重置（验证码 + 新密码）
+  Future<bool> confirmPasswordReset({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await _http.post('/auth/reset-password/confirm', data: {
+        'email': email,
+        'code': code,
+        'new_password': newPassword,
+      });
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        final detail = e.response?.data['detail'];
+        if (detail != null) {
+          throw Exception(detail);
+        }
+        throw Exception('验证码错误或已过期');
+      }
+      if (e.response?.statusCode == 404) {
+        throw Exception('用户不存在');
       }
       rethrow;
     }

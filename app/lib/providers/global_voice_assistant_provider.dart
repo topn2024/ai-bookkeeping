@@ -81,7 +81,10 @@ final conversationHistoryProvider = Provider<List<ChatMessage>>((ref) {
 });
 
 /// 语音上下文服务 Provider
-final voiceContextServiceProvider = ChangeNotifierProvider<VoiceContextService>((ref) {
+/// 注意：使用 Provider 而不是 ChangeNotifierProvider，
+/// 因为 contextService 是 GlobalVoiceAssistantManager 管理的单例，
+/// 不应该被 Riverpod 销毁
+final voiceContextServiceProvider = Provider<VoiceContextService>((ref) {
   final manager = ref.watch(globalVoiceAssistantProvider);
   return manager.contextService ?? VoiceContextService();
 });

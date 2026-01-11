@@ -135,6 +135,7 @@ const menuItems = computed(() => {
         { path: '/monitor/alerts', title: '告警管理', permission: 'monitor:alert' },
         { path: '/monitor/ai-service', title: 'AI服务监控', permission: 'monitor:view' },
         { path: '/monitor/diagnostics', title: '诊断报告', permission: 'monitor:view' },
+        { path: '/monitor/data-quality', title: '数据质量', permission: 'monitor:data_quality:view' },
       ],
     },
     {
