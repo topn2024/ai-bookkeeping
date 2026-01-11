@@ -164,8 +164,14 @@ async def check_update(
             message="Already up to date"
         )
 
-    # Check if update is available (compare version codes)
-    has_update = latest.version_code > version_code
+    # Check if update is available
+    # Compare both version_code and version_name for robustness
+    # This handles cases where version_name changes but version_code stays the same
+    has_update = (
+        latest.version_code > version_code or
+        (latest.version_code == version_code and
+         compare_versions(latest.version_name, version_name) > 0)
+    )
 
     if not has_update:
         return CheckUpdateResponse(
