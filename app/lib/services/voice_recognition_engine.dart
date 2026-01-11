@@ -58,8 +58,16 @@ class VoiceRecognitionEngine {
   }
 
   /// 流式识别（实时转写）
+  ///
+  /// 如果已有识别进行中，会先取消之前的识别
   Stream<ASRPartialResult> transcribeStream(
       Stream<Uint8List> audioStream) async* {
+    // 防止并发：如果已有识别在进行中，先取消
+    if (_isRecognizing) {
+      debugPrint('VoiceRecognitionEngine: cancelling previous recognition');
+      await cancelTranscription();
+    }
+
     _isRecognizing = true;
     _isCancelled = false;
 
@@ -527,8 +535,15 @@ class AliCloudASRService {
   /// 实时语音识别（流式，WebSocket）
   ///
   /// 支持静音检测、超时处理和连接恢复
+  /// 如果已有识别在进行中，会先取消之前的识别
   Stream<ASRPartialResult> transcribeStream(
       Stream<Uint8List> audioStream) async* {
+    // 防止并发：如果已有 WebSocket 连接，先取消
+    if (_webSocket != null) {
+      debugPrint('AliCloudASRService: cancelling previous recognition');
+      await cancelTranscription();
+    }
+
     // 重置状态
     _isCancelled = false;
     _cleanupTimers();

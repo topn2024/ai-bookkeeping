@@ -28,6 +28,13 @@ class VoiceTokenService {
   VoiceTokenInfo? _cachedToken;
   Timer? _refreshTimer;
 
+  // 防止并发请求的锁
+  Completer<VoiceTokenInfo>? _fetchingCompleter;
+
+  // 重试配置
+  static const int _maxRetries = 3;
+  static const Duration _baseRetryDelay = Duration(seconds: 1);
+
   // 存储键
   static const String _tokenKey = 'voice_service_token';
   static const String _expiresAtKey = 'voice_service_expires_at';
@@ -61,13 +68,63 @@ class VoiceTokenService {
   ///
   /// 如果缓存有效则返回缓存，否则从服务器获取新Token。
   /// 自动处理Token刷新。
+  /// 使用锁机制防止并发请求，支持自动重试。
   Future<VoiceTokenInfo> getToken() async {
     // 检查缓存是否有效
     if (_cachedToken != null && !_cachedToken!.isExpiringSoon) {
       return _cachedToken!;
     }
 
-    // 从服务器获取新Token
+    // 如果已有请求在进行中，等待该请求完成
+    if (_fetchingCompleter != null) {
+      return _fetchingCompleter!.future;
+    }
+
+    // 创建新的 Completer 防止并发请求
+    _fetchingCompleter = Completer<VoiceTokenInfo>();
+
+    try {
+      final tokenInfo = await _fetchTokenWithRetry();
+      _fetchingCompleter!.complete(tokenInfo);
+      return tokenInfo;
+    } catch (e) {
+      _fetchingCompleter!.completeError(e);
+      rethrow;
+    } finally {
+      _fetchingCompleter = null;
+    }
+  }
+
+  /// 带重试的Token获取
+  Future<VoiceTokenInfo> _fetchTokenWithRetry() async {
+    Exception? lastException;
+
+    for (var attempt = 0; attempt < _maxRetries; attempt++) {
+      try {
+        return await _fetchToken();
+      } on VoiceTokenException catch (e) {
+        lastException = e;
+
+        // 不可重试的错误直接抛出
+        if (e.message.contains('语音服务未配置') ||
+            e.message.contains('请求过于频繁')) {
+          rethrow;
+        }
+
+        // 可重试错误，等待后重试
+        if (attempt < _maxRetries - 1) {
+          final delay = _baseRetryDelay * (attempt + 1);
+          debugPrint('VoiceTokenService: 获取Token失败，${delay.inSeconds}秒后重试 (${attempt + 1}/$_maxRetries)');
+          await Future.delayed(delay);
+        }
+      }
+    }
+
+    throw lastException ?? VoiceTokenException('获取Token失败');
+  }
+
+  /// 从服务器获取Token
+  Future<VoiceTokenInfo> _fetchToken() async {
     try {
       final response = await _dio.get('/api/v1/voice/token');
 
@@ -215,16 +272,37 @@ class VoiceTokenService {
     if (refreshTime.isAfter(now)) {
       final delay = refreshTime.difference(now);
       _refreshTimer = Timer(delay, () async {
-        try {
-          await refreshToken();
-          debugPrint('Voice token auto-refreshed');
-        } catch (e) {
-          debugPrint('Failed to auto-refresh token: $e');
-        }
+        await _autoRefreshWithRetry();
       });
 
       debugPrint('Scheduled token refresh in ${delay.inMinutes} minutes');
     }
+  }
+
+  /// 自动刷新带重试
+  Future<void> _autoRefreshWithRetry() async {
+    for (var attempt = 0; attempt < _maxRetries; attempt++) {
+      try {
+        await refreshToken();
+        debugPrint('Voice token auto-refreshed');
+        return;
+      } catch (e) {
+        debugPrint('Failed to auto-refresh token (attempt ${attempt + 1}/$_maxRetries): $e');
+
+        if (attempt < _maxRetries - 1) {
+          // 指数退避重试
+          final delay = _baseRetryDelay * (1 << attempt);
+          await Future.delayed(delay);
+        }
+      }
+    }
+
+    // 所有重试都失败，设置一个短期重试定时器
+    debugPrint('All auto-refresh attempts failed, scheduling retry in 1 minute');
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer(const Duration(minutes: 1), () async {
+      await _autoRefreshWithRetry();
+    });
   }
 
   /// 释放资源

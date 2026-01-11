@@ -343,8 +343,11 @@ class VoiceWakeWordService {
     // 检查权限
     if (!await _recorder!.hasPermission()) {
       _isListening = false;
-      _stateController.add(WakeWordServiceState.error);
-      throw Exception('Microphone permission denied');
+      _stateController.add(WakeWordServiceState.permissionDenied);
+      throw MicrophonePermissionException(
+        '麦克风权限被拒绝，请在设置中授予权限',
+        isPermanentlyDenied: false,
+      );
     }
 
     // 开始录音
@@ -563,4 +566,21 @@ enum WakeWordServiceState {
 
   /// 错误
   error,
+
+  /// 权限被拒绝
+  permissionDenied,
+}
+
+/// 麦克风权限异常
+class MicrophonePermissionException implements Exception {
+  final String message;
+  final bool isPermanentlyDenied;
+
+  MicrophonePermissionException(
+    this.message, {
+    this.isPermanentlyDenied = false,
+  });
+
+  @override
+  String toString() => 'MicrophonePermissionException: $message';
 }
