@@ -14,6 +14,7 @@ import 'voice/multi_intent_models.dart';
 import 'voice/conversation_context.dart';
 import 'voice/barge_in_detector.dart';
 import 'voice/ai_intent_decomposer.dart';
+import 'voice/smart_intent_recognizer.dart';
 import 'voice_recognition_engine.dart';
 import 'tts_service.dart';
 import 'voice_navigation_service.dart';
@@ -51,6 +52,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// AI意图分解器（大模型兜底）
   final AIIntentDecomposer _aiDecomposer;
+
+  /// 智能意图识别器（多层递进架构）
+  final SmartIntentRecognizer _smartRecognizer;
 
   /// 是否启用流式TTS模式
   bool _streamingTTSEnabled = true;
@@ -104,6 +108,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     ConversationContext? conversationContext,
     BargeInDetector? bargeInDetector,
     AIIntentDecomposer? aiDecomposer,
+    SmartIntentRecognizer? smartRecognizer,
     bool enableStreamingTTS = true,
   }) : _recognitionEngine = recognitionEngine ?? VoiceRecognitionEngine(),
        _ttsService = ttsService ?? TTSService(enableStreaming: enableStreamingTTS),
@@ -119,6 +124,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
        _conversationContext = conversationContext ?? ConversationContext(),
        _bargeInDetector = bargeInDetector ?? BargeInDetector(),
        _aiDecomposer = aiDecomposer ?? AIIntentDecomposer(),
+       _smartRecognizer = smartRecognizer ?? SmartIntentRecognizer(),
        _streamingTTSEnabled = enableStreamingTTS {
     // 设置打断检测回调
     _bargeInDetector.onBargeInDetected = _handleBargeIn;
@@ -234,20 +240,20 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       // 记录到对话上下文（用于多轮对话和自然响应生成）
       _conversationContext.addUserInput(voiceInput);
 
-      // Step 1: 使用意图路由器分析语音输入
-      final contextData = _currentSession != null
-          ? VoiceSessionContext(
-              intentType: _currentSession!.intentType,
-              sessionData: _currentSession!.sessionData ?? {},
-              needsContinuation: true,
-              createdAt: _currentSession!.createdAt,
-            )
-          : null;
-
-      final intentResult = await _intentRouter.analyzeIntent(
+      // Step 1: 使用智能意图识别器分析语音输入（多层递进架构）
+      // Layer 1: 精确规则匹配 → Layer 2: 同义词扩展 → Layer 3: 模板匹配
+      // → Layer 4: 学习缓存 → Layer 5: LLM兜底
+      final pageContext = _currentSession?.intentType.name ?? 'home';
+      final smartResult = await _smartRecognizer.recognize(
         voiceInput,
-        context: contextData,
+        pageContext: pageContext,
       );
+
+      debugPrint('[VoiceCoordinator] SmartIntent结果: ${smartResult.intentType}, '
+          '来源: ${smartResult.source}, 置信度: ${smartResult.confidence}');
+
+      // 转换为IntentAnalysisResult以兼容现有处理流程
+      final intentResult = _convertSmartIntentResult(smartResult);
 
       // 更新命令历史中的意图分析结果
       command.intentResult = intentResult;
@@ -1686,6 +1692,42 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   void clearCommandHistory() {
     _commandHistory.clear();
     notifyListeners();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // SmartIntentRecognizer 集成
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 将SmartIntentResult转换为IntentAnalysisResult
+  IntentAnalysisResult _convertSmartIntentResult(SmartIntentResult smartResult) {
+    return IntentAnalysisResult(
+      intent: _mapSmartIntentTypeToVoiceIntentType(smartResult.intentType),
+      confidence: smartResult.confidence,
+      entities: Map<String, dynamic>.from(smartResult.entities),
+      rawInput: smartResult.originalInput,
+    );
+  }
+
+  /// 将SmartIntentType映射到VoiceIntentType
+  VoiceIntentType _mapSmartIntentTypeToVoiceIntentType(SmartIntentType type) {
+    switch (type) {
+      case SmartIntentType.addTransaction:
+        return VoiceIntentType.addTransaction;
+      case SmartIntentType.navigate:
+        return VoiceIntentType.navigateToPage;
+      case SmartIntentType.query:
+        return VoiceIntentType.queryTransaction;
+      case SmartIntentType.modify:
+        return VoiceIntentType.modifyTransaction;
+      case SmartIntentType.delete:
+        return VoiceIntentType.deleteTransaction;
+      case SmartIntentType.confirm:
+        return VoiceIntentType.confirmAction;
+      case SmartIntentType.cancel:
+        return VoiceIntentType.cancelAction;
+      case SmartIntentType.unknown:
+        return VoiceIntentType.unknown;
+    }
   }
 
   /// 释放资源
