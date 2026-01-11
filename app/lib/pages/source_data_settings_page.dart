@@ -56,13 +56,29 @@ class _SourceDataSettingsPageState extends State<SourceDataSettingsPage> {
   }
 
   Future<void> _updateRetentionDays(int days) async {
-    await _fileService.setRetentionDays(days);
-    setState(() => _retentionDays = days);
+    try {
+      await _fileService.setRetentionDays(days);
+      setState(() => _retentionDays = days);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存设置失败: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _updateWifiSync(bool enabled) async {
-    await _fileService.setWifiSyncEnabled(enabled);
-    setState(() => _wifiSyncEnabled = enabled);
+    try {
+      await _fileService.setWifiSyncEnabled(enabled);
+      setState(() => _wifiSyncEnabled = enabled);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存设置失败: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _cleanupExpiredFiles() async {

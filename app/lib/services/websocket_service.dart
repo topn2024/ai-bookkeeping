@@ -358,7 +358,8 @@ class WebSocketService {
       if (_currentPath != null) {
         try {
           await _doConnect(_currentPath!);
-        } catch (_) {
+        } catch (e) {
+          debugPrint('WebSocket reconnect failed: $e');
           _scheduleReconnect();
         }
       }
@@ -386,8 +387,8 @@ class WebSocketService {
         // Pong超时，认为连接已断开
         _socket?.close();
       });
-    } catch (_) {
-      // 发送失败忽略
+    } catch (e) {
+      debugPrint('WebSocket ping failed: $e');
     }
   }
 

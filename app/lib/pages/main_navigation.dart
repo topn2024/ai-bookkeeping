@@ -87,15 +87,19 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
     if (_hasCheckedUpdate) return;
     _hasCheckedUpdate = true;
 
-    final result = AppUpgradeService().lastCheckResult;
-    if (result != null && result.hasUpdate && result.latestVersion != null) {
-      if (mounted) {
-        await AppUpdateDialog.show(
-          context,
-          versionInfo: result.latestVersion!,
-          isForceUpdate: result.isForceUpdate,
-        );
+    try {
+      final result = AppUpgradeService().lastCheckResult;
+      if (result != null && result.hasUpdate && result.latestVersion != null) {
+        if (mounted) {
+          await AppUpdateDialog.show(
+            context,
+            versionInfo: result.latestVersion!,
+            isForceUpdate: result.isForceUpdate,
+          );
+        }
       }
+    } catch (e) {
+      debugPrint('检查更新失败: $e');
     }
   }
 

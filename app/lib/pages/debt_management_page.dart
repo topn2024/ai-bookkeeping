@@ -927,8 +927,14 @@ class _DebtDetailPageState extends ConsumerState<DebtDetailPage> {
   }
 
   Future<void> _loadPayments() async {
-    final payments = await ref.read(debtProvider.notifier).getPaymentHistory(widget.debtId);
-    setState(() => _payments = payments);
+    try {
+      final payments = await ref.read(debtProvider.notifier).getPaymentHistory(widget.debtId);
+      if (mounted) {
+        setState(() => _payments = payments);
+      }
+    } catch (e) {
+      debugPrint('加载还款记录失败: $e');
+    }
   }
 
   @override
