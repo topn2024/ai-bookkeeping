@@ -621,8 +621,8 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
     if (!_isRecording) return;
     setState(() => _isRecording = false);
 
-    // 模拟语音识别
-    _sendMessage('今天花了多少钱？');
+    // 在模拟器上提示用户输入文字
+    _addAssistantMessage('语音识别需要真机环境。\n\n请在下方输入框中输入您的问题，或使用快捷问题按钮。');
   }
 
   void _scrollToBottom() {
