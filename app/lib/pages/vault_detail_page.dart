@@ -36,56 +36,65 @@ class _VaultDetailPageState extends ConsumerState<VaultDetailPage> {
   }
 
   Future<void> _loadRealTransactions() async {
-    final db = sl<IDatabaseService>();
-    final allocations = await db.getVaultAllocations(widget.vault.id);
-    final transfers = await db.getVaultTransfers(widget.vault.id);
+    try {
+      final db = sl<IDatabaseService>();
+      final allocations = await db.getVaultAllocations(widget.vault.id);
+      final transfers = await db.getVaultTransfers(widget.vault.id);
 
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month, 1);
+      final now = DateTime.now();
+      final monthStart = DateTime(now.year, now.month, 1);
 
-    // 转换分配记录为交易
-    final txList = <VaultTransaction>[];
-    double monthDeposit = 0;
+      // 转换分配记录为交易
+      final txList = <VaultTransaction>[];
+      double monthDeposit = 0;
 
-    for (final alloc in allocations) {
-      txList.add(VaultTransaction(
-        id: alloc.id,
-        type: VaultTransactionType.deposit,
-        amount: alloc.amount,
-        date: alloc.allocatedAt,
-        description: '存入',
-      ));
-      // 计算本月存入
-      if (alloc.allocatedAt.isAfter(monthStart)) {
-        monthDeposit += alloc.amount;
+      for (final alloc in allocations) {
+        txList.add(VaultTransaction(
+          id: alloc.id,
+          type: VaultTransactionType.deposit,
+          amount: alloc.amount,
+          date: alloc.allocatedAt,
+          description: '存入',
+        ));
+        // 计算本月存入
+        if (alloc.allocatedAt.isAfter(monthStart)) {
+          monthDeposit += alloc.amount;
+        }
+      }
+
+      // 转换调拨记录为交易
+      for (final transfer in transfers) {
+        final isIncoming = transfer.toVaultId == widget.vault.id;
+        txList.add(VaultTransaction(
+          id: transfer.id,
+          type: isIncoming ? VaultTransactionType.deposit : VaultTransactionType.withdraw,
+          amount: transfer.amount,
+          date: transfer.transferredAt,
+          description: isIncoming ? '从其他小金库转入' : '转出到其他小金库',
+        ));
+        // 计算本月存入（仅统计转入）
+        if (isIncoming && transfer.transferredAt.isAfter(monthStart)) {
+          monthDeposit += transfer.amount;
+        }
+      }
+
+      // 按日期降序排序
+      txList.sort((a, b) => b.date.compareTo(a.date));
+
+      if (mounted) {
+        setState(() {
+          _transactions.clear();
+          _transactions.addAll(txList.take(10)); // 只显示最近10条
+          _monthlyDeposit = monthDeposit;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载小金库交易记录失败: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
-
-    // 转换调拨记录为交易
-    for (final transfer in transfers) {
-      final isIncoming = transfer.toVaultId == widget.vault.id;
-      txList.add(VaultTransaction(
-        id: transfer.id,
-        type: isIncoming ? VaultTransactionType.deposit : VaultTransactionType.withdraw,
-        amount: transfer.amount,
-        date: transfer.transferredAt,
-        description: isIncoming ? '从其他小金库转入' : '转出到其他小金库',
-      ));
-      // 计算本月存入（仅统计转入）
-      if (isIncoming && transfer.transferredAt.isAfter(monthStart)) {
-        monthDeposit += transfer.amount;
-      }
-    }
-
-    // 按日期降序排序
-    txList.sort((a, b) => b.date.compareTo(a.date));
-
-    setState(() {
-      _transactions.clear();
-      _transactions.addAll(txList.take(10)); // 只显示最近10条
-      _monthlyDeposit = monthDeposit;
-      _isLoading = false;
-    });
   }
 
   @override

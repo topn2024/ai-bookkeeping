@@ -558,25 +558,33 @@ class _ExchangeRatesEditorState extends ConsumerState<ExchangeRatesEditor> {
   }
 
   Future<void> _saveRates() async {
-    final currencyNotifier = ref.read(currencyProvider.notifier);
-    final defaultCurrency = ref.read(currencyProvider).defaultCurrency;
+    try {
+      final currencyNotifier = ref.read(currencyProvider.notifier);
+      final defaultCurrency = ref.read(currencyProvider).defaultCurrency;
 
-    for (final entry in _controllers.entries) {
-      final value = double.tryParse(entry.value.text);
-      if (value != null && value > 0) {
-        await currencyNotifier.setExchangeRate(
-          defaultCurrency,
-          entry.key,
-          value,
+      for (final entry in _controllers.entries) {
+        final value = double.tryParse(entry.value.text);
+        if (value != null && value > 0) {
+          await currencyNotifier.setExchangeRate(
+            defaultCurrency,
+            entry.key,
+            value,
+          );
+        }
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('汇率已保存')),
         );
       }
-    }
-
-    if (mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('汇率已保存')),
-      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存汇率失败: $e')),
+        );
+      }
     }
   }
 }

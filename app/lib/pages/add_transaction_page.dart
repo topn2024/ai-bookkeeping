@@ -925,19 +925,37 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
 
     if (_isEditing) {
       // 编辑模式直接更新，不检查重复
-      ref.read(transactionProvider.notifier).updateTransaction(transaction);
-      Navigator.of(context).pop();
+      try {
+        await ref.read(transactionProvider.notifier).updateTransaction(transaction);
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('保存失败: $e')),
+          );
+        }
+      }
     } else {
       // 新增模式使用重复检测
-      final confirmed = await DuplicateTransactionHelper.checkAndConfirm(
-        context: context,
-        transaction: transaction,
-        transactionNotifier: ref.read(transactionProvider.notifier),
-        showSuccessMessage: false,
-      );
+      try {
+        final confirmed = await DuplicateTransactionHelper.checkAndConfirm(
+          context: context,
+          transaction: transaction,
+          transactionNotifier: ref.read(transactionProvider.notifier),
+          showSuccessMessage: false,
+        );
 
-      if (confirmed && mounted) {
-        Navigator.of(context).pop();
+        if (confirmed && mounted) {
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('保存失败: $e')),
+          );
+        }
       }
     }
   }
