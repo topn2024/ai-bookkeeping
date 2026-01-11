@@ -18,6 +18,13 @@ class VoiceRecognitionEngine {
   final NetworkChecker _networkChecker;
   final BookkeepingASROptimizer _optimizer;
 
+  /// 当前是否正在识别
+  bool _isRecognizing = false;
+  bool get isRecognizing => _isRecognizing;
+
+  /// 取消标记
+  bool _isCancelled = false;
+
   VoiceRecognitionEngine({
     AliCloudASRService? aliASR,
     LocalWhisperService? whisper,
@@ -54,40 +61,74 @@ class VoiceRecognitionEngine {
   /// 流式识别（实时转写）
   Stream<ASRPartialResult> transcribeStream(
       Stream<Uint8List> audioStream) async* {
-    // 检查网络状态
-    final hasNetwork = await _networkChecker.isOnline();
+    _isRecognizing = true;
+    _isCancelled = false;
 
-    if (hasNetwork) {
-      // 使用阿里云实时语音识别
-      await for (final partial in _aliASR.transcribeStream(audioStream)) {
-        yield ASRPartialResult(
-          text: _optimizer.postProcessNumbers(partial.text),
-          isFinal: partial.isFinal,
-          index: partial.index,
-          confidence: partial.confidence,
-        );
+    try {
+      // 检查网络状态
+      final hasNetwork = await _networkChecker.isOnline();
+
+      if (hasNetwork) {
+        // 使用阿里云实时语音识别
+        await for (final partial in _aliASR.transcribeStream(audioStream)) {
+          if (_isCancelled) break;
+
+          yield ASRPartialResult(
+            text: _optimizer.postProcessNumbers(partial.text),
+            isFinal: partial.isFinal,
+            index: partial.index,
+            confidence: partial.confidence,
+          );
+        }
+      } else {
+        // 离线模式：收集音频后批量识别
+        final audioData = <int>[];
+        await for (final chunk in audioStream) {
+          if (_isCancelled) break;
+          audioData.addAll(chunk);
+        }
+
+        if (!_isCancelled) {
+          final result = await _whisper.transcribe(ProcessedAudio(
+            data: Uint8List.fromList(audioData),
+            segments: [],
+            duration: Duration(
+                milliseconds: (audioData.length / 32).round()), // 估算时长
+          ));
+
+          yield ASRPartialResult(
+            text: _optimizer.postProcessNumbers(result.text),
+            isFinal: true,
+            index: 0,
+            confidence: result.confidence,
+          );
+        }
       }
-    } else {
-      // 离线模式：收集音频后批量识别
-      final audioData = <int>[];
-      await for (final chunk in audioStream) {
-        audioData.addAll(chunk);
-      }
-
-      final result = await _whisper.transcribe(ProcessedAudio(
-        data: Uint8List.fromList(audioData),
-        segments: [],
-        duration: Duration(
-            milliseconds: (audioData.length / 32).round()), // 估算时长
-      ));
-
-      yield ASRPartialResult(
-        text: _optimizer.postProcessNumbers(result.text),
-        isFinal: true,
-        index: 0,
-        confidence: result.confidence,
-      );
+    } finally {
+      _isRecognizing = false;
     }
+  }
+
+  /// 取消当前识别
+  ///
+  /// 优雅地停止当前的流式识别任务
+  Future<void> cancelTranscription() async {
+    if (!_isRecognizing) return;
+
+    _isCancelled = true;
+
+    // 发送停止命令到阿里云ASR
+    await _aliASR.stopTranscription();
+
+    debugPrint('VoiceRecognitionEngine: transcription cancelled');
+  }
+
+  /// 检查是否已取消
+  bool get isCancelled => _isCancelled;
+
+  /// 重置取消状态
+  void resetCancelState() {
+    _isCancelled = false;
   }
 
   /// 后处理ASR结果
@@ -556,6 +597,7 @@ class AliCloudASRService {
 
       // 发送开始识别命令
       final taskId = _generateTaskId();
+      _currentTaskId = taskId; // 保存任务ID用于取消
       final startParams = {
         'header': {
           'message_id': _generateMessageId(),
@@ -693,8 +735,45 @@ class AliCloudASRService {
     return 'task_${DateTime.now().millisecondsSinceEpoch}';
   }
 
+  /// 停止当前流式识别
+  ///
+  /// 发送StopTranscription命令并关闭WebSocket连接
+  Future<void> stopTranscription() async {
+    if (_webSocket == null || _webSocket!.readyState != WebSocket.open) {
+      return;
+    }
+
+    try {
+      // 发送停止命令
+      final stopParams = {
+        'header': {
+          'message_id': _generateMessageId(),
+          'task_id': _currentTaskId ?? 'unknown',
+          'namespace': 'SpeechTranscriber',
+          'name': 'StopTranscription',
+        },
+      };
+      _webSocket!.add(jsonEncode(stopParams));
+
+      // 等待一小段时间让服务器处理
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // 关闭WebSocket
+      await _webSocket!.close();
+      _webSocket = null;
+      _currentTaskId = null;
+
+      debugPrint('AliCloudASRService: transcription stopped');
+    } catch (e) {
+      debugPrint('AliCloudASRService: stop transcription error - $e');
+    }
+  }
+
+  /// 当前任务ID
+  String? _currentTaskId;
+
   void dispose() {
-    _webSocket?.close();
+    stopTranscription();
     _dio.close();
   }
 }
@@ -782,6 +861,32 @@ class BookkeepingASROptimizer {
     HotWord('转账', weight: 1.8),
     HotWord('收入', weight: 1.8),
     HotWord('工资', weight: 1.8),
+
+    // 打断相关（高优先级）
+    HotWord('停', weight: 2.5),
+    HotWord('等等', weight: 2.5),
+    HotWord('等一下', weight: 2.5),
+    HotWord('算了', weight: 2.5),
+    HotWord('不对', weight: 2.5),
+    HotWord('不是', weight: 2.5),
+    HotWord('停止', weight: 2.5),
+    HotWord('打住', weight: 2.5),
+    HotWord('继续', weight: 2.0),
+
+    // 确认相关
+    HotWord('好的', weight: 1.8),
+    HotWord('确认', weight: 1.8),
+    HotWord('对', weight: 1.8),
+    HotWord('是的', weight: 1.8),
+    HotWord('取消', weight: 2.0),
+    HotWord('不要', weight: 2.0),
+
+    // 自动化相关
+    HotWord('支付宝', weight: 2.0),
+    HotWord('微信', weight: 2.0),
+    HotWord('同步', weight: 1.8),
+    HotWord('导入', weight: 1.8),
+    HotWord('账单', weight: 1.8),
   ];
 
   /// 后处理：数字识别纠错

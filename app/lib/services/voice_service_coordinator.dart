@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
@@ -12,12 +11,14 @@ import 'voice/voice_delete_service.dart';
 import 'voice/voice_modify_service.dart';
 import 'voice/voice_intent_router.dart';
 import 'voice/multi_intent_models.dart';
+import 'voice/conversation_context.dart';
+import 'voice/barge_in_detector.dart';
 import 'voice_recognition_engine.dart';
 import 'tts_service.dart';
 import 'voice_navigation_service.dart';
 import 'voice_feedback_system.dart';
-import 'nlu_engine.dart';
 import 'screen_reader_service.dart';
+import 'automation_task_service.dart';
 
 /// 语音服务协调器
 ///
@@ -39,6 +40,16 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   final VoiceFeedbackSystem _feedbackSystem;
   final DatabaseService _databaseService;
   final ScreenReaderService _screenReaderService;
+  final AutomationTaskService _automationService;
+
+  /// 对话上下文管理
+  final ConversationContext _conversationContext;
+
+  /// 打断检测器
+  final BargeInDetector _bargeInDetector;
+
+  /// 是否启用流式TTS模式
+  bool _streamingTTSEnabled = true;
 
   /// 当前会话状态
   VoiceSessionState _sessionState = VoiceSessionState.idle;
@@ -72,8 +83,12 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     VoiceFeedbackSystem? feedbackSystem,
     DatabaseService? databaseService,
     ScreenReaderService? screenReaderService,
+    AutomationTaskService? automationService,
+    ConversationContext? conversationContext,
+    BargeInDetector? bargeInDetector,
+    bool enableStreamingTTS = true,
   }) : _recognitionEngine = recognitionEngine ?? VoiceRecognitionEngine(),
-       _ttsService = ttsService ?? TTSService(),
+       _ttsService = ttsService ?? TTSService(enableStreaming: enableStreamingTTS),
        _disambiguationService = disambiguationService ?? EntityDisambiguationService(),
        _deleteService = deleteService ?? VoiceDeleteService(),
        _modifyService = modifyService ?? VoiceModifyService(),
@@ -81,7 +96,44 @@ class VoiceServiceCoordinator extends ChangeNotifier {
        _intentRouter = intentRouter ?? VoiceIntentRouter(),
        _feedbackSystem = feedbackSystem ?? VoiceFeedbackSystem(),
        _databaseService = databaseService ?? DatabaseService(),
-       _screenReaderService = screenReaderService ?? ScreenReaderService();
+       _screenReaderService = screenReaderService ?? ScreenReaderService(),
+       _automationService = automationService ?? AutomationTaskService(),
+       _conversationContext = conversationContext ?? ConversationContext(),
+       _bargeInDetector = bargeInDetector ?? BargeInDetector(),
+       _streamingTTSEnabled = enableStreamingTTS {
+    // 设置打断检测回调
+    _bargeInDetector.onBargeInDetected = _handleBargeIn;
+  }
+
+  /// 处理打断事件
+  void _handleBargeIn() {
+    debugPrint('VoiceServiceCoordinator: barge-in detected');
+
+    // 淡出TTS
+    _ttsService.fadeOutAndStop();
+
+    // 取消当前识别并重新开始监听
+    _recognitionEngine.cancelTranscription();
+
+    // 更新状态
+    _sessionState = VoiceSessionState.listening;
+    notifyListeners();
+  }
+
+  /// 启用流式TTS模式
+  Future<void> enableStreamingTTS() async {
+    _streamingTTSEnabled = true;
+    await _ttsService.enableStreamingMode();
+  }
+
+  /// 禁用流式TTS模式
+  void disableStreamingTTS() {
+    _streamingTTSEnabled = false;
+    _ttsService.disableStreamingMode();
+  }
+
+  /// 是否启用流式TTS
+  bool get isStreamingTTSEnabled => _streamingTTSEnabled;
 
   /// 当前会话状态
   VoiceSessionState get sessionState => _sessionState;
@@ -153,6 +205,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         timestamp: DateTime.now(),
       );
       _addToHistory(command);
+
+      // 记录到对话上下文（用于多轮对话和自然响应生成）
+      _conversationContext.addUserInput(voiceInput);
 
       // Step 1: 使用意图路由器分析语音输入
       final contextData = _currentSession != null
@@ -265,8 +320,13 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       case VoiceIntentType.screenRecognition:
         return await _handleScreenRecognitionIntent(intentResult, originalInput);
 
+      case VoiceIntentType.automateAlipaySync:
+        return await _handleAutomationIntent(intentResult, originalInput, isAlipay: true);
+
+      case VoiceIntentType.automateWeChatSync:
+        return await _handleAutomationIntent(intentResult, originalInput, isAlipay: false);
+
       case VoiceIntentType.unknown:
-      default:
         return await _handleUnknownIntent(intentResult, originalInput);
     }
   }
@@ -370,7 +430,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       _sessionState = VoiceSessionState.idle;
       notifyListeners();
 
-      final message = '已记录${executedCount}笔交易${navigationMessage != null ? '，$navigationMessage' : ''}';
+      final message = '已记录$executedCount笔交易${navigationMessage != null ? '，$navigationMessage' : ''}';
       await _ttsService.speak(message);
 
       return VoiceSessionResult.success(message, {
@@ -548,7 +608,6 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       case TransactionIntentType.transfer:
         return model.TransactionType.transfer;
       case TransactionIntentType.expense:
-      default:
         return model.TransactionType.expense;
     }
   }
@@ -739,6 +798,12 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       case VoiceIntentType.screenRecognition:
         // No specific cleanup needed for these types
         break;
+
+      case VoiceIntentType.automateAlipaySync:
+      case VoiceIntentType.automateWeChatSync:
+        // 取消自动化任务
+        _automationService.cancelTask();
+        break;
     }
 
     _clearSession();
@@ -828,14 +893,14 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       );
 
       // 检查重复交易
-      print('VoiceCoordinator: 开始检查重复交易，金额=${transaction.amount}，分类=${transaction.category}');
+      debugPrint('VoiceCoordinator: 开始检查重复交易，金额=${transaction.amount}，分类=${transaction.category}');
       final existingTransactions = await _databaseService.getTransactions();
-      print('VoiceCoordinator: 获取到${existingTransactions.length}条现有交易');
+      debugPrint('VoiceCoordinator: 获取到${existingTransactions.length}条现有交易');
       final duplicateCheck = DuplicateDetectionService.checkDuplicate(
         transaction,
         existingTransactions,
       );
-      print('VoiceCoordinator: 重复检测结果: hasPotentialDuplicate=${duplicateCheck.hasPotentialDuplicate}, score=${duplicateCheck.similarityScore}');
+      debugPrint('VoiceCoordinator: 重复检测结果: hasPotentialDuplicate=${duplicateCheck.hasPotentialDuplicate}, score=${duplicateCheck.similarityScore}');
 
       if (duplicateCheck.hasPotentialDuplicate) {
         // 发现潜在重复，提示用户
@@ -860,7 +925,31 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       await _databaseService.insertTransaction(transaction);
 
-      final message = '已记录${category ?? ""}消费${amount.toStringAsFixed(2)}元';
+      // 记录交易引用到对话上下文（用于后续代词指代，如"删掉它"）
+      final transactionRef = TransactionReference(
+        id: transaction.id,
+        amount: amount,
+        category: category ?? 'other_expense',
+        date: DateTime.now(),
+      );
+
+      // 使用自然语言响应生成
+      final message = ResponseTemplate.recordSuccess(
+        amount: amount,
+        category: category ?? '',
+        useNaturalStyle: true,
+      );
+      _conversationContext.addAssistantResponse(message, transactionRef: transactionRef);
+
+      // 记录到消歧服务（用于后续"刚才那笔"等指代解析）
+      _disambiguationService.recordRecentOperation(TransactionRecord(
+        id: transaction.id,
+        amount: amount,
+        category: category,
+        date: DateTime.now(),
+        type: 'expense',
+      ));
+
       await _feedbackSystem.provideOperationFeedback(
         result: OperationResult.success('add', {'amount': amount}),
       );
@@ -1047,7 +1136,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       for (final billInfo in validBills) {
         // 创建交易记录
         final transaction = model.Transaction(
-          id: DateTime.now().millisecondsSinceEpoch.toString() + '_${recordedIds.length}',
+          id: '${DateTime.now().millisecondsSinceEpoch}_${recordedIds.length}',
           type: _mapBillTypeToTransactionType(billInfo.type),
           amount: billInfo.amount!,
           category: 'other_expense', // TODO: 根据商户智能分类
@@ -1083,6 +1172,79 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     } catch (e) {
       _clearSession();
       final message = '记录失败：$e';
+      await _ttsService.speak(message);
+      return VoiceSessionResult.error(message);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 自动化账单同步
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 处理自动化账单同步意图
+  ///
+  /// [isAlipay] true表示支付宝同步，false表示微信同步
+  Future<VoiceSessionResult> _handleAutomationIntent(
+    IntentAnalysisResult intentResult,
+    String originalInput, {
+    required bool isAlipay,
+  }) async {
+    final appName = isAlipay ? '支付宝' : '微信';
+
+    // 播放开始提示
+    await _ttsService.speak('好的，正在打开$appName读取账单...');
+
+    // 设置自动化运行状态
+    _sessionState = VoiceSessionState.automationRunning;
+    _currentSession = VoiceSessionContext(
+      intentType: isAlipay ? VoiceIntentType.automateAlipaySync : VoiceIntentType.automateWeChatSync,
+      sessionData: {'appName': appName, 'isAlipay': isAlipay},
+      needsContinuation: false,
+      createdAt: DateTime.now(),
+    );
+    notifyListeners();
+
+    // 设置进度回调
+    _automationService.onProgressUpdate = (message) {
+      debugPrint('AutomationProgress: $message');
+    };
+
+    try {
+      // 执行自动化同步
+      final result = isAlipay
+          ? await _automationService.syncAlipayBills()
+          : await _automationService.syncWeChatBills();
+
+      // 播放结果反馈
+      final feedback = result.getVoiceFeedback();
+      await _ttsService.speak(feedback);
+
+      _clearSession();
+
+      if (result.isSuccess) {
+        return VoiceSessionResult.success(feedback, {
+          'automation': true,
+          'appName': appName,
+          'totalFound': result.totalFound,
+          'newRecorded': result.newRecorded,
+          'transactions': result.transactions.map((t) => {
+            'id': t.id,
+            'amount': t.amount,
+            'description': t.description,
+            'type': t.type.toString(),
+          }).toList(),
+        });
+      } else if (result.needsServiceEnabled) {
+        return VoiceSessionResult.success(feedback, {
+          'automation': true,
+          'needsAccessibilitySettings': true,
+        });
+      } else {
+        return VoiceSessionResult.error(feedback);
+      }
+    } catch (e) {
+      _clearSession();
+      final message = '自动化同步失败：$e';
       await _ttsService.speak(message);
       return VoiceSessionResult.error(message);
     }
@@ -1240,6 +1402,7 @@ enum VoiceSessionState {
   waitingForClarification,        // 等待澄清
   waitingForMultiIntentConfirmation, // 等待多意图确认
   waitingForAmountSupplement,     // 等待金额补充
+  automationRunning,              // 自动化任务执行中
   error,                          // 错误状态
 }
 
@@ -1255,6 +1418,8 @@ enum VoiceIntentType {
   cancelAction,              // 取消操作
   clarifySelection,          // 澄清选择
   screenRecognition,         // 屏幕识别记账
+  automateAlipaySync,        // 自动化支付宝账单同步
+  automateWeChatSync,        // 自动化微信账单同步
 }
 
 /// 语音会话结果状态

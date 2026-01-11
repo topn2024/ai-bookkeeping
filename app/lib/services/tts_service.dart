@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
@@ -10,6 +9,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'voice_token_service.dart';
+import 'streaming_tts_service.dart';
 
 /// 文字转语音服务（TTS）
 ///
@@ -18,19 +18,32 @@ import 'voice_token_service.dart';
 /// 2. 语音播报
 /// 3. 语音设置（语速、音量、音色）
 /// 4. 离线TTS支持
+/// 5. 流式合成模式（低延迟）
 class TTSService {
   final TTSEngine _engine;
   final TTSSettings _settings;
   bool _isInitialized = false;
   bool _isSpeaking = false;
 
+  /// 流式TTS服务（可选）
+  StreamingTTSService? _streamingTTS;
+
+  /// 是否启用流式模式
+  bool _streamingMode = false;
+
+  /// 流式模式首字延迟
+  Duration? _lastFirstChunkLatency;
+  Duration? get lastFirstChunkLatency => _lastFirstChunkLatency;
+
   final _speakingController = StreamController<TTSSpeakingState>.broadcast();
 
   TTSService({
     TTSEngine? engine,
     TTSSettings? settings,
+    bool enableStreaming = false,
   })  : _engine = engine ?? FlutterTTSEngine(),
-        _settings = settings ?? TTSSettings.defaultSettings();
+        _settings = settings ?? TTSSettings.defaultSettings(),
+        _streamingMode = enableStreaming;
 
   /// 是否正在播报
   bool get isSpeaking => _isSpeaking;
@@ -45,13 +58,67 @@ class TTSService {
     try {
       await _engine.initialize();
       await _applySettings();
+
+      // 初始化流式TTS服务（如果启用）
+      if (_streamingMode) {
+        _streamingTTS = StreamingTTSService();
+        await _streamingTTS!.initialize();
+
+        // 监听流式TTS状态
+        _streamingTTS!.stateStream.listen((state) {
+          switch (state) {
+            case StreamingTTSState.started:
+              _speakingController.add(TTSSpeakingState.started);
+              break;
+            case StreamingTTSState.firstChunkReady:
+              _lastFirstChunkLatency = _streamingTTS!.firstChunkLatency;
+              break;
+            case StreamingTTSState.completed:
+              _speakingController.add(TTSSpeakingState.completed);
+              break;
+            case StreamingTTSState.stopped:
+              _speakingController.add(TTSSpeakingState.stopped);
+              break;
+            case StreamingTTSState.interrupted:
+              _speakingController.add(TTSSpeakingState.stopped);
+              break;
+            case StreamingTTSState.error:
+              _speakingController.add(TTSSpeakingState.error);
+              break;
+            default:
+              break;
+          }
+        });
+      }
+
       _isInitialized = true;
-      debugPrint('TTS service initialized');
+      debugPrint('TTS service initialized (streaming: $_streamingMode)');
     } catch (e) {
       debugPrint('TTS initialization failed: $e');
       rethrow;
     }
   }
+
+  /// 启用流式模式
+  Future<void> enableStreamingMode() async {
+    if (_streamingMode) return;
+
+    _streamingMode = true;
+    if (_isInitialized && _streamingTTS == null) {
+      _streamingTTS = StreamingTTSService();
+      await _streamingTTS!.initialize();
+    }
+    debugPrint('TTS streaming mode enabled');
+  }
+
+  /// 禁用流式模式
+  void disableStreamingMode() {
+    _streamingMode = false;
+    debugPrint('TTS streaming mode disabled');
+  }
+
+  /// 是否启用流式模式
+  bool get isStreamingMode => _streamingMode;
 
   /// 应用设置
   Future<void> _applySettings() async {
@@ -66,7 +133,15 @@ class TTSService {
   }
 
   /// 朗读文本
-  Future<void> speak(String text, {bool interrupt = true}) async {
+  ///
+  /// [text] 要朗读的文本
+  /// [interrupt] 是否打断当前播报
+  /// [forceStreaming] 强制使用流式模式（忽略全局设置）
+  Future<void> speak(
+    String text, {
+    bool interrupt = true,
+    bool? forceStreaming,
+  }) async {
     if (!_isInitialized) {
       await initialize();
     }
@@ -77,20 +152,36 @@ class TTSService {
       await stop();
     }
 
+    final useStreaming = forceStreaming ?? _streamingMode;
+
     try {
       _isSpeaking = true;
-      _speakingController.add(TTSSpeakingState.started);
 
-      await _engine.speak(text);
+      if (useStreaming && _streamingTTS != null) {
+        // 使用流式TTS（低延迟）
+        await _streamingTTS!.speak(text, interrupt: interrupt);
+      } else {
+        // 使用传统TTS
+        _speakingController.add(TTSSpeakingState.started);
+        await _engine.speak(text);
+        _speakingController.add(TTSSpeakingState.completed);
+      }
 
       _isSpeaking = false;
-      _speakingController.add(TTSSpeakingState.completed);
     } catch (e) {
       _isSpeaking = false;
       _speakingController.add(TTSSpeakingState.error);
       debugPrint('TTS speak failed: $e');
       rethrow;
     }
+  }
+
+  /// 流式朗读（快速响应模式）
+  ///
+  /// 使用流式TTS服务实现低延迟播报
+  /// 适用于需要快速响应的场景
+  Future<void> speakStreaming(String text, {bool interrupt = true}) async {
+    await speak(text, interrupt: interrupt, forceStreaming: true);
   }
 
   /// 朗读记账结果
@@ -189,11 +280,42 @@ class TTSService {
     if (!_isSpeaking) return;
 
     try {
+      // 停止流式TTS
+      if (_streamingTTS != null) {
+        await _streamingTTS!.stop();
+      }
+
+      // 停止传统TTS
       await _engine.stop();
+
       _isSpeaking = false;
       _speakingController.add(TTSSpeakingState.stopped);
     } catch (e) {
       debugPrint('TTS stop failed: $e');
+    }
+  }
+
+  /// 淡出并停止（用于打断场景）
+  ///
+  /// 平滑降低音量后停止，避免突兀的停止感
+  Future<void> fadeOutAndStop({
+    Duration duration = const Duration(milliseconds: 100),
+  }) async {
+    if (!_isSpeaking) return;
+
+    try {
+      // 流式TTS淡出
+      if (_streamingTTS != null) {
+        await _streamingTTS!.fadeOutAndStop(duration: duration);
+      }
+
+      // 传统TTS直接停止（不支持淡出）
+      await _engine.stop();
+
+      _isSpeaking = false;
+      _speakingController.add(TTSSpeakingState.stopped);
+    } catch (e) {
+      debugPrint('TTS fadeOut failed: $e');
     }
   }
 
@@ -279,6 +401,7 @@ class TTSService {
   void dispose() {
     stop();
     _speakingController.close();
+    _streamingTTS?.dispose();
     _engine.dispose();
   }
 }
