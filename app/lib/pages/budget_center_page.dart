@@ -7,6 +7,8 @@ import '../providers/budget_provider.dart';
 import 'vault_create_page.dart';
 import 'vault_detail_page.dart';
 import 'reports/budget_report_page.dart';
+import 'category_detail_page.dart';
+import 'transaction_list_page.dart';
 
 /// 预算中心页面
 /// 原型设计 1.04：预算中心 Budget
@@ -88,12 +90,18 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '¥${monthlyIncome.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TransactionListPage()),
+                    ),
+                    child: Text(
+                      '¥${monthlyIncome.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -469,16 +477,37 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
           else
             ...budgetUsages.map((usage) {
               final percent = (usage.percentage * 100).round();
-              return _buildBudgetItem(
-                context,
-                theme,
-                name: usage.budget.name,
-                icon: Icons.category,
-                iconColor: const Color(0xFFFF7043),
-                spent: usage.spent,
-                budget: usage.budget.amount,
-                percent: percent,
-                daysLeft: daysLeft,
+              final categoryId = usage.budget.categoryId;
+              return GestureDetector(
+                onTap: () {
+                  if (categoryId != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CategoryDetailPage(
+                          categoryId: categoryId,
+                          isExpense: true,
+                        ),
+                      ),
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TransactionListPage()),
+                    );
+                  }
+                },
+                child: _buildBudgetItem(
+                  context,
+                  theme,
+                  name: usage.budget.name,
+                  icon: Icons.category,
+                  iconColor: const Color(0xFFFF7043),
+                  spent: usage.spent,
+                  budget: usage.budget.amount,
+                  percent: percent,
+                  daysLeft: daysLeft,
+                ),
               );
             }),
           // 伙伴化设计：鼓励消息

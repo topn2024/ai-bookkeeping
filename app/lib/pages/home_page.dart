@@ -11,10 +11,14 @@ import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
 import '../widgets/budget_alert_widget.dart';
+import '../widgets/swipeable_transaction_item.dart';
 import 'transaction_list_page.dart';
+import 'transaction_detail_page.dart';
 import 'add_transaction_page.dart';
 import 'today_allowance_page.dart';
 import 'money_age_page.dart';
+import 'category_detail_page.dart';
+import 'budget_center_page.dart';
 
 /// 仪表盘首页
 /// 原型设计 1.01：仪表盘 Dashboard
@@ -32,6 +36,8 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
+  String? _activeItemId;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -127,51 +133,59 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
               const SizedBox(height: 24),
-              // 本月结余
-              Center(
-                child: Column(
-                  children: [
-                    Text(
-                      '本月结余',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withValues(alpha: 0.85),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '¥${balance.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // 趋势指示
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          isPositiveGrowth
-                              ? Icons.trending_up
-                              : Icons.trending_down,
-                          size: 16,
-                          color: Colors.white.withValues(alpha: 0.9),
+              // 本月结余 - 点击可查看本月交易明细
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TransactionListPage()),
+                  );
+                },
+                child: Center(
+                  child: Column(
+                    children: [
+                      Text(
+                        '本月结余',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withValues(alpha: 0.85),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          isPositiveGrowth
-                              ? '太棒了！较上月提升 ${growth.toStringAsFixed(1)}% 💪'
-                              : '较上月下降 ${(-growth).toStringAsFixed(1)}%',
-                          style: TextStyle(
-                            fontSize: 13,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '¥${balance.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // 趋势指示
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isPositiveGrowth
+                                ? Icons.trending_up
+                                : Icons.trending_down,
+                            size: 16,
                             color: Colors.white.withValues(alpha: 0.9),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          const SizedBox(width: 4),
+                          Text(
+                            isPositiveGrowth
+                                ? '太棒了！较上月提升 ${growth.toStringAsFixed(1)}% 💪'
+                                : '较上月下降 ${(-growth).toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -601,7 +615,10 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
               TextButton(
                 onPressed: () {
-                  // 跳转到预算中心
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const BudgetCenterPage()),
+                  );
                 },
                 child: const Text('查看全部'),
               ),
@@ -632,15 +649,28 @@ class _HomePageState extends ConsumerState<HomePage> {
 
               return Padding(
                 padding: EdgeInsets.only(top: index > 0 ? 12 : 0),
-                child: _buildBudgetItem(
-                  context,
-                  theme,
-                  name: categoryName,
-                  icon: category?.icon ?? Icons.category,
-                  iconColor: category?.color ?? Colors.grey,
-                  spent: item.spent,
-                  budget: item.budget.amount,
-                  percent: item.percent,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CategoryDetailPage(
+                          categoryId: categoryId,
+                          isExpense: true,
+                        ),
+                      ),
+                    );
+                  },
+                  child: _buildBudgetItem(
+                    context,
+                    theme,
+                    name: categoryName,
+                    icon: category?.icon ?? Icons.category,
+                    iconColor: category?.color ?? Colors.grey,
+                    spent: item.spent,
+                    budget: item.budget.amount,
+                    percent: item.percent,
+                  ),
                 ),
               );
             }),
@@ -789,96 +819,70 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
             )
           else
-            ...transactions.take(5).map((tx) => _buildTransactionItem(
-                  context,
-                  theme,
-                  tx,
-                  colors,
+            ...transactions.take(5).map((tx) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: SwipeableTransactionItem(
+                    key: ValueKey(tx.id),
+                    transaction: tx,
+                    isActive: _activeItemId == tx.id,
+                    themeColors: colors,
+                    onLongPress: () => setState(() => _activeItemId = tx.id),
+                    onEdit: () => _handleEdit(tx),
+                    onDelete: () => _confirmDelete(tx),
+                    onTap: () => _showTransactionDetail(tx),
+                    onDismiss: () => setState(() => _activeItemId = null),
+                  ),
                 )),
         ],
       ),
     );
   }
 
-  Widget _buildTransactionItem(
-    BuildContext context,
-    ThemeData theme,
-    Transaction transaction,
-    ThemeColors colors,
-  ) {
-    final category = DefaultCategories.findById(transaction.category);
-    final isExpense = transaction.type == TransactionType.expense;
-
-    return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => AddTransactionPage(transaction: transaction),
-        ),
+  /// 查看交易详情
+  void _showTransactionDetail(Transaction transaction) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TransactionDetailPage(transaction: transaction),
       ),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: (category?.color ?? Colors.grey).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                category?.icon ?? Icons.help_outline,
-                color: category?.color ?? Colors.grey,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    category?.localizedName ?? transaction.category,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                  ),
-                  Text(
-                    transaction.note ??
-                        DateFormat('MM/dd HH:mm').format(transaction.date),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Text(
-              '${isExpense ? '-' : '+'}¥${transaction.amount.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: isExpense ? colors.expense : colors.income,
-              ),
-            ),
-          ],
-        ),
+    );
+  }
+
+  /// 编辑交易
+  void _handleEdit(Transaction transaction) {
+    setState(() => _activeItemId = null);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddTransactionPage(transaction: transaction),
+      ),
+    );
+  }
+
+  /// 确认删除交易
+  void _confirmDelete(Transaction transaction) {
+    setState(() => _activeItemId = null);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: const Text('确定要删除这笔记录吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              ref.read(transactionProvider.notifier).deleteTransaction(transaction.id);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('已删除')),
+              );
+            },
+            child: const Text('删除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

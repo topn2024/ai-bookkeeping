@@ -7,8 +7,9 @@ import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import '../models/budget.dart';
 import '../providers/transaction_provider.dart';
-import '../providers/money_age_provider.dart';
+import '../providers/budget_provider.dart';
 import '../extensions/category_extensions.dart';
 
 /// 聊天消息类型
@@ -716,49 +717,30 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage>
 
   /// 生成钱龄查询响应（使用真实数据）
   Map<String, dynamic> _generateMoneyAgeResponse() {
-    final dashboardAsync = ref.read(moneyAgeDashboardProvider);
+    final moneyAge = ref.read(moneyAgeProvider);
+    final avgAge = moneyAge.days;
+    final level = moneyAge.statusText;
 
-    return dashboardAsync.when(
-      data: (dashboard) {
-        if (dashboard == null) {
-          return {
-            'message': '暂时无法获取钱龄数据，请稍后再试 😅',
-            'metadata': null,
-          };
-        }
+    String levelEmoji;
+    switch (moneyAge.status) {
+      case MoneyAgeStatus.excellent:
+        levelEmoji = '🌟';
+        break;
+      case MoneyAgeStatus.good:
+        levelEmoji = '✨';
+        break;
+      case MoneyAgeStatus.fair:
+        levelEmoji = '📊';
+        break;
+      case MoneyAgeStatus.poor:
+        levelEmoji = '💪';
+        break;
+    }
 
-        final avgAge = dashboard.averageMoneyAge;
-        final level = dashboard.level;
-
-        String levelEmoji;
-        switch (level) {
-          case '健康':
-            levelEmoji = '🌟';
-            break;
-          case '良好':
-            levelEmoji = '✨';
-            break;
-          case '一般':
-            levelEmoji = '📊';
-            break;
-          default:
-            levelEmoji = '💪';
-        }
-
-        return {
-          'message': '您当前的钱龄是 $avgAge天，处于"$level"水平 $levelEmoji\n\n这意味着您花的钱平均是$avgAge天前赚的。\n\n想了解如何提升钱龄吗？',
-          'metadata': null,
-        };
-      },
-      loading: () => {
-        'message': '正在查询钱龄数据...',
-        'metadata': null,
-      },
-      error: (_, __) => {
-        'message': '查询钱龄时遇到问题，请稍后再试 😅',
-        'metadata': null,
-      },
-    );
+    return {
+      'message': '您当前的钱龄是 $avgAge天，处于"$level"水平 $levelEmoji\n\n这意味着您花的钱平均是$avgAge天前赚的。\n\n想了解如何提升钱龄吗？',
+      'metadata': null,
+    };
   }
 
   /// 获取分类对应的emoji

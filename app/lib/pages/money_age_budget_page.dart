@@ -5,9 +5,10 @@ import '../models/transaction.dart';
 import '../models/category.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/budget_provider.dart';
-import '../providers/money_age_provider.dart';
 import '../extensions/category_extensions.dart';
 import '../theme/app_theme.dart';
+import 'category_detail_page.dart';
+import 'money_age_page.dart';
 
 /// 钱龄预算联动页面
 /// 原型设计 2.08：钱龄 × 预算
@@ -75,104 +76,22 @@ class MoneyAgeBudgetPage extends ConsumerWidget {
 
   /// 钱龄影响预测卡片
   Widget _buildPredictionCard(BuildContext context, ThemeData theme, WidgetRef ref) {
-    final dashboardAsync = ref.watch(moneyAgeDashboardProvider);
+    final moneyAge = ref.watch(moneyAgeProvider);
+    final currentAge = moneyAge.days;
+    // 简单预测：假设按当前预算执行，每月可增加5-10天
+    final predictedGain = (currentAge * 0.15).round().clamp(3, 15);
+    final predictedAge = currentAge + predictedGain;
 
-    return dashboardAsync.when(
-      data: (dashboard) {
-        final currentAge = dashboard?.averageMoneyAge ?? 0;
-        // 简单预测：假设按当前预算执行，每月可增加5-10天
-        final predictedGain = (currentAge * 0.15).round().clamp(3, 15);
-        final predictedAge = currentAge + predictedGain;
-
-        return Container(
-          margin: const EdgeInsets.all(12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              Column(
-                children: [
-                  Text(
-                    '按当前预算执行',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    '月末预计钱龄',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Column(
-                    children: [
-                      Text(
-                        '$currentAge天',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        '当前',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Icon(
-                      Icons.arrow_forward,
-                      color: AppColors.success,
-                    ),
-                  ),
-                  Column(
-                    children: [
-                      Text(
-                        '$predictedAge天',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.success,
-                        ),
-                      ),
-                      Text(
-                        '+$predictedGain天 ↑',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.success,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MoneyAgePage()),
         );
       },
-      loading: () => Container(
+      child: Container(
         margin: const EdgeInsets.all(12),
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
@@ -181,16 +100,79 @@ class MoneyAgeBudgetPage extends ConsumerWidget {
           ),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Center(child: CircularProgressIndicator()),
-      ),
-      error: (_, __) => Container(
-        margin: const EdgeInsets.all(12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(16),
+        child: Column(
+          children: [
+            Column(
+              children: [
+                Text(
+                  '按当前预算执行',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '月末预计钱龄',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Column(
+                  children: [
+                    Text(
+                      '$currentAge天',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '当前',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Icon(
+                    Icons.arrow_forward,
+                    color: AppColors.success,
+                  ),
+                ),
+                Column(
+                  children: [
+                    Text(
+                      '$predictedAge天',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.success,
+                      ),
+                    ),
+                    Text(
+                      '+$predictedGain天 ↑',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ),
-        child: const Center(child: Text('暂无钱龄数据')),
       ),
     );
   }
@@ -279,17 +261,30 @@ class MoneyAgeBudgetPage extends ConsumerWidget {
 
       final emoji = _getCategoryEmoji(categoryId);
 
-      impactItems.add(_buildBudgetImpactItem(
-        context,
-        theme,
-        emoji: emoji,
-        name: '${category?.localizedName ?? categoryId}预算',
-        current: spent,
-        budget: budget.amount,
-        impact: impact,
-        isPositive: isPositive,
-        progressPercent: progress.clamp(0.0, 1.0),
-        progressColor: progressColor,
+      impactItems.add(GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CategoryDetailPage(
+                categoryId: categoryId,
+                isExpense: true,
+              ),
+            ),
+          );
+        },
+        child: _buildBudgetImpactItem(
+          context,
+          theme,
+          emoji: emoji,
+          name: '${category?.localizedName ?? categoryId}预算',
+          current: spent,
+          budget: budget.amount,
+          impact: impact,
+          isPositive: isPositive,
+          progressPercent: progress.clamp(0.0, 1.0),
+          progressColor: progressColor,
+        ),
       ));
       impactItems.add(const SizedBox(height: 8));
     }
@@ -436,7 +431,7 @@ class MoneyAgeBudgetPage extends ConsumerWidget {
   Widget _buildAISuggestion(BuildContext context, ThemeData theme, WidgetRef ref) {
     final budgets = ref.watch(budgetProvider);
     final transactions = ref.watch(transactionProvider);
-    final dashboardAsync = ref.watch(moneyAgeDashboardProvider);
+    final moneyAge = ref.watch(moneyAgeProvider);
     final now = DateTime.now();
     final monthStart = DateTime(now.year, now.month, 1);
 
@@ -479,11 +474,7 @@ class MoneyAgeBudgetPage extends ConsumerWidget {
         final savings = (targetBudget - reducedBudget).round();
 
         // 获取当前钱龄
-        final currentAge = dashboardAsync.when(
-          data: (d) => d?.averageMoneyAge ?? 30,
-          loading: () => 30,
-          error: (_, __) => 30,
-        );
+        final currentAge = moneyAge.days;
         final predictedAge = currentAge + (savings / 100).round();
 
         suggestion = '将$categoryName预算从¥${targetBudget.toStringAsFixed(0)}降至¥$reducedBudget，每月可额外储蓄¥$savings，预计可将钱龄提升至$predictedAge天（+${predictedAge - currentAge}天）';

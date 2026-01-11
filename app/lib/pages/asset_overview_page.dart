@@ -9,6 +9,10 @@ import '../providers/investment_provider.dart';
 import '../providers/debt_provider.dart';
 import '../models/transaction.dart';
 import '../extensions/account_extensions.dart';
+import 'credit_card_page.dart';
+import 'investment_page.dart';
+import 'debt_management_page.dart';
+import 'account_management_page.dart';
 
 class AssetOverviewPage extends ConsumerStatefulWidget {
   const AssetOverviewPage({super.key});
@@ -177,13 +181,25 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
           const SizedBox(height: 12),
           ...accounts
               .where((a) => a.type != AccountType.creditCard && a.balance >= 0)
-              .map((account) => _buildAccountCard(account)),
+              .map((account) => GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AccountManagementPage()),
+                ),
+                child: _buildAccountCard(account),
+              )),
           // Investment section
           if (investments != null && investments.isNotEmpty) ...[
             const SizedBox(height: 24),
             _buildSectionHeader('投资资产', investmentSummary?.totalCurrentValue ?? 0),
             const SizedBox(height: 12),
-            ...investments.map((investment) => _buildInvestmentCard(investment)),
+            ...investments.map((investment) => GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const InvestmentPage()),
+              ),
+              child: _buildInvestmentCard(investment),
+            )),
             // Investment summary
             if (investmentSummary != null && investmentSummary.totalProfit != 0)
               Container(
@@ -213,20 +229,32 @@ class _AssetOverviewPageState extends ConsumerState<AssetOverviewPage>
           _buildSectionHeader('负债账户', totalLiabilities),
           const SizedBox(height: 12),
           if (creditCardSummary.totalUsed > 0)
-            _buildLiabilityCard(
-              '信用卡欠款',
-              creditCardSummary.totalUsed,
-              Icons.credit_card,
-              Colors.red,
-              '${creditCardSummary.cardCount}张卡',
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CreditCardPage()),
+              ),
+              child: _buildLiabilityCard(
+                '信用卡欠款',
+                creditCardSummary.totalUsed,
+                Icons.credit_card,
+                Colors.red,
+                '${creditCardSummary.cardCount}张卡',
+              ),
             ),
           if (debtSummary != null && debtSummary.totalBalance > 0)
-            _buildLiabilityCard(
-              '贷款负债',
-              debtSummary.totalBalance,
-              Icons.account_balance,
-              Colors.orange,
-              '${debtSummary.activeCount}笔贷款',
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DebtManagementPage()),
+              ),
+              child: _buildLiabilityCard(
+                '贷款负债',
+                debtSummary.totalBalance,
+                Icons.account_balance,
+                Colors.orange,
+                '${debtSummary.activeCount}笔贷款',
+              ),
             ),
           if (totalLiabilities == 0)
             Container(

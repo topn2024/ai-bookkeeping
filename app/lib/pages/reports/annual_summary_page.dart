@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/transaction.dart';
 import '../../providers/transaction_provider.dart';
 import '../../theme/app_theme.dart';
+import '../transaction_list_page.dart';
+import '../money_age_page.dart';
+import '../savings_goal_page.dart';
 
 /// 年度总结页面
 /// 原型设计 7.03：年度总结
@@ -144,8 +147,20 @@ class _AnnualSummaryPageState extends ConsumerState<AnnualSummaryPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildHeroItem('¥${totalIncome.toStringAsFixed(0)}', '总收入'),
-              _buildHeroItem('¥${totalExpense.toStringAsFixed(0)}', '总支出'),
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TransactionListPage()),
+                ),
+                child: _buildHeroItem('¥${totalIncome.toStringAsFixed(0)}', '总收入'),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TransactionListPage()),
+                ),
+                child: _buildHeroItem('¥${totalExpense.toStringAsFixed(0)}', '总支出'),
+              ),
             ],
           ),
         ],
@@ -192,31 +207,49 @@ class _AnnualSummaryPageState extends ConsumerState<AnnualSummaryPage> {
             ),
           ),
           const SizedBox(height: 12),
-          _buildHighlightCard(
-            theme,
-            icon: Icons.trending_up,
-            iconColor: Colors.green,
-            iconBgColor: Colors.green,
-            title: '储蓄率 ${savingsRate.toStringAsFixed(1)}%',
-            subtitle: '超越90%的用户',
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TransactionListPage()),
+            ),
+            child: _buildHighlightCard(
+              theme,
+              icon: Icons.trending_up,
+              iconColor: Colors.green,
+              iconBgColor: Colors.green,
+              title: '储蓄率 ${savingsRate.toStringAsFixed(1)}%',
+              subtitle: '超越90%的用户',
+            ),
           ),
           const SizedBox(height: 8),
-          _buildHighlightCard(
-            theme,
-            icon: Icons.savings,
-            iconColor: Colors.white,
-            iconBgColor: AppTheme.primaryColor,
-            title: '达成3个储蓄目标',
-            subtitle: '日本旅行、新电脑、应急基金',
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SavingsGoalPage()),
+            ),
+            child: _buildHighlightCard(
+              theme,
+              icon: Icons.savings,
+              iconColor: Colors.white,
+              iconBgColor: AppTheme.primaryColor,
+              title: '达成3个储蓄目标',
+              subtitle: '日本旅行、新电脑、应急基金',
+            ),
           ),
           const SizedBox(height: 8),
-          _buildHighlightCard(
-            theme,
-            icon: Icons.access_time,
-            iconColor: Colors.white,
-            iconBgColor: Colors.orange,
-            title: '平均钱龄 78天',
-            subtitle: '财务健康度良好',
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MoneyAgePage()),
+            ),
+            child: _buildHighlightCard(
+              theme,
+              icon: Icons.access_time,
+              iconColor: Colors.white,
+              iconBgColor: Colors.orange,
+              title: '平均钱龄 78天',
+              subtitle: '财务健康度良好',
+            ),
           ),
         ],
       ),

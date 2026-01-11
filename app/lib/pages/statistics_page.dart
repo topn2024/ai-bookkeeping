@@ -211,7 +211,29 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
   }) {
     final color = isExpense ? _themeColors.expense : _themeColors.income;
 
-    return Container(
+    // 确定对比模式
+    ComparisonMode mode;
+    switch (_selectedPeriod) {
+      case StatsPeriod.day:
+      case StatsPeriod.week:
+      case StatsPeriod.month:
+        mode = ComparisonMode.month;
+        break;
+      case StatsPeriod.year:
+        mode = ComparisonMode.year;
+        break;
+    }
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PeriodComparisonPage(initialMode: mode),
+          ),
+        );
+      },
+      child: Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -280,6 +302,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
             ],
           ),
         ],
+      ),
       ),
     );
   }
