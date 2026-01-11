@@ -144,13 +144,14 @@ async def check_update(
     a forced update.
     """
     # Query the latest published version for this platform
+    # Order by version_code DESC, then by created_at DESC to handle same version_code
     result = await db.execute(
         select(AppVersion)
         .where(
             AppVersion.platform == platform,
             AppVersion.status == 1,  # Published only
         )
-        .order_by(desc(AppVersion.version_code))
+        .order_by(desc(AppVersion.version_code), desc(AppVersion.created_at))
         .limit(1)
     )
     latest = result.scalar_one_or_none()
@@ -282,7 +283,7 @@ async def get_latest_version(
             AppVersion.platform == platform,
             AppVersion.status == 1,  # Published only
         )
-        .order_by(desc(AppVersion.version_code))
+        .order_by(desc(AppVersion.version_code), desc(AppVersion.created_at))
         .limit(1)
     )
     latest = result.scalar_one_or_none()
