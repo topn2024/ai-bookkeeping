@@ -589,7 +589,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         await _databaseService.insertTransaction(transaction);
         executedCount++;
       } catch (e) {
-        debugPrint('执行意图失败: $e');
+        debugPrint('[VoiceCoordinator] 执行意图失败: $e');
       }
     }
 
