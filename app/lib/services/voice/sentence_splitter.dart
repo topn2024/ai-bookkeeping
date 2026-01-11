@@ -70,8 +70,9 @@ class SentenceSplitter {
   /// 1. 按强分隔符分割
   /// 2. 检测连接词边界
   /// 3. 检测时间转换边界
-  /// 4. 合并过短片段
-  /// 5. 过滤空白和无意义片段
+  /// 4. 按逗号分割多笔交易
+  /// 5. 合并过短片段
+  /// 6. 过滤空白和无意义片段
   List<String> split(String text) {
     if (text.trim().isEmpty) {
       return [];
@@ -86,13 +87,120 @@ class SentenceSplitter {
     // 3. 按时间转换词分割
     segments = _splitByTimeTransitions(segments);
 
-    // 4. 合并过短且无动作的片段
+    // 4. 按逗号分割多笔交易（如"打车15，买菜18"）
+    segments = _splitByCommaWithAction(segments);
+
+    // 5. 合并过短且无动作的片段
     segments = _mergeShortSegments(segments);
 
-    // 5. 过滤和清理
+    // 6. 过滤和清理
     segments = _cleanSegments(segments);
 
     return segments;
+  }
+
+  /// 按逗号分割包含多个动作的句子
+  ///
+  /// 处理如"打车花了15，买菜花了18"或"打车花了15，买菜花了，28"这样的句子
+  List<String> _splitByCommaWithAction(List<String> segments) {
+    final result = <String>[];
+
+    for (final segment in segments) {
+      // 按逗号分割
+      final parts = segment.split(RegExp(r'[，,]'));
+
+      if (parts.length <= 1) {
+        result.add(segment);
+        continue;
+      }
+
+      // 预处理：合并"动作"和紧随的"金额"部分
+      // 例如：["买菜花了", "28"] → ["买菜花了28"]
+      final mergedParts = <String>[];
+      var i = 0;
+      while (i < parts.length) {
+        final current = parts[i].trim();
+        if (current.isEmpty) {
+          i++;
+          continue;
+        }
+
+        final hasAction = _hasActionVerb(current);
+        final hasAmount = RegExp(r'\d+|[一二三四五六七八九十百千万两]+').hasMatch(current);
+
+        // 如果当前部分只有动作没有金额，检查下一个部分
+        if (hasAction && !hasAmount && i + 1 < parts.length) {
+          final next = parts[i + 1].trim();
+          final nextHasAmount = RegExp(r'^\d+|^[一二三四五六七八九十百千万两]+').hasMatch(next);
+          final nextHasAction = _hasActionVerb(next);
+
+          if (nextHasAmount && !nextHasAction) {
+            // 合并动作和金额
+            mergedParts.add('$current$next');
+            i += 2;
+            continue;
+          }
+        }
+
+        mergedParts.add(current);
+        i++;
+      }
+
+      // 检查每个部分是否有独立的动作+金额
+      final validParts = <String>[];
+      var buffer = '';
+
+      for (final part in mergedParts) {
+        final trimmed = part.trim();
+        if (trimmed.isEmpty) continue;
+
+        final hasAction = _hasActionVerb(trimmed);
+        final hasAmount = RegExp(r'\d+|[一二三四五六七八九十百千万两]+').hasMatch(trimmed);
+
+        if (hasAction && hasAmount) {
+          // 这是一个独立的交易记录
+          if (buffer.isNotEmpty) {
+            // 先把 buffer 中的内容加到这个部分前面
+            validParts.add('$buffer，$trimmed');
+            buffer = '';
+          } else {
+            validParts.add(trimmed);
+          }
+        } else if (hasAction || hasAmount) {
+          // 有动作或金额但不完整，暂存
+          if (buffer.isNotEmpty) {
+            buffer = '$buffer，$trimmed';
+          } else {
+            buffer = trimmed;
+          }
+        } else {
+          // 没有动作和金额，作为修饰语暂存
+          if (buffer.isNotEmpty) {
+            buffer = '$buffer，$trimmed';
+          } else {
+            buffer = trimmed;
+          }
+        }
+      }
+
+      // 处理剩余的 buffer
+      if (buffer.isNotEmpty) {
+        if (validParts.isNotEmpty) {
+          // 合并到最后一个有效部分
+          validParts[validParts.length - 1] = '${validParts.last}，$buffer';
+        } else {
+          validParts.add(buffer);
+        }
+      }
+
+      if (validParts.isEmpty) {
+        result.add(segment);
+      } else {
+        result.addAll(validParts);
+      }
+    }
+
+    return result;
   }
 
   /// 按强分隔符分割

@@ -218,7 +218,24 @@ class VoiceIntentRouter {
     final splitter = SentenceSplitter();
     final segments = splitter.split(input);
 
-    return segments.length > 1;
+    if (segments.length > 1) return true;
+
+    // 检查是否包含多个金额（阿拉伯数字或中文数字）
+    final arabicAmounts = RegExp(r'\d+(\.\d+)?').allMatches(input).length;
+    final chineseAmountPattern = RegExp(r'[一二三四五六七八九十百千万两]+\s*[块元钱]');
+    final chineseAmounts = chineseAmountPattern.allMatches(input).length;
+
+    if (arabicAmounts + chineseAmounts >= 2) return true;
+
+    // 检查是否有多个消费动词（花了...花了, 买了...买了）
+    final expenseVerbs = ['花了', '买了', '付了', '吃了', '喝了', '打车'];
+    var verbCount = 0;
+    for (final verb in expenseVerbs) {
+      verbCount += RegExp(verb).allMatches(input).length;
+    }
+    if (verbCount >= 2) return true;
+
+    return false;
   }
 
   /// 预处理用户输入

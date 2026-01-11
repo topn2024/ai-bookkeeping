@@ -296,6 +296,13 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       VoiceSessionResult result;
       if (mightBeMultiple) {
         result = await coordinator.processMultiIntentCommand(command);
+        // 多意图处理后自动确认执行
+        if (result.status == VoiceSessionStatus.success) {
+          debugPrint('[App] 多意图识别成功，自动确认执行');
+          final confirmResult = await coordinator.confirmMultiIntents();
+          debugPrint('[App] 多意图执行结果: ${confirmResult.status} - ${confirmResult.message}');
+          result = confirmResult;
+        }
       } else {
         result = await coordinator.processVoiceCommand(command);
       }
