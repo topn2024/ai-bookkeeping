@@ -1547,6 +1547,519 @@ class VoiceConfigService extends ChangeNotifier {
       valueExtractor: (match) => match.group(3),
       confirmTemplate: '已将日志级别设为{value}',
     ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // 十四、零基预算配置
+    // ═══════════════════════════════════════════════════════════════
+    ConfigItemDefinition(
+      id: 'budget.zero_based.enabled',
+      name: '零基预算开关',
+      category: ConfigCategory.budgetFinance,
+      valueType: ConfigValueType.boolean,
+      patterns: [
+        r'(开启|打开|启用|关闭|禁用)零基预算',
+      ],
+      valueExtractor: (match) => ['开启', '打开', '启用'].contains(match.group(1)),
+      confirmTemplate: '已{action}零基预算功能',
+    ),
+    ConfigItemDefinition(
+      id: 'budget.zero_based.reset_day',
+      name: '零基预算重置日',
+      category: ConfigCategory.budgetFinance,
+      valueType: ConfigValueType.number,
+      patterns: [
+        r'零基预算(每月)?(\d+)(号|日)重置',
+        r'(\d+)(号|日)重新分配预算',
+      ],
+      valueExtractor: (match) => int.tryParse(match.group(2) ?? match.group(1) ?? ''),
+      confirmTemplate: '已设置零基预算每月{value}日重置',
+    ),
+    ConfigItemDefinition(
+      id: 'budget.template.save',
+      name: '保存预算模板',
+      category: ConfigCategory.budgetFinance,
+      valueType: ConfigValueType.string,
+      patterns: [
+        r'(把|将)?当前预算(保存|存)为(.+?)模板',
+        r'保存预算模板(.+)',
+      ],
+      valueExtractor: (match) => match.group(3) ?? match.group(1),
+      confirmTemplate: '已将当前预算保存为模板"{value}"',
+    ),
+    ConfigItemDefinition(
+      id: 'budget.template.apply',
+      name: '应用预算模板',
+      category: ConfigCategory.budgetFinance,
+      valueType: ConfigValueType.string,
+      patterns: [
+        r'(应用|使用)(.+?)预算模板',
+        r'切换到(.+?)预算',
+      ],
+      valueExtractor: (match) => match.group(2) ?? match.group(1),
+      confirmTemplate: '已应用预算模板"{value}"',
+    ),
+    ConfigItemDefinition(
+      id: 'budget.carryover.mode',
+      name: '预算结转模式',
+      category: ConfigCategory.budgetFinance,
+      valueType: ConfigValueType.enumValue,
+      patterns: [
+        r'预算结转(模式)?(设为|改成)?(全额|部分|不结转)',
+        r'(全额|部分)结转预算',
+      ],
+      valueExtractor: (match) => match.group(3) ?? match.group(1),
+      confirmTemplate: '已设置预算结转模式为{value}',
+    ),
+    ConfigItemDefinition(
+      id: 'budget.carryover.ratio',
+      name: '预算结转比例',
+      category: ConfigCategory.budgetFinance,
+      valueType: ConfigValueType.percentage,
+      patterns: [
+        r'结转(\d+)%预算',
+        r'预算结转比例(\d+)%?',
+      ],
+      valueExtractor: (match) => int.tryParse(match.group(1) ?? ''),
+      confirmTemplate: '已设置预算结转比例为{value}%',
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // 十五、信用卡高级配置
+    // ═══════════════════════════════════════════════════════════════
+    ConfigItemDefinition(
+      id: 'creditcard.temp_limit',
+      name: '临时额度',
+      category: ConfigCategory.accountAsset,
+      valueType: ConfigValueType.number,
+      patterns: [
+        r'临时额度(设为|改成)?(\d+)',
+        r'申请临时额度(\d+)',
+      ],
+      valueExtractor: (match) => double.tryParse(match.group(2) ?? match.group(1) ?? ''),
+      confirmTemplate: '已设置临时额度为{value}元',
+    ),
+    ConfigItemDefinition(
+      id: 'creditcard.min_payment_ratio',
+      name: '最低还款比例',
+      category: ConfigCategory.accountAsset,
+      valueType: ConfigValueType.percentage,
+      patterns: [
+        r'最低还款(比例)?(设为|改成)?(\d+)%?',
+      ],
+      valueExtractor: (match) => int.tryParse(match.group(3) ?? ''),
+      confirmTemplate: '已设置最低还款比例为{value}%',
+    ),
+    ConfigItemDefinition(
+      id: 'creditcard.auto_payment',
+      name: '自动还款',
+      category: ConfigCategory.accountAsset,
+      valueType: ConfigValueType.enumValue,
+      patterns: [
+        r'(开启|关闭)(自动)?(全额|最低)还款',
+        r'自动还款(设为|改成)?(全额|最低|关闭)',
+      ],
+      valueExtractor: (match) {
+        final action = match.group(1);
+        if (action == '关闭') return 'off';
+        return match.group(3) ?? match.group(2) ?? 'full';
+      },
+      confirmTemplate: '已设置自动还款为{value}',
+    ),
+    ConfigItemDefinition(
+      id: 'creditcard.interest_free_days',
+      name: '免息期天数',
+      category: ConfigCategory.accountAsset,
+      valueType: ConfigValueType.number,
+      patterns: [
+        r'免息期(设为|改成)?(\d+)天',
+      ],
+      valueExtractor: (match) => int.tryParse(match.group(2) ?? ''),
+      confirmTemplate: '已设置免息期为{value}天',
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // 十六、家庭账本高级配置
+    // ═══════════════════════════════════════════════════════════════
+    ConfigItemDefinition(
+      id: 'family.member.permission.view',
+      name: '成员查看权限',
+      category: ConfigCategory.bookMember,
+      valueType: ConfigValueType.parentChild,
+      patterns: [
+        r'(.+?)(可以|能|允许)查看(记录|账单)?',
+        r'允许(.+?)查看',
+      ],
+      valueExtractor: (match) => {
+        'member': match.group(1),
+        'permission': 'view',
+      },
+      confirmTemplate: '已允许{member}查看记录',
+    ),
+    ConfigItemDefinition(
+      id: 'family.member.permission.edit',
+      name: '成员编辑权限',
+      category: ConfigCategory.bookMember,
+      valueType: ConfigValueType.parentChild,
+      patterns: [
+        r'(.+?)(可以|能|允许)编辑(记录)?',
+        r'允许(.+?)编辑',
+      ],
+      valueExtractor: (match) => {
+        'member': match.group(1),
+        'permission': 'edit',
+      },
+      confirmTemplate: '已允许{member}编辑记录',
+    ),
+    ConfigItemDefinition(
+      id: 'family.approval.enabled',
+      name: '消费审批开关',
+      category: ConfigCategory.bookMember,
+      valueType: ConfigValueType.boolean,
+      patterns: [
+        r'(开启|打开|启用|关闭|禁用)消费审批',
+      ],
+      valueExtractor: (match) => ['开启', '打开', '启用'].contains(match.group(1)),
+      confirmTemplate: '已{action}消费审批功能',
+    ),
+    ConfigItemDefinition(
+      id: 'family.approval.threshold',
+      name: '审批金额阈值',
+      category: ConfigCategory.bookMember,
+      valueType: ConfigValueType.number,
+      patterns: [
+        r'超过(\d+)(元)?需要审批',
+        r'审批阈值(设为|改成)?(\d+)',
+      ],
+      valueExtractor: (match) => double.tryParse(match.group(1) ?? match.group(2) ?? ''),
+      confirmTemplate: '已设置消费超过{value}元需要审批',
+    ),
+    ConfigItemDefinition(
+      id: 'family.budget.allocation',
+      name: '家庭预算分配',
+      category: ConfigCategory.bookMember,
+      valueType: ConfigValueType.parentChild,
+      patterns: [
+        r'(.+?)(的)?预算(占比|比例)(设为|改成)?(\d+)%?',
+      ],
+      valueExtractor: (match) => {
+        'member': match.group(1),
+        'ratio': int.tryParse(match.group(5) ?? ''),
+      },
+      confirmTemplate: '已设置{member}的预算占比为{ratio}%',
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // 十七、AI智能高级配置
+    // ═══════════════════════════════════════════════════════════════
+    ConfigItemDefinition(
+      id: 'ai.category.confidence_threshold',
+      name: '分类置信度阈值',
+      category: ConfigCategory.aiSmart,
+      valueType: ConfigValueType.percentage,
+      patterns: [
+        r'分类(置信度|准确度)(阈值)?(设为|改成|调到)?(\d+)%?',
+      ],
+      valueExtractor: (match) => int.tryParse(match.group(4) ?? ''),
+      confirmTemplate: '已设置分类置信度阈值为{value}%',
+    ),
+    ConfigItemDefinition(
+      id: 'ai.anomaly.sensitivity',
+      name: '异常检测灵敏度',
+      category: ConfigCategory.aiSmart,
+      valueType: ConfigValueType.enumValue,
+      patterns: [
+        r'异常检测(灵敏度)?(设为|改成|调)?(高|中|低)',
+        r'(高|中|低)灵敏度异常检测',
+      ],
+      valueExtractor: (match) => match.group(3) ?? match.group(1),
+      confirmTemplate: '已设置异常检测灵敏度为{value}',
+    ),
+    ConfigItemDefinition(
+      id: 'ai.anomaly.amount_threshold',
+      name: '异常金额阈值',
+      category: ConfigCategory.aiSmart,
+      valueType: ConfigValueType.number,
+      patterns: [
+        r'超过(\d+)(元)?(才)?算异常',
+        r'异常(金额)?(阈值)?(设为|改成)?(\d+)',
+      ],
+      valueExtractor: (match) => double.tryParse(match.group(1) ?? match.group(4) ?? ''),
+      confirmTemplate: '已设置异常金额阈值为{value}元',
+    ),
+    ConfigItemDefinition(
+      id: 'ai.suggestion.frequency',
+      name: '智能建议频率',
+      category: ConfigCategory.aiSmart,
+      valueType: ConfigValueType.enumValue,
+      patterns: [
+        r'(每天|每周|每月)给我(一次)?(消费)?建议',
+        r'建议频率(设为|改成)?(每天|每周|每月)',
+      ],
+      valueExtractor: (match) => match.group(1) ?? match.group(2),
+      confirmTemplate: '已设置{value}推送一次消费建议',
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // 十八、习惯培养配置
+    // ═══════════════════════════════════════════════════════════════
+    ConfigItemDefinition(
+      id: 'habit.checkin.enabled',
+      name: '记账打卡',
+      category: ConfigCategory.reminderNotification,
+      valueType: ConfigValueType.boolean,
+      patterns: [
+        r'(开启|打开|启用|关闭|禁用)(记账)?打卡(功能)?',
+      ],
+      valueExtractor: (match) => ['开启', '打开', '启用'].contains(match.group(1)),
+      confirmTemplate: '已{action}记账打卡功能',
+    ),
+    ConfigItemDefinition(
+      id: 'habit.checkin.reminder_time',
+      name: '打卡提醒时间',
+      category: ConfigCategory.reminderNotification,
+      valueType: ConfigValueType.time,
+      patterns: [
+        r'(每天)?(晚上|早上|中午)?(\d+)(点|时)提醒打卡',
+        r'打卡提醒(设为|改成)?(\d+)(点|时)',
+      ],
+      valueExtractor: (match) {
+        var hour = int.tryParse(match.group(3) ?? match.group(2) ?? '') ?? 21;
+        if (match.group(2) == '晚上' && hour < 12) hour += 12;
+        return hour;
+      },
+      confirmTemplate: '已设置每天{value}:00提醒打卡',
+    ),
+    ConfigItemDefinition(
+      id: 'habit.streak.notify',
+      name: '连续记账提醒',
+      category: ConfigCategory.reminderNotification,
+      valueType: ConfigValueType.boolean,
+      patterns: [
+        r'(开启|打开|启用|关闭|禁用)连续记账提醒',
+        r'(开启|关闭)打卡连续提醒',
+      ],
+      valueExtractor: (match) => ['开启', '打开', '启用'].contains(match.group(1)),
+      confirmTemplate: '已{action}连续记账提醒',
+    ),
+    ConfigItemDefinition(
+      id: 'habit.challenge.start',
+      name: '开始挑战',
+      category: ConfigCategory.goalDebt,
+      valueType: ConfigValueType.string,
+      patterns: [
+        r'开始(.+?)挑战',
+        r'参加(.+?)挑战',
+      ],
+      valueExtractor: (match) => match.group(1),
+      confirmTemplate: '已开始"{value}"挑战',
+    ),
+    ConfigItemDefinition(
+      id: 'habit.challenge.quit',
+      name: '退出挑战',
+      category: ConfigCategory.goalDebt,
+      valueType: ConfigValueType.string,
+      patterns: [
+        r'退出(.+?)挑战',
+        r'放弃(.+?)挑战',
+      ],
+      valueExtractor: (match) => match.group(1),
+      confirmTemplate: '已退出"{value}"挑战',
+    ),
+    ConfigItemDefinition(
+      id: 'habit.reward.auto_redeem',
+      name: '自动兑换奖励',
+      category: ConfigCategory.goalDebt,
+      valueType: ConfigValueType.boolean,
+      patterns: [
+        r'(开启|打开|启用|关闭|禁用)自动兑换(奖励)?',
+      ],
+      valueExtractor: (match) => ['开启', '打开', '启用'].contains(match.group(1)),
+      confirmTemplate: '已{action}自动兑换奖励',
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // 十九、钱龄配置
+    // ═══════════════════════════════════════════════════════════════
+    ConfigItemDefinition(
+      id: 'money_age.calculation.method',
+      name: '钱龄计算方式',
+      category: ConfigCategory.aiSmart,
+      valueType: ConfigValueType.enumValue,
+      patterns: [
+        r'钱龄(计算)?(方式|方法)?(设为|改成)?(FIFO|加权平均|简单平均)',
+      ],
+      valueExtractor: (match) => match.group(4),
+      confirmTemplate: '已设置钱龄计算方式为{value}',
+    ),
+    ConfigItemDefinition(
+      id: 'money_age.display.unit',
+      name: '钱龄显示单位',
+      category: ConfigCategory.appearanceDisplay,
+      valueType: ConfigValueType.enumValue,
+      patterns: [
+        r'钱龄(用|按)(天|周|月)显示',
+        r'钱龄单位(设为|改成)?(天|周|月)',
+      ],
+      valueExtractor: (match) => match.group(2) ?? match.group(1),
+      confirmTemplate: '已设置钱龄按{value}显示',
+    ),
+    ConfigItemDefinition(
+      id: 'money_age.alert.threshold',
+      name: '钱龄预警阈值',
+      category: ConfigCategory.reminderNotification,
+      valueType: ConfigValueType.number,
+      patterns: [
+        r'钱龄低于(\d+)(天)?提醒',
+        r'钱龄预警(阈值)?(设为|改成)?(\d+)(天)?',
+      ],
+      valueExtractor: (match) => int.tryParse(match.group(1) ?? match.group(3) ?? ''),
+      confirmTemplate: '已设置钱龄低于{value}天时提醒',
+    ),
+    ConfigItemDefinition(
+      id: 'money_age.alert.enabled',
+      name: '钱龄预警开关',
+      category: ConfigCategory.reminderNotification,
+      valueType: ConfigValueType.boolean,
+      patterns: [
+        r'(开启|打开|启用|关闭|禁用)钱龄(预警|提醒)',
+      ],
+      valueExtractor: (match) => ['开启', '打开', '启用'].contains(match.group(1)),
+      confirmTemplate: '已{action}钱龄预警',
+    ),
+    ConfigItemDefinition(
+      id: 'money_age.optimization.enabled',
+      name: '钱龄优化建议',
+      category: ConfigCategory.aiSmart,
+      valueType: ConfigValueType.boolean,
+      patterns: [
+        r'(开启|打开|启用|关闭|禁用)钱龄优化(建议)?',
+      ],
+      valueExtractor: (match) => ['开启', '打开', '启用'].contains(match.group(1)),
+      confirmTemplate: '已{action}钱龄优化建议',
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // 二十、小金库配置
+    // ═══════════════════════════════════════════════════════════════
+    ConfigItemDefinition(
+      id: 'vault.create',
+      name: '创建小金库',
+      category: ConfigCategory.budgetFinance,
+      valueType: ConfigValueType.string,
+      patterns: [
+        r'创建(.+?)小金库',
+        r'新建(.+?)小金库',
+      ],
+      valueExtractor: (match) => match.group(1),
+      confirmTemplate: '已创建小金库"{value}"',
+    ),
+    ConfigItemDefinition(
+      id: 'vault.allocate',
+      name: '分配资金到小金库',
+      category: ConfigCategory.budgetFinance,
+      valueType: ConfigValueType.parentChild,
+      patterns: [
+        r'(分配|存入)(\d+)(元)?(到|进)(.+?)(小金库)?',
+      ],
+      valueExtractor: (match) => {
+        'amount': double.tryParse(match.group(2) ?? ''),
+        'vault': match.group(5),
+      },
+      confirmTemplate: '已向"{vault}"小金库分配{amount}元',
+    ),
+    ConfigItemDefinition(
+      id: 'vault.transfer',
+      name: '小金库资金调拨',
+      category: ConfigCategory.budgetFinance,
+      valueType: ConfigValueType.goalConfig,
+      patterns: [
+        r'(把|将)(.+?)(的)?(\d+)(元)?调(到|拨到)(.+)',
+      ],
+      valueExtractor: (match) => {
+        'from': match.group(2),
+        'amount': double.tryParse(match.group(4) ?? ''),
+        'to': match.group(7),
+      },
+      confirmTemplate: '已将{amount}元从"{from}"调拨到"{to}"',
+    ),
+    ConfigItemDefinition(
+      id: 'vault.delete',
+      name: '删除小金库',
+      category: ConfigCategory.budgetFinance,
+      valueType: ConfigValueType.string,
+      patterns: [
+        r'删除(.+?)小金库',
+        r'移除(.+?)小金库',
+      ],
+      valueExtractor: (match) => match.group(1),
+      confirmTemplate: '已删除小金库"{value}"',
+    ),
+    ConfigItemDefinition(
+      id: 'vault.rename',
+      name: '重命名小金库',
+      category: ConfigCategory.budgetFinance,
+      valueType: ConfigValueType.parentChild,
+      patterns: [
+        r'(把|将)?(.+?)小金库(改名|重命名)(为|成)(.+)',
+      ],
+      valueExtractor: (match) => {
+        'oldName': match.group(2),
+        'newName': match.group(5),
+      },
+      confirmTemplate: '已将小金库"{oldName}"重命名为"{newName}"',
+    ),
+    ConfigItemDefinition(
+      id: 'vault.target',
+      name: '设置小金库目标',
+      category: ConfigCategory.budgetFinance,
+      valueType: ConfigValueType.parentChild,
+      patterns: [
+        r'(.+?)小金库目标(设为|改成)?(\d+)',
+      ],
+      valueExtractor: (match) => {
+        'vault': match.group(1),
+        'target': double.tryParse(match.group(3) ?? ''),
+      },
+      confirmTemplate: '已设置"{vault}"小金库目标为{target}元',
+    ),
+
+    // ═══════════════════════════════════════════════════════════════
+    // 二十一、导入导出配置
+    // ═══════════════════════════════════════════════════════════════
+    ConfigItemDefinition(
+      id: 'import.duplicate.strategy',
+      name: '导入重复策略',
+      category: ConfigCategory.dataSync,
+      valueType: ConfigValueType.enumValue,
+      patterns: [
+        r'导入重复(时)?(跳过|覆盖|合并)',
+        r'重复记录(跳过|覆盖|合并)',
+      ],
+      valueExtractor: (match) => match.group(1) ?? match.group(2),
+      confirmTemplate: '已设置导入重复时{value}',
+    ),
+    ConfigItemDefinition(
+      id: 'export.include.images',
+      name: '导出包含图片',
+      category: ConfigCategory.dataSync,
+      valueType: ConfigValueType.boolean,
+      patterns: [
+        r'导出(时)?(包含|包括|不含|排除)图片',
+      ],
+      valueExtractor: (match) => ['包含', '包括'].contains(match.group(2)),
+      confirmTemplate: '已设置导出{action}图片',
+    ),
+    ConfigItemDefinition(
+      id: 'export.date_range',
+      name: '导出时间范围',
+      category: ConfigCategory.dataSync,
+      valueType: ConfigValueType.enumValue,
+      patterns: [
+        r'导出(本月|本年|全部|最近一年)数据',
+      ],
+      valueExtractor: (match) => match.group(1),
+      confirmTemplate: '正在导出{value}数据...',
+    ),
   ];
 
   /// 解析配置指令

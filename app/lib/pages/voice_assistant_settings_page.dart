@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../providers/global_voice_assistant_provider.dart';
+import 'voice_learning_report_page.dart';
 
 /// 语音助手设置页面
 class VoiceAssistantSettingsPage extends ConsumerStatefulWidget {
@@ -66,6 +67,25 @@ class _VoiceAssistantSettingsPageState extends ConsumerState<VoiceAssistantSetti
                           ref.read(floatingBallSettingsProvider.notifier).setSize(value);
                         }
                       : null,
+                ),
+              ],
+            ),
+            _buildSectionHeader('智能学习'),
+            _buildSettingsCard(
+              children: [
+                _buildMenuItem(
+                  icon: Icons.psychology,
+                  iconColor: const Color(0xFF9C27B0),
+                  title: '学习报告',
+                  subtitle: '查看语音助手的学习进度和效果',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const VoiceLearningReportPage(),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

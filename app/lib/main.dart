@@ -281,12 +281,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     String command,
   ) async {
     try {
-      // 先检查是否是导航命令
-      if (_isNavigationCommand(command)) {
-        final navResult = await VoiceNavigationExecutor.instance.executeNavigation(command);
-        debugPrint('[App] 导航执行结果: $navResult');
-        return;
-      }
+      // 所有命令统一走 SmartIntentRecognizer 多层架构处理
+      // Layer 1: 精确规则匹配 → Layer 2: 同义词扩展 → Layer 3: 模板匹配
+      // → Layer 4: 学习缓存 → Layer 5: LLM兜底
 
       // 检查是否可能包含多个意图
       final intentRouter = coordinator.intentRouter;
@@ -313,13 +310,20 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       if (result.status == VoiceSessionStatus.error) {
         final errorMsg = result.errorMessage ?? '处理时遇到了问题';
         debugPrint('[App] 处理出错: $errorMsg');
-        // 可以通过 GlobalVoiceAssistantManager 追加错误消息
-        // 但为了不打断用户，这里只记录日志
       } else if (result.status == VoiceSessionStatus.success) {
-        // 成功处理，可以选择性地追加详细信息
         final detailMsg = result.message;
         if (detailMsg != null && detailMsg.isNotEmpty) {
           debugPrint('[App] 处理成功: $detailMsg');
+        }
+
+        // 如果结果包含导航路由，执行实际导航
+        final data = result.data;
+        if (data is Map<String, dynamic> && data.containsKey('route')) {
+          final route = data['route'] as String?;
+          if (route != null) {
+            debugPrint('[App] 执行导航: $route');
+            await VoiceNavigationExecutor.instance.executeNavigation(command);
+          }
         }
       }
     } catch (e) {

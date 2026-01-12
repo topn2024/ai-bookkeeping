@@ -4,6 +4,10 @@ import '../pages/analysis_center_page.dart';
 import '../pages/budget_center_page.dart';
 import '../pages/savings_goal_page.dart';
 import '../pages/money_age_page.dart';
+import '../pages/account_list_page.dart';
+import '../pages/ai/ai_learning_report_page.dart';
+import '../pages/voice_learning_report_page.dart';
+import '../pages/voice_assistant_settings_page.dart';
 import 'voice_navigation_service.dart';
 
 /// 语音导航执行器
@@ -135,6 +139,22 @@ class VoiceNavigationExecutor {
 
       // 钱龄分析
       '/money-age': () => const MoneyAgePage(),
+
+      // 账户管理
+      '/accounts': () => const AccountListPage(),
+      '/account': () => const AccountListPage(),
+
+      // AI学习报告
+      '/ai/learning-report': () => const AILearningReportPage(),
+      '/ai-learning-report': () => const AILearningReportPage(),
+
+      // 语音学习报告
+      '/voice/learning-report': () => const VoiceLearningReportPage(),
+      '/voice-learning-report': () => const VoiceLearningReportPage(),
+
+      // 语音助手设置
+      '/voice-assistant-settings': () => const VoiceAssistantSettingsPage(),
+      '/settings/voice': () => const VoiceAssistantSettingsPage(),
     };
 
     final builder = pageMap[route];

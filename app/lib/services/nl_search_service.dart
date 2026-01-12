@@ -741,3 +741,190 @@ abstract class NLSearchTransactionRepository {
 abstract class SimpleLLMService {
   Future<Map<String, dynamic>?> parseSearchQuery(String query);
 }
+
+/// 基于 DatabaseService 的 NLSearchTransactionRepository 实现
+class DatabaseTransactionRepository implements NLSearchTransactionRepository {
+  final Future<List<Map<String, dynamic>>> Function({
+    DateTime? startDate,
+    DateTime? endDate,
+    String? category,
+    String? merchant,
+    double? minAmount,
+    double? maxAmount,
+    int? limit,
+  }) queryTransactions;
+
+  DatabaseTransactionRepository({required this.queryTransactions});
+
+  @override
+  Future<double> sumByFilter({
+    DateRange? dateRange,
+    String? categoryName,
+    String? merchant,
+    AmountRange? amountRange,
+  }) async {
+    final transactions = await _queryWithFilter(
+      dateRange: dateRange,
+      categoryName: categoryName,
+      merchant: merchant,
+      amountRange: amountRange,
+    );
+    return transactions.fold<double>(0.0, (sum, t) => sum + (t['amount'] as double? ?? 0.0));
+  }
+
+  @override
+  Future<int> countByFilter({
+    DateRange? dateRange,
+    String? categoryName,
+    String? merchant,
+    AmountRange? amountRange,
+  }) async {
+    final transactions = await _queryWithFilter(
+      dateRange: dateRange,
+      categoryName: categoryName,
+      merchant: merchant,
+      amountRange: amountRange,
+    );
+    return transactions.length;
+  }
+
+  @override
+  Future<double> avgByFilter({
+    DateRange? dateRange,
+    String? categoryName,
+  }) async {
+    final transactions = await _queryWithFilter(
+      dateRange: dateRange,
+      categoryName: categoryName,
+    );
+    if (transactions.isEmpty) return 0.0;
+    final total = transactions.fold<double>(0.0, (sum, t) => sum + (t['amount'] as double? ?? 0.0));
+    return total / transactions.length;
+  }
+
+  @override
+  Future<NLSearchTransaction?> findMaxByFilter({
+    DateRange? dateRange,
+    String? categoryName,
+  }) async {
+    final transactions = await _queryWithFilter(
+      dateRange: dateRange,
+      categoryName: categoryName,
+    );
+    if (transactions.isEmpty) return null;
+
+    transactions.sort((a, b) => ((b['amount'] as double?) ?? 0.0)
+        .compareTo((a['amount'] as double?) ?? 0.0));
+    return _mapToTransaction(transactions.first);
+  }
+
+  @override
+  Future<NLSearchTransaction?> findMinByFilter({
+    DateRange? dateRange,
+    String? categoryName,
+  }) async {
+    final transactions = await _queryWithFilter(
+      dateRange: dateRange,
+      categoryName: categoryName,
+    );
+    if (transactions.isEmpty) return null;
+
+    transactions.sort((a, b) => ((a['amount'] as double?) ?? 0.0)
+        .compareTo((b['amount'] as double?) ?? 0.0));
+    return _mapToTransaction(transactions.first);
+  }
+
+  @override
+  Future<List<NLSearchTransaction>> findByFilter({
+    DateRange? dateRange,
+    String? categoryName,
+    String? merchant,
+    AmountRange? amountRange,
+    int limit = 50,
+  }) async {
+    final transactions = await _queryWithFilter(
+      dateRange: dateRange,
+      categoryName: categoryName,
+      merchant: merchant,
+      amountRange: amountRange,
+      limit: limit,
+    );
+    return transactions.map(_mapToTransaction).toList();
+  }
+
+  @override
+  Future<List<TrendDataPoint>> getTrendByFilter({
+    DateRange? dateRange,
+    String? categoryName,
+  }) async {
+    final transactions = await _queryWithFilter(
+      dateRange: dateRange,
+      categoryName: categoryName,
+    );
+
+    // 按日期分组汇总
+    final dailyTotals = <DateTime, double>{};
+    for (final t in transactions) {
+      final date = DateTime.tryParse(t['date'] as String? ?? '');
+      if (date != null) {
+        final day = DateTime(date.year, date.month, date.day);
+        dailyTotals[day] = (dailyTotals[day] ?? 0) + (t['amount'] as double? ?? 0.0);
+      }
+    }
+
+    // 转换为趋势数据点并按日期排序
+    final points = dailyTotals.entries
+        .map((e) => TrendDataPoint(date: e.key, amount: e.value))
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    return points;
+  }
+
+  @override
+  Future<List<NLSearchTransaction>> fullTextSearch(String query, {int limit = 50}) async {
+    // 简单全文搜索：在备注和商家中查找关键词
+    final allTransactions = await queryTransactions(limit: 500);
+    final lowerQuery = query.toLowerCase();
+
+    final matched = allTransactions.where((t) {
+      final note = (t['note'] as String? ?? '').toLowerCase();
+      final merchant = (t['rawMerchant'] as String? ?? '').toLowerCase();
+      final category = (t['category'] as String? ?? '').toLowerCase();
+      return note.contains(lowerQuery) ||
+          merchant.contains(lowerQuery) ||
+          category.contains(lowerQuery);
+    }).take(limit).toList();
+
+    return matched.map(_mapToTransaction).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> _queryWithFilter({
+    DateRange? dateRange,
+    String? categoryName,
+    String? merchant,
+    AmountRange? amountRange,
+    int? limit,
+  }) async {
+    return await queryTransactions(
+      startDate: dateRange?.start,
+      endDate: dateRange?.end,
+      category: categoryName,
+      merchant: merchant,
+      minAmount: amountRange?.min,
+      maxAmount: amountRange?.max,
+      limit: limit,
+    );
+  }
+
+  NLSearchTransaction _mapToTransaction(Map<String, dynamic> map) {
+    return NLSearchTransaction(
+      id: map['id'] as String? ?? '',
+      amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+      date: DateTime.tryParse(map['date'] as String? ?? '') ?? DateTime.now(),
+      category: map['category'] as String?,
+      merchant: map['rawMerchant'] as String?,
+      description: map['note'] as String?,
+    );
+  }
+}

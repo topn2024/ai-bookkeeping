@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../qwen_service.dart';
 import '../voice_service_coordinator.dart' show VoiceIntentType;
+import '../voice_navigation_service.dart';
 import 'voice_intent_router.dart';
 
 /// 智能意图识别器
@@ -25,6 +26,7 @@ import 'voice_intent_router.dart';
 class SmartIntentRecognizer {
   final VoiceIntentRouter _ruleRouter;
   final QwenService _qwenService;
+  final VoiceNavigationService _navigationService;
 
   /// 学习缓存
   final Map<String, LearnedPattern> _learnedCache = {};
@@ -35,8 +37,10 @@ class SmartIntentRecognizer {
   SmartIntentRecognizer({
     VoiceIntentRouter? ruleRouter,
     QwenService? qwenService,
+    VoiceNavigationService? navigationService,
   })  : _ruleRouter = ruleRouter ?? VoiceIntentRouter(),
-        _qwenService = qwenService ?? QwenService();
+        _qwenService = qwenService ?? QwenService(),
+        _navigationService = navigationService ?? VoiceNavigationService();
 
   /// 识别意图（多层递进）
   Future<SmartIntentResult> recognize(
@@ -157,6 +161,31 @@ class SmartIntentRecognizer {
   }
 
   SmartIntentResult? _checkNavigationWithSynonyms(String input) {
+    // 使用 VoiceNavigationService 进行导航识别
+    // 它包含 237 个页面的丰富别名配置、模式匹配和模糊匹配
+    final navResult = _navigationService.parseNavigation(input);
+
+    if (navResult.success && navResult.config != null) {
+      final config = navResult.config!;
+
+      // 根据匹配置信度调整结果置信度
+      // VoiceNavigationService 返回的模糊匹配置信度为 0.7，精确匹配为 1.0
+      final confidence = navResult.confidence >= 0.9 ? 0.9 : 0.8;
+
+      return SmartIntentResult(
+        intentType: SmartIntentType.navigate,
+        confidence: confidence,
+        entities: {
+          'targetPage': config.name,
+          'route': config.route,
+          'module': config.module,
+        },
+        source: RecognitionSource.synonymExpansion,
+        originalInput: input,
+      );
+    }
+
+    // 如果 VoiceNavigationService 未匹配，回退到本地同义词检查
     // 检查是否包含导航动词（或同义词）
     bool hasNavVerb = false;
     for (final synonyms in _navigationSynonyms.values) {
@@ -184,7 +213,7 @@ class SmartIntentRecognizer {
 
     if (!hasNavVerb) return null;
 
-    // 检查目标页面
+    // 检查目标页面（本地同义词作为兜底）
     for (final entry in _targetSynonyms.entries) {
       final targetKey = entry.key;
       final synonyms = entry.value;
@@ -293,6 +322,55 @@ class SmartIntentRecognizer {
       '{删除|删掉|去掉}{那笔|上一笔|这笔}',       // 删掉那笔
       '{不要了|取消}{那笔?}',                     // 不要了
     ],
+    SmartIntentType.config: [
+      '{开启|打开|启用|关闭|禁用}{configItem}',   // 开启零基预算
+      '{configItem}{设置|调|改}{为?}{value}',     // 分类置信度阈值调到80%
+      '{设置}{configItem}{为?}{value}',           // 设置预算结转上限500
+    ],
+    SmartIntentType.moneyAge: [
+      '{查看|看看}{我的?}钱龄',                   // 查看钱龄
+      '钱龄{分析|报告|情况}',                     // 钱龄分析
+      '{我的?}资金{健康|健康度}',                 // 我的资金健康度
+      '查看{资金池|FIFO}',                        // 查看资金池
+      '钱龄{优化|提升}{建议}',                    // 钱龄优化建议
+    ],
+    SmartIntentType.habit: [
+      '{打卡|签到}{今日?}',                       // 打卡
+      '{今日|今天}打卡',                          // 今日打卡
+      '{查看|看看}{挑战|挑战进度}',               // 查看挑战进度
+      '{兑换|使用}{奖励|积分}',                   // 兑换奖励
+      '{查看|我有}多少积分',                      // 查看积分
+      '{开始|发起}{省钱|记账}挑战',               // 开始省钱挑战
+    ],
+    SmartIntentType.vault: [
+      '{分配|存入}{amount}{到|进}{vaultName}',    // 分配1000到旅游
+      '{vaultName}{还有|余额|剩余}多少',          // 旅游小金库还有多少
+      '{各|所有}小金库{余额|情况}',               // 各小金库余额
+      '{从}{vaultName}{取|取出}{amount}',         // 从旅游取出500
+      '{把|将}{vaultName}的{amount}调到{target}', // 把餐饮的200调到购物
+    ],
+    SmartIntentType.dataOp: [
+      '{立即|马上}备份',                          // 立即备份
+      '备份{到|数据}{云端?}',                     // 备份到云端
+      '{导出|下载}{time?}数据',                   // 导出本月数据
+      '导出{年度|月度}报告',                      // 导出年度报告
+      '{同步|刷新}数据',                          // 同步数据
+      '强制{同步|刷新}',                          // 强制刷新
+    ],
+    SmartIntentType.share: [
+      '{分享|发送}{月报|周报|年报}',              // 分享月报
+      '{生成|创建}年度总结',                      // 生成年度总结
+      '{邀请|分享给}好友',                        // 邀请好友
+      '{生成|创建}邀请{链接|码}',                 // 生成邀请链接
+    ],
+    SmartIntentType.systemOp: [
+      '{检查|有没有}更新',                        // 检查更新
+      '{当前|查看}版本',                          // 当前版本
+      '{提交|写}反馈',                            // 提交反馈
+      '{联系|找}客服',                            // 联系客服
+      '{清理|清除}缓存',                          // 清理缓存
+      '{释放|节省}空间',                          // 释放空间
+    ],
   };
 
   Future<SmartIntentResult?> _layer3TemplateMatch(String input) async {
@@ -323,11 +401,23 @@ class SmartIntentRecognizer {
     final entities = <String, dynamic>{};
     double confidence = 0.5;
 
-    // 导航模板特殊处理
+    // 导航模板特殊处理 - 使用 VoiceNavigationService 的 237 页面配置
     if (template.contains('{navVerb}') || template.contains('{target}')) {
       final hasNavVerb = _navigationSynonyms.values
           .any((synonyms) => synonyms.any((s) => input.contains(s)));
 
+      // 使用 VoiceNavigationService 进行页面匹配
+      final navResult = _navigationService.parseNavigation(input);
+      if (navResult.success && navResult.config != null) {
+        final config = navResult.config!;
+        entities['targetPage'] = config.name;
+        entities['route'] = config.route;
+        entities['module'] = config.module;
+        confidence = hasNavVerb ? 0.85 : 0.75;
+        return {'confidence': confidence, 'entities': entities};
+      }
+
+      // 兜底：使用本地同义词
       String? targetPage;
       for (final entry in _targetSynonyms.entries) {
         if (entry.value.any((s) => input.contains(s))) {
@@ -361,6 +451,199 @@ class SmartIntentRecognizer {
       return {'confidence': confidence, 'entities': entities};
     }
 
+    // 钱龄操作模板
+    if (template.contains('钱龄') || template.contains('资金')) {
+      if (input.contains('钱龄') || input.contains('资金健康')) {
+        if (input.contains('优化') || input.contains('建议')) {
+          entities['operation'] = 'optimize';
+        } else if (input.contains('资金池') || input.contains('FIFO')) {
+          entities['operation'] = 'pool';
+        } else {
+          entities['operation'] = 'query';
+        }
+        confidence = 0.85;
+        return {'confidence': confidence, 'entities': entities};
+      }
+    }
+
+    // 习惯操作模板
+    if (template.contains('打卡') || template.contains('签到') ||
+        template.contains('挑战') || template.contains('奖励') ||
+        template.contains('积分')) {
+      if (input.contains('打卡') || input.contains('签到')) {
+        entities['operation'] = 'checkin';
+        confidence = 0.9;
+      } else if (input.contains('挑战')) {
+        entities['operation'] = 'challenge';
+        confidence = 0.85;
+      } else if (input.contains('兑换') || input.contains('奖励')) {
+        entities['operation'] = 'reward';
+        confidence = 0.85;
+      } else if (input.contains('积分')) {
+        entities['operation'] = 'points';
+        confidence = 0.85;
+      }
+      if (entities.containsKey('operation')) {
+        return {'confidence': confidence, 'entities': entities};
+      }
+    }
+
+    // 小金库操作模板
+    if (template.contains('小金库') || template.contains('{vaultName}')) {
+      if (input.contains('分配') || input.contains('存入')) {
+        entities['operation'] = 'allocate';
+        final amount = _extractAmount(input);
+        if (amount != null) entities['amount'] = amount;
+        entities['vaultName'] = _extractVaultName(input);
+        confidence = 0.85;
+      } else if (input.contains('取') || input.contains('取出')) {
+        entities['operation'] = 'withdraw';
+        final amount = _extractAmount(input);
+        if (amount != null) entities['amount'] = amount;
+        entities['vaultName'] = _extractVaultName(input);
+        confidence = 0.85;
+      } else if (input.contains('调') || input.contains('转')) {
+        entities['operation'] = 'transfer';
+        final amount = _extractAmount(input);
+        if (amount != null) entities['amount'] = amount;
+        confidence = 0.80;
+      } else if (input.contains('还有') || input.contains('余额') ||
+                 input.contains('剩余') || input.contains('多少')) {
+        entities['operation'] = 'query';
+        entities['vaultName'] = _extractVaultName(input);
+        confidence = 0.85;
+      }
+      if (entities.containsKey('operation')) {
+        return {'confidence': confidence, 'entities': entities};
+      }
+    }
+
+    // 数据操作模板
+    if (template.contains('备份') || template.contains('导出') ||
+        template.contains('同步') || template.contains('刷新')) {
+      if (input.contains('备份')) {
+        entities['operation'] = 'backup';
+        confidence = 0.9;
+      } else if (input.contains('导出') || input.contains('下载')) {
+        entities['operation'] = 'export';
+        confidence = 0.85;
+      } else if (input.contains('同步') || input.contains('刷新')) {
+        entities['operation'] = 'sync';
+        confidence = 0.85;
+      } else if (input.contains('恢复')) {
+        entities['operation'] = 'restore';
+        confidence = 0.8;
+      }
+      if (entities.containsKey('operation')) {
+        return {'confidence': confidence, 'entities': entities};
+      }
+    }
+
+    // 分享操作模板
+    if (template.contains('分享') || template.contains('邀请')) {
+      if (input.contains('分享') && (input.contains('报') || input.contains('总结'))) {
+        entities['operation'] = 'report';
+        if (input.contains('月')) {
+          entities['reportType'] = 'month';
+        } else if (input.contains('周')) {
+          entities['reportType'] = 'week';
+        } else if (input.contains('年')) {
+          entities['reportType'] = 'year';
+        }
+        confidence = 0.85;
+      } else if (input.contains('邀请') || input.contains('好友')) {
+        entities['operation'] = 'invite';
+        confidence = 0.85;
+      } else if (input.contains('总结')) {
+        entities['operation'] = 'summary';
+        confidence = 0.85;
+      }
+      if (entities.containsKey('operation')) {
+        return {'confidence': confidence, 'entities': entities};
+      }
+    }
+
+    // 系统操作模板
+    if (template.contains('更新') || template.contains('版本') ||
+        template.contains('反馈') || template.contains('客服') ||
+        template.contains('缓存') || template.contains('空间')) {
+      if (input.contains('更新') || input.contains('检查')) {
+        entities['operation'] = 'update';
+        confidence = 0.85;
+      } else if (input.contains('版本')) {
+        entities['operation'] = 'version';
+        confidence = 0.85;
+      } else if (input.contains('反馈')) {
+        entities['operation'] = 'feedback';
+        confidence = 0.85;
+      } else if (input.contains('客服')) {
+        entities['operation'] = 'support';
+        confidence = 0.85;
+      } else if (input.contains('缓存') || input.contains('清理')) {
+        entities['operation'] = 'cache';
+        confidence = 0.85;
+      } else if (input.contains('空间') || input.contains('释放')) {
+        entities['operation'] = 'space';
+        confidence = 0.85;
+      }
+      if (entities.containsKey('operation')) {
+        return {'confidence': confidence, 'entities': entities};
+      }
+    }
+
+    // 配置操作模板
+    if (template.contains('{configItem}') || template.contains('开启') ||
+        template.contains('关闭') || template.contains('设置')) {
+      if (input.contains('开启') || input.contains('打开') || input.contains('启用')) {
+        entities['operation'] = 'enable';
+        entities['configId'] = _extractConfigItem(input);
+        confidence = 0.8;
+      } else if (input.contains('关闭') || input.contains('禁用')) {
+        entities['operation'] = 'disable';
+        entities['configId'] = _extractConfigItem(input);
+        confidence = 0.8;
+      } else if (input.contains('设置') || input.contains('调') || input.contains('改')) {
+        entities['operation'] = 'set';
+        entities['configId'] = _extractConfigItem(input);
+        confidence = 0.75;
+      }
+      if (entities.containsKey('operation') && entities['configId'] != null) {
+        return {'confidence': confidence, 'entities': entities};
+      }
+    }
+
+    return null;
+  }
+
+  /// 提取小金库名称
+  String? _extractVaultName(String input) {
+    // 常见小金库名称
+    const vaultNames = ['旅游', '购物', '餐饮', '交通', '娱乐', '应急', '储蓄', '教育', '医疗'];
+    for (final name in vaultNames) {
+      if (input.contains(name)) return name;
+    }
+    // 尝试提取"到XXX"或"从XXX"格式
+    final toMatch = RegExp(r'(?:到|进|向|从)(.+?)(?:小金库)?(?:取|分配|存入|$)').firstMatch(input);
+    if (toMatch != null) return toMatch.group(1)?.trim();
+    return null;
+  }
+
+  /// 提取配置项名称
+  String? _extractConfigItem(String input) {
+    // 常见配置项关键词
+    const configItems = {
+      '零基预算': 'budget.zero_based.enabled',
+      '预算结转': 'budget.carryover.mode',
+      '分类置信度': 'ai.category.confidence_threshold',
+      '异常检测': 'ai.anomaly.sensitivity',
+      '打卡提醒': 'habit.checkin.reminder_time',
+      '自动备份': 'sync.auto_backup.enabled',
+      '深色模式': 'theme.dark_mode.enabled',
+      '手势识别': 'security.gesture.enabled',
+    };
+    for (final entry in configItems.entries) {
+      if (input.contains(entry.key)) return entry.value;
+    }
     return null;
   }
 
@@ -427,6 +710,13 @@ class SmartIntentRecognizer {
   }
 
   String _buildLLMPrompt(String input, String? pageContext) {
+    // 获取高适配语音导航的页面列表
+    final highAdaptPages = _navigationService.highAdaptationPages;
+    final pageList = highAdaptPages
+        .take(30) // 限制数量以控制 prompt 长度
+        .map((p) => '${p.name}(${p.route})')
+        .join('、');
+
     return '''
 你是一个记账助手，请理解用户输入并返回JSON。
 
@@ -441,12 +731,19 @@ class SmartIntentRecognizer {
 - delete: 删除记录
 - confirm: 确认
 - cancel: 取消
+- config: 配置操作（设置、开启/关闭功能）
+- money_age: 钱龄操作（查看钱龄、资金健康度）
+- habit: 习惯操作（打卡、挑战、奖励）
+- vault: 小金库操作（分配、查询、调拨资金）
+- data: 数据操作（备份、导出、同步）
+- share: 分享操作（分享报告、邀请好友）
+- system: 系统操作（检查更新、清理缓存）
 
 【返回格式】
-{"intent":"意图类型","confidence":0.9,"entities":{"amount":金额,"category":"分类","targetPage":"页面"}}
+{"intent":"意图类型","confidence":0.9,"entities":{"amount":金额,"category":"分类","targetPage":"页面名","route":"路由","operation":"操作类型","configId":"配置项ID","vaultName":"小金库名称"}}
 
 【分类】餐饮、交通、购物、娱乐、居住、医疗、其他
-【页面】设置、账本、预算、统计、首页、分类、钱龄、储蓄
+【常用页面】$pageList
 
 只返回JSON，不要其他内容：''';
   }
@@ -671,6 +968,20 @@ class SmartIntentRecognizer {
         return SmartIntentType.confirm;
       case 'cancel':
         return SmartIntentType.cancel;
+      case 'config':
+        return SmartIntentType.config;
+      case 'money_age':
+        return SmartIntentType.moneyAge;
+      case 'habit':
+        return SmartIntentType.habit;
+      case 'vault':
+        return SmartIntentType.vault;
+      case 'data':
+        return SmartIntentType.dataOp;
+      case 'share':
+        return SmartIntentType.share;
+      case 'system':
+        return SmartIntentType.systemOp;
       default:
         return SmartIntentType.unknown;
     }
@@ -757,6 +1068,13 @@ enum SmartIntentType {
   delete,
   confirm,
   cancel,
+  config,        // 配置操作
+  moneyAge,      // 钱龄操作
+  habit,         // 习惯操作
+  vault,         // 小金库操作
+  dataOp,        // 数据操作
+  share,         // 分享操作
+  systemOp,      // 系统操作
   unknown,
 }
 

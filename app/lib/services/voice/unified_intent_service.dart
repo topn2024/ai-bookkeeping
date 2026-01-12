@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../qwen_service.dart';
+import '../voice_service_coordinator.dart' show VoiceIntentType;
 import 'voice_intent_router.dart';
-import 'multi_intent_models.dart';
 
 /// 统一意图理解服务
 ///
@@ -59,8 +59,9 @@ class UnifiedIntentService {
     // 步骤1: 尝试规则快速匹配（可选优化）
     if (!forceAI) {
       final ruleResult = await _tryRuleMatch(userInput);
-      if (ruleResult != null && ruleResult.confidence >= _ruleCacheThreshold) {
-        debugPrint('[UnifiedIntent] 规则匹配成功，置信度: ${ruleResult.confidence}');
+      final primaryConfidence = ruleResult?.primaryIntent?.confidence ?? 0.0;
+      if (ruleResult != null && primaryConfidence >= _ruleCacheThreshold) {
+        debugPrint('[UnifiedIntent] 规则匹配成功，置信度: $primaryConfidence');
         return ruleResult;
       }
     }
@@ -99,7 +100,7 @@ class UnifiedIntentService {
     try {
       final result = await _ruleRouter.analyzeIntent(input);
 
-      if (result.type == VoiceIntentType.unknown) {
+      if (result.intent == VoiceIntentType.unknown) {
         return null;
       }
 
@@ -111,7 +112,7 @@ class UnifiedIntentService {
       return UnifiedIntentResult(
         intents: [
           IntentItem(
-            type: _mapVoiceIntentType(result.type),
+            type: _mapVoiceIntentType(result.intent),
             confidence: confidence,
             entities: _extractEntities(result),
             isComplete: _checkCompleteness(result),
@@ -367,7 +368,18 @@ $historySection
         return IntentType.confirm;
       case VoiceIntentType.cancelAction:
         return IntentType.cancel;
-      default:
+      case VoiceIntentType.unknown:
+      case VoiceIntentType.clarifySelection:
+      case VoiceIntentType.screenRecognition:
+      case VoiceIntentType.automateAlipaySync:
+      case VoiceIntentType.automateWeChatSync:
+      case VoiceIntentType.configOperation:
+      case VoiceIntentType.moneyAgeOperation:
+      case VoiceIntentType.habitOperation:
+      case VoiceIntentType.vaultOperation:
+      case VoiceIntentType.dataOperation:
+      case VoiceIntentType.shareOperation:
+      case VoiceIntentType.systemOperation:
         return IntentType.unknown;
     }
   }
@@ -384,7 +396,7 @@ $historySection
 
   /// 检查意图完整性
   bool _checkCompleteness(IntentAnalysisResult result) {
-    if (result.type == VoiceIntentType.addTransaction) {
+    if (result.intent == VoiceIntentType.addTransaction) {
       return result.entities['amount'] != null;
     }
     return true;

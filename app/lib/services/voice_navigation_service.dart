@@ -952,6 +952,20 @@ class VoiceNavigationService extends ChangeNotifier {
       aliases: ['学习报告', 'AI报告', '学习统计'],
       voiceAdaptation: VoiceAdaptation.medium,
     ),
+    '/voice/learning-report': PageConfig(
+      route: '/voice/learning-report',
+      name: '语音学习报告',
+      module: '语音助手',
+      aliases: ['语音学习', '语音报告', '自学习报告', '语音助手学习'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
+    '/voice-assistant-settings': PageConfig(
+      route: '/voice-assistant-settings',
+      name: '语音助手设置',
+      module: '语音助手',
+      aliases: ['语音设置', '语音助手配置', '助手设置'],
+      voiceAdaptation: VoiceAdaptation.high,
+    ),
     '/ai/profile': PageConfig(
       route: '/ai/profile',
       name: '用户画像',

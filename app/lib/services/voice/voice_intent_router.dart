@@ -746,6 +746,20 @@ class VoiceIntentRouter {
         return '自动化支付宝账单同步';
       case VoiceIntentType.automateWeChatSync:
         return '自动化微信账单同步';
+      case VoiceIntentType.configOperation:
+        return '配置操作';
+      case VoiceIntentType.moneyAgeOperation:
+        return '钱龄操作';
+      case VoiceIntentType.habitOperation:
+        return '习惯操作';
+      case VoiceIntentType.vaultOperation:
+        return '小金库操作';
+      case VoiceIntentType.dataOperation:
+        return '数据操作';
+      case VoiceIntentType.shareOperation:
+        return '分享操作';
+      case VoiceIntentType.systemOperation:
+        return '系统操作';
       case VoiceIntentType.unknown:
         return '未知意图';
     }
