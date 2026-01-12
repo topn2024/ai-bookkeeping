@@ -1,0 +1,15 @@
+{
+  "version": "2.0.6",
+  "build_number": 46,
+  "download_url": "https://160.202.238.29/versions/app-2.0.6+46.apk",
+  "force_update": false,
+  "release_notes": "密码重置自动登录、错误提示优化、语音助手增强、发布流程自动化",
+  "platform": "android",
+  "min_supported_version": "2.0.0",
+  "changelog": [
+    "密码重置成功后自动登录，操作流程从7步优化到3步",
+    "针对不同错误场景提供详细的用户提示",
+    "集成智能意图识别器，提升语音识别准确性",
+    "新增一键式发布脚本，简化版本发布流程"
+  ]
+}
