@@ -181,7 +181,8 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
         // 小狐狸橙色主题
         return [const Color(0xFFFF8C00), const Color(0xFFFF6B00)];
       case FloatingBallState.recording:
-        return [Colors.red, Colors.red.shade400];
+        // 录音状态使用浅色背景，便于波浪形动画显示
+        return [Colors.white, const Color(0xFFF5F5F5)];
       case FloatingBallState.processing:
         return [Colors.orange, Colors.orange.shade400];
       case FloatingBallState.success:
@@ -200,6 +201,7 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
         // 小狐狸橙色阴影
         return const Color(0xFFFF8C00).withValues(alpha: 0.4);
       case FloatingBallState.recording:
+        // 录音状态使用红色阴影，增强视觉效果
         return Colors.red.withValues(alpha:0.5);
       case FloatingBallState.processing:
         return Colors.orange.withValues(alpha:0.4);
@@ -222,8 +224,9 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
         );
 
       case FloatingBallState.recording:
+        // 录音状态使用红色波浪形，在浅色背景上清晰可见
         return const WaveformAnimation(
-          color: Colors.white,
+          color: Colors.red,
           size: 28,
           barCount: 5,
         );
