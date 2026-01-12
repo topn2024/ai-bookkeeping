@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../pages/voice_chat_page.dart';
 import '../providers/global_voice_assistant_provider.dart';
+import '../providers/voice_coordinator_provider.dart';
 import '../services/global_voice_assistant_manager.dart';
 import 'waveform_animation.dart';
 
@@ -139,7 +140,6 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
       top: position.dy,
       child: GestureDetector(
         onTap: _handleTap,
-        onLongPress: _handleLongPress,
         onPanStart: _handleDragStart,
         onPanUpdate: _handleDragUpdate,
         onPanEnd: _handleDragEnd,
@@ -261,21 +261,60 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
     }
   }
 
-  /// 处理点击
-  void _handleTap() {
+  /// 处理点击 - 切换对话模式
+  void _handleTap() async {
     final manager = ref.read(globalVoiceAssistantProvider);
+    final coordinator = ref.read(voiceServiceCoordinatorProvider);
+    final currentState = manager.ballState;
 
-    if (manager.ballState == FloatingBallState.idle) {
-      manager.startRecording();
-    } else if (manager.ballState == FloatingBallState.recording) {
+    // 如果正在处理中，忽略点击
+    if (currentState == FloatingBallState.processing) {
+      debugPrint('[GlobalFloatingBall] 正在处理中，忽略点击');
+      return;
+    }
+
+    // 如果正在录音，停止录音（但不结束连续模式）
+    if (currentState == FloatingBallState.recording) {
+      debugPrint('[GlobalFloatingBall] 停止当前录音');
       manager.stopRecording();
+      return;
+    }
+
+    // 如果已经在连续对话模式中且处于空闲状态，结束对话
+    if (manager.isContinuousMode && currentState == FloatingBallState.idle) {
+      debugPrint('[GlobalFloatingBall] 单击结束连续对话');
+      manager.stopContinuousMode();
+      HapticFeedback.mediumImpact();
+      return;
+    }
+
+    // 否则，开始新的连续对话
+    if (currentState == FloatingBallState.idle ||
+        currentState == FloatingBallState.success ||
+        currentState == FloatingBallState.error) {
+      // 启用对话式智能体模式并预热
+      if (!coordinator.isAgentModeEnabled) {
+        debugPrint('[GlobalFloatingBall] 启用对话式智能体模式');
+        await coordinator.enableAgentMode();
+      }
+      // 触发语音按钮预热（预热LLM连接）
+      coordinator.onVoiceButtonPressed();
+
+      // 启用连续对话模式
+      manager.setContinuousMode(true);
+      debugPrint('[GlobalFloatingBall] 开始连续对话');
+      HapticFeedback.mediumImpact();
+
+      manager.startRecording();
     }
   }
 
-  /// 处理长按
-  void _handleLongPress() {
-    HapticFeedback.mediumImpact();
-    widget.onOpenChat?.call();
+  /// 处理长按 - 结束连续对话
+  void _handleLongPressEndConversation() {
+    final manager = ref.read(globalVoiceAssistantProvider);
+    debugPrint('[GlobalFloatingBall] 长按结束连续对话');
+    manager.stopContinuousMode();
+    HapticFeedback.heavyImpact();
   }
 
   /// 开始拖动

@@ -108,6 +108,12 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   GlobalVoiceAssistantManager._internal();
 
+  /// 用于测试的工厂方法
+  @visibleForTesting
+  factory GlobalVoiceAssistantManager.forTest() {
+    return GlobalVoiceAssistantManager._internal();
+  }
+
   // 核心服务（延迟初始化）
   VoiceRecognitionEngine? _recognitionEngine;
   TTSService? _ttsService;
@@ -134,6 +140,10 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   double _amplitude = 0.0;
   StreamSubscription<Amplitude>? _amplitudeSubscription;
 
+  // 连续对话模式
+  bool _continuousMode = false;
+  bool _shouldAutoRestart = false;
+
   // 权限回调（由 UI 层设置）
   void Function(MicrophonePermissionStatus status)? onPermissionRequired;
 
@@ -154,6 +164,26 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   double get amplitude => _amplitude;
   List<ChatMessage> get conversationHistory => List.unmodifiable(_conversationHistory);
   VoiceContextService? get contextService => _contextService;
+  bool get isContinuousMode => _continuousMode;
+
+  /// 启用/禁用连续对话模式
+  void setContinuousMode(bool enabled) {
+    _continuousMode = enabled;
+    _shouldAutoRestart = enabled;
+    debugPrint('[GlobalVoiceAssistant] 连续对话模式: $enabled');
+    notifyListeners();
+  }
+
+  /// 停止连续对话
+  void stopContinuousMode() {
+    _continuousMode = false;
+    _shouldAutoRestart = false;
+    if (_ballState == FloatingBallState.recording) {
+      stopRecording();
+    }
+    setBallState(FloatingBallState.idle);
+    debugPrint('[GlobalVoiceAssistant] 连续对话已停止');
+  }
 
   /// 检查麦克风权限状态
   Future<MicrophonePermissionStatus> checkMicrophonePermission() async {
@@ -523,19 +553,44 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       // 显示成功状态
       setBallState(FloatingBallState.success);
 
-      // 2秒后恢复空闲状态，准备接收下一条指令
-      Future.delayed(const Duration(seconds: 2), () {
-        if (_ballState == FloatingBallState.success) {
-          setBallState(FloatingBallState.idle);
-        }
-      });
+      debugPrint('[GlobalVoiceAssistant] 异步处理完成, 连续模式=$_continuousMode');
 
-      debugPrint('[GlobalVoiceAssistant] 异步处理完成');
+      // 检查是否需要自动重新开始录音（连续对话模式）
+      if (_continuousMode && _shouldAutoRestart) {
+        // 短暂延迟后自动开始下一轮录音
+        Future.delayed(const Duration(milliseconds: 800), () {
+          debugPrint('[GlobalVoiceAssistant] 检查自动重启: 连续模式=$_continuousMode, 自动重启=$_shouldAutoRestart, 状态=$_ballState');
+          if (_continuousMode && _shouldAutoRestart) {
+            // 只要连续模式开启就自动重启，不严格检查状态
+            if (_ballState != FloatingBallState.recording) {
+              debugPrint('[GlobalVoiceAssistant] 连续对话: 自动开始下一轮录音');
+              startRecording();
+            }
+          }
+        });
+      } else {
+        // 2秒后恢复空闲状态，准备接收下一条指令
+        Future.delayed(const Duration(seconds: 2), () {
+          if (_ballState == FloatingBallState.success) {
+            setBallState(FloatingBallState.idle);
+          }
+        });
+      }
     } catch (e) {
       debugPrint('[GlobalVoiceAssistant] 异步处理失败: $e');
       // 添加错误消息
       _addAssistantMessage('处理时遇到问题，请再试一次');
-      setBallState(FloatingBallState.idle);
+
+      // 连续模式下也尝试继续
+      if (_continuousMode && _shouldAutoRestart) {
+        Future.delayed(const Duration(seconds: 1), () {
+          if (_continuousMode && _shouldAutoRestart) {
+            startRecording();
+          }
+        });
+      } else {
+        setBallState(FloatingBallState.idle);
+      }
     }
 
     notifyListeners();
@@ -741,7 +796,13 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
     Future.delayed(const Duration(seconds: 2), () {
       if (_ballState == FloatingBallState.error) {
-        setBallState(FloatingBallState.idle);
+        // 连续模式下，错误后也继续录音
+        if (_continuousMode && _shouldAutoRestart) {
+          debugPrint('[GlobalVoiceAssistant] 连续对话: 错误后自动继续');
+          startRecording();
+        } else {
+          setBallState(FloatingBallState.idle);
+        }
       }
     });
   }
