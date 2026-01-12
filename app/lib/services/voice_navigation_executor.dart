@@ -31,6 +31,7 @@ class VoiceNavigationExecutor {
 
   /// 设置标签切换器
   void setTabSwitcher(void Function(int index)? switcher) {
+    debugPrint('[VoiceNavigationExecutor] setTabSwitcher: ${switcher != null ? "已设置" : "已清除"}');
     _tabSwitcher = switcher;
   }
 
@@ -38,19 +39,23 @@ class VoiceNavigationExecutor {
   ///
   /// 返回导航结果消息
   Future<String> executeNavigation(String voiceInput) async {
+    debugPrint('[VoiceNavigationExecutor] executeNavigation: $voiceInput');
     final result = _navigationService.parseNavigation(voiceInput);
 
     if (!result.success) {
+      debugPrint('[VoiceNavigationExecutor] 解析失败: ${result.errorMessage}');
       return result.errorMessage ?? '抱歉，我不知道您想去哪个页面';
     }
 
     final route = result.route;
+    debugPrint('[VoiceNavigationExecutor] 解析结果: route=$route, pageName=${result.pageName}');
     if (route == null) {
       return '导航失败，请重试';
     }
 
     // 尝试执行导航
     final executed = await _navigateToRoute(route);
+    debugPrint('[VoiceNavigationExecutor] 导航执行结果: $executed');
 
     if (executed) {
       return '正在打开${result.pageName}';
@@ -65,6 +70,13 @@ class VoiceNavigationExecutor {
 
     // 首先尝试使用底部导航切换（对于主要页面）
     if (_tryTabSwitch(route)) {
+      return true;
+    }
+
+    // 对于首页路由，如果标签切换失败但已经在首页，返回成功
+    if (route == '/' || route == '/home') {
+      debugPrint('[VoiceNavigationExecutor] 首页路由，标签切换器未设置，可能已在首页');
+      // 不认为是失败，因为用户可能已经在首页
       return true;
     }
 
@@ -95,6 +107,7 @@ class VoiceNavigationExecutor {
 
   /// 尝试使用底部导航切换
   bool _tryTabSwitch(String route) {
+    debugPrint('[VoiceNavigationExecutor] _tryTabSwitch: route=$route, _tabSwitcher=${_tabSwitcher != null ? "已设置" : "未设置"}');
     if (_tabSwitcher == null) return false;
 
     // 主要标签页的路由映射
@@ -110,6 +123,7 @@ class VoiceNavigationExecutor {
 
     final tabIndex = tabRoutes[route];
     if (tabIndex != null) {
+      debugPrint('[VoiceNavigationExecutor] 切换到标签: $tabIndex');
       _tabSwitcher!(tabIndex);
       return true;
     }
@@ -168,6 +182,14 @@ class VoiceNavigationExecutor {
     }
 
     return null;
+  }
+
+  /// 直接导航到指定路由（不需要重新解析）
+  ///
+  /// 供外部直接传入路由时使用
+  Future<bool> navigateToRoute(String route) async {
+    debugPrint('[VoiceNavigationExecutor] navigateToRoute: $route');
+    return await _navigateToRoute(route);
   }
 
   /// 返回上一页

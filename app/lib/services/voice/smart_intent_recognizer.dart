@@ -8,20 +8,19 @@ import 'voice_intent_router.dart';
 
 /// 智能意图识别器
 ///
-/// 多层递进架构，平衡速度和准确性：
+/// LLM优先架构，规则兜底：
 ///
 /// ```
-/// Layer 1: 精确规则匹配（最快，~1ms）
-///    ↓ 未命中
-/// Layer 2: 同义词扩展匹配（快，~5ms）
-///    ↓ 未命中
-/// Layer 3: 意图模板匹配（较快，~10ms）
-///    ↓ 未命中
-/// Layer 4: 学习缓存匹配（快，~5ms）
-///    ↓ 未命中
-/// Layer 5: LLM兜底（慢，~2-3s）
-///    ↓ 成功后
-/// 反向学习: 将结果加入Layer 4缓存
+/// 主路径: LLM识别（优先，~1-2s）
+///    ↓ 失败/超时/不可用
+/// 兜底路径:
+///   Layer 1: 精确规则匹配（最快，~1ms）
+///      ↓ 未命中
+///   Layer 2: 同义词扩展匹配（快，~5ms）
+///      ↓ 未命中
+///   Layer 3: 意图模板匹配（较快，~10ms）
+///      ↓ 未命中
+///   Layer 4: 学习缓存匹配（快，~5ms）
 /// ```
 class SmartIntentRecognizer {
   final VoiceIntentRouter _ruleRouter;
@@ -42,7 +41,10 @@ class SmartIntentRecognizer {
         _qwenService = qwenService ?? QwenService(),
         _navigationService = navigationService ?? VoiceNavigationService();
 
-  /// 识别意图（多层递进）
+  /// LLM调用超时时间（毫秒）
+  static const int _llmTimeoutMs = 5000;
+
+  /// 识别意图（LLM优先，规则兜底）
   Future<SmartIntentResult> recognize(
     String input, {
     String? pageContext,
@@ -54,44 +56,82 @@ class SmartIntentRecognizer {
     final normalizedInput = _normalize(input);
     debugPrint('[SmartIntent] 开始识别: $input');
 
+    // ═══════════════════════════════════════════════════════════════
+    // 主路径: LLM识别（优先）
+    // ═══════════════════════════════════════════════════════════════
+    if (_qwenService.isAvailable) {
+      debugPrint('[SmartIntent] 尝试LLM识别...');
+      final llmResult = await _tryLLMWithTimeout(input, pageContext);
+      if (llmResult != null && llmResult.isSuccess && llmResult.confidence >= 0.7) {
+        debugPrint('[SmartIntent] LLM识别成功: ${llmResult.intentType}, 置信度: ${llmResult.confidence}');
+        // 反向学习：将LLM结果加入缓存，加速后续相似请求
+        if (llmResult.confidence >= 0.85) {
+          await _learnPattern(normalizedInput, llmResult);
+        }
+        return llmResult;
+      }
+      debugPrint('[SmartIntent] LLM识别失败或置信度不足，使用规则兜底');
+    } else {
+      debugPrint('[SmartIntent] LLM不可用（未配置API Key），使用规则兜底');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 兜底路径: 规则匹配
+    // ═══════════════════════════════════════════════════════════════
+    return _fallbackToRules(normalizedInput, input, pageContext);
+  }
+
+  /// 带超时的LLM调用
+  Future<SmartIntentResult?> _tryLLMWithTimeout(
+    String input,
+    String? pageContext,
+  ) async {
+    try {
+      return await _layer5LLMFallback(input, pageContext)
+          .timeout(Duration(milliseconds: _llmTimeoutMs));
+    } catch (e) {
+      debugPrint('[SmartIntent] LLM调用超时或失败: $e');
+      return null;
+    }
+  }
+
+  /// 规则兜底识别
+  Future<SmartIntentResult> _fallbackToRules(
+    String normalizedInput,
+    String originalInput,
+    String? pageContext,
+  ) async {
+    SmartIntentResult? result;
+
     // Layer 1: 精确规则匹配
-    var result = await _layer1ExactRule(normalizedInput);
+    result = await _layer1ExactRule(normalizedInput);
     if (result != null && result.confidence >= 0.8) {
-      debugPrint('[SmartIntent] Layer1命中: ${result.intentType}');
+      debugPrint('[SmartIntent] 规则Layer1命中: ${result.intentType}');
       return result;
     }
 
     // Layer 2: 同义词扩展匹配
     result = await _layer2SynonymExpansion(normalizedInput);
     if (result != null && result.confidence >= 0.75) {
-      debugPrint('[SmartIntent] Layer2命中: ${result.intentType}');
+      debugPrint('[SmartIntent] 规则Layer2命中: ${result.intentType}');
       return result;
     }
 
     // Layer 3: 意图模板匹配
     result = await _layer3TemplateMatch(normalizedInput);
     if (result != null && result.confidence >= 0.7) {
-      debugPrint('[SmartIntent] Layer3命中: ${result.intentType}');
+      debugPrint('[SmartIntent] 规则Layer3命中: ${result.intentType}');
       return result;
     }
 
     // Layer 4: 学习缓存匹配
     result = await _layer4LearnedCache(normalizedInput);
     if (result != null && result.confidence >= 0.85) {
-      debugPrint('[SmartIntent] Layer4命中: ${result.intentType}');
+      debugPrint('[SmartIntent] 规则Layer4命中: ${result.intentType}');
       return result;
     }
 
-    // Layer 5: LLM兜底
-    debugPrint('[SmartIntent] 进入Layer5 LLM兜底');
-    result = await _layer5LLMFallback(input, pageContext);
-
-    // 反向学习：成功识别后加入缓存
-    if (result != null && result.isSuccess && result.confidence >= 0.85) {
-      await _learnPattern(normalizedInput, result);
-    }
-
-    return result ?? SmartIntentResult.error('无法理解您的指令');
+    return SmartIntentResult.error('无法理解您的指令');
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -141,7 +181,7 @@ class SmartIntentRecognizer {
   /// 记账动词同义词组
   static const _addSynonyms = {
     '花了': ['花了', '花', '消费', '支出', '付了', '付', '买了', '买', '用了', '支付'],
-    '收入': ['收入', '赚了', '进账', '收到', '工资', '奖金', '入账'],
+    '收入': ['收入', '赚了', '进账', '收到', '工资', '奖金', '入账', '捡到', '捡了', '找到钱', '中奖', '返现', '退款'],
   };
 
   Future<SmartIntentResult?> _layer2SynonymExpansion(String input) async {

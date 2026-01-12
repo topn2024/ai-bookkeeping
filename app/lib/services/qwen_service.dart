@@ -157,6 +157,9 @@ other_income: 其他收入（无法归类的收入）
 
   QwenService._internal();
 
+  /// 检查LLM服务是否可用（已配置API Key）
+  bool get isAvailable => appConfig.qwenApiKey.isNotEmpty;
+
   /// Initialize the service with API key from config
   /// Re-initializes if API key has changed (e.g., after login)
   void _ensureInitialized() {

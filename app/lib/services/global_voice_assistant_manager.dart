@@ -130,6 +130,10 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   DateTime? _recordingStartTime;
   String? _recordingPath;
 
+  // 音频振幅 (0.0 - 1.0)
+  double _amplitude = 0.0;
+  StreamSubscription<Amplitude>? _amplitudeSubscription;
+
   // 权限回调（由 UI 层设置）
   void Function(MicrophonePermissionStatus status)? onPermissionRequired;
 
@@ -147,6 +151,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   bool get isVisible => _isVisible;
   Offset get position => _position;
   bool get isInitialized => _isInitialized;
+  double get amplitude => _amplitude;
   List<ChatMessage> get conversationHistory => List.unmodifiable(_conversationHistory);
   VoiceContextService? get contextService => _contextService;
 
@@ -296,6 +301,18 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       // 开始录音
       await _audioRecorder!.start(config, path: _recordingPath!);
 
+      // 订阅振幅变化
+      _amplitudeSubscription = _audioRecorder!
+          .onAmplitudeChanged(const Duration(milliseconds: 100))
+          .listen((amp) {
+        // 将 dB 值转换为 0-1 的振幅
+        // amp.current 通常在 -60 到 0 之间，0 表示最大音量
+        // 转换公式：将 -60~0 映射到 0~1
+        final normalized = ((amp.current + 60) / 60).clamp(0.0, 1.0);
+        _amplitude = normalized;
+        notifyListeners();
+      });
+
       _recordingStartTime = DateTime.now();
       setBallState(FloatingBallState.recording);
 
@@ -315,6 +332,11 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     }
 
     try {
+      // 停止振幅订阅
+      await _amplitudeSubscription?.cancel();
+      _amplitudeSubscription = null;
+      _amplitude = 0.0;
+
       // 检查录音时长
       final duration = DateTime.now().difference(_recordingStartTime!);
       debugPrint('[GlobalVoiceAssistant] 录音时长: ${duration.inMilliseconds}ms');
@@ -386,31 +408,27 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       // 添加用户消息
       _addUserMessage(recognizedText);
 
-      // 处理意图（这里简化处理，实际应调用 VoiceServiceCoordinator）
-      final response = await _processIntent(recognizedText, context);
+      // 获取即时反馈（不等待后台处理完成）
+      final immediateResponse = _getImmediateResponse(recognizedText);
 
-      // 添加助手响应
-      _addAssistantMessage(response.message, metadata: response.metadata);
+      // 添加即时反馈消息
+      _addAssistantMessage(immediateResponse);
 
-      // 显示成功状态
-      setBallState(FloatingBallState.success);
+      // 显示处理中状态
+      setBallState(FloatingBallState.processing);
 
-      // 2秒后恢复空闲状态
-      Future.delayed(const Duration(seconds: 2), () {
-        if (_ballState == FloatingBallState.success) {
-          setBallState(FloatingBallState.idle);
-        }
-      });
-
-      // 可选：TTS 播报（独立错误处理，防止TTS失败影响主流程）
-      if (_ttsService != null && response.shouldSpeak) {
+      // 播放即时反馈
+      if (_ttsService != null) {
         try {
-          await _ttsService!.speak(response.message);
+          // 不等待TTS完成，异步播放
+          _ttsService!.speak(immediateResponse);
         } catch (ttsError) {
           debugPrint('[GlobalVoiceAssistant] TTS播报失败（已忽略）: $ttsError');
-          // TTS 失败不影响主流程，只记录日志
         }
       }
+
+      // 异步后台处理命令（不阻塞UI）
+      _processCommandAsync(recognizedText, context);
 
       // 清理临时文件
       try {
@@ -438,6 +456,89 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         _handleError('处理失败，请重试');
       }
     }
+  }
+
+  /// 获取即时反馈（根据输入内容快速生成）
+  String _getImmediateResponse(String text) {
+    // 确认/取消指令 - 立即响应
+    if (text.contains('确认') || text.contains('是的') || text.contains('好的')) {
+      return '好的，正在处理~';
+    }
+    if (text.contains('取消') || text.contains('算了') || text.contains('不要')) {
+      return '好的，已取消';
+    }
+
+    // 导航指令
+    final navKeywords = ['打开', '进入', '查看', '看看', '去'];
+    if (navKeywords.any((k) => text.contains(k))) {
+      return '好的，马上~';
+    }
+
+    // 记账指令（包含金额）
+    final hasAmount = RegExp(r'\d+|[一二三四五六七八九十百千万两]+').hasMatch(text);
+    if (hasAmount) {
+      // 多笔交易
+      final amountCount = RegExp(r'\d+(?:\.\d+)?').allMatches(text).length;
+      if (amountCount > 1) {
+        return '好的，我来帮你记录这几笔~';
+      }
+      return '好的，我来记一下~';
+    }
+
+    // 查询指令
+    if (text.contains('多少') || text.contains('查') || text.contains('统计')) {
+      return '好的，我帮你看看~';
+    }
+
+    // 默认
+    return '好的，收到~';
+  }
+
+  /// 异步处理命令（不阻塞UI）
+  Future<void> _processCommandAsync(String text, PageContext? context) async {
+    debugPrint('[GlobalVoiceAssistant] 开始异步处理: $text');
+
+    try {
+      // 调用命令处理器（后台执行）
+      final response = await _processIntent(text, context);
+
+      // 处理完成后，添加结果反馈到聊天记录
+      if (response.message.isNotEmpty) {
+        // 如果结果和即时反馈不同，添加结果消息
+        final immediateResponse = _getImmediateResponse(text);
+        if (response.message != immediateResponse) {
+          _addAssistantMessage(response.message, metadata: response.metadata);
+        }
+
+        // 播放结果TTS
+        if (_ttsService != null && response.shouldSpeak) {
+          try {
+            await _ttsService!.speak(response.message);
+          } catch (ttsError) {
+            debugPrint('[GlobalVoiceAssistant] 结果TTS播报失败: $ttsError');
+          }
+        }
+      }
+
+      // 显示成功状态
+      setBallState(FloatingBallState.success);
+
+      // 2秒后恢复空闲状态，准备接收下一条指令
+      Future.delayed(const Duration(seconds: 2), () {
+        if (_ballState == FloatingBallState.success) {
+          setBallState(FloatingBallState.idle);
+        }
+      });
+
+      debugPrint('[GlobalVoiceAssistant] 异步处理完成');
+    } catch (e) {
+      debugPrint('[GlobalVoiceAssistant] 异步处理失败: $e');
+      // 添加错误消息
+      _addAssistantMessage('处理时遇到问题，请再试一次');
+      setBallState(FloatingBallState.idle);
+    }
+
+    notifyListeners();
   }
 
   /// 处理意图
@@ -670,6 +771,14 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       timestamp: DateTime.now(),
       metadata: metadata,
     ));
+  }
+
+  /// 添加处理结果消息（公开方法，供外部调用）
+  ///
+  /// 用于在语音命令处理完成后，将实际结果反馈给用户
+  void addResultMessage(String content, {Map<String, dynamic>? metadata}) {
+    _addAssistantMessage(content, metadata: metadata);
+    notifyListeners();
   }
 
   /// 添加系统消息

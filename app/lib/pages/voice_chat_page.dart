@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/global_voice_assistant_provider.dart';
 import '../services/global_voice_assistant_manager.dart';
+import 'transaction_list_page.dart';
 
 /// 6.12 连续对话记账页面
 /// 支持多轮对话的语音记账交互
@@ -136,6 +137,9 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
       );
     }
 
+    // 检查是否是交易记录反馈消息（可点击跳转）
+    final isTransactionFeedback = _isTransactionFeedbackMessage(message);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -165,32 +169,81 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
             const SizedBox(width: 8),
           ],
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isUser ? AppTheme.primaryColor : Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isUser ? 16 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 16),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+            child: GestureDetector(
+              onTap: isTransactionFeedback ? () => _navigateToTransactions() : null,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isUser ? AppTheme.primaryColor : Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(16),
+                    topRight: const Radius.circular(16),
+                    bottomLeft: Radius.circular(isUser ? 16 : 4),
+                    bottomRight: Radius.circular(isUser ? 4 : 16),
                   ),
-                ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    message.isLoading
+                        ? _buildLoadingIndicator()
+                        : _buildMessageContent(message, isUser),
+                    // 交易记录反馈添加"点击查看"提示
+                    if (isTransactionFeedback) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.touch_app,
+                            size: 14,
+                            color: AppTheme.primaryColor.withValues(alpha: 0.7),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '点击查看交易记录',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.primaryColor.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
-              child: message.isLoading
-                  ? _buildLoadingIndicator()
-                  : _buildMessageContent(message, isUser),
             ),
           ),
           if (isUser) const SizedBox(width: 8),
         ],
       ),
+    );
+  }
+
+  /// 检查是否是交易记录反馈消息
+  bool _isTransactionFeedbackMessage(ChatMessage message) {
+    if (message.type == ChatMessageType.user || message.type == ChatMessageType.system) {
+      return false;
+    }
+    final content = message.content;
+    // 检查是否包含交易记录成功的标识
+    return content.contains('✅') &&
+           (content.contains('已记录') || content.contains('已成功记录') || content.contains('笔交易'));
+  }
+
+  /// 跳转到交易记录页面
+  void _navigateToTransactions() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TransactionListPage()),
     );
   }
 

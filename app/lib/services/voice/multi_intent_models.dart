@@ -129,7 +129,7 @@ class MultiIntentResult {
       );
     }
 
-    final amount = singleResult.entities['amount'] as double?;
+    final amount = (singleResult.entities['amount'] as num?)?.toDouble();
     if (amount != null) {
       return MultiIntentResult(
         completeIntents: [

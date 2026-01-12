@@ -166,7 +166,7 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
               ],
             ),
             child: Center(
-              child: _buildBallContent(manager.ballState),
+              child: _buildBallContent(manager.ballState, manager),
             ),
           ),
         ),
@@ -215,7 +215,7 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
   }
 
   /// 构建悬浮球内容
-  Widget _buildBallContent(FloatingBallState state) {
+  Widget _buildBallContent(FloatingBallState state, GlobalVoiceAssistantManager manager) {
     switch (state) {
       case FloatingBallState.idle:
         return const Text(
@@ -224,11 +224,12 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
         );
 
       case FloatingBallState.recording:
-        // 录音状态使用红色波浪形，在浅色背景上清晰可见
-        return const WaveformAnimation(
+        // 录音状态：红色流动波浪线
+        // 无声音时显示直线，有声音时波浪流动，振幅随音量变化
+        return WaveformAnimation(
           color: Colors.red,
           size: 28,
-          barCount: 5,
+          amplitude: manager.amplitude,
         );
 
       case FloatingBallState.processing:

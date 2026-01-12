@@ -82,16 +82,39 @@ class IntentMerger {
 
   /// 检查是否为导航意图
   bool _isNavigationSegment(SegmentAnalysis segment) {
-    final navKeywords = ['打开', '进入', '去', '跳转', '切换', '查看', '看看'];
+    final text = segment.text;
 
-    // 检查是否包含导航关键词
-    final hasNavKeyword = navKeywords.any((k) => segment.text.contains(k));
-
-    // 检查意图分析结果
+    // 检查意图分析结果（优先）
     final intentResult = segment.intentResult;
     final isNavIntent = intentResult?.intent == VoiceIntentType.navigateToPage;
+    if (isNavIntent) return true;
 
-    return hasNavKeyword || isNavIntent;
+    // 如果有金额，通常不是导航意图
+    if (segment.amount != null && segment.amount! > 0) {
+      return false;
+    }
+
+    // 如果有消费动作动词，不是导航意图
+    final expenseVerbs = ['买', '花', '吃', '喝', '打车', '坐', '付', '消费', '充值'];
+    if (expenseVerbs.any((v) => text.contains(v))) {
+      return false;
+    }
+
+    // 检查导航关键词（"去"需要特殊处理，因为"去买"、"去吃"不是导航）
+    final strictNavKeywords = ['打开', '进入', '跳转', '切换', '查看', '看看'];
+    if (strictNavKeywords.any((k) => text.contains(k))) {
+      return true;
+    }
+
+    // "去" 只有在后面跟着页面/地点名词时才是导航
+    if (text.contains('去')) {
+      final pageKeywords = ['首页', '主页', '设置', '预算', '分析', '统计', '账户', '记录', '分类'];
+      if (pageKeywords.any((k) => text.contains(k))) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /// 检查是否为确认/取消意图
@@ -200,7 +223,7 @@ class IntentMerger {
     final text = segment.text;
 
     // 收入关键词
-    final incomeKeywords = ['收入', '赚', '进账', '到账', '收到', '工资', '奖金', '红包'];
+    final incomeKeywords = ['收入', '赚', '进账', '到账', '收到', '工资', '奖金', '红包', '捡到', '捡了', '找到钱', '中奖', '返现', '退款'];
     if (incomeKeywords.any((k) => text.contains(k))) {
       return TransactionIntentType.income;
     }

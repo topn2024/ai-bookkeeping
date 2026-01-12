@@ -26,6 +26,7 @@ import 'services/voice_token_service.dart';
 import 'services/voice_context_route_observer.dart';
 import 'services/voice_service_coordinator.dart' show VoiceServiceCoordinator, VoiceSessionResult, VoiceSessionStatus;
 import 'providers/voice_coordinator_provider.dart';
+import 'providers/transaction_provider.dart';
 import 'widgets/global_floating_ball.dart';
 import 'models/ledger.dart';
 import 'services/voice_navigation_executor.dart';
@@ -293,8 +294,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       VoiceSessionResult result;
       if (mightBeMultiple) {
         result = await coordinator.processMultiIntentCommand(command);
-        // 多意图处理后自动确认执行
-        if (result.status == VoiceSessionStatus.success) {
+        // 多意图处理后自动确认执行（仅当确实有待确认的多意图时）
+        if (result.status == VoiceSessionStatus.success && coordinator.hasPendingMultiIntent) {
           debugPrint('[App] 多意图识别成功，自动确认执行');
           final confirmResult = await coordinator.confirmMultiIntents();
           debugPrint('[App] 多意图执行结果: ${confirmResult.status} - ${confirmResult.message}');
@@ -306,15 +307,40 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
       debugPrint('[App] 后台处理完成: ${result.status}');
 
-      // 如果有错误或需要补充信息，追加消息通知用户
+      // 根据处理结果，向聊天记录添加详细反馈
       if (result.status == VoiceSessionStatus.error) {
         final errorMsg = result.errorMessage ?? '处理时遇到了问题';
         debugPrint('[App] 处理出错: $errorMsg');
+        // 添加错误反馈到聊天记录
+        GlobalVoiceAssistantManager.instance.addResultMessage(
+          '❌ 处理失败：$errorMsg',
+        );
+      } else if (result.needsConfirmation) {
+        // 需要确认：等待TTS播放完成后自动开始录音
+        debugPrint('[App] 需要确认，等待用户回复...');
+        // 添加确认请求到聊天记录
+        final confirmMsg = result.message ?? '需要您确认';
+        GlobalVoiceAssistantManager.instance.addResultMessage(
+          '⏳ $confirmMsg',
+        );
+        // 延迟一下让TTS播放完成，然后自动开始录音
+        await Future.delayed(const Duration(milliseconds: 2500));
+        debugPrint('[App] 自动开始录音等待确认');
+        GlobalVoiceAssistantManager.instance.startRecording();
       } else if (result.status == VoiceSessionStatus.success) {
         final detailMsg = result.message;
-        if (detailMsg != null && detailMsg.isNotEmpty) {
-          debugPrint('[App] 处理成功: $detailMsg');
+        debugPrint('[App] 处理成功: $detailMsg');
+
+        // 生成详细的结果反馈
+        final resultFeedback = _generateResultFeedback(result, mightBeMultiple);
+        if (resultFeedback.isNotEmpty) {
+          GlobalVoiceAssistantManager.instance.addResultMessage(resultFeedback);
         }
+
+        // 刷新交易列表，确保UI显示最新数据
+        debugPrint('[App] 刷新交易列表...');
+        await ref.read(transactionProvider.notifier).refresh();
+        debugPrint('[App] 交易列表已刷新');
 
         // 如果结果包含导航路由，执行实际导航
         final data = result.data;
@@ -322,13 +348,100 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           final route = data['route'] as String?;
           if (route != null) {
             debugPrint('[App] 执行导航: $route');
-            await VoiceNavigationExecutor.instance.executeNavigation(command);
+            // 直接使用已解析的路由，避免重复解析
+            final success = await VoiceNavigationExecutor.instance.navigateToRoute(route);
+            debugPrint('[App] 导航结果: $success');
           }
         }
       }
     } catch (e) {
       debugPrint('[App] 后台处理失败: $e');
+      // 添加异常反馈到聊天记录
+      GlobalVoiceAssistantManager.instance.addResultMessage(
+        '❌ 系统错误，请稍后重试',
+      );
     }
+  }
+
+  /// 生成详细的结果反馈
+  ///
+  /// 根据处理结果生成用户友好的反馈信息，以要点形式呈现
+  String _generateResultFeedback(VoiceSessionResult result, bool isMultiIntent) {
+    final data = result.data;
+    final message = result.message ?? '';
+    final buffer = StringBuffer();
+
+    // 检查是否有交易记录信息
+    if (data is Map<String, dynamic>) {
+      // 多笔交易记录
+      if (data.containsKey('transactions') && data['transactions'] is List) {
+        final transactions = data['transactions'] as List;
+        buffer.writeln('✅ 已成功记录 ${transactions.length} 笔交易：');
+        for (var i = 0; i < transactions.length; i++) {
+          final tx = transactions[i];
+          if (tx is Map<String, dynamic>) {
+            final amount = tx['amount'] ?? 0;
+            final category = tx['category'] ?? '其他';
+            final note = tx['note'] ?? '';
+            buffer.writeln('  • $category ${amount}元${note.isNotEmpty ? " ($note)" : ""}');
+          }
+        }
+        return buffer.toString().trim();
+      }
+
+      // 单笔交易记录
+      if (data.containsKey('amount')) {
+        final amount = data['amount'];
+        final category = data['category'] ?? '其他';
+        final note = data['note'] ?? '';
+        buffer.writeln('✅ 已记录：');
+        buffer.writeln('  • $category ${amount}元${note.isNotEmpty ? " ($note)" : ""}');
+        return buffer.toString().trim();
+      }
+
+      // 导航操作
+      if (data.containsKey('route')) {
+        final route = data['route'] as String?;
+        final routeName = _getRouteDisplayName(route ?? '');
+        return '✅ 已打开：$routeName';
+      }
+
+      // 查询结果
+      if (data.containsKey('queryResult')) {
+        return '✅ 查询完成：${data['queryResult']}';
+      }
+    }
+
+    // 从消息中提取交易信息（兜底方案）
+    if (message.contains('记录') || message.contains('记了')) {
+      // 尝试解析消息中的交易信息
+      final amountMatch = RegExp(r'(\d+(?:\.\d+)?)\s*(?:块|元)').firstMatch(message);
+      if (amountMatch != null) {
+        return '✅ $message';
+      }
+    }
+
+    // 默认返回原始消息，加上成功标记
+    if (message.isNotEmpty) {
+      return '✅ $message';
+    }
+
+    return '';
+  }
+
+  /// 获取路由的显示名称
+  String _getRouteDisplayName(String route) {
+    final routeNames = {
+      '/settings': '设置',
+      '/budget': '预算管理',
+      '/statistics': '统计报表',
+      '/accounts': '账户管理',
+      '/categories': '分类管理',
+      '/transactions': '交易记录',
+      '/savings': '储蓄目标',
+      '/': '首页',
+    };
+    return routeNames[route] ?? route;
   }
 
   /// 检查是否是导航命令

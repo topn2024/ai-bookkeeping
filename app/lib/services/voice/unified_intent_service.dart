@@ -387,7 +387,7 @@ $historySection
   /// 从规则结果提取实体
   IntentEntities _extractEntities(IntentAnalysisResult result) {
     return IntentEntities(
-      amount: result.entities['amount'] as double?,
+      amount: (result.entities['amount'] as num?)?.toDouble(),
       category: result.entities['category'] as String?,
       merchant: result.entities['merchant'] as String?,
       targetPage: result.entities['targetPage'] as String?,

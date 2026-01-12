@@ -45,7 +45,9 @@ class VoiceIntentRouter {
   static final _addPatterns = [
     RegExp(r'添加|新增|记录|记一笔', caseSensitive: false),
     RegExp(r'花了|买了|付了|支付|消费', caseSensitive: false),
-    RegExp(r'收入|赚了|进账|工资|奖金', caseSensitive: false),
+    // 计划/预计支出（如"打算花"、"预计花"、"准备花"、"要花"）
+    RegExp(r'(打算|预计|准备|计划|想要?|要).{0,5}(花|买|付|消费)', caseSensitive: false),
+    RegExp(r'收入|赚了|进账|工资|奖金|捡到|捡了|中奖|返现|退款', caseSensitive: false),
     RegExp(r'记账|记录.*消费', caseSensitive: false),
     // 简单金额表达：数字+单位 (如 "35块", "50元", "100")
     RegExp(r'\d+(\.\d+)?\s*(块|元|块钱)?', caseSensitive: false),
@@ -374,6 +376,13 @@ class VoiceIntentRouter {
           input.contains('吃') || input.contains('喝') || input.contains('打车')) {
         scores[VoiceIntentType.addTransaction] =
             (scores[VoiceIntentType.addTransaction] ?? 0.0) + 0.2;
+      }
+
+      // 计划/预计支出（如"打算花"、"预计花"、"要花"）
+      final plannedPattern = RegExp(r'(打算|预计|准备|计划|想要?|要).{0,5}(花|买|付|消费)');
+      if (plannedPattern.hasMatch(input)) {
+        scores[VoiceIntentType.addTransaction] =
+            (scores[VoiceIntentType.addTransaction] ?? 0.0) + 0.3;
       }
     }
 

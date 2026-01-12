@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 用户类型
 enum UserType {
@@ -187,7 +188,7 @@ class FeatureAccessResult {
 ///
 /// 实现用户权限策略：
 /// - 全免费版本
-/// - 访客：可使用所有不调用大模型的功能
+/// - 访客：首月可使用所有AI功能（试用期），之后仅可使用基础功能
 /// - 登录用户：可使用所有功能（包括AI大模型功能）
 ///
 /// 对应设计文档：第35章 用户体系与权限设计
@@ -205,12 +206,24 @@ class UserAccessService extends ChangeNotifier {
   // 会话变更监听器
   final List<void Function(UserSession)> _sessionListeners = [];
 
+  // 首次使用日期存储键
+  static const String _firstUseDateKey = 'first_use_date';
+
+  // 试用期天数
+  static const int _trialPeriodDays = 30;
+
+  // 首次使用日期
+  DateTime? _firstUseDate;
+
   /// 初始化服务
   Future<void> initialize({UserSession? savedSession}) async {
     if (_initialized) return;
 
     // 注册所有功能定义
     _registerFeatures();
+
+    // 加载或设置首次使用日期
+    await _loadOrSetFirstUseDate();
 
     // 恢复保存的会话
     if (savedSession != null && !savedSession.isExpired) {
@@ -221,8 +234,51 @@ class UserAccessService extends ChangeNotifier {
 
     if (kDebugMode) {
       debugPrint('UserAccessService initialized: ${_session.userType.name}');
+      debugPrint('Trial period: ${isInTrialPeriod ? "有效" : "已过期"} (首次使用: $_firstUseDate)');
     }
   }
+
+  /// 加载或设置首次使用日期
+  Future<void> _loadOrSetFirstUseDate() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedDate = prefs.getString(_firstUseDateKey);
+
+      if (savedDate != null) {
+        _firstUseDate = DateTime.parse(savedDate);
+      } else {
+        // 首次使用，记录当前日期
+        _firstUseDate = DateTime.now();
+        await prefs.setString(_firstUseDateKey, _firstUseDate!.toIso8601String());
+        debugPrint('UserAccessService: 记录首次使用日期: $_firstUseDate');
+      }
+    } catch (e) {
+      debugPrint('UserAccessService: 加载首次使用日期失败: $e');
+      _firstUseDate = DateTime.now();
+    }
+  }
+
+  /// 是否在试用期内（首次使用后30天内）
+  bool get isInTrialPeriod {
+    if (_firstUseDate == null) return true; // 未初始化时默认允许
+
+    final now = DateTime.now();
+    final trialEndDate = _firstUseDate!.add(const Duration(days: _trialPeriodDays));
+    return now.isBefore(trialEndDate);
+  }
+
+  /// 获取试用期剩余天数
+  int get trialDaysRemaining {
+    if (_firstUseDate == null) return _trialPeriodDays;
+
+    final now = DateTime.now();
+    final trialEndDate = _firstUseDate!.add(const Duration(days: _trialPeriodDays));
+    final remaining = trialEndDate.difference(now).inDays;
+    return remaining > 0 ? remaining : 0;
+  }
+
+  /// 获取首次使用日期
+  DateTime? get firstUseDate => _firstUseDate;
 
   /// 当前会话
   UserSession get session => _session;
@@ -277,7 +333,13 @@ class UserAccessService extends ChangeNotifier {
       return FeatureAccessResult.allowed();
     }
 
+    // 基础功能所有人可用
     if (feature.canAccess(_session.userType)) {
+      return FeatureAccessResult.allowed();
+    }
+
+    // AI功能：登录用户或试用期内的访客可用
+    if (feature.requiresLLM && (_session.isLoggedIn || isInTrialPeriod)) {
       return FeatureAccessResult.allowed();
     }
 
@@ -294,13 +356,17 @@ class UserAccessService extends ChangeNotifier {
   }
 
   /// 检查是否可以使用AI功能
+  /// 登录用户或试用期内的访客都可以使用AI功能
   bool canUseAIFeatures() {
-    return _session.isLoggedIn;
+    return _session.isLoggedIn || isInTrialPeriod;
   }
 
   /// 获取功能的访问拒绝消息
   String _getAccessDeniedMessage(FeatureDefinition feature) {
     if (feature.requiresLLM) {
+      if (isGuest && !isInTrialPeriod) {
+        return '${feature.name}的试用期已结束，登录后可继续使用AI智能功能';
+      }
       return '${feature.name}需要登录后才能使用，登录后可享受AI智能功能';
     }
     return '${feature.name}需要登录后才能使用';

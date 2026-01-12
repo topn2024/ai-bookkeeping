@@ -147,19 +147,28 @@ class TTSService {
     bool interrupt = true,
     bool? forceStreaming,
   }) async {
+    debugPrint('TTS: speak() called with text: "${text.substring(0, text.length > 50 ? 50 : text.length)}..."');
+
     if (!_isInitialized) {
+      debugPrint('TTS: not initialized, initializing...');
       await initialize();
     }
 
-    if (text.trim().isEmpty) return;
+    if (text.trim().isEmpty) {
+      debugPrint('TTS: text is empty, returning');
+      return;
+    }
 
     if (interrupt && _isSpeaking) {
+      debugPrint('TTS: interrupting current speech');
       await stop();
     }
 
     // 如果流式TTS连续失败多次，自动降级到离线模式
     final shouldUseStreaming = (forceStreaming ?? _streamingMode) &&
         _streamingFailCount < _maxStreamingFailures;
+
+    debugPrint('TTS: shouldUseStreaming=$shouldUseStreaming, streamingMode=$_streamingMode, failCount=$_streamingFailCount');
 
     try {
       _isSpeaking = true;
@@ -187,10 +196,12 @@ class TTSService {
         }
       } else {
         // 使用传统TTS（离线）
+        debugPrint('TTS: using offline engine');
         await _speakWithOfflineEngine(text);
       }
 
       _isSpeaking = false;
+      debugPrint('TTS: speak() completed successfully');
     } catch (e) {
       _isSpeaking = false;
       _speakingController.add(TTSSpeakingState.error);
@@ -201,8 +212,10 @@ class TTSService {
 
   /// 使用离线引擎播报
   Future<void> _speakWithOfflineEngine(String text) async {
+    debugPrint('TTS: _speakWithOfflineEngine() starting');
     _speakingController.add(TTSSpeakingState.started);
     await _engine.speak(text);
+    debugPrint('TTS: _speakWithOfflineEngine() completed');
     _speakingController.add(TTSSpeakingState.completed);
   }
 
@@ -313,8 +326,9 @@ class TTSService {
 
   /// 停止播报
   Future<void> stop() async {
-    if (!_isSpeaking) return;
+    debugPrint('TTS: stop() called, isSpeaking=$_isSpeaking');
 
+    // 即使_isSpeaking为false，也尝试停止，因为可能是其他TTS实例在播放
     try {
       // 停止流式TTS
       if (_streamingTTS != null) {
@@ -322,7 +336,9 @@ class TTSService {
       }
 
       // 停止传统TTS
+      debugPrint('TTS: calling engine.stop()...');
       await _engine.stop();
+      debugPrint('TTS: engine.stop() completed');
 
       _isSpeaking = false;
       _speakingController.add(TTSSpeakingState.stopped);
@@ -517,16 +533,22 @@ class FlutterTTSEngine implements TTSEngine {
 
   @override
   Future<void> speak(String text) async {
+    debugPrint('FlutterTTSEngine: speak() called with "${text.substring(0, text.length > 30 ? 30 : text.length)}..."');
     if (!_isInitialized) {
+      debugPrint('FlutterTTSEngine: not initialized, initializing...');
       await initialize();
     }
 
-    await _flutterTts.speak(text);
+    debugPrint('FlutterTTSEngine: calling _flutterTts.speak()...');
+    final result = await _flutterTts.speak(text);
+    debugPrint('FlutterTTSEngine: speak() returned, result=$result');
   }
 
   @override
   Future<void> stop() async {
+    debugPrint('FlutterTTSEngine: stop() called');
     await _flutterTts.stop();
+    debugPrint('FlutterTTSEngine: stop() completed');
   }
 
   @override

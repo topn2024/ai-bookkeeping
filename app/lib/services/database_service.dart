@@ -30,7 +30,7 @@ class DatabaseService implements IDatabaseService {
   final Logger _logger = Logger();
 
   // 当前数据库版本
-  static const int currentVersion = 18;
+  static const int currentVersion = 19;
 
   factory DatabaseService() => _instance;
 
@@ -234,13 +234,25 @@ class DatabaseService implements IDatabaseService {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         description TEXT,
-        iconCode INTEGER NOT NULL,
-        colorValue INTEGER NOT NULL,
+        iconCode INTEGER,
+        colorValue INTEGER,
         isDefault INTEGER NOT NULL DEFAULT 0,
         createdAt INTEGER NOT NULL,
         updatedAt INTEGER,
         isDeleted INTEGER NOT NULL DEFAULT 0,
-        deletedAt INTEGER
+        deletedAt INTEGER,
+        ownerId TEXT DEFAULT 'default_user',
+        type TEXT DEFAULT 'personal',
+        icon INTEGER,
+        iconFontFamily TEXT,
+        color INTEGER,
+        memberIds TEXT,
+        visibility TEXT DEFAULT 'members',
+        inviteCode TEXT,
+        inviteCodeExpiry TEXT,
+        isArchived INTEGER DEFAULT 0,
+        settings TEXT,
+        coverImage TEXT
       )
     ''');
 
@@ -1353,6 +1365,54 @@ class DatabaseService implements IDatabaseService {
 
       _logger.info('Version 18 migration completed', tag: 'DB');
     }
+
+    // Version 19: Add missing columns to ledgers table to match Ledger model
+    if (oldVersion < 19) {
+      _logger.info('Starting version 19 migration...', tag: 'DB');
+
+      // List of columns to add with their definitions
+      final columnsToAdd = <String, String>{
+        'ownerId': 'TEXT DEFAULT \'default_user\'',
+        'type': 'TEXT DEFAULT \'personal\'',
+        'icon': 'INTEGER',
+        'iconFontFamily': 'TEXT',
+        'color': 'INTEGER',
+        'memberIds': 'TEXT',
+        'visibility': 'TEXT DEFAULT \'members\'',
+        'inviteCode': 'TEXT',
+        'inviteCodeExpiry': 'TEXT',
+        'isArchived': 'INTEGER DEFAULT 0',
+        'settings': 'TEXT',
+        'coverImage': 'TEXT',
+      };
+
+      for (final entry in columnsToAdd.entries) {
+        try {
+          await db.execute('''
+            ALTER TABLE ledgers ADD COLUMN ${entry.key} ${entry.value}
+          ''');
+          _logger.info('Added ${entry.key} column to ledgers table', tag: 'DB');
+        } catch (e) {
+          // Column might already exist, that's OK
+          _logger.debug('Column ${entry.key} may already exist: $e', tag: 'DB');
+        }
+      }
+
+      // Migrate existing data: copy iconCode to icon, colorValue to color
+      try {
+        await db.execute('''
+          UPDATE ledgers SET icon = iconCode WHERE icon IS NULL AND iconCode IS NOT NULL
+        ''');
+        await db.execute('''
+          UPDATE ledgers SET color = colorValue WHERE color IS NULL AND colorValue IS NOT NULL
+        ''');
+        _logger.info('Migrated iconCode/colorValue to icon/color', tag: 'DB');
+      } catch (e) {
+        _logger.debug('Icon/color migration skipped: $e', tag: 'DB');
+      }
+
+      _logger.info('Version 19 migration completed', tag: 'DB');
+    }
   }
 
   // ==================== 事务支持 ====================
@@ -1750,16 +1810,42 @@ class DatabaseService implements IDatabaseService {
       'ledgers',
       where: includeDeleted ? null : 'isDeleted = 0',
     );
-    return maps.map((map) => Ledger(
-      id: map['id'] as String,
-      name: map['name'] as String,
-      description: map['description'] as String?,
-      icon: IconData(map['iconCode'] as int, fontFamily: 'MaterialIcons'),
-      color: Color(map['colorValue'] as int),
-      isDefault: (map['isDefault'] as int) == 1,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
-      ownerId: (map['ownerId'] as String?) ?? 'default_user',
-    )).toList();
+    return maps.map((map) {
+      // 兼容新旧列名: icon/iconCode, color/colorValue
+      final iconCode = map['icon'] ?? map['iconCode'];
+      final colorValue = map['color'] ?? map['colorValue'];
+      final iconFontFamily = map['iconFontFamily'] as String? ?? 'MaterialIcons';
+
+      // 兼容 createdAt 的两种格式: int (毫秒时间戳) 或 String (ISO8601)
+      DateTime createdAt;
+      final createdAtValue = map['createdAt'];
+      if (createdAtValue is int) {
+        createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtValue);
+      } else if (createdAtValue is String) {
+        createdAt = DateTime.tryParse(createdAtValue) ?? DateTime.now();
+      } else {
+        createdAt = DateTime.now();
+      }
+
+      // 安全转换 int 值，兼容 String 和 int 类型
+      int safeInt(dynamic value, int defaultValue) {
+        if (value == null) return defaultValue;
+        if (value is int) return value;
+        if (value is String) return int.tryParse(value) ?? defaultValue;
+        return defaultValue;
+      }
+
+      return Ledger(
+        id: map['id'] as String,
+        name: map['name'] as String,
+        description: map['description'] as String?,
+        icon: IconData(safeInt(iconCode, 0xe88a), fontFamily: iconFontFamily), // 默认 home 图标
+        color: Color(safeInt(colorValue, 0xFF2196F3)), // 默认蓝色
+        isDefault: safeInt(map['isDefault'], 0) == 1,
+        createdAt: createdAt,
+        ownerId: (map['ownerId'] as String?) ?? 'default_user',
+      );
+    }).toList();
   }
 
   /// Get the default ledger, or the first ledger if none is marked as default
@@ -1775,14 +1861,38 @@ class DatabaseService implements IDatabaseService {
     if (maps.isEmpty) return null;
 
     final map = maps.first;
+    // 兼容新旧列名: icon/iconCode, color/colorValue
+    final iconCode = map['icon'] ?? map['iconCode'];
+    final colorValue = map['color'] ?? map['colorValue'];
+    final iconFontFamily = map['iconFontFamily'] as String? ?? 'MaterialIcons';
+
+    // 兼容 createdAt 的两种格式: int (毫秒时间戳) 或 String (ISO8601)
+    DateTime createdAt;
+    final createdAtValue = map['createdAt'];
+    if (createdAtValue is int) {
+      createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtValue);
+    } else if (createdAtValue is String) {
+      createdAt = DateTime.tryParse(createdAtValue) ?? DateTime.now();
+    } else {
+      createdAt = DateTime.now();
+    }
+
+    // 安全转换 int 值，兼容 String 和 int 类型
+    int safeInt(dynamic value, int defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? defaultValue;
+      return defaultValue;
+    }
+
     return Ledger(
       id: map['id'] as String,
       name: map['name'] as String,
       description: map['description'] as String?,
-      icon: IconData(map['iconCode'] as int, fontFamily: 'MaterialIcons'),
-      color: Color(map['colorValue'] as int),
-      isDefault: (map['isDefault'] as int) == 1,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
+      icon: IconData(safeInt(iconCode, 0xe88a), fontFamily: iconFontFamily),
+      color: Color(safeInt(colorValue, 0xFF2196F3)),
+      isDefault: safeInt(map['isDefault'], 0) == 1,
+      createdAt: createdAt,
       ownerId: (map['ownerId'] as String?) ?? 'default_user',
     );
   }

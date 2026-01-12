@@ -61,7 +61,7 @@ class EntityDisambiguationService extends ChangeNotifier {
       RegExp(r'(打车|地铁|公交|加油|停车)'),
       RegExp(r'(超市|淘宝|京东|购物)'),
       RegExp(r'(电影|游戏|旅游|娱乐)'),
-      RegExp(r'(工资|奖金|收入|入账)'),
+      RegExp(r'(工资|奖金|收入|入账|捡到|中奖|返现|退款)'),
     ],
     // 金额指代
     ReferenceType.amount: [
@@ -306,7 +306,7 @@ class EntityDisambiguationService extends ChangeNotifier {
       '打车': '交通', '地铁': '交通', '公交': '交通', '加油': '交通', '停车': '交通',
       '超市': '购物', '淘宝': '购物', '京东': '购物', '购物': '购物',
       '电影': '娱乐', '游戏': '娱乐', '旅游': '娱乐', '娱乐': '娱乐',
-      '工资': '收入', '奖金': '收入', '收入': '收入', '入账': '收入',
+      '工资': '收入', '奖金': '收入', '收入': '收入', '入账': '收入', '捡到': '收入', '中奖': '收入', '返现': '收入', '退款': '收入',
     };
 
     for (final entry in categoryMap.entries) {

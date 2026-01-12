@@ -4,16 +4,19 @@ import 'package:flutter/material.dart';
 /// 波浪动画组件
 ///
 /// 用于录音时在悬浮球中显示动态波形
+/// - 无声音时显示水平直线
+/// - 有声音时显示流动的正弦波，振幅根据音量变化
 class WaveformAnimation extends StatefulWidget {
   final Color color;
   final double size;
-  final int barCount;
+  /// 真实振幅值 (0.0 - 1.0)
+  final double? amplitude;
 
   const WaveformAnimation({
     super.key,
     this.color = Colors.white,
     this.size = 24,
-    this.barCount = 5,
+    this.amplitude,
   });
 
   @override
@@ -23,31 +26,15 @@ class WaveformAnimation extends StatefulWidget {
 class _WaveformAnimationState extends State<WaveformAnimation>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late List<Animation<double>> _animations;
-  final Random _random = Random();
 
   @override
   void initState() {
     super.initState();
+    // 动画控制器，用于波浪流动效果
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 800),
     )..repeat();
-
-    // 为每个柱子创建不同相位的动画
-    _animations = List.generate(widget.barCount, (index) {
-      final delay = index / widget.barCount;
-      return Tween<double>(begin: 0.3, end: 1.0).animate(
-        CurvedAnimation(
-          parent: _controller,
-          curve: Interval(
-            delay,
-            delay + 0.5 > 1.0 ? 1.0 : delay + 0.5,
-            curve: Curves.easeInOut,
-          ),
-        ),
-      );
-    });
   }
 
   @override
@@ -65,13 +52,8 @@ class _WaveformAnimationState extends State<WaveformAnimation>
           size: Size(widget.size, widget.size),
           painter: _WaveformPainter(
             color: widget.color,
-            barCount: widget.barCount,
-            amplitudes: List.generate(widget.barCount, (index) {
-              // 添加一些随机性使动画更自然
-              final baseValue = _animations[index].value;
-              final randomFactor = 0.8 + _random.nextDouble() * 0.4;
-              return (baseValue * randomFactor).clamp(0.2, 1.0);
-            }),
+            amplitude: widget.amplitude ?? 0.0,
+            phase: _controller.value * 2 * pi, // 相位随时间变化，产生流动效果
           ),
         );
       },
@@ -82,13 +64,13 @@ class _WaveformAnimationState extends State<WaveformAnimation>
 /// 波形绘制器
 class _WaveformPainter extends CustomPainter {
   final Color color;
-  final int barCount;
-  final List<double> amplitudes;
+  final double amplitude; // 0.0 - 1.0
+  final double phase; // 动画相位
 
   _WaveformPainter({
     required this.color,
-    required this.barCount,
-    required this.amplitudes,
+    required this.amplitude,
+    required this.phase,
   });
 
   @override
@@ -96,27 +78,52 @@ class _WaveformPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = size.width / (barCount * 2.5);
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke;
 
-    final barWidth = size.width / (barCount * 2 - 1);
-    final maxHeight = size.height * 0.8;
     final centerY = size.height / 2;
+    final maxAmplitude = size.height * 0.38; // 最大振幅高度
 
-    for (int i = 0; i < barCount; i++) {
-      final x = i * barWidth * 2 + barWidth / 2;
-      final height = maxHeight * amplitudes[i];
+    // 检查是否有声音（振幅是否足够大）
+    final hasSound = amplitude > 0.1;
 
+    if (!hasSound) {
+      // 无声音：画一条水平直线
       canvas.drawLine(
-        Offset(x, centerY - height / 2),
-        Offset(x, centerY + height / 2),
+        Offset(0, centerY),
+        Offset(size.width, centerY),
         paint,
       );
+    } else {
+      // 有声音：画流动的正弦波
+      final path = Path();
+      final waveCount = 2.0; // 波浪数量
+      final points = 50; // 采样点数量
+
+      for (int i = 0; i <= points; i++) {
+        final x = (i / points) * size.width;
+        final progress = i / points;
+
+        // 使用正弦函数创建波浪，phase 使波浪流动
+        final sineValue = sin(progress * waveCount * 2 * pi + phase);
+        // 振幅随位置变化（中间大，两端小），乘以实际音量振幅
+        final envelopeValue = sin(progress * pi);
+        final y = centerY + sineValue * amplitude * maxAmplitude * envelopeValue;
+
+        if (i == 0) {
+          path.moveTo(x, y);
+        } else {
+          path.lineTo(x, y);
+        }
+      }
+
+      canvas.drawPath(path, paint);
     }
   }
 
   @override
   bool shouldRepaint(covariant _WaveformPainter oldDelegate) {
-    return oldDelegate.amplitudes != amplitudes;
+    return oldDelegate.amplitude != amplitude || oldDelegate.phase != phase;
   }
 }
 

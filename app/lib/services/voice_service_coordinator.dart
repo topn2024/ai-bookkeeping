@@ -15,6 +15,7 @@ import 'voice/conversation_context.dart';
 import 'voice/barge_in_detector.dart';
 import 'voice/ai_intent_decomposer.dart';
 import 'voice/smart_intent_recognizer.dart';
+import 'voice/llm_response_generator.dart';
 import 'voice_recognition_engine.dart';
 import 'tts_service.dart';
 import 'voice_navigation_service.dart';
@@ -272,6 +273,15 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       _sessionState = VoiceSessionState.processing;
       notifyListeners();
 
+      // 预检查：过滤无效或异常的输入
+      final invalidReason = _checkInvalidInput(voiceInput);
+      if (invalidReason != null) {
+        debugPrint('[VoiceCoordinator] 无效输入: $invalidReason');
+        _sessionState = VoiceSessionState.idle;
+        notifyListeners();
+        return VoiceSessionResult.error(invalidReason);
+      }
+
       // 记录命令历史
       final command = VoiceCommand(
         input: voiceInput,
@@ -438,6 +448,15 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       _sessionState = VoiceSessionState.processing;
       notifyListeners();
 
+      // 预检查：过滤无效或异常的输入
+      final invalidReason = _checkInvalidInput(voiceInput);
+      if (invalidReason != null) {
+        debugPrint('[VoiceCoordinator] 多意图处理 - 无效输入: $invalidReason');
+        _sessionState = VoiceSessionState.idle;
+        notifyListeners();
+        return VoiceSessionResult.error(invalidReason);
+      }
+
       // 记录命令历史
       final command = VoiceCommand(
         input: voiceInput,
@@ -524,8 +543,16 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       _sessionState = VoiceSessionState.idle;
       notifyListeners();
 
-      final message = '已记录$executedCount笔交易${navigationMessage != null ? '，$navigationMessage' : ''}';
-      await _ttsService.speak(message);
+      // 使用LLM生成多笔交易的回复
+      final llmGenerator = LLMResponseGenerator.instance;
+      final message = await llmGenerator.generateResponse(
+        action: '记账',
+        result: '成功记录$executedCount笔交易',
+        success: true,
+        userInput: null,
+      );
+      final finalMessage = navigationMessage != null ? '$message，$navigationMessage' : message;
+      await _ttsService.speak(finalMessage);
 
       return VoiceSessionResult.success(message, {
         'executedCount': executedCount,
@@ -840,7 +867,18 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         final sessionData = _currentSession!.sessionData as Map<String, dynamic>;
         final transaction = sessionData['transaction'] as model.Transaction;
         await _databaseService.insertTransaction(transaction);
-        final message = '已记录消费${transaction.amount.toStringAsFixed(2)}元';
+        // 使用LLM生成确认回复
+        final llmGen = LLMResponseGenerator.instance;
+        final message = await llmGen.generateTransactionResponse(
+          transactions: [
+            TransactionInfo(
+              amount: transaction.amount,
+              category: transaction.category,
+              isIncome: transaction.type == model.TransactionType.income,
+            ),
+          ],
+          userInput: '确认记录',
+        );
         await _ttsService.speak(message);
         result = VoiceSessionResult.success(message);
         break;
@@ -970,7 +1008,8 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   ) async {
     try {
       final entities = intentResult.entities;
-      final amount = entities['amount'] as double?;
+      // 使用 num 类型处理，因为 LLM 可能返回 int 或 double
+      final amount = (entities['amount'] as num?)?.toDouble();
       final category = entities['category'] as String?;
       final merchant = entities['merchant'] as String?;
 
@@ -1004,9 +1043,43 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       debugPrint('VoiceCoordinator: 重复检测结果: hasPotentialDuplicate=${duplicateCheck.hasPotentialDuplicate}, score=${duplicateCheck.similarityScore}');
 
       if (duplicateCheck.hasPotentialDuplicate) {
-        // 发现潜在重复，提示用户
-        final duplicateMessage = '检测到可能的重复记录：${duplicateCheck.duplicateReason}。是否仍要添加？请说"确认"或"取消"。';
-        await _ttsService.speak(duplicateMessage);
+        // 发现潜在重复，生成简洁的语音播报和详细的聊天记录
+        final similarTx = duplicateCheck.potentialDuplicates.isNotEmpty
+            ? duplicateCheck.potentialDuplicates.first
+            : null;
+
+        // 简洁的语音播报
+        String voiceMessage;
+        if (similarTx != null) {
+          final timeAgo = _getTimeAgoDescription(similarTx.date);
+          voiceMessage = '这笔和$timeAgo记的${similarTx.category}${similarTx.amount.toStringAsFixed(0)}元很像，要继续记吗？';
+        } else {
+          voiceMessage = '这笔可能是重复的，要继续记吗？';
+        }
+
+        // 详细的聊天记录内容
+        final detailMessage = StringBuffer();
+        detailMessage.writeln('⚠️ 检测到疑似重复记录');
+        if (similarTx != null) {
+          final timeStr = _formatDateTime(similarTx.date);
+          detailMessage.writeln('与 $timeStr 记录的「${similarTx.category} ${similarTx.amount}元」高度相似');
+        }
+        detailMessage.writeln('');
+        detailMessage.write('请说"确认"继续记录，或"取消"放弃');
+
+        // 等待即时反馈TTS播放完成
+        debugPrint('VoiceCoordinator: 准备播放重复确认提示，等待1秒让即时反馈TTS完成...');
+        await Future.delayed(const Duration(milliseconds: 1000));
+
+        // 先停止任何正在播放的TTS
+        debugPrint('VoiceCoordinator: 停止任何正在播放的TTS');
+        await _ttsService.stop();
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        // 播放简洁的语音提示
+        debugPrint('VoiceCoordinator: 开始播放TTS: $voiceMessage');
+        await _ttsService.speak(voiceMessage);
+        debugPrint('VoiceCoordinator: TTS播放完成');
 
         // 保存待确认的交易到会话
         _currentSession = VoiceSessionContext(
@@ -1018,10 +1091,8 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         _sessionState = VoiceSessionState.waitingForConfirmation;
         notifyListeners();
 
-        return VoiceSessionResult.success(duplicateMessage, {
-          'needsConfirmation': true,
-          'duplicateCheck': duplicateCheck,
-        });
+        // 返回详细内容给聊天记录
+        return VoiceSessionResult.waitingForConfirmation(detailMessage.toString());
       }
 
       await _databaseService.insertTransaction(transaction);
@@ -1034,11 +1105,18 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         date: DateTime.now(),
       );
 
-      // 使用自然语言响应生成
-      final message = ResponseTemplate.recordSuccess(
-        amount: amount,
-        category: category ?? '',
-        useNaturalStyle: true,
+      // 使用LLM生成自然语言响应（降级到模板）
+      final llmGenerator = LLMResponseGenerator.instance;
+      final message = await llmGenerator.generateTransactionResponse(
+        transactions: [
+          TransactionInfo(
+            amount: amount,
+            category: category ?? '其他',
+            isIncome: false,
+            merchant: merchant,
+          ),
+        ],
+        userInput: originalInput,
       );
       _conversationContext.addAssistantResponse(message, transactionRef: transactionRef);
 
@@ -1373,13 +1451,18 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       _clearSession();
 
-      String message;
-      if (validBills.length == 1) {
-        final billInfo = validBills.first;
-        message = '已记录${billInfo.typeDisplayName}${billInfo.amount!.toStringAsFixed(2)}元';
-      } else {
-        message = '已批量记录${validBills.length}笔交易，总金额${totalAmount.toStringAsFixed(2)}元';
-      }
+      // 使用LLM生成屏幕识别结果回复
+      final llmGen = LLMResponseGenerator.instance;
+      final txInfos = validBills.map((b) => TransactionInfo(
+        amount: b.amount!,
+        category: b.typeDisplayName ?? '其他',
+        isIncome: b.type == 'income',
+        merchant: b.merchant,
+      )).toList();
+      final message = await llmGen.generateTransactionResponse(
+        transactions: txInfos,
+        userInput: '屏幕识别记账',
+      );
       await _ttsService.speak(message);
 
       return VoiceSessionResult.success(message, {
@@ -1647,7 +1730,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       final entities = intentResult.entities;
       final operation = entities['operation'] as String? ?? 'query';
       final vaultName = entities['vaultName'] as String?;
-      final amount = entities['amount'] as double?;
+      final amount = (entities['amount'] as num?)?.toDouble();
 
       String message;
       Map<String, dynamic>? data;
@@ -1934,7 +2017,14 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
             final executedCount = await _executeCompleteIntents(multiResult.completeIntents);
             if (executedCount > 0) {
-              final message = '已记录$executedCount笔交易';
+              // 使用LLM生成回复
+              final llmGen = LLMResponseGenerator.instance;
+              final message = await llmGen.generateResponse(
+                action: '记账',
+                result: '成功记录$executedCount笔交易',
+                success: true,
+                userInput: originalInput,
+              );
               await _ttsService.speak(message);
               return VoiceSessionResult.success(message, {
                 'executedCount': executedCount,
@@ -2042,6 +2132,139 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     _sessionTimeoutTimer = Timer(timeout, () {
       _handleSessionTimeout();
     });
+  }
+
+  /// 检查输入是否无效或异常
+  ///
+  /// 返回无效原因，如果输入有效则返回 null
+  String? _checkInvalidInput(String input) {
+    final trimmed = input.trim();
+
+    // 1. 输入太短
+    if (trimmed.length < 2) {
+      return '没有听清楚，请再说一遍';
+    }
+
+    // 2. ASR识别错误的特征词（识别结果中包含这些通常表示识别出错）
+    final asrErrorPatterns = [
+      '没理解',
+      '没有理解',
+      '不理解',
+      '更清楚',
+      '说清楚',
+      '再说一遍',
+      '没听清',
+      '听不清',
+      '您的指',  // 被截断的"您的指令"
+      '您说的',
+    ];
+
+    for (final pattern in asrErrorPatterns) {
+      if (trimmed.contains(pattern)) {
+        return '没有听清楚，请再说一遍';
+      }
+    }
+
+    // 3. 纯噪音或无意义内容（只有语气词、叹词）
+    final noisePatterns = RegExp(r'^[啊呃嗯哦唔额哈嘿呀吧了的吗呢嘛，。、！？\s]+$');
+    if (noisePatterns.hasMatch(trimmed)) {
+      return '没有听清楚，请再说一遍';
+    }
+
+    // 4. 重复字符过多（可能是噪音）
+    if (_hasExcessiveRepetition(trimmed)) {
+      return '没有听清楚，请再说一遍';
+    }
+
+    // 5. 检查是否包含任何有意义的关键词
+    final meaningfulKeywords = [
+      // 记账相关
+      '花', '买', '吃', '喝', '付', '收', '转', '存', '取', '充',
+      '元', '块', '毛', '分',
+      // 数字
+      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+      '一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '百', '千', '万',
+      // 导航相关
+      '打开', '进入', '查看', '看看', '设置', '预算', '统计', '账户', '记录',
+      // 确认相关
+      '确认', '取消', '是', '否', '好', '行', '可以', '不',
+      // 查询相关
+      '多少', '几', '什么', '哪', '怎么',
+    ];
+
+    final hasMeaningfulContent = meaningfulKeywords.any((k) => trimmed.contains(k));
+    if (!hasMeaningfulContent && trimmed.length < 10) {
+      return '没有听清楚，请再说一遍';
+    }
+
+    return null; // 输入有效
+  }
+
+  /// 检查是否有过多重复字符
+  bool _hasExcessiveRepetition(String text) {
+    if (text.length < 4) return false;
+
+    // 检查连续重复字符
+    var maxRepeat = 1;
+    var currentRepeat = 1;
+    for (var i = 1; i < text.length; i++) {
+      if (text[i] == text[i - 1]) {
+        currentRepeat++;
+        if (currentRepeat > maxRepeat) {
+          maxRepeat = currentRepeat;
+        }
+      } else {
+        currentRepeat = 1;
+      }
+    }
+
+    // 超过3个连续重复字符认为是噪音
+    return maxRepeat > 3;
+  }
+
+  /// 获取相对时间描述（用于语音播报）
+  String _getTimeAgoDescription(DateTime dateTime) {
+    final now = DateTime.now();
+    final diff = now.difference(dateTime);
+
+    if (diff.inMinutes < 1) {
+      return '刚才';
+    } else if (diff.inMinutes < 5) {
+      return '${diff.inMinutes}分钟前';
+    } else if (diff.inMinutes < 30) {
+      return '${diff.inMinutes}分钟前';
+    } else if (diff.inHours < 1) {
+      return '半小时前';
+    } else if (diff.inHours < 2) {
+      return '1小时前';
+    } else if (diff.inHours < 24) {
+      return '${diff.inHours}小时前';
+    } else if (diff.inDays == 1) {
+      return '昨天';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays}天前';
+    } else {
+      return '${dateTime.month}月${dateTime.day}日';
+    }
+  }
+
+  /// 格式化日期时间（用于聊天记录显示）
+  String _formatDateTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final isToday = dateTime.year == now.year &&
+        dateTime.month == now.month &&
+        dateTime.day == now.day;
+
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+
+    if (isToday) {
+      return '今天 $hour:$minute';
+    } else if (dateTime.year == now.year) {
+      return '${dateTime.month}月${dateTime.day}日 $hour:$minute';
+    } else {
+      return '${dateTime.year}年${dateTime.month}月${dateTime.day}日 $hour:$minute';
+    }
   }
 
   /// 取消会话超时计时器
