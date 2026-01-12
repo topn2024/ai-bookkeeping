@@ -28,6 +28,12 @@ import 'add_transaction_page.dart';
 class MainNavigation extends ConsumerStatefulWidget {
   const MainNavigation({super.key});
 
+  /// 获取FAB按钮的GlobalKey（用于功能引导）
+  static GlobalKey get fabKey => _MainNavigationState._fabKey;
+
+  /// 获取小记导航栏的GlobalKey（用于功能引导）
+  static GlobalKey get xiaojiNavKey => _MainNavigationState._xiaojiNavKey;
+
   @override
   ConsumerState<MainNavigation> createState() => _MainNavigationState();
 }
@@ -40,6 +46,10 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
   bool _hasPermission = false;
   late AnimationController _pulseController;
   OverlayEntry? _recordingOverlay;
+
+  // GlobalKey for feature guide
+  static final GlobalKey _fabKey = GlobalKey();
+  static final GlobalKey _xiaojiNavKey = GlobalKey();
 
   // 录音自动停止配置
   static const int _maxRecordingSeconds = 15;  // 最大录音时长
@@ -96,8 +106,10 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
 
   /// 设置语音导航执行器
   void _setupVoiceNavigationExecutor() {
+    debugPrint('[MainNavigation] 设置语音导航标签切换器');
     // 设置标签切换器，允许语音导航切换底部标签
     VoiceNavigationExecutor.instance.setTabSwitcher((index) {
+      debugPrint('[MainNavigation] 切换到标签: $index');
       if (mounted) {
         setState(() {
           // 将语音导航索引映射到底部导航索引
@@ -202,8 +214,10 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
   Widget _buildCenterButton(BuildContext context) {
     return Transform.translate(
       offset: const Offset(0, 8),  // 向下偏移
-      child: GestureDetector(
-        onTap: () {
+      child: Container(
+        key: _fabKey,  // Add key for feature guide
+        child: GestureDetector(
+          onTap: () {
           // 单击进入手动记账
           Navigator.push(
             context,
@@ -255,6 +269,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
             );
           },
         ),
+      ),
       ),
     );
   }
@@ -424,7 +439,9 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
 
   /// 底部导航栏
   Widget _buildBottomNavBar(BuildContext context) {
-    return GlassBottomNavigation(
+    return Container(
+      key: _xiaojiNavKey,  // Add key for the navigation bar (targeting xiaoji tab)
+      child: GlassBottomNavigation(
       currentIndex: _currentIndex,
       onTap: (index) {
         // 跳过中间的占位项(index=2)
@@ -460,6 +477,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
           label: context.l10n.profile,
         ),
       ],
+    ),
     );
   }
 }

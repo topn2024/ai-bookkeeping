@@ -19,6 +19,10 @@ import 'today_allowance_page.dart';
 import 'money_age_page.dart';
 import 'category_detail_page.dart';
 import 'budget_center_page.dart';
+import '../services/feature_guide_service.dart';
+import '../models/guide_step.dart';
+import '../providers/feature_guide_provider.dart';
+import 'main_navigation.dart';
 
 /// 仪表盘首页
 /// 原型设计 1.01：仪表盘 Dashboard
@@ -37,6 +41,76 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   String? _activeItemId;
+
+  // GlobalKey for feature guide
+  static final GlobalKey appContentKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+
+    // 页面加载完成后检查是否需要显示引导
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowGuide();
+    });
+  }
+
+  /// 检查并显示功能引导
+  void _checkAndShowGuide() {
+    final shouldShow = ref.read(featureGuideProvider.notifier).shouldShowHomeGuide();
+
+    if (shouldShow && mounted) {
+      // 延迟一段时间，确保页面完全渲染
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (!mounted) return;
+
+        _showFeatureGuide();
+      });
+    }
+  }
+
+  /// 显示功能引导（3步）
+  void _showFeatureGuide() {
+    final steps = [
+      // 第1步：数据下钻
+      GuideStep(
+        id: 'home_guide',
+        targetKey: appContentKey,
+        title: '💡 数据下钻',
+        description: '首页展示的所有汇总数据都支持下钻\n\n点击任意数据卡片，即可查看详细信息和历史记录',
+        position: GuidePosition.center,
+      ),
+      // 第2步：语音操控
+      GuideStep(
+        id: 'voice_control',
+        targetKey: MainNavigation.fabKey,
+        title: '🎤 语音操控',
+        description: '语音是最强大的功能！\n\n• 语音记账："午餐花了50块"\n• 语音查询："这个月餐饮花了多少"\n• 语音导航："打开预算管理"\n\n长按此按钮即可开始',
+        position: GuidePosition.top,
+      ),
+      // 第3步：小记助手
+      GuideStep(
+        id: 'xiaoji_assistant',
+        targetKey: MainNavigation.xiaojiNavKey,
+        title: '🐾 小记助手',
+        description: '所有操作都会记录在小记中\n\n小记会帮你：\n• 记住你说过的话\n• 追踪账目变化\n• 提供智能建议\n\n随时点击查看对话历史',
+        position: GuidePosition.top,
+      ),
+    ];
+
+    FeatureGuideService.instance.showGuide(
+      context: context,
+      steps: steps,
+      onComplete: () {
+        debugPrint('[HomePage] Feature guide completed');
+        ref.read(featureGuideProvider.notifier).markHomeGuideShown();
+      },
+      onSkip: () {
+        debugPrint('[HomePage] Feature guide skipped');
+        ref.read(featureGuideProvider.notifier).markHomeGuideShown();
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,8 +146,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
 
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
+      body: Container(
+        key: appContentKey,  // Add key for feature guide
+        child: SingleChildScrollView(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeaderGradient(context, theme, balance, colors),
@@ -87,6 +163,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             const SizedBox(height: 100), // 底部导航栏留白
           ],
         ),
+      ),
       ),
     );
   }
