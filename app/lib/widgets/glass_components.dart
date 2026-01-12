@@ -1,5 +1,7 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'dart:io' show Platform;
 import '../theme/antigravity_shadows.dart';
 
 /// 玻璃态效果组件 (Glassmorphism Components)
@@ -362,7 +364,11 @@ class _FloatingCardState extends State<FloatingCard> {
 
   @override
   Widget build(BuildContext context) {
-    final currentLevel = _isHovered && widget.enableHover
+    // 检测是否为桌面平台（仅桌面端和Web端启用悬浮效果）
+    final isDesktop = kIsWeb || Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+    final shouldEnableHover = isDesktop && widget.enableHover;
+
+    final currentLevel = _isHovered && shouldEnableHover
         ? widget.shadowLevel + 1
         : widget.shadowLevel;
 
@@ -372,7 +378,7 @@ class _FloatingCardState extends State<FloatingCard> {
       padding: widget.padding ?? const EdgeInsets.all(16),
       transform: Matrix4.translationValues(
         0,
-        _isHovered ? -2 : 0,
+        _isHovered && shouldEnableHover ? -2 : 0,
         0,
       ),
       decoration: BoxDecoration(
@@ -387,14 +393,22 @@ class _FloatingCardState extends State<FloatingCard> {
       card = Padding(padding: widget.margin!, child: card);
     }
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
+    // 仅在桌面平台使用 MouseRegion，移动端直接返回卡片
+    if (shouldEnableHover) {
+      return MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: card,
+        ),
+      );
+    } else {
+      return GestureDetector(
         onTap: widget.onTap,
         child: card,
-      ),
-    );
+      );
+    }
   }
 }
 
