@@ -63,7 +63,8 @@ class LocaleNotifier extends Notifier<LocaleState> {
   @override
   LocaleState build() {
     _loadSettings();
-    return LocaleState(effectiveLanguage: getSystemLanguage());
+    // 默认使用简体中文
+    return LocaleState(effectiveLanguage: AppLanguage.zhCN);
   }
 
   /// 获取系统语言
@@ -101,13 +102,14 @@ class LocaleNotifier extends Notifier<LocaleState> {
       );
       _syncLocalizationServices(selected);
     } else {
-      // 跟随系统
-      final systemLanguage = getSystemLanguage();
+      // 默认使用简体中文（首次启动）
       state = LocaleState(
-        selectedLanguage: null,
-        effectiveLanguage: systemLanguage,
+        selectedLanguage: AppLanguage.zhCN,
+        effectiveLanguage: AppLanguage.zhCN,
       );
-      _syncLocalizationServices(systemLanguage);
+      _syncLocalizationServices(AppLanguage.zhCN);
+      // 保存默认设置
+      _saveSettings();
     }
   }
 

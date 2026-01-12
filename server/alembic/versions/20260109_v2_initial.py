@@ -164,14 +164,14 @@ def upgrade() -> None:
         sa.Column('user_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
         sa.Column('book_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('books.id', ondelete='CASCADE'), nullable=False),
         sa.Column('category_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('categories.id', ondelete='CASCADE'), nullable=True),
-        sa.Column('name', sa.String(100), server_default='Budget'),
+        sa.Column('name', sa.String(100), nullable=False, server_default='Budget'),  # Fixed: added nullable=False to match model
         sa.Column('budget_type', sa.Integer(), nullable=False),  # 1: monthly, 2: yearly
         sa.Column('amount', sa.Numeric(15, 2), nullable=False),
         sa.Column('year', sa.Integer(), nullable=False),
         sa.Column('month', sa.Integer(), nullable=True),  # NULL for yearly
         sa.Column('is_active', sa.Boolean(), server_default='true'),
         sa.Column('created_at', sa.DateTime(), nullable=False),
-        sa.Column('updated_at', sa.DateTime(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(), nullable=False),  # Note: model has onupdate, will be handled by SQLAlchemy
         sa.CheckConstraint('amount > 0', name='ck_budgets_amount_positive'),
         sa.CheckConstraint('budget_type IN (1, 2)', name='ck_budgets_type'),
     )
@@ -323,27 +323,29 @@ def upgrade() -> None:
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column('book_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('books.id', ondelete='CASCADE'), nullable=False),
         sa.Column('inviter_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('invite_code', sa.String(20), unique=True, nullable=False),
-        sa.Column('role', sa.Integer(), server_default='2'),
-        sa.Column('max_uses', sa.Integer(), server_default='1'),
+        sa.Column('code', sa.String(20), unique=True, nullable=False),  # Fixed: invite_code -> code
+        sa.Column('voice_code', sa.String(6), nullable=True),  # Added: 6-digit voice code for phone invites
+        sa.Column('role', sa.Integer(), server_default='1'),  # Fixed: default role is 1 (member), not 2
+        sa.Column('max_uses', sa.Integer(), nullable=True),  # Fixed: NULL for unlimited, not default='1'
         sa.Column('used_count', sa.Integer(), server_default='0'),
-        sa.Column('expires_at', sa.DateTime(), nullable=True),
-        sa.Column('is_active', sa.Boolean(), server_default='true'),
+        sa.Column('status', sa.Integer(), server_default='0'),  # Fixed: is_active (Boolean) -> status (Integer): 0=active, 1=expired, 2=revoked, 3=accepted
+        sa.Column('expires_at', sa.DateTime(), nullable=False),  # Fixed: nullable=True -> nullable=False
         sa.Column('created_at', sa.DateTime(), nullable=False),
     )
-    op.create_index('idx_book_invitations_code', 'book_invitations', ['invite_code'])
+    op.create_index('idx_book_invitations_code', 'book_invitations', ['code'])  # Fixed: invite_code -> code
+    op.create_index('idx_book_invitations_voice_code', 'book_invitations', ['voice_code'])  # Added: index for voice_code
 
     # ==================== Family Book: Family Budgets ====================
     op.create_table(
         'family_budgets',
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column('book_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('books.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('period', sa.String(20), nullable=False),  # monthly/yearly
-        sa.Column('strategy', sa.Integer(), server_default='0'),  # 0: equal, 1: proportional, 2: custom
+        sa.Column('period', sa.String(7), nullable=False),  # Fixed: String(20) -> String(7), format: "YYYY-MM"
+        sa.Column('strategy', sa.Integer(), server_default='0'),  # 0: unified, 1: per_member, 2: per_category, 3: hybrid
         sa.Column('total_budget', sa.Numeric(15, 2), nullable=False),
         sa.Column('rules', postgresql.JSONB(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False),
-        sa.Column('updated_at', sa.DateTime(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(), nullable=True),  # Fixed: nullable=False -> nullable=True (matches model onupdate behavior)
     )
     op.create_index('idx_family_budgets_book_id', 'family_budgets', ['book_id'])
 
