@@ -209,37 +209,148 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
             height: 1.5,
           ),
         ),
-        // 如果有记账结果，显示卡片
-        if (metadata != null && metadata['amount'] != null) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isUser
-                  ? Colors.white.withValues(alpha: 0.15)
-                  : AppTheme.successColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+        // 显示详细的操作反馈
+        if (metadata != null) ...[
+          _buildActionFeedback(metadata, isUser),
+        ],
+      ],
+    );
+  }
+
+  /// 构建操作反馈卡片
+  Widget _buildActionFeedback(Map<String, dynamic> metadata, bool isUser) {
+    // 获取操作结果列表
+    final results = metadata['results'] as List?;
+    final actionType = metadata['action_type'] as String?;
+
+    if (results == null || results.isEmpty) {
+      // 兼容旧格式：单笔记账
+      if (metadata['amount'] != null) {
+        return _buildSingleTransactionCard(metadata, isUser);
+      }
+      return const SizedBox.shrink();
+    }
+
+    // 多笔操作反馈
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        ...results.map((result) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _buildResultCard(result, isUser, actionType),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  /// 构建单笔交易卡片（兼容旧格式）
+  Widget _buildSingleTransactionCard(Map<String, dynamic> metadata, bool isUser) {
+    final success = metadata['success'] ?? true;
+    final amount = metadata['amount'];
+    final category = metadata['category'];
+    final merchant = metadata['merchant'];
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isUser
+            ? Colors.white.withValues(alpha: 0.15)
+            : (success ? AppTheme.successColor : Colors.red).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            success ? Icons.check_circle : Icons.error_outline,
+            size: 16,
+            color: isUser ? Colors.white : (success ? AppTheme.successColor : Colors.red),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              success
+                  ? '已记录 ¥$amount${category != null ? " · $category" : ""}${merchant != null ? " · $merchant" : ""}'
+                  : '记录失败: ${metadata['error'] ?? "未知错误"}',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isUser ? Colors.white : AppTheme.textPrimaryColor,
+              ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 构建结果卡片
+  Widget _buildResultCard(Map<String, dynamic> result, bool isUser, String? actionType) {
+    final success = result['success'] ?? false;
+    final amount = result['amount'];
+    final type = result['type'];
+    final category = result['category'];
+    final merchant = result['merchant'];
+    final description = result['description'];
+    final errorMessage = result['error_message'];
+
+    Color backgroundColor;
+    Color iconColor;
+    IconData icon;
+
+    if (success) {
+      backgroundColor = isUser
+          ? Colors.white.withValues(alpha: 0.15)
+          : AppTheme.successColor.withValues(alpha: 0.1);
+      iconColor = isUser ? Colors.white : AppTheme.successColor;
+      icon = Icons.check_circle;
+    } else {
+      backgroundColor = isUser
+          ? Colors.white.withValues(alpha: 0.15)
+          : Colors.red.withValues(alpha: 0.1);
+      iconColor = isUser ? Colors.white : Colors.red;
+      icon = Icons.error_outline;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: iconColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.check_circle,
-                  size: 16,
-                  color: isUser ? Colors.white : AppTheme.successColor,
-                ),
-                const SizedBox(width: 8),
+                // 第一行：类型和金额
                 Text(
-                  '已记录 ¥${metadata['amount']}',
+                  success
+                      ? '${type == "expense" ? "支出" : "收入"} ¥$amount'
+                      : errorMessage ?? '操作失败',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: isUser ? Colors.white : AppTheme.successColor,
+                    color: isUser ? Colors.white : AppTheme.textPrimaryColor,
                   ),
                 ),
-                if (metadata['category'] != null) ...[
+                // 第二行：详细信息
+                if (success && (category != null || merchant != null || description != null)) ...[
+                  const SizedBox(height: 4),
                   Text(
-                    ' · ${metadata['category']}',
+                    [
+                      if (category != null) category,
+                      if (merchant != null) merchant,
+                      if (description != null) description,
+                    ].join(' · '),
                     style: TextStyle(
                       fontSize: 12,
                       color: isUser
@@ -252,7 +363,7 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
             ),
           ),
         ],
-      ],
+      ),
     );
   }
 
