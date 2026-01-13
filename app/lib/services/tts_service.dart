@@ -19,7 +19,60 @@ import 'streaming_tts_service.dart';
 /// 3. 语音设置（语速、音量、音色）
 /// 4. 离线TTS支持
 /// 5. 流式合成模式（低延迟）
+///
+/// 单例模式使用：
+/// ```dart
+/// final tts = TTSService.instance;
+/// await tts.speak('Hello');
+/// ```
 class TTSService {
+  // ==================== 单例模式 ====================
+
+  /// 单例实例
+  static TTSService? _instance;
+
+  /// 获取单例实例
+  ///
+  /// 默认使用 FlutterTTS 引擎
+  static TTSService get instance {
+    _instance ??= TTSService._internal();
+    return _instance!;
+  }
+
+  /// 使用自定义配置创建单例
+  ///
+  /// 仅在首次调用时有效，后续调用返回已存在的实例
+  static TTSService instanceWith({
+    TTSEngine? engine,
+    TTSSettings? settings,
+    bool enableStreaming = false,
+  }) {
+    _instance ??= TTSService._internal(
+      engine: engine,
+      settings: settings,
+      enableStreaming: enableStreaming,
+    );
+    return _instance!;
+  }
+
+  /// 重置单例（仅用于测试）
+  @visibleForTesting
+  static void resetInstance() {
+    _instance?.dispose();
+    _instance = null;
+  }
+
+  /// 私有构造函数
+  TTSService._internal({
+    TTSEngine? engine,
+    TTSSettings? settings,
+    bool enableStreaming = false,
+  })  : _engine = engine ?? FlutterTTSEngine(),
+        _settings = settings ?? TTSSettings.defaultSettings(),
+        _streamingMode = enableStreaming;
+
+  // ==================== 实例成员 ====================
+
   final TTSEngine _engine;
   final TTSSettings _settings;
   bool _isInitialized = false;
@@ -37,13 +90,21 @@ class TTSService {
 
   final _speakingController = StreamController<TTSSpeakingState>.broadcast();
 
-  TTSService({
+  /// 创建独立实例（用于测试或特殊场景）
+  ///
+  /// 注意：这不会影响单例实例
+  @visibleForTesting
+  factory TTSService.forTesting({
     TTSEngine? engine,
     TTSSettings? settings,
     bool enableStreaming = false,
-  })  : _engine = engine ?? FlutterTTSEngine(),
-        _settings = settings ?? TTSSettings.defaultSettings(),
-        _streamingMode = enableStreaming;
+  }) {
+    return TTSService._internal(
+      engine: engine,
+      settings: settings,
+      enableStreaming: enableStreaming,
+    );
+  }
 
   /// 是否正在播报
   bool get isSpeaking => _isSpeaking;
@@ -154,7 +215,10 @@ class TTSService {
       await initialize();
     }
 
-    if (text.trim().isEmpty) {
+    // 预处理文本：移除不应被朗读的特殊字符
+    final processedText = _preprocessTextForTTS(text);
+
+    if (processedText.trim().isEmpty) {
       debugPrint('TTS: text is empty, returning');
       return;
     }
@@ -176,7 +240,7 @@ class TTSService {
       if (shouldUseStreaming && _streamingTTS != null) {
         // 使用流式TTS（低延迟），带超时保护
         try {
-          await _streamingTTS!.speak(text, interrupt: interrupt)
+          await _streamingTTS!.speak(processedText, interrupt: interrupt)
               .timeout(_streamingTimeout, onTimeout: () {
             debugPrint('TTS: streaming timeout, falling back to offline');
             throw TimeoutException('Streaming TTS timeout');
@@ -187,17 +251,17 @@ class TTSService {
           _streamingFailCount++;
           debugPrint('TTS: streaming fail count = $_streamingFailCount');
           // 降级到离线TTS
-          await _speakWithOfflineEngine(text);
+          await _speakWithOfflineEngine(processedText);
         } catch (e) {
           _streamingFailCount++;
           debugPrint('TTS: streaming error, fail count = $_streamingFailCount, error: $e');
           // 降级到离线TTS
-          await _speakWithOfflineEngine(text);
+          await _speakWithOfflineEngine(processedText);
         }
       } else {
         // 使用传统TTS（离线）
         debugPrint('TTS: using offline engine');
-        await _speakWithOfflineEngine(text);
+        await _speakWithOfflineEngine(processedText);
       }
 
       _isSpeaking = false;
@@ -217,6 +281,37 @@ class TTSService {
     await _engine.speak(text);
     debugPrint('TTS: _speakWithOfflineEngine() completed');
     _speakingController.add(TTSSpeakingState.completed);
+  }
+
+  /// 预处理文本，移除不应被TTS朗读的特殊字符
+  ///
+  /// TTS引擎会把某些符号（如波浪号~）当作独立词朗读出来，
+  /// 需要在播报前移除这些符号。
+  String _preprocessTextForTTS(String text) {
+    // 移除波浪号（会被TTS读成"波浪号"或奇怪的音）
+    // 移除其他装饰性符号
+    String processed = text
+        .replaceAll('~', '')
+        .replaceAll('～', '')  // 全角波浪号
+        .replaceAll('♪', '')
+        .replaceAll('♫', '')
+        .replaceAll('★', '')
+        .replaceAll('☆', '')
+        .replaceAll('♥', '')
+        .replaceAll('♡', '')
+        .replaceAll('→', '')
+        .replaceAll('←', '')
+        .replaceAll('↑', '')
+        .replaceAll('↓', '');
+
+    // 清理多余空格
+    processed = processed.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    if (text != processed) {
+      debugPrint('TTS: 文本预处理: "$text" -> "$processed"');
+    }
+
+    return processed;
   }
 
   /// 重置流式TTS失败计数（用于网络恢复后重试）
@@ -1149,9 +1244,11 @@ class TTSEngineFactory {
 /// TTS 服务构建器
 ///
 /// 方便创建配置好的 TTS 服务
+/// 注意：构建的是独立实例，不影响 TTSService.instance 单例
 class TTSServiceBuilder {
   TTSEngine? _engine;
   TTSSettings? _settings;
+  bool _enableStreaming = false;
 
   /// 设置引擎
   TTSServiceBuilder withEngine(TTSEngine engine) {
@@ -1168,6 +1265,12 @@ class TTSServiceBuilder {
   /// 使用阿里云 TTS 引擎
   TTSServiceBuilder useAlibabaTTS() {
     _engine = AlibabaCloudTTSEngine();
+    return this;
+  }
+
+  /// 启用流式模式
+  TTSServiceBuilder withStreaming(bool enabled) {
+    _enableStreaming = enabled;
     return this;
   }
 
@@ -1189,11 +1292,25 @@ class TTSServiceBuilder {
     return this;
   }
 
-  /// 构建 TTS 服务
+  /// 构建 TTS 服务（独立实例）
+  ///
+  /// 返回独立实例，不影响全局单例
   TTSService build() {
-    return TTSService(
+    return TTSService.forTesting(
       engine: _engine,
       settings: _settings,
+      enableStreaming: _enableStreaming,
+    );
+  }
+
+  /// 配置全局单例
+  ///
+  /// 仅在首次调用时有效
+  TTSService buildSingleton() {
+    return TTSService.instanceWith(
+      engine: _engine,
+      settings: _settings,
+      enableStreaming: _enableStreaming,
     );
   }
 }

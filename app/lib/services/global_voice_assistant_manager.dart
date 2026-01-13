@@ -166,6 +166,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   // 命令处理中（TTS播放期间忽略ASR结果）
   bool _isProcessingCommand = false;
 
+  // ASR输入静音（TTS播放期间停止向ASR发送音频，防止回声）
+  bool _isMutingASRInput = false;
+
   // 权限回调（由 UI 层设置）
   void Function(MicrophonePermissionStatus status)? onPermissionRequired;
 
@@ -316,7 +319,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
     _audioRecorder = AudioRecorder();
     _recognitionEngine = VoiceRecognitionEngine();
-    _ttsService = TTSService();
+    _ttsService = TTSService.instance;  // 使用单例
     await _ttsService!.initialize();
 
     // 初始化VAD服务
@@ -537,10 +540,13 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       _audioStreamSubscription = audioStream.listen((data) {
         final audioData = Uint8List.fromList(data);
 
-        // 1. 传输给流式ASR（TTS播放时跳过，但始终传输给ASR）
-        // 注意：即使在TTS播放时也要传输音频给ASR，只是ASR结果会被忽略
+        // 1. 传输给流式ASR
+        // 关键：TTS播放时不发送音频给ASR，避免回声被识别
         if (_audioStreamController != null && !_audioStreamController!.isClosed) {
-          _audioStreamController!.add(audioData);
+          if (!_isMutingASRInput) {
+            _audioStreamController!.add(audioData);
+          }
+          // TTS播放时不发送，避免回声
         }
 
         // 2. 发送到VAD进行语音活动检测（始终运行，用于打断检测）
@@ -587,6 +593,13 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         .transcribeStream(_audioStreamController!.stream)
         .listen(
       (result) {
+        // 检查是否为结束命令（即使在TTS播放中也要响应）
+        if (result.isFinal && _isVoiceEndCommand(result.text)) {
+          debugPrint('[GlobalVoiceAssistant] 检测到结束命令: "${result.text}"');
+          _handleVoiceEndCommand();
+          return;
+        }
+
         // 命令处理中或TTS播放期间忽略ASR结果（避免回声）
         if (_isProcessingCommand || _ttsService?.isSpeaking == true) {
           debugPrint('[GlobalVoiceAssistant] 处理中/TTS播放中，忽略ASR结果: "${result.text}"');
@@ -675,6 +688,16 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     if (_commandProcessor != null) {
       debugPrint('[GlobalVoiceAssistant] 使用外部命令处理器');
       try {
+        // 关键：停止向ASR发送音频，防止TTS回声被录入
+        _isMutingASRInput = true;
+        debugPrint('[GlobalVoiceAssistant] ASR输入已静音（防止回声）');
+
+        // 取消当前ASR会话（清除已缓冲的数据）
+        await _recognitionEngine?.cancelTranscription();
+        _asrResultSubscription?.cancel();
+        _asrResultSubscription = null;
+        debugPrint('[GlobalVoiceAssistant] ASR会话已取消');
+
         final response = await _commandProcessor!(recognizedText);
         if (response != null && response.isNotEmpty) {
           _addAssistantMessage(response);
@@ -696,15 +719,29 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
           // TTS播放完成，禁用打断检测
           _disableBargeInDetection();
+        }
 
-          // 延迟一段时间再清除处理中标志，等待可能的回声最终结果到达
-          // ASR的SentenceEnd可能比TTS播放完成晚到达约1秒
-          debugPrint('[GlobalVoiceAssistant] TTS播放完成，等待回声消散...');
-          await Future.delayed(const Duration(milliseconds: 1500));
-          debugPrint('[GlobalVoiceAssistant] 回声等待完成，准备接收新输入');
+        // 等待回声消散
+        debugPrint('[GlobalVoiceAssistant] 等待回声消散...');
+        await Future.delayed(const Duration(milliseconds: 500));
+        debugPrint('[GlobalVoiceAssistant] 回声等待完成');
+
+        // 恢复ASR输入
+        _isMutingASRInput = false;
+        debugPrint('[GlobalVoiceAssistant] ASR输入已恢复');
+
+        // 重新启动ASR会话（全新会话，无残留数据）
+        if (_ballState == FloatingBallState.recording) {
+          _startStreamingASR();
+          debugPrint('[GlobalVoiceAssistant] ASR会话已重启');
         }
       } catch (e) {
         debugPrint('[GlobalVoiceAssistant] 命令处理器错误: $e');
+        // 出错时也要恢复ASR
+        _isMutingASRInput = false;
+        if (_ballState == FloatingBallState.recording) {
+          _startStreamingASR();
+        }
       } finally {
         // 命令处理完成，清除处理中标志
         _isProcessingCommand = false;
@@ -714,27 +751,123 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       final immediateResponse = _getImmediateResponse(recognizedText);
       _addAssistantMessage(immediateResponse);
 
-      // 启用打断检测模式
-      _enableBargeInDetection();
+      try {
+        // 关键：停止向ASR发送音频，防止TTS回声被录入
+        _isMutingASRInput = true;
+        debugPrint('[GlobalVoiceAssistant] ASR输入已静音（防止回声）');
 
-      // 播放即时反馈
-      if (_ttsService != null) {
-        try {
-          await _ttsService!.speak(immediateResponse);
-        } catch (ttsError) {
-          debugPrint('[GlobalVoiceAssistant] TTS播报失败: $ttsError');
+        // 取消当前ASR会话（清除已缓冲的数据）
+        await _recognitionEngine?.cancelTranscription();
+        _asrResultSubscription?.cancel();
+        _asrResultSubscription = null;
+        debugPrint('[GlobalVoiceAssistant] ASR会话已取消');
+
+        // 启用打断检测模式
+        _enableBargeInDetection();
+
+        // 播放即时反馈
+        if (_ttsService != null) {
+          try {
+            await _ttsService!.speak(immediateResponse);
+          } catch (ttsError) {
+            debugPrint('[GlobalVoiceAssistant] TTS播报失败: $ttsError');
+          }
         }
+
+        // TTS播放完成，禁用打断检测
+        _disableBargeInDetection();
+
+        // 等待回声消散
+        debugPrint('[GlobalVoiceAssistant] TTS播放完成，等待回声消散...');
+        await Future.delayed(const Duration(milliseconds: 500));
+        debugPrint('[GlobalVoiceAssistant] 回声等待完成');
+
+        // 恢复ASR输入
+        _isMutingASRInput = false;
+        debugPrint('[GlobalVoiceAssistant] ASR输入已恢复');
+
+        // 重新启动ASR会话（全新会话，无残留数据）
+        if (_ballState == FloatingBallState.recording) {
+          _startStreamingASR();
+          debugPrint('[GlobalVoiceAssistant] ASR会话已重启');
+        }
+      } catch (e) {
+        debugPrint('[GlobalVoiceAssistant] 本地响应处理错误: $e');
+        // 出错时也要恢复ASR
+        _isMutingASRInput = false;
+        if (_ballState == FloatingBallState.recording) {
+          _startStreamingASR();
+        }
+      } finally {
+        _isProcessingCommand = false;
       }
-
-      // TTS播放完成，禁用打断检测
-      _disableBargeInDetection();
-
-      // 延迟一段时间再清除处理中标志，等待可能的回声最终结果到达
-      debugPrint('[GlobalVoiceAssistant] TTS播放完成，等待回声消散...');
-      await Future.delayed(const Duration(milliseconds: 1500));
-      debugPrint('[GlobalVoiceAssistant] 回声等待完成，准备接收新输入');
-      _isProcessingCommand = false;
     }
+
+    notifyListeners();
+  }
+
+  /// 检测是否为语音结束命令
+  ///
+  /// 支持的结束词："结束"、"停止"、"好了"、"谢谢"、"拜拜"、"再见"、"没了"
+  bool _isVoiceEndCommand(String text) {
+    if (text.isEmpty) return false;
+
+    // 结束命令关键词（精确匹配或包含）
+    const endKeywords = [
+      '结束',
+      '停止',
+      '好了',
+      '谢谢',
+      '拜拜',
+      '再见',
+      '没了',
+      '退出',
+      '关闭',
+    ];
+
+    final normalizedText = text.replaceAll(RegExp(r'[。，！？,.!?]'), '').trim();
+
+    // 检查是否以结束词结尾或完全匹配
+    for (final keyword in endKeywords) {
+      if (normalizedText == keyword ||
+          normalizedText.endsWith(keyword) ||
+          (normalizedText.length <= keyword.length + 2 && normalizedText.contains(keyword))) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// 处理语音结束命令
+  ///
+  /// 停止TTS播放，结束连续对话
+  Future<void> _handleVoiceEndCommand() async {
+    debugPrint('[GlobalVoiceAssistant] 处理语音结束命令');
+
+    // 1. 立即停止TTS
+    try {
+      await _ttsService?.stop();
+      debugPrint('[GlobalVoiceAssistant] TTS已停止');
+    } catch (e) {
+      debugPrint('[GlobalVoiceAssistant] 停止TTS失败: $e');
+    }
+
+    // 2. 清除处理中标志
+    _isProcessingCommand = false;
+
+    // 3. 添加系统消息到对话历史
+    _addAssistantMessage('好的，有需要随时叫我');
+
+    // 4. 播放简短告别语
+    try {
+      await _ttsService?.speak('好的');
+    } catch (e) {
+      debugPrint('[GlobalVoiceAssistant] 播放告别语失败: $e');
+    }
+
+    // 5. 停止录音
+    await stopRecording();
 
     notifyListeners();
   }
@@ -757,6 +890,22 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _isTTSPlayingWithBargeIn = false;
     _bargeInDetector?.notifyTTSStopped();
     _bargeInDetector?.stop();
+  }
+
+  /// 暂停ASR订阅（TTS播放期间避免回声）
+  void _pauseASRSubscription() {
+    if (_asrResultSubscription != null && !_asrResultSubscription!.isPaused) {
+      debugPrint('[GlobalVoiceAssistant] 暂停ASR订阅（防止回声）');
+      _asrResultSubscription!.pause();
+    }
+  }
+
+  /// 恢复ASR订阅
+  void _resumeASRSubscription() {
+    if (_asrResultSubscription != null && _asrResultSubscription!.isPaused) {
+      debugPrint('[GlobalVoiceAssistant] 恢复ASR订阅');
+      _asrResultSubscription!.resume();
+    }
   }
 
   /// 从PCM数据计算振幅
@@ -1079,6 +1228,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 添加助手消息
     _addAssistantMessage(proactiveMessage);
 
+    // 暂停ASR订阅，防止TTS回声被识别
+    _pauseASRSubscription();
+
     // 启用打断检测模式（录音继续运行，VAD检测用户打断）
     _enableBargeInDetection();
 
@@ -1096,11 +1248,15 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 禁用打断检测模式
     _disableBargeInDetection();
 
+    // 等待回声消散
+    debugPrint('[GlobalVoiceAssistant] 主动对话TTS完成，等待回声消散...');
+    await Future.delayed(const Duration(milliseconds: 1500));
+
     // 清除主动对话模式和处理中标志
     _isProactiveConversation = false;
     _isProcessingCommand = false;
 
-    // TTS播放完成后，重启ASR继续监听
+    // TTS播放完成后，恢复或重启ASR继续监听
     if (_ballState == FloatingBallState.recording &&
         _audioStreamController != null &&
         !_audioStreamController!.isClosed) {
@@ -1311,8 +1467,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _amplitudeSubscription?.cancel();
     _audioRecorder?.dispose();
 
-    // TTS
-    _ttsService?.dispose();
+    // 不释放 TTSService 单例 - 它是全局共享资源
 
     super.dispose();
   }
