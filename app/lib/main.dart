@@ -5,10 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'theme/app_theme.dart';
 import 'pages/main_navigation.dart';
-import 'pages/onboarding_flow_page.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
-import 'providers/onboarding_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/generated/app_localizations.dart' as gen;
 import 'core/logger.dart';
@@ -24,7 +22,7 @@ import 'services/database_service.dart';
 import 'services/global_voice_assistant_manager.dart';
 import 'services/voice_token_service.dart';
 import 'services/voice_context_route_observer.dart';
-import 'services/voice_service_coordinator.dart' show VoiceServiceCoordinator, VoiceSessionResult, VoiceSessionStatus;
+import 'services/voice_service_coordinator.dart' show VoiceSessionResult, VoiceSessionStatus;
 import 'providers/voice_coordinator_provider.dart';
 import 'providers/transaction_provider.dart';
 import 'widgets/global_floating_ball.dart';
@@ -104,7 +102,7 @@ void main() async {
   // Note: For production, these should be obtained from backend
   try {
     VoiceTokenService().configureDirectMode(
-      token: 'fc1cd8fba41b4dae95b5c88d7290e0a4',
+      token: '2d5310f789ce40999762c6092571d7c4',
       appKey: 'C8F0dz0ihFmvKH8G',
     );
     logger.info('Voice token service configured with direct mode', tag: 'App');
@@ -205,162 +203,87 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
   /// 设置命令处理器，将 GlobalVoiceAssistantManager 与 VoiceServiceCoordinator 集成
   ///
-  /// 交互策略：即时反馈 + 后台处理
-  /// 1. 收到语音输入后立即给出自然的回应（如"好的，我来帮你记录..."）
-  /// 2. 在后台异步处理实际的记账操作
-  /// 3. 处理完成后更新对话历史（不打断用户）
+  /// 交互策略：LLM 优先处理
+  /// 1. 收到语音输入后，使用 VoiceServiceCoordinator 处理（内部调用 SmartIntentRecognizer）
+  /// 2. VoiceServiceCoordinator 内部会播放 LLM 生成的自然语言响应
+  /// 3. 返回空字符串，避免 GlobalVoiceAssistantManager 重复播放 TTS
   void _setupCommandProcessor() {
     final coordinator = ref.read(voiceServiceCoordinatorProvider);
 
     GlobalVoiceAssistantManager.instance.setCommandProcessor((command) async {
       debugPrint('[App] 处理语音命令: $command');
 
-      // 1. 生成即时自然回应（先回复用户，让对话不断开）
-      final immediateResponse = _generateImmediateResponse(command);
-      debugPrint('[App] 即时反馈: $immediateResponse');
+      try {
+        // 检查是否可能包含多个意图
+        final intentRouter = coordinator.intentRouter;
+        final mightBeMultiple = intentRouter.mightContainMultipleIntents(command);
+        debugPrint('[App] 是否多意图: $mightBeMultiple');
 
-      // 2. 异步处理实际命令（不阻塞对话）
-      _processCommandInBackground(coordinator, command);
+        VoiceSessionResult result;
+        if (mightBeMultiple) {
+          result = await coordinator.processMultiIntentCommand(command);
+          // 多意图处理后自动确认执行（仅当确实有待确认的多意图时）
+          if (result.status == VoiceSessionStatus.success && coordinator.hasPendingMultiIntent) {
+            debugPrint('[App] 多意图识别成功，自动确认执行');
+            final confirmResult = await coordinator.confirmMultiIntents();
+            debugPrint('[App] 多意图执行结果: ${confirmResult.status} - ${confirmResult.message}');
+            result = confirmResult;
+          }
+        } else {
+          result = await coordinator.processVoiceCommand(command);
+        }
 
-      // 3. 立即返回自然回应
-      return immediateResponse;
+        debugPrint('[App] 处理完成: ${result.status}');
+
+        // 根据处理结果，向聊天记录添加详细反馈
+        if (result.status == VoiceSessionStatus.error) {
+          final errorMsg = result.errorMessage ?? '处理时遇到了问题';
+          debugPrint('[App] 处理出错: $errorMsg');
+          GlobalVoiceAssistantManager.instance.addResultMessage('❌ 处理失败：$errorMsg');
+        } else if (result.needsConfirmation) {
+          debugPrint('[App] 需要确认，等待用户回复...');
+          final confirmMsg = result.message ?? '需要您确认';
+          GlobalVoiceAssistantManager.instance.addResultMessage('⏳ $confirmMsg');
+          // 延迟让 TTS 播放完成，然后自动开始录音
+          await Future.delayed(const Duration(milliseconds: 2500));
+          debugPrint('[App] 自动开始录音等待确认');
+          GlobalVoiceAssistantManager.instance.startRecording();
+        } else if (result.status == VoiceSessionStatus.success) {
+          debugPrint('[App] 处理成功: ${result.message}');
+
+          // 生成详细的结果反馈
+          final resultFeedback = _generateResultFeedback(result, mightBeMultiple);
+          if (resultFeedback.isNotEmpty) {
+            GlobalVoiceAssistantManager.instance.addResultMessage(resultFeedback);
+          }
+
+          // 刷新交易列表，确保 UI 显示最新数据
+          debugPrint('[App] 刷新交易列表...');
+          await ref.read(transactionProvider.notifier).refresh();
+          debugPrint('[App] 交易列表已刷新');
+
+          // 如果结果包含导航路由，执行实际导航
+          final data = result.data;
+          if (data is Map<String, dynamic> && data.containsKey('route')) {
+            final route = data['route'] as String?;
+            if (route != null) {
+              debugPrint('[App] 执行导航: $route');
+              final success = await VoiceNavigationExecutor.instance.navigateToRoute(route);
+              debugPrint('[App] 导航结果: $success');
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('[App] 命令处理失败: $e');
+        GlobalVoiceAssistantManager.instance.addResultMessage('❌ 系统错误，请稍后重试');
+      }
+
+      // 返回空字符串，VoiceServiceCoordinator 已经播放了 TTS
+      // GlobalVoiceAssistantManager 收到空字符串不会再播放
+      return '';
     });
 
     logger.info('Command processor setup completed', tag: 'App');
-  }
-
-  /// 生成即时自然回应（让用户感到被理解）
-  String _generateImmediateResponse(String command) {
-    // 检测命令类型，生成相应的即时回应
-    final lowerCommand = command.toLowerCase();
-
-    // 多条记录
-    if (command.contains('然后') ||
-        command.contains('还有') ||
-        command.contains('另外') ||
-        command.contains('以及')) {
-      return '好的，我来帮你记录这几笔~';
-    }
-
-    // 记账相关
-    if (lowerCommand.contains('花') ||
-        lowerCommand.contains('买') ||
-        lowerCommand.contains('吃') ||
-        lowerCommand.contains('块') ||
-        lowerCommand.contains('元') ||
-        RegExp(r'\d+').hasMatch(command)) {
-      final responses = [
-        '好的，记下来了~',
-        '收到，帮你记上~',
-        '好嘞，已记录~',
-        '明白，记好了~',
-      ];
-      return responses[DateTime.now().millisecond % responses.length];
-    }
-
-    // 查询相关
-    if (lowerCommand.contains('多少') ||
-        lowerCommand.contains('查') ||
-        lowerCommand.contains('看看')) {
-      return '好的，我帮你查一下...';
-    }
-
-    // 导航相关
-    if (lowerCommand.contains('打开') ||
-        lowerCommand.contains('去') ||
-        lowerCommand.contains('跳转')) {
-      return '好的，马上~';
-    }
-
-    // 默认回应
-    return '好的，我来处理~';
-  }
-
-  /// 后台处理命令（异步，不阻塞对话）
-  Future<void> _processCommandInBackground(
-    VoiceServiceCoordinator coordinator,
-    String command,
-  ) async {
-    try {
-      // 所有命令统一走 SmartIntentRecognizer 多层架构处理
-      // Layer 1: 精确规则匹配 → Layer 2: 同义词扩展 → Layer 3: 模板匹配
-      // → Layer 4: 学习缓存 → Layer 5: LLM兜底
-
-      // 检查是否可能包含多个意图
-      final intentRouter = coordinator.intentRouter;
-      final mightBeMultiple = intentRouter.mightContainMultipleIntents(command);
-      debugPrint('[App] 后台处理 - 是否多意图: $mightBeMultiple');
-
-      VoiceSessionResult result;
-      if (mightBeMultiple) {
-        result = await coordinator.processMultiIntentCommand(command);
-        // 多意图处理后自动确认执行（仅当确实有待确认的多意图时）
-        if (result.status == VoiceSessionStatus.success && coordinator.hasPendingMultiIntent) {
-          debugPrint('[App] 多意图识别成功，自动确认执行');
-          final confirmResult = await coordinator.confirmMultiIntents();
-          debugPrint('[App] 多意图执行结果: ${confirmResult.status} - ${confirmResult.message}');
-          result = confirmResult;
-        }
-      } else {
-        result = await coordinator.processVoiceCommand(command);
-      }
-
-      debugPrint('[App] 后台处理完成: ${result.status}');
-
-      // 根据处理结果，向聊天记录添加详细反馈
-      if (result.status == VoiceSessionStatus.error) {
-        final errorMsg = result.errorMessage ?? '处理时遇到了问题';
-        debugPrint('[App] 处理出错: $errorMsg');
-        // 添加错误反馈到聊天记录
-        GlobalVoiceAssistantManager.instance.addResultMessage(
-          '❌ 处理失败：$errorMsg',
-        );
-      } else if (result.needsConfirmation) {
-        // 需要确认：等待TTS播放完成后自动开始录音
-        debugPrint('[App] 需要确认，等待用户回复...');
-        // 添加确认请求到聊天记录
-        final confirmMsg = result.message ?? '需要您确认';
-        GlobalVoiceAssistantManager.instance.addResultMessage(
-          '⏳ $confirmMsg',
-        );
-        // 延迟一下让TTS播放完成，然后自动开始录音
-        await Future.delayed(const Duration(milliseconds: 2500));
-        debugPrint('[App] 自动开始录音等待确认');
-        GlobalVoiceAssistantManager.instance.startRecording();
-      } else if (result.status == VoiceSessionStatus.success) {
-        final detailMsg = result.message;
-        debugPrint('[App] 处理成功: $detailMsg');
-
-        // 生成详细的结果反馈
-        final resultFeedback = _generateResultFeedback(result, mightBeMultiple);
-        if (resultFeedback.isNotEmpty) {
-          GlobalVoiceAssistantManager.instance.addResultMessage(resultFeedback);
-        }
-
-        // 刷新交易列表，确保UI显示最新数据
-        debugPrint('[App] 刷新交易列表...');
-        await ref.read(transactionProvider.notifier).refresh();
-        debugPrint('[App] 交易列表已刷新');
-
-        // 如果结果包含导航路由，执行实际导航
-        final data = result.data;
-        if (data is Map<String, dynamic> && data.containsKey('route')) {
-          final route = data['route'] as String?;
-          if (route != null) {
-            debugPrint('[App] 执行导航: $route');
-            // 直接使用已解析的路由，避免重复解析
-            final success = await VoiceNavigationExecutor.instance.navigateToRoute(route);
-            debugPrint('[App] 导航结果: $success');
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[App] 后台处理失败: $e');
-      // 添加异常反馈到聊天记录
-      GlobalVoiceAssistantManager.instance.addResultMessage(
-        '❌ 系统错误，请稍后重试',
-      );
-    }
   }
 
   /// 生成详细的结果反馈
@@ -383,7 +306,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             final amount = tx['amount'] ?? 0;
             final category = tx['category'] ?? '其他';
             final note = tx['note'] ?? '';
-            buffer.writeln('  • $category ${amount}元${note.isNotEmpty ? " ($note)" : ""}');
+            buffer.writeln('  • $category $amount元${note.isNotEmpty ? " ($note)" : ""}');
           }
         }
         return buffer.toString().trim();
@@ -395,7 +318,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         final category = data['category'] ?? '其他';
         final note = data['note'] ?? '';
         buffer.writeln('✅ 已记录：');
-        buffer.writeln('  • $category ${amount}元${note.isNotEmpty ? " ($note)" : ""}');
+        buffer.writeln('  • $category $amount元${note.isNotEmpty ? " ($note)" : ""}');
         return buffer.toString().trim();
       }
 
@@ -444,25 +367,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     return routeNames[route] ?? route;
   }
 
-  /// 检查是否是导航命令
-  bool _isNavigationCommand(String command) {
-    final navigationKeywords = [
-      '打开', '去', '跳转', '进入', '查看', '看看',
-      '想进行', '进行', '管理', '想看', '想去', '帮我打开',
-    ];
-    final targetKeywords = [
-      '设置', '配置', '首页', '主页', '预算', '报表', '统计',
-      '储蓄', '钱龄', '分析', '账户', '分类', '交易', '记录',
-      '语音', '主题', '通知', '提醒', '备份', '同步', '安全',
-      '账本', '习惯', '家庭', '导入', '导出', '搜索',
-    ];
-
-    final hasNavigationKeyword = navigationKeywords.any((k) => command.contains(k));
-    final hasTargetKeyword = targetKeywords.any((k) => command.contains(k));
-
-    return hasNavigationKeyword && hasTargetKeyword;
-  }
-
   @override
   void dispose() {
     // 清除命令处理器
@@ -491,7 +395,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     final themeNotifier = ref.read(themeProvider.notifier);
     final localeState = ref.watch(localeProvider);
     final l10n = ref.watch(localeProvider.notifier).l10n;
-    final onboardingState = ref.watch(onboardingProvider);
 
     // 根据是否使用自定义主题选择对应的 ThemeData
     final lightTheme = themeState.isUsingCustomTheme
@@ -500,22 +403,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     final darkTheme = themeState.isUsingCustomTheme
         ? themeNotifier.getDarkTheme()
         : AppTheme.createDarkTheme(themeNotifier.primaryColor);
-
-    // Show loading screen while checking onboarding status
-    if (onboardingState.isLoading) {
-      return MaterialApp(
-        title: l10n.appName,
-        debugShowCheckedModeBanner: false,
-        theme: lightTheme,
-        darkTheme: darkTheme,
-        themeMode: themeNotifier.themeMode,
-        home: const Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-      );
-    }
 
     return MaterialApp(
       title: l10n.appName,
@@ -542,9 +429,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      home: onboardingState.isCompleted
-          ? const MainNavigation()
-          : const OnboardingFlowPage(),
+      // 新引导方式：直接进入主页面，使用悬浮引导
+      // 功能引导会在 HomePage 中通过 FeatureGuideService 显示
+      home: const MainNavigation(),
     );
   }
 }
