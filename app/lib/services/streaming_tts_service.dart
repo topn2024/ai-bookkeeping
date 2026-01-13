@@ -194,6 +194,7 @@ class StreamingTTSService {
     // 使用Map存储Future，支持动态移除已完成的
     final audioFutures = <int, Future<File?>>{};
     final tempFiles = <File>[]; // 跟踪所有临时文件，确保清理
+    int successCount = 0; // 记录成功合成的句子数
 
     try {
       // 启动预取
@@ -219,6 +220,8 @@ class StreamingTTSService {
 
         if (audioFile == null || _isCancelled) continue;
 
+        successCount++; // 记录成功
+
         tempFiles.add(audioFile); // 跟踪临时文件
 
         // 记录首字延迟
@@ -242,6 +245,11 @@ class StreamingTTSService {
         // 立即删除已播放的临时文件
         _safeDeleteFile(audioFile);
         tempFiles.remove(audioFile);
+      }
+
+      // 如果所有句子都合成失败，抛出异常以便降级到离线TTS
+      if (successCount == 0 && sentences.isNotEmpty && !_isCancelled) {
+        throw Exception('All sentences synthesis failed');
       }
     } finally {
       // 确保清理所有临时文件（即使发生异常或取消）
