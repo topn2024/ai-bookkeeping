@@ -9,6 +9,7 @@ import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/logger.dart';
 import '../core/build_info.dart';
+import '../core/config/api_endpoints.dart';
 import 'app_config_service.dart';
 import 'bspatch_service.dart';
 
@@ -92,6 +93,7 @@ class VersionInfo {
   final String? fileMd5;
   final DateTime? publishedAt;
   final PatchInfo? patch;
+  final String? serverUrl;  // 记录版本信息来源的服务器URL
 
   VersionInfo({
     required this.versionName,
@@ -104,6 +106,7 @@ class VersionInfo {
     this.fileMd5,
     this.publishedAt,
     this.patch,
+    this.serverUrl,
   });
 
   factory VersionInfo.fromJson(Map<String, dynamic> json) {
@@ -252,30 +255,22 @@ class AppUpgradeService {
   /// 是否需要强制更新
   bool get isForceUpdate => _lastCheckResult?.isForceUpdate ?? false;
 
-  /// 检查更新
-  Future<UpdateCheckResult> checkUpdate({bool force = false}) async {
-    // 检查缓存
-    if (!force && _lastCheckResult != null && _lastCheckTime != null) {
-      final elapsed = DateTime.now().difference(_lastCheckTime!);
-      if (elapsed < _cacheExpiry) {
-        _logger.debug('Using cached update check result', tag: 'Upgrade');
-        return _lastCheckResult!;
-      }
-    }
-
+  /// 从单个服务器检查更新
+  Future<UpdateCheckResult?> _checkUpdateFromServer({
+    required String serverUrl,
+    required PackageInfo packageInfo,
+    required String deviceId,
+    required bool skipCertVerification,
+  }) async {
     try {
-      final config = AppConfigService().config;
-      final packageInfo = await PackageInfo.fromPlatform();
-      final deviceId = await _getDeviceId();
-
       final dio = Dio(BaseOptions(
-        baseUrl: config.apiBaseUrl,
+        baseUrl: serverUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),
       ));
 
       // 配置 SSL
-      if (config.skipCertificateVerification) {
+      if (skipCertVerification) {
         dio.httpClientAdapter = IOHttpClientAdapter(
           createHttpClient: () {
             final client = HttpClient();
@@ -297,19 +292,124 @@ class AppUpgradeService {
       );
 
       if (response.statusCode == 200) {
-        _lastCheckResult = UpdateCheckResult.fromJson(response.data);
-        _lastCheckTime = DateTime.now();
+        final result = UpdateCheckResult.fromJson(response.data);
 
-        _logger.info(
-          'Update check: hasUpdate=${_lastCheckResult!.hasUpdate}, '
-          'force=${_lastCheckResult!.isForceUpdate}',
-          tag: 'Upgrade',
-        );
+        // 如果有版本信息，记录服务器 URL
+        if (result.latestVersion != null) {
+          final versionWithServer = VersionInfo(
+            versionName: result.latestVersion!.versionName,
+            versionCode: result.latestVersion!.versionCode,
+            releaseNotes: result.latestVersion!.releaseNotes,
+            releaseNotesEn: result.latestVersion!.releaseNotesEn,
+            isForceUpdate: result.latestVersion!.isForceUpdate,
+            downloadUrl: result.latestVersion!.downloadUrl,
+            fileSize: result.latestVersion!.fileSize,
+            fileMd5: result.latestVersion!.fileMd5,
+            publishedAt: result.latestVersion!.publishedAt,
+            patch: result.latestVersion!.patch,
+            serverUrl: serverUrl,  // 记录服务器URL
+          );
 
-        return _lastCheckResult!;
+          return UpdateCheckResult(
+            hasUpdate: result.hasUpdate,
+            isForceUpdate: result.isForceUpdate,
+            hasPatch: result.hasPatch,
+            currentVersion: result.currentVersion,
+            latestVersion: versionWithServer,
+            message: result.message,
+          );
+        }
+
+        return result;
       }
     } catch (e) {
-      _logger.warning('Failed to check update: $e', tag: 'Upgrade');
+      _logger.debug('Failed to check update from $serverUrl: $e', tag: 'Upgrade');
+    }
+
+    return null;
+  }
+
+  /// 检查更新（支持多服务器）
+  Future<UpdateCheckResult> checkUpdate({bool force = false}) async {
+    // 检查缓存
+    if (!force && _lastCheckResult != null && _lastCheckTime != null) {
+      final elapsed = DateTime.now().difference(_lastCheckTime!);
+      if (elapsed < _cacheExpiry) {
+        _logger.debug('Using cached update check result', tag: 'Upgrade');
+        return _lastCheckResult!;
+      }
+    }
+
+    try {
+      final config = AppConfigService().config;
+      final packageInfo = await PackageInfo.fromPlatform();
+      final deviceId = await _getDeviceId();
+
+      // 获取所有可用的服务器 URL
+      final serverUrls = ApiEndpoints.allServerUrls;
+
+      _logger.info('Checking updates from ${serverUrls.length} servers', tag: 'Upgrade');
+
+      // 并发检查所有服务器
+      final futures = serverUrls.map((serverUrl) {
+        return _checkUpdateFromServer(
+          serverUrl: serverUrl,
+          packageInfo: packageInfo,
+          deviceId: deviceId,
+          skipCertVerification: config.skipCertificateVerification,
+        );
+      }).toList();
+
+      // 等待所有服务器响应（并发执行）
+      final results = await Future.wait(futures);
+
+      // 过滤出所有成功的结果
+      final successResults = results.where((r) => r != null).toList();
+
+      if (successResults.isEmpty) {
+        _logger.warning('All servers failed to respond', tag: 'Upgrade');
+        // 继续执行到返回错误结果
+      } else {
+        // 比较所有服务器的版本号，选择最高版本
+        UpdateCheckResult? bestResult;
+        int highestVersionCode = -1;
+
+        for (final result in successResults) {
+          if (result!.latestVersion != null) {
+            final versionCode = result.latestVersion!.versionCode;
+            if (versionCode > highestVersionCode) {
+              highestVersionCode = versionCode;
+              bestResult = result;
+            }
+          } else if (bestResult == null) {
+            // 如果没有版本信息，但是第一个结果，也保存
+            bestResult = result;
+          }
+        }
+
+        if (bestResult != null) {
+          _lastCheckResult = bestResult;
+          _lastCheckTime = DateTime.now();
+
+          final serverUrl = bestResult.latestVersion?.serverUrl ?? 'unknown';
+          final versionInfo = bestResult.latestVersion != null
+              ? '${bestResult.latestVersion!.versionName}+${bestResult.latestVersion!.versionCode}'
+              : 'unknown';
+
+          _logger.info(
+            'Update check: hasUpdate=${bestResult.hasUpdate}, '
+            'force=${bestResult.isForceUpdate}, '
+            'version=$versionInfo, '
+            'server=$serverUrl '
+            '(checked ${successResults.length}/${serverUrls.length} servers)',
+            tag: 'Upgrade',
+          );
+
+          return bestResult;
+        }
+      }
+    } catch (e) {
+      _logger.warning('Failed to check update from all servers: $e', tag: 'Upgrade');
     }
 
     // 返回无更新结果
@@ -317,7 +417,7 @@ class AppUpgradeService {
       hasUpdate: false,
       isForceUpdate: false,
       currentVersion: BuildInfo.version,
-      message: '检查更新失败',
+      message: '检查更新失败，请检查网络连接',
     );
   }
 
@@ -341,12 +441,19 @@ class AppUpgradeService {
       String fullDownloadUrl = version.downloadUrl!;
       if (!fullDownloadUrl.startsWith('http')) {
         // 相对路径，需要拼接服务器地址
+        // 优先使用版本信息中记录的服务器URL（版本检查时使用的服务器）
+        // 这样可以确保从同一个服务器下载，避免版本不一致问题
+        String baseUrl = version.serverUrl ?? config.apiBaseUrl;
+
         // apiBaseUrl 格式: https://160.202.238.29/api/v1
         // 需要提取 https://160.202.238.29
-        final baseUri = Uri.parse(config.apiBaseUrl);
+        final baseUri = Uri.parse(baseUrl);
         final serverBase = '${baseUri.scheme}://${baseUri.host}${baseUri.port != 80 && baseUri.port != 443 ? ':${baseUri.port}' : ''}';
         fullDownloadUrl = '$serverBase$fullDownloadUrl';
-        _logger.info('Constructed full download URL: $fullDownloadUrl', tag: 'Upgrade');
+        _logger.info(
+          'Constructed full download URL: $fullDownloadUrl (from ${version.serverUrl != null ? "version check server" : "config"})',
+          tag: 'Upgrade',
+        );
       }
       final dir = await getExternalStorageDirectory();
       if (dir == null) {
@@ -360,21 +467,29 @@ class AppUpgradeService {
         await downloadDir.create(recursive: true);
       }
 
+      // 文件名包含版本号和构建号，避免版本冲突
       final savePath =
-          '${downloadDir.path}/ai_bookkeeping_${version.versionName}.apk';
+          '${downloadDir.path}/ai_bookkeeping_${version.versionName}_${version.versionCode}.apk';
       final tempPath = '$savePath.tmp';
 
-      // 如果完整文件已存在，检查 MD5
-      final existingFile = File(savePath);
-      if (await existingFile.exists()) {
-        if (verifyMd5 && version.fileMd5 != null) {
-          final existingMd5 = await _calculateFileMd5(existingFile);
-          if (existingMd5 == version.fileMd5!.toLowerCase()) {
-            _logger.info('APK already exists and MD5 matches', tag: 'Upgrade');
-            return DownloadResult.success(savePath);
+      // 清理所有旧版本的APK文件（包括同名的），释放存储空间并确保下载最新版本
+      // 注意：这样可以避免旧版本App代码（文件名不包含构建号）复用旧APK的问题
+      try {
+        final files = await downloadDir.list().toList();
+        int deletedCount = 0;
+        for (final file in files) {
+          if (file is File && file.path.contains('ai_bookkeeping_') &&
+              file.path.endsWith('.apk')) {
+            await file.delete();
+            deletedCount++;
+            _logger.info('Deleted old APK: ${file.path}', tag: 'Upgrade');
           }
         }
-        await existingFile.delete();
+        if (deletedCount > 0) {
+          _logger.info('Cleaned up $deletedCount old APK file(s)', tag: 'Upgrade');
+        }
+      } catch (e) {
+        _logger.warning('Failed to clean old APKs: $e', tag: 'Upgrade');
       }
 
       // 检查是否有部分下载的文件（断点续传）

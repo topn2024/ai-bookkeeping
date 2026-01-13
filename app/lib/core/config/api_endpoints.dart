@@ -6,8 +6,11 @@ class ApiEndpoints {
 
   // ============== 后端 API 基础 URL ==============
 
-  /// 生产环境 API 基础 URL
-  static const String _prodApiBaseUrl = 'https://160.202.238.29/api/v1';
+  /// 生产环境主服务器 API 基础 URL (服务器2 - 主服务器)
+  static const String _prodApiBaseUrl = 'https://39.105.12.124/api/v1';
+
+  /// 生产环境备份服务器 API 基础 URL (服务器1 - 备份服务器)
+  static const String _prodBackupApiBaseUrl = 'https://160.202.238.29/api/v1';
 
   /// 预发布环境 API 基础 URL
   static const String _stagingApiBaseUrl = 'https://staging-api.example.com/api/v1';
@@ -15,7 +18,7 @@ class ApiEndpoints {
   /// 开发环境 API 基础 URL
   static const String _devApiBaseUrl = 'http://localhost:8000/api/v1';
 
-  /// 获取当前环境的 API 基础 URL
+  /// 获取当前环境的 API 基础 URL（主服务器）
   /// 优先使用编译时变量，否则根据环境返回默认值
   static String get apiBaseUrl {
     // 编译时变量优先
@@ -32,6 +35,20 @@ class ApiEndpoints {
         return _stagingApiBaseUrl;
       case AppEnvironment.production:
         return _prodApiBaseUrl;
+    }
+  }
+
+  /// 获取所有可用的服务器 URL（用于多服务器版本检查和容灾）
+  /// 返回顺序: [主服务器, 备份服务器]
+  static List<String> get allServerUrls {
+    switch (EnvironmentConfig.current) {
+      case AppEnvironment.development:
+        return [_devApiBaseUrl];
+      case AppEnvironment.staging:
+        return [_stagingApiBaseUrl];
+      case AppEnvironment.production:
+        // 生产环境返回两个服务器
+        return [_prodApiBaseUrl, _prodBackupApiBaseUrl];
     }
   }
 
