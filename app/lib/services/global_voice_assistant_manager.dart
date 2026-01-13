@@ -322,11 +322,17 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _ttsService = TTSService.instance;  // 使用单例
     await _ttsService!.initialize();
 
+    // 启用流式TTS模式（降低首字延迟）
+    await _ttsService!.enableStreamingMode();
+    debugPrint('[GlobalVoiceAssistant] 流式TTS已启用');
+
     // 初始化VAD服务
+    // speechEndThresholdMs权衡：太短会截断用户思考，太长会响应迟钝
+    // 800ms: 反应快但易截断 | 1200ms: 折中 | 1500ms: 安全但迟钝
     _vadService = RealtimeVADService(
       config: RealtimeVADConfig.defaultConfig().copyWith(
-        speechEndThresholdMs: 800,  // 静音800ms判定说完
-        silenceTimeoutMs: 5000,     // 5秒无声音触发主动对话
+        speechEndThresholdMs: 1200,  // 静音1.2秒判定说完（折中方案）
+        silenceTimeoutMs: 30000,     // 30秒无声音自动结束对话
       ),
     );
 
@@ -372,18 +378,14 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         break;
 
       case VADEventType.silenceTimeout:
-        debugPrint('[GlobalVoiceAssistant] VAD: 用户沉默超时 (ballState=$_ballState, isProcessing=$_isProcessingUtterance, partialText=$_partialText, isProcessingCommand=$_isProcessingCommand)');
-        // 检查条件：
-        // 1. 正在录音状态
-        // 2. 没有有意义的ASR结果（partialText为空或很短，可能是噪音）
-        // 3. 不在命令处理中（避免TTS播放期间触发主动对话）
-        final hasNoMeaningfulInput = _partialText.trim().isEmpty || _partialText.trim().length < 2;
-        if (_ballState == FloatingBallState.recording && hasNoMeaningfulInput && !_isProcessingCommand) {
-          debugPrint('[GlobalVoiceAssistant] 满足条件，触发主动对话');
-          final context = _contextService?.currentContext;
-          _initiateProactiveConversation(context);
+        debugPrint('[GlobalVoiceAssistant] VAD: 用户沉默30秒超时 (ballState=$_ballState, isProcessing=$_isProcessingUtterance, partialText=$_partialText, isProcessingCommand=$_isProcessingCommand)');
+        // 30秒无声音，自动结束对话
+        // 条件：正在录音状态，且不在命令处理中
+        if (_ballState == FloatingBallState.recording && !_isProcessingCommand) {
+          debugPrint('[GlobalVoiceAssistant] 30秒无语音输入，自动结束对话');
+          _handleSilenceTimeoutEnd();
         } else {
-          debugPrint('[GlobalVoiceAssistant] 条件不满足（有输入内容），跳过主动对话');
+          debugPrint('[GlobalVoiceAssistant] 条件不满足，跳过自动结束');
         }
         break;
 
@@ -659,6 +661,13 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         return;
       }
 
+      // 检查是否应该自动重启ASR
+      // 如果正在静音ASR输入（TTS播放期间），不要重启，因为会创建空闲的WebSocket连接导致超时
+      if (_isMutingASRInput) {
+        debugPrint('[GlobalVoiceAssistant] ASR输入静音中，跳过自动重启');
+        return;
+      }
+
       if (_ballState == FloatingBallState.recording &&
           _audioStreamController != null &&
           !_audioStreamController!.isClosed) {
@@ -862,6 +871,39 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 4. 播放简短告别语
     try {
       await _ttsService?.speak('好的');
+    } catch (e) {
+      debugPrint('[GlobalVoiceAssistant] 播放告别语失败: $e');
+    }
+
+    // 5. 停止录音
+    await stopRecording();
+
+    notifyListeners();
+  }
+
+  /// 处理沉默超时自动结束对话
+  ///
+  /// 用户30秒无语音输入，自动结束本次对话
+  /// 对话有记忆，用户随时可以继续
+  Future<void> _handleSilenceTimeoutEnd() async {
+    debugPrint('[GlobalVoiceAssistant] 处理沉默超时，自动结束对话');
+
+    // 1. 立即停止TTS（如果正在播放）
+    try {
+      await _ttsService?.stop();
+    } catch (e) {
+      debugPrint('[GlobalVoiceAssistant] 停止TTS失败: $e');
+    }
+
+    // 2. 清除处理中标志
+    _isProcessingCommand = false;
+
+    // 3. 添加系统消息到对话历史
+    _addAssistantMessage('你不说话我就先休息啦，有需要随时叫我');
+
+    // 4. 播放简短告别语
+    try {
+      await _ttsService?.speak('有需要随时叫我');
     } catch (e) {
       debugPrint('[GlobalVoiceAssistant] 播放告别语失败: $e');
     }

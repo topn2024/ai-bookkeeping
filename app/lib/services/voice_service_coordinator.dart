@@ -97,8 +97,10 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   static const int maxHistorySize = 50;
 
   /// 会话超时配置
-  static const Duration _sessionTimeout = Duration(seconds: 30);
-  static const Duration _waitingStateTimeout = Duration(seconds: 60);
+  /// 注意：连续对话模式下可能有多轮交互，超时时间应足够长
+  /// 用户一直聊天最长支持30分钟
+  static const Duration _sessionTimeout = Duration(minutes: 30);
+  static const Duration _waitingStateTimeout = Duration(minutes: 30);
 
   /// 会话超时计时器
   Timer? _sessionTimeoutTimer;
@@ -133,7 +135,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   }) : _conversationalAgent = conversationalAgent,
        _agentModeEnabled = enableAgentMode,
        _recognitionEngine = recognitionEngine ?? VoiceRecognitionEngine(),
-       _ttsService = ttsService ?? TTSService(enableStreaming: enableStreamingTTS),
+       _ttsService = ttsService ?? TTSService.instanceWith(enableStreaming: enableStreamingTTS),
        _disambiguationService = disambiguationService ?? EntityDisambiguationService(),
        _deleteService = deleteService ?? VoiceDeleteService(),
        _modifyService = modifyService ?? VoiceModifyService(),
@@ -243,8 +245,18 @@ class VoiceServiceCoordinator extends ChangeNotifier {
             'emotion': response.emotion,
           });
 
-        case AgentResponseType.error:
         case AgentResponseType.unknown:
+          // unknown 表示无法识别具体意图，但 Agent 仍提供了友好的引导回复
+          // 应该作为成功处理，而非错误
+          await _ttsService.speak(response.text);
+          _sessionState = VoiceSessionState.idle;
+          notifyListeners();
+          return VoiceSessionResult.success(response.text, {
+            'agentMode': true,
+            'responseType': 'unknown',
+          });
+
+        case AgentResponseType.error:
           await _ttsService.speak(response.text);
           _sessionState = VoiceSessionState.idle;
           notifyListeners();
