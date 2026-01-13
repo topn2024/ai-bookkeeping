@@ -140,6 +140,7 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
       top: position.dy,
       child: GestureDetector(
         onTap: _handleTap,
+        onLongPress: () => _showForceEndMenu(context, position),
         onPanStart: _handleDragStart,
         onPanUpdate: _handleDragUpdate,
         onPanEnd: _handleDragEnd,
@@ -273,16 +274,9 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
       return;
     }
 
-    // 如果正在录音，停止录音（但不结束连续模式）
-    if (currentState == FloatingBallState.recording) {
-      debugPrint('[GlobalFloatingBall] 停止当前录音');
-      manager.stopRecording();
-      return;
-    }
-
-    // 如果已经在连续对话模式中且处于空闲状态，结束对话
-    if (manager.isContinuousMode && currentState == FloatingBallState.idle) {
-      debugPrint('[GlobalFloatingBall] 单击结束连续对话');
+    // 如果已经在连续对话模式中，单击停止整个对话
+    if (manager.isContinuousMode) {
+      debugPrint('[GlobalFloatingBall] 单击结束连续对话，当前状态: $currentState');
       manager.stopContinuousMode();
       HapticFeedback.mediumImpact();
       return;
@@ -292,29 +286,111 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
     if (currentState == FloatingBallState.idle ||
         currentState == FloatingBallState.success ||
         currentState == FloatingBallState.error) {
-      // 启用对话式智能体模式并预热
-      if (!coordinator.isAgentModeEnabled) {
-        debugPrint('[GlobalFloatingBall] 启用对话式智能体模式');
-        await coordinator.enableAgentMode();
-      }
-      // 触发语音按钮预热（预热LLM连接）
-      coordinator.onVoiceButtonPressed();
-
-      // 启用连续对话模式
+      // 先给用户反馈和启动录音，再做异步初始化
+      // 这样可以避免用户说话时录音还没开始的问题
+      HapticFeedback.mediumImpact();
       manager.setContinuousMode(true);
       debugPrint('[GlobalFloatingBall] 开始连续对话');
-      HapticFeedback.mediumImpact();
 
+      // 立即开始录音，不等待其他初始化
       manager.startRecording();
+
+      // 异步初始化对话式智能体（不阻塞录音）
+      if (!coordinator.isAgentModeEnabled) {
+        debugPrint('[GlobalFloatingBall] 异步启用对话式智能体模式');
+        coordinator.enableAgentMode().then((_) {
+          // 预热LLM连接（在agent初始化完成后）
+          coordinator.onVoiceButtonPressed();
+        });
+      } else {
+        // 如果已启用，直接触发预热
+        coordinator.onVoiceButtonPressed();
+      }
     }
   }
 
-  /// 处理长按 - 结束连续对话
-  void _handleLongPressEndConversation() {
+  /// 显示强制结束菜单
+  void _showForceEndMenu(BuildContext context, Offset position) {
+    HapticFeedback.mediumImpact();
+
     final manager = ref.read(globalVoiceAssistantProvider);
-    debugPrint('[GlobalFloatingBall] 长按结束连续对话');
-    manager.stopContinuousMode();
+    final isActive = manager.isContinuousMode ||
+                     manager.ballState != FloatingBallState.idle;
+
+    // 计算菜单位置（在悬浮球旁边）
+    final screenSize = MediaQuery.of(context).size;
+    final isOnLeft = position.dx < screenSize.width / 2;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        isOnLeft ? position.dx + 60 : position.dx - 120,
+        position.dy,
+        isOnLeft ? screenSize.width - position.dx - 60 : position.dx + 60,
+        screenSize.height - position.dy - 50,
+      ),
+      items: [
+        PopupMenuItem<String>(
+          value: 'force_end',
+          enabled: isActive,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.stop_circle_outlined,
+                color: isActive ? Colors.red : Colors.grey,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '强制结束',
+                style: TextStyle(
+                  color: isActive ? Colors.red : Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'open_chat',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.chat_bubble_outline, size: 20),
+              SizedBox(width: 8),
+              Text('打开对话'),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'force_end') {
+        _forceEndConversation();
+      } else if (value == 'open_chat') {
+        widget.onOpenChat?.call();
+      }
+    });
+  }
+
+  /// 强制结束对话（重置所有状态）
+  void _forceEndConversation() {
+    final manager = ref.read(globalVoiceAssistantProvider);
+    debugPrint('[GlobalFloatingBall] 强制结束对话');
+
+    // 停止所有活动
+    manager.forceReset();
+
     HapticFeedback.heavyImpact();
+
+    // 显示提示
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('语音对话已强制结束'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   /// 开始拖动

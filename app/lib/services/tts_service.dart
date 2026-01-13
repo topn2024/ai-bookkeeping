@@ -482,31 +482,62 @@ abstract class TTSEngine {
 /// 使用 flutter_tts 插件实现真实的文本转语音功能
 class FlutterTTSEngine implements TTSEngine {
   late FlutterTts _flutterTts;
-  final Completer<void> _speakCompleter = Completer<void>();
   bool _isInitialized = false;
 
   String _language = 'zh-CN';
+  double _volume = 1.0;
+  double _rate = 0.5;
+  double _pitch = 1.0;
+
+  /// 用于等待TTS播放完成的Completer
+  Completer<void>? _speakCompleter;
 
   @override
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
+      debugPrint('[FlutterTTS] 开始初始化...');
       _flutterTts = FlutterTts();
 
-      // 设置完成回调
+      // 设置各种回调
+      _flutterTts.setStartHandler(() {
+        debugPrint('[FlutterTTS] ✓ 开始播放');
+      });
+
       _flutterTts.setCompletionHandler(() {
-        if (!_speakCompleter.isCompleted) {
-          // 不需要complete，因为每次speak都会创建新的completer逻辑
-        }
+        debugPrint('[FlutterTTS] ✓ 播放完成');
+        _speakCompleter?.complete();
+        _speakCompleter = null;
+      });
+
+      _flutterTts.setProgressHandler((String text, int start, int end, String word) {
+        debugPrint('[FlutterTTS] 播放进度: "$word" ($start-$end)');
       });
 
       _flutterTts.setErrorHandler((message) {
-        debugPrint('FlutterTTS error: $message');
+        debugPrint('[FlutterTTS] ✗ 错误: $message');
+        _speakCompleter?.completeError(Exception('TTS error: $message'));
+        _speakCompleter = null;
+      });
+
+      _flutterTts.setCancelHandler(() {
+        debugPrint('[FlutterTTS] 播放被取消');
+        _speakCompleter?.complete();
+        _speakCompleter = null;
+      });
+
+      _flutterTts.setPauseHandler(() {
+        debugPrint('[FlutterTTS] 播放暂停');
+      });
+
+      _flutterTts.setContinueHandler(() {
+        debugPrint('[FlutterTTS] 播放继续');
       });
 
       // iOS特殊设置
       if (Platform.isIOS) {
+        debugPrint('[FlutterTTS] iOS: 设置音频会话...');
         await _flutterTts.setSharedInstance(true);
         await _flutterTts.setIosAudioCategory(
           IosTextToSpeechAudioCategory.playback,
@@ -519,34 +550,97 @@ class FlutterTTSEngine implements TTSEngine {
         );
       }
 
+      // Android特殊设置
+      if (Platform.isAndroid) {
+        debugPrint('[FlutterTTS] Android: 获取引擎信息...');
+        final engines = await _flutterTts.getEngines;
+        debugPrint('[FlutterTTS] Android可用引擎: $engines');
+
+        // 检查是否有可用的中文语音
+        final isLanguageAvailable = await _flutterTts.isLanguageAvailable(_language);
+        debugPrint('[FlutterTTS] 中文语言可用: $isLanguageAvailable');
+
+        // 获取可用语言
+        final languages = await _flutterTts.getLanguages;
+        debugPrint('[FlutterTTS] 可用语言: ${languages?.where((l) => l.toString().startsWith('zh')).toList()}');
+      }
+
       // 设置默认语言
-      await _flutterTts.setLanguage(_language);
+      final langResult = await _flutterTts.setLanguage(_language);
+      debugPrint('[FlutterTTS] 设置语言 $_language 结果: $langResult');
+
+      // 设置音量（确保不是0）
+      _volume = 1.0;
+      final volResult = await _flutterTts.setVolume(_volume);
+      debugPrint('[FlutterTTS] 设置音量 $_volume 结果: $volResult');
+
+      // 设置语速
+      _rate = 0.5;
+      final rateResult = await _flutterTts.setSpeechRate(_rate);
+      debugPrint('[FlutterTTS] 设置语速 $_rate 结果: $rateResult');
+
+      // 设置音调
+      _pitch = 1.0;
+      final pitchResult = await _flutterTts.setPitch(_pitch);
+      debugPrint('[FlutterTTS] 设置音调 $_pitch 结果: $pitchResult');
+
       await _flutterTts.awaitSpeakCompletion(true);
 
       _isInitialized = true;
-      debugPrint('FlutterTTS engine initialized');
+      debugPrint('[FlutterTTS] ✓ 初始化完成');
     } catch (e) {
-      debugPrint('FlutterTTS initialization failed: $e');
+      debugPrint('[FlutterTTS] ✗ 初始化失败: $e');
       rethrow;
     }
   }
 
   @override
   Future<void> speak(String text) async {
-    debugPrint('FlutterTTSEngine: speak() called with "${text.substring(0, text.length > 30 ? 30 : text.length)}..."');
+    final displayText = text.length > 30 ? '${text.substring(0, 30)}...' : text;
+    debugPrint('[FlutterTTS] speak() 调用: "$displayText"');
+    debugPrint('[FlutterTTS] 当前状态: initialized=$_isInitialized, volume=$_volume, rate=$_rate');
+
     if (!_isInitialized) {
-      debugPrint('FlutterTTSEngine: not initialized, initializing...');
+      debugPrint('[FlutterTTS] 未初始化，正在初始化...');
       await initialize();
     }
 
-    debugPrint('FlutterTTSEngine: calling _flutterTts.speak()...');
+    // 再次确保音量不是0
+    if (_volume < 0.1) {
+      debugPrint('[FlutterTTS] ⚠️ 音量太低 ($_volume)，重置为1.0');
+      _volume = 1.0;
+      await _flutterTts.setVolume(_volume);
+    }
+
+    // 创建Completer等待播放完成
+    _speakCompleter = Completer<void>();
+
+    debugPrint('[FlutterTTS] 调用 _flutterTts.speak()...');
     final result = await _flutterTts.speak(text);
-    debugPrint('FlutterTTSEngine: speak() returned, result=$result');
+    // flutter_tts 返回值: 0=开始播放, 1=播放完成(awaitSpeakCompletion=true时)
+    debugPrint('[FlutterTTS] speak() 返回结果: $result (0=开始, 1=完成)');
+
+    // 如果返回0，说明开始播放但未完成，需要等待completion回调
+    if (result == 0 && _speakCompleter != null) {
+      debugPrint('[FlutterTTS] 等待播放完成回调...');
+      try {
+        await _speakCompleter!.future;
+        debugPrint('[FlutterTTS] 播放完成回调已触发');
+      } catch (e) {
+        debugPrint('[FlutterTTS] 播放出错: $e');
+      }
+    } else {
+      // 如果返回1或Completer已被完成，清理Completer
+      _speakCompleter = null;
+    }
   }
 
   @override
   Future<void> stop() async {
     debugPrint('FlutterTTSEngine: stop() called');
+    // 完成等待中的Completer，让speak()可以返回
+    _speakCompleter?.complete();
+    _speakCompleter = null;
     await _flutterTts.stop();
     debugPrint('FlutterTTSEngine: stop() completed');
   }

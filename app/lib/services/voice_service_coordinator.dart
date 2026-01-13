@@ -16,15 +16,18 @@ import 'voice/barge_in_detector.dart';
 import 'voice/ai_intent_decomposer.dart';
 import 'voice/smart_intent_recognizer.dart';
 import 'voice/llm_response_generator.dart';
+import 'voice/agent/agent.dart';
 import 'voice_recognition_engine.dart';
 import 'tts_service.dart';
 import 'voice_navigation_service.dart';
+import 'voice_navigation_executor.dart';
 import 'voice_feedback_system.dart';
 import 'screen_reader_service.dart';
 import 'automation_task_service.dart';
 import 'nl_search_service.dart';
 import 'voice_budget_query_service.dart';
 import 'vault_repository.dart';
+import 'casual_chat_service.dart';
 
 /// 语音服务协调器
 ///
@@ -48,6 +51,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   final ScreenReaderService _screenReaderService;
   final AutomationTaskService _automationService;
   final NaturalLanguageSearchService _nlSearchService;
+  final CasualChatService _casualChatService;
   VoiceBudgetQueryService? _budgetQueryService;
 
   /// 对话上下文管理
@@ -61,6 +65,12 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 智能意图识别器（多层递进架构）
   final SmartIntentRecognizer _smartRecognizer;
+
+  /// 对话式智能体（边聊边做模式）
+  ConversationalAgent? _conversationalAgent;
+
+  /// 是否启用对话式智能体模式
+  bool _agentModeEnabled = false;
 
   /// 是否启用流式TTS模式
   bool _streamingTTSEnabled = true;
@@ -112,12 +122,17 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     ScreenReaderService? screenReaderService,
     AutomationTaskService? automationService,
     NaturalLanguageSearchService? nlSearchService,
+    CasualChatService? casualChatService,
     ConversationContext? conversationContext,
     BargeInDetector? bargeInDetector,
     AIIntentDecomposer? aiDecomposer,
     SmartIntentRecognizer? smartRecognizer,
+    ConversationalAgent? conversationalAgent,
     bool enableStreamingTTS = true,
-  }) : _recognitionEngine = recognitionEngine ?? VoiceRecognitionEngine(),
+    bool enableAgentMode = false,
+  }) : _conversationalAgent = conversationalAgent,
+       _agentModeEnabled = enableAgentMode,
+       _recognitionEngine = recognitionEngine ?? VoiceRecognitionEngine(),
        _ttsService = ttsService ?? TTSService(enableStreaming: enableStreamingTTS),
        _disambiguationService = disambiguationService ?? EntityDisambiguationService(),
        _deleteService = deleteService ?? VoiceDeleteService(),
@@ -129,6 +144,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
        _screenReaderService = screenReaderService ?? ScreenReaderService(),
        _automationService = automationService ?? AutomationTaskService(),
        _nlSearchService = nlSearchService ?? _createDefaultNLSearchService(databaseService ?? sl<IDatabaseService>()),
+       _casualChatService = casualChatService ?? CasualChatService(),
        _conversationContext = conversationContext ?? ConversationContext(),
        _bargeInDetector = bargeInDetector ?? BargeInDetector(),
        _aiDecomposer = aiDecomposer ?? AIIntentDecomposer(),
@@ -188,6 +204,64 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 使用对话式智能体处理语音输入
+  ///
+  /// 将语音输入传递给 ConversationalAgent 进行处理，
+  /// 支持 LLM 优先的意图识别和自然对话
+  Future<VoiceSessionResult> _processWithAgent(String voiceInput) async {
+    try {
+      final agent = _conversationalAgent!;
+
+      // 记录命令历史
+      final command = VoiceCommand(
+        input: voiceInput,
+        timestamp: DateTime.now(),
+      );
+      _addToHistory(command);
+
+      // 使用智能体处理
+      final userInput = UserInput.fromVoice(voiceInput);
+      final response = await agent.process(userInput);
+
+      debugPrint('[VoiceCoordinator] Agent响应: type=${response.type}, '
+          'text=${response.text.substring(0, response.text.length > 50 ? 50 : response.text.length)}...');
+
+      // 根据响应类型处理
+      switch (response.type) {
+        case AgentResponseType.action:
+        case AgentResponseType.chat:
+        case AgentResponseType.hybrid:
+          // 播放语音响应
+          if (response.shouldSpeak) {
+            await _ttsService.speak(response.text);
+          }
+          _sessionState = VoiceSessionState.idle;
+          notifyListeners();
+          return VoiceSessionResult.success(response.text, {
+            'agentMode': true,
+            'responseType': response.type.name,
+            'emotion': response.emotion,
+          });
+
+        case AgentResponseType.error:
+        case AgentResponseType.unknown:
+          await _ttsService.speak(response.text);
+          _sessionState = VoiceSessionState.idle;
+          notifyListeners();
+          return VoiceSessionResult.error(response.text);
+      }
+    } catch (e) {
+      debugPrint('[VoiceCoordinator] Agent处理失败: $e');
+      _sessionState = VoiceSessionState.error;
+      notifyListeners();
+
+      // 降级到传统模式处理
+      debugPrint('[VoiceCoordinator] 降级到传统模式处理');
+      _agentModeEnabled = false;
+      return await processVoiceCommand(voiceInput);
+    }
+  }
+
   /// 启用流式TTS模式
   Future<void> enableStreamingTTS() async {
     _streamingTTSEnabled = true;
@@ -202,6 +276,48 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 是否启用流式TTS
   bool get isStreamingTTSEnabled => _streamingTTSEnabled;
+
+  // ═══════════════════════════════════════════════════════════════
+  // 对话式智能体模式
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 是否启用对话式智能体模式
+  bool get isAgentModeEnabled => _agentModeEnabled;
+
+  /// 获取对话式智能体（可能为null）
+  ConversationalAgent? get conversationalAgent => _conversationalAgent;
+
+  /// 启用对话式智能体模式
+  ///
+  /// 对话式智能体支持"边聊边做"的自然交互，
+  /// LLM优先识别意图，支持上下文关联和指代消解
+  Future<void> enableAgentMode() async {
+    if (_conversationalAgent == null) {
+      _conversationalAgent = ConversationalAgent();
+      await _conversationalAgent!.initialize();
+    }
+    _agentModeEnabled = true;
+    notifyListeners();
+    debugPrint('[VoiceCoordinator] 对话式智能体模式已启用');
+  }
+
+  /// 禁用对话式智能体模式
+  ///
+  /// 回退到传统的规则优先意图识别模式
+  void disableAgentMode() {
+    _agentModeEnabled = false;
+    notifyListeners();
+    debugPrint('[VoiceCoordinator] 对话式智能体模式已禁用');
+  }
+
+  /// 语音按钮按下时的预热
+  ///
+  /// 在用户按下语音按钮时调用，预热网络连接和LLM服务
+  void onVoiceButtonPressed() {
+    if (_agentModeEnabled && _conversationalAgent != null) {
+      _conversationalAgent!.onVoiceButtonPressed();
+    }
+  }
 
   /// 获取意图路由器（用于外部访问多意图检测等功能）
   VoiceIntentRouter get intentRouter => _intentRouter;
@@ -282,48 +398,19 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         return VoiceSessionResult.error(invalidReason);
       }
 
-      // 记录命令历史
-      final command = VoiceCommand(
-        input: voiceInput,
-        timestamp: DateTime.now(),
-      );
-      _addToHistory(command);
+      // 对话式智能体模式：使用 ConversationalAgent 处理
+      if (_agentModeEnabled && _conversationalAgent != null) {
+        return await _processWithAgent(voiceInput);
+      }
 
-      // 记录到对话上下文（用于多轮对话和自然响应生成）
-      _conversationContext.addUserInput(voiceInput);
+      // 检查是否处于闲聊模式
+      if (_conversationContext.isChatMode) {
+        debugPrint('[VoiceCoordinator] 当前处于闲聊模式');
+        return await _processChatModeInput(voiceInput);
+      }
 
-      // Step 1: 使用智能意图识别器分析语音输入（多层递进架构）
-      // Layer 1: 精确规则匹配 → Layer 2: 同义词扩展 → Layer 3: 模板匹配
-      // → Layer 4: 学习缓存 → Layer 5: LLM兜底
-      final pageContext = _currentSession?.intentType.name ?? 'home';
-      final smartResult = await _smartRecognizer.recognize(
-        voiceInput,
-        pageContext: pageContext,
-      );
-
-      debugPrint('[VoiceCoordinator] SmartIntent结果: ${smartResult.intentType}, '
-          '来源: ${smartResult.source}, 置信度: ${smartResult.confidence}');
-
-      // 转换为IntentAnalysisResult以兼容现有处理流程
-      final intentResult = _convertSmartIntentResult(smartResult);
-
-      // 更新命令历史中的意图分析结果
-      command.intentResult = intentResult;
-
-      // 提供上下文感知的反馈
-      await _feedbackSystem.provideContextualFeedback(
-        intentResult: intentResult,
-        enableTts: true,
-        enableHaptic: false, // 避免处理过程中过度震动
-      );
-
-      // Step 2: 根据意图类型路由处理
-      final result = await _routeToIntentHandler(intentResult, voiceInput);
-
-      // 更新命令历史中的结果
-      command.result = result;
-
-      return result;
+      // 正常处理流程
+      return await _processNormalInput(voiceInput);
     } catch (e) {
       _sessionState = VoiceSessionState.error;
       notifyListeners();
@@ -700,11 +787,20 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 执行导航意图
   Future<String> _executeNavigationIntent(NavigationIntent intent) async {
+    debugPrint('[VoiceServiceCoordinator] 执行导航意图: ${intent.originalText}');
     final result = _navigationService.parseNavigation(intent.originalText);
-    if (result.success) {
-      return '正在跳转到${result.pageName}';
+    if (result.success && result.route != null) {
+      debugPrint('[VoiceServiceCoordinator] 导航解析成功: route=${result.route}, pageName=${result.pageName}');
+      // 实际执行导航
+      final executed = await VoiceNavigationExecutor.instance.navigateToRoute(result.route!);
+      if (executed) {
+        return '正在打开${result.pageName}';
+      } else {
+        return '抱歉，暂时无法打开${result.pageName}';
+      }
     }
-    return '';
+    debugPrint('[VoiceServiceCoordinator] 导航解析失败: ${result.errorMessage}');
+    return result.errorMessage ?? '抱歉，我不知道您想去哪个页面';
   }
 
   /// 生成金额补充提示
@@ -1006,14 +1102,19 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     IntentAnalysisResult intentResult,
     String originalInput,
   ) async {
+    debugPrint('[VoiceCoordinator] _handleAddIntent被调用');
+    debugPrint('[VoiceCoordinator] 原始输入: $originalInput');
+    debugPrint('[VoiceCoordinator] 意图实体: ${intentResult.entities}');
     try {
       final entities = intentResult.entities;
       // 使用 num 类型处理，因为 LLM 可能返回 int 或 double
       final amount = (entities['amount'] as num?)?.toDouble();
       final category = entities['category'] as String?;
       final merchant = entities['merchant'] as String?;
+      debugPrint('[VoiceCoordinator] 解析结果: amount=$amount, category=$category, merchant=$merchant');
 
       if (amount == null || amount <= 0) {
+        debugPrint('[VoiceCoordinator] 金额无效，返回错误');
         const message = '请告诉我金额是多少';
         await _ttsService.speak(message);
         return VoiceSessionResult.error(message);
@@ -1095,7 +1196,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         return VoiceSessionResult.waitingForConfirmation(detailMessage.toString());
       }
 
+      debugPrint('[VoiceCoordinator] 正在插入交易到数据库: id=${transaction.id}, amount=${transaction.amount}');
       await _databaseService.insertTransaction(transaction);
+      debugPrint('[VoiceCoordinator] 交易插入成功');
 
       // 记录交易引用到对话上下文（用于后续代词指代，如"删掉它"）
       final transactionRef = TransactionReference(
@@ -1320,17 +1423,27 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     IntentAnalysisResult intentResult,
     String originalInput,
   ) async {
+    debugPrint('[VoiceServiceCoordinator] 处理导航意图: $originalInput');
     final result = _navigationService.parseNavigation(originalInput);
-    final message = result.success
-        ? '正在跳转到${result.pageName}'
-        : result.errorMessage ?? '导航失败';
-    await _ttsService.speak(message);
 
-    // Include navigation route in result data so UI can perform navigation
-    return VoiceSessionResult.success(
-      message,
-      result.success ? {'route': result.route, 'pageName': result.pageName} : null,
-    );
+    if (result.success && result.route != null) {
+      debugPrint('[VoiceServiceCoordinator] 导航解析成功: route=${result.route}, pageName=${result.pageName}');
+      // 实际执行导航
+      final executed = await VoiceNavigationExecutor.instance.navigateToRoute(result.route!);
+      final message = executed
+          ? '正在打开${result.pageName}'
+          : '抱歉，暂时无法打开${result.pageName}';
+      await _ttsService.speak(message);
+      return VoiceSessionResult.success(
+        message,
+        {'route': result.route, 'pageName': result.pageName, 'executed': executed},
+      );
+    }
+
+    final message = result.errorMessage ?? '抱歉，我不知道您想去哪个页面';
+    debugPrint('[VoiceServiceCoordinator] 导航解析失败: $message');
+    await _ttsService.speak(message);
+    return VoiceSessionResult.success(message, null);
   }
 
   /// 处理屏幕识别意图
@@ -2001,12 +2114,17 @@ class VoiceServiceCoordinator extends ChangeNotifier {
             debugPrint('[VoiceCoordinator] AI识别到导航意图: ${navIntent.targetPage}');
 
             final navResult = _navigationService.parseNavigation(originalInput);
-            if (navResult.success) {
-              final message = '正在打开${navResult.pageName}';
+            if (navResult.success && navResult.route != null) {
+              // 实际执行导航
+              final executed = await VoiceNavigationExecutor.instance.navigateToRoute(navResult.route!);
+              final message = executed
+                  ? '正在打开${navResult.pageName}'
+                  : '抱歉，暂时无法打开${navResult.pageName}';
               await _ttsService.speak(message);
               return VoiceSessionResult.success(message, {
                 'navigation': navResult.route,
                 'aiAssisted': true,
+                'executed': executed,
               });
             }
           }
@@ -2038,10 +2156,178 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       debugPrint('[VoiceCoordinator] AI兜底失败: $e');
     }
 
-    // AI也无法识别，返回错误
-    const message = '抱歉，我没有理解您的指令。请说得更清楚一些，或者尝试其他表达方式。';
+    // AI也无法识别，进入闲聊模式
+    debugPrint('[VoiceCoordinator] AI无法识别，进入闲聊模式');
+    try {
+      // 进入闲聊模式
+      _conversationContext.enterChatMode();
+      debugPrint('[VoiceCoordinator] 已进入闲聊模式');
+
+      // 检测闲聊意图（用于引导LLM回复方向）
+      final chatResponse = await _casualChatService.handleCasualChat(
+        userId: 'default',
+        input: originalInput,
+      );
+      final chatIntent = chatResponse.intent.name;
+
+      // 使用LLM生成回复
+      final llmGenerator = LLMResponseGenerator.instance;
+      final message = await llmGenerator.generateCasualChatResponse(
+        userInput: originalInput,
+        chatIntent: chatIntent,
+      );
+
+      debugPrint('[VoiceCoordinator] LLM闲聊响应: $message');
+      await _ttsService.speak(message);
+
+      // 记录到闲聊历史（用于多轮对话）
+      _conversationContext.addChatTurn(
+        userInput: originalInput,
+        assistantResponse: message,
+      );
+
+      // 如果是再见意图，退出闲聊模式
+      if (chatResponse.intent == CasualChatIntent.goodbye) {
+        _conversationContext.exitChatMode();
+        return VoiceSessionResult.success(message, {
+          'chatMode': false,
+          'chatIntent': chatIntent,
+        });
+      }
+
+      return VoiceSessionResult.success(message, {
+        'chatMode': true,
+        'chatIntent': chatIntent,
+        'suggestions': chatResponse.suggestions,
+      });
+    } catch (e) {
+      debugPrint('[VoiceCoordinator] 闲聊处理失败: $e');
+      _conversationContext.exitChatMode();
+      const message = '嗯？没太听清，你是想记账还是查询呢？';
+      await _ttsService.speak(message);
+      return VoiceSessionResult.error(message);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 闲聊模式处理
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 检查输入是否像记账相关的指令
+  bool _looksLikeBookkeepingIntent(String input) {
+    // 记账关键词
+    final bookkeepingPatterns = [
+      RegExp(r'\d+[块元角分]'), // 金额
+      RegExp(r'记[一]?笔'),
+      RegExp(r'(支出|收入|花了|赚了|入账)'),
+      RegExp(r'(删除|删掉|修改|改成).*[记录|交易|账]'),
+      RegExp(r'(查询|查看|看看).*(消费|支出|收入|花了|账)'),
+      RegExp(r'(预算|余额|结余|存款|储蓄)'),
+      RegExp(r'(本月|这个月|今天|昨天|上周).*(花|消费|支出)'),
+      RegExp(r'(打开|去|跳转).*(设置|预算|报表|首页)'),
+    ];
+
+    for (final pattern in bookkeepingPatterns) {
+      if (pattern.hasMatch(input)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// 处理闲聊模式下的输入
+  Future<VoiceSessionResult> _processChatModeInput(String input) async {
+    debugPrint('[VoiceCoordinator] 闲聊模式处理: $input');
+
+    // 检查是否是记账相关意图
+    if (_looksLikeBookkeepingIntent(input)) {
+      debugPrint('[VoiceCoordinator] 检测到记账意图，退出闲聊模式');
+      _conversationContext.exitChatMode();
+      // 继续正常处理流程
+      return await _processNormalInput(input);
+    }
+
+    // 检测闲聊意图（用于引导 LLM）
+    final chatResponse = await _casualChatService.handleCasualChat(
+      userId: 'default',
+      input: input,
+    );
+    final chatIntent = chatResponse.intent.name;
+
+    // 使用 LLM 生成回复，带上对话历史
+    final llmGenerator = LLMResponseGenerator.instance;
+    final chatHistory = _conversationContext.getChatHistoryForLLM();
+    final message = await llmGenerator.generateCasualChatResponse(
+      userInput: input,
+      chatIntent: chatIntent,
+      chatHistory: chatHistory,
+    );
+
+    debugPrint('[VoiceCoordinator] LLM闲聊回复: $message');
     await _ttsService.speak(message);
-    return VoiceSessionResult.error(message);
+
+    // 记录到闲聊历史
+    _conversationContext.addChatTurn(
+      userInput: input,
+      assistantResponse: message,
+    );
+
+    // 如果是再见意图，退出闲聊模式
+    if (chatResponse.intent == CasualChatIntent.goodbye) {
+      debugPrint('[VoiceCoordinator] 用户告别，退出闲聊模式');
+      _conversationContext.exitChatMode();
+      return VoiceSessionResult.success(message, {
+        'chatMode': false,
+        'chatIntent': chatIntent,
+      });
+    }
+
+    return VoiceSessionResult.success(message, {
+      'chatMode': true,
+      'chatIntent': chatIntent,
+    });
+  }
+
+  /// 正常处理输入（非闲聊模式）
+  Future<VoiceSessionResult> _processNormalInput(String input) async {
+    // 记录命令历史
+    final command = VoiceCommand(
+      input: input,
+      timestamp: DateTime.now(),
+    );
+    _addToHistory(command);
+
+    // 记录到对话上下文
+    _conversationContext.addUserInput(input);
+
+    // 使用智能意图识别器分析
+    final pageContext = _currentSession?.intentType.name ?? 'home';
+    final smartResult = await _smartRecognizer.recognize(
+      input,
+      pageContext: pageContext,
+    );
+
+    debugPrint('[VoiceCoordinator] SmartIntent结果: ${smartResult.intentType}, '
+        '来源: ${smartResult.source}, 置信度: ${smartResult.confidence}');
+
+    // 转换为IntentAnalysisResult
+    final intentResult = _convertSmartIntentResult(smartResult);
+
+    // 更新命令历史
+    command.intentResult = intentResult;
+
+    // 提供反馈
+    await _feedbackSystem.provideContextualFeedback(
+      intentResult: intentResult,
+      enableTts: true,
+      enableHaptic: false,
+    );
+
+    // 路由处理
+    final result = await _routeToIntentHandler(intentResult, input);
+    command.result = result;
+
+    return result;
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -2136,68 +2422,29 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 检查输入是否无效或异常
   ///
-  /// 返回无效原因，如果输入有效则返回 null
+  /// 只做最基本的预处理，过滤明显的噪音/空输入
+  /// 有效性和意图判断交给 LLM 处理
   String? _checkInvalidInput(String input) {
     final trimmed = input.trim();
 
-    // 1. 输入太短
-    if (trimmed.length < 2) {
+    // 1. 输入为空或太短（单个字符无法表达意图）
+    if (trimmed.isEmpty) {
       return '没有听清楚，请再说一遍';
     }
 
-    // 2. ASR识别错误的特征词（识别结果中包含这些通常表示识别出错）
-    final asrErrorPatterns = [
-      '没理解',
-      '没有理解',
-      '不理解',
-      '更清楚',
-      '说清楚',
-      '再说一遍',
-      '没听清',
-      '听不清',
-      '您的指',  // 被截断的"您的指令"
-      '您说的',
-    ];
-
-    for (final pattern in asrErrorPatterns) {
-      if (trimmed.contains(pattern)) {
-        return '没有听清楚，请再说一遍';
-      }
-    }
-
-    // 3. 纯噪音或无意义内容（只有语气词、叹词）
+    // 2. 纯噪音内容（只有语气词、标点符号）
     final noisePatterns = RegExp(r'^[啊呃嗯哦唔额哈嘿呀吧了的吗呢嘛，。、！？\s]+$');
     if (noisePatterns.hasMatch(trimmed)) {
       return '没有听清楚，请再说一遍';
     }
 
-    // 4. 重复字符过多（可能是噪音）
+    // 3. 重复字符过多（明显的ASR识别噪音）
     if (_hasExcessiveRepetition(trimmed)) {
       return '没有听清楚，请再说一遍';
     }
 
-    // 5. 检查是否包含任何有意义的关键词
-    final meaningfulKeywords = [
-      // 记账相关
-      '花', '买', '吃', '喝', '付', '收', '转', '存', '取', '充',
-      '元', '块', '毛', '分',
-      // 数字
-      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-      '一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '百', '千', '万',
-      // 导航相关
-      '打开', '进入', '查看', '看看', '设置', '预算', '统计', '账户', '记录',
-      // 确认相关
-      '确认', '取消', '是', '否', '好', '行', '可以', '不',
-      // 查询相关
-      '多少', '几', '什么', '哪', '怎么',
-    ];
-
-    final hasMeaningfulContent = meaningfulKeywords.any((k) => trimmed.contains(k));
-    if (!hasMeaningfulContent && trimmed.length < 10) {
-      return '没有听清楚，请再说一遍';
-    }
-
-    return null; // 输入有效
+    // 其他情况交给 LLM 判断意图和有效性
+    return null;
   }
 
   /// 检查是否有过多重复字符
@@ -2576,6 +2823,10 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
     // 释放打断检测器
     _bargeInDetector.dispose();
+
+    // 释放对话式智能体
+    _conversationalAgent?.dispose();
+    _conversationalAgent = null;
 
     // 清理命令历史防止内存泄漏
     _commandHistory.clear();

@@ -26,6 +26,21 @@ class ConversationContext {
   /// 随机数生成器（用于响应变体选择）
   final Random _random = Random();
 
+  /// 是否处于闲聊模式
+  bool _isChatMode = false;
+
+  /// 闲聊历史（用于多轮对话）
+  final List<ChatTurn> _chatHistory = [];
+
+  /// 最大闲聊历史轮数
+  static const int _maxChatHistoryTurns = 10;
+
+  /// 获取是否处于闲聊模式
+  bool get isChatMode => _isChatMode;
+
+  /// 获取闲聊历史
+  List<ChatTurn> get chatHistory => List.unmodifiable(_chatHistory);
+
   ConversationContext({this.maxHistoryTurns = 5});
 
   /// 开始新会话
@@ -40,6 +55,47 @@ class ConversationContext {
     _sessionId = null;
     _history.clear();
     _lastTransactionRef = null;
+    _isChatMode = false;
+    _chatHistory.clear();
+  }
+
+  // ==================== 闲聊模式管理 ====================
+
+  /// 进入闲聊模式
+  void enterChatMode() {
+    _isChatMode = true;
+  }
+
+  /// 退出闲聊模式
+  void exitChatMode() {
+    _isChatMode = false;
+    _chatHistory.clear();
+  }
+
+  /// 添加闲聊轮次
+  void addChatTurn({required String userInput, required String assistantResponse}) {
+    _chatHistory.add(ChatTurn(
+      userInput: userInput,
+      assistantResponse: assistantResponse,
+      timestamp: DateTime.now(),
+    ));
+    // 保持历史轮数在限制内
+    while (_chatHistory.length > _maxChatHistoryTurns) {
+      _chatHistory.removeAt(0);
+    }
+  }
+
+  /// 获取闲聊历史的格式化字符串（用于LLM上下文）
+  String getChatHistoryForLLM() {
+    if (_chatHistory.isEmpty) return '';
+
+    final buffer = StringBuffer();
+    buffer.writeln('之前的对话：');
+    for (final turn in _chatHistory) {
+      buffer.writeln('用户：${turn.userInput}');
+      buffer.writeln('助手：${turn.assistantResponse}');
+    }
+    return buffer.toString();
   }
 
   /// 添加用户输入
@@ -365,4 +421,17 @@ class ResponseTemplate {
     }
     return '${amount.toStringAsFixed(2)}元';
   }
+}
+
+/// 闲聊轮次
+class ChatTurn {
+  final String userInput;
+  final String assistantResponse;
+  final DateTime timestamp;
+
+  ChatTurn({
+    required this.userInput,
+    required this.assistantResponse,
+    required this.timestamp,
+  });
 }
