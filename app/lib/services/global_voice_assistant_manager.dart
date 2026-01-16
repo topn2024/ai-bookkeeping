@@ -8,9 +8,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'voice_recognition_engine.dart';
 import 'tts_service.dart';
+import 'streaming_tts_service.dart';
 import 'voice_context_service.dart';
 import 'voice/realtime_vad_config.dart';
 import 'voice/barge_in_detector.dart';
+import 'voice/config/feature_flags.dart';
+import 'voice/config/pipeline_config.dart';
+import 'voice/pipeline/voice_pipeline_controller.dart';
 
 /// 麦克风权限状态
 enum MicrophonePermissionStatus {
@@ -119,6 +123,11 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   TTSService? _ttsService;
   VoiceContextService? _contextService;
 
+  // 流水线模式服务（新架构，当前唯一的语音处理模式）
+  StreamingTTSService? _streamingTtsService;
+  VoicePipelineController? _pipelineController;
+  StreamSubscription<VoicePipelineState>? _pipelineStateSubscription;
+
   // 录音器
   AudioRecorder? _audioRecorder;
 
@@ -191,6 +200,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   VoiceContextService? get contextService => _contextService;
   bool get isAutoEndEnabled => _autoEndEnabled;
   String get partialText => _partialText;  // 部分识别结果（用于实时显示）
+  bool get isPipelineMode => true;  // 流水线模式始终启用
 
   /// 启用/禁用自动结束检测
   void setAutoEndEnabled(bool enabled) {
@@ -233,6 +243,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 重置打断检测器
     _bargeInDetector?.reset();
 
+    // 重置流水线控制器
+    _pipelineController?.reset();
+
     // 停止录音（如果正在录音）
     _audioRecorder?.stop().catchError((e) {
       debugPrint('[GlobalVoiceAssistant] 强制停止录音失败: $e');
@@ -247,6 +260,10 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 停止TTS播放
     _ttsService?.stop().catchError((e) {
       debugPrint('[GlobalVoiceAssistant] 强制停止TTS失败: $e');
+      return;
+    });
+    _streamingTtsService?.stop().catchError((e) {
+      debugPrint('[GlobalVoiceAssistant] 强制停止流式TTS失败: $e');
       return;
     });
 
@@ -291,6 +308,10 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     if (_isInitialized) return;
 
     try {
+      // 加载特性开关配置
+      await VoiceFeatureFlags.instance.load();
+      debugPrint('[GlobalVoiceAssistant] 特性开关已加载: ${VoiceFeatureFlags.instance}');
+
       // 初始化上下文服务
       _contextService = VoiceContextService();
 
@@ -351,7 +372,362 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 订阅打断事件
     _bargeInSubscription = _bargeInDetector!.eventStream.listen(_handleBargeInEvent);
 
-    debugPrint('[GlobalVoiceAssistant] 语音服务延迟初始化完成 (VAD+BargeIn已启用)');
+    // 初始化流水线模式（当前唯一的语音处理模式）
+    await _initializePipelineMode();
+
+    debugPrint('[GlobalVoiceAssistant] 语音服务延迟初始化完成 (VAD+BargeIn已启用, 流水线模式=true)');
+  }
+
+  /// 初始化流水线模式
+  Future<void> _initializePipelineMode() async {
+    debugPrint('[GlobalVoiceAssistant] 初始化流水线模式...');
+
+    // 初始化流式TTS服务
+    _streamingTtsService = StreamingTTSService();
+    await _streamingTtsService!.initialize();
+    debugPrint('[GlobalVoiceAssistant] 流式TTS服务已初始化');
+
+    // 创建流水线控制器
+    _pipelineController = VoicePipelineController(
+      asrEngine: _recognitionEngine!,
+      ttsService: _streamingTtsService!,
+      vadService: _vadService,
+      config: PipelineConfig.defaultConfig,
+    );
+
+    // 设置流水线回调
+    _setupPipelineCallbacks();
+
+    debugPrint('[GlobalVoiceAssistant] 流水线控制器已创建');
+  }
+
+  /// 设置流水线回调
+  void _setupPipelineCallbacks() {
+    if (_pipelineController == null) return;
+
+    // 状态变化回调
+    _pipelineController!.onStateChanged = (state) {
+      debugPrint('[GlobalVoiceAssistant] 流水线状态: $state');
+      _handlePipelineStateChanged(state);
+    };
+
+    // 中间结果回调（显示用户说的话）
+    _pipelineController!.onPartialResult = (text) {
+      _partialText = text;
+      notifyListeners();
+    };
+
+    // 最终结果回调（添加用户消息到历史）
+    _pipelineController!.onFinalResult = (text) {
+      _partialText = '';
+      _addUserMessage(text);
+      notifyListeners();
+    };
+
+    // 处理用户输入回调（连接到命令处理器）
+    _pipelineController!.onProcessInput = _handlePipelineProcessInput;
+
+    // 打断回调
+    _pipelineController!.onBargeIn = (result) {
+      debugPrint('[GlobalVoiceAssistant] 流水线打断: $result');
+      _addAssistantMessage('好的，请继续~');
+    };
+
+    // 错误回调
+    _pipelineController!.onError = (error) {
+      debugPrint('[GlobalVoiceAssistant] 流水线错误: $error');
+      _handleError('语音处理出错');
+    };
+
+    // 需要重启音频录制回调（当ASR超时或流意外结束时）
+    _pipelineController!.onNeedRestartRecording = () {
+      debugPrint('[GlobalVoiceAssistant] 收到重启音频录制请求');
+      _restartNativeAudioRecording();
+    };
+  }
+
+  /// 处理流水线状态变化
+  void _handlePipelineStateChanged(VoicePipelineState pipelineState) {
+    switch (pipelineState) {
+      case VoicePipelineState.idle:
+        setBallState(FloatingBallState.idle);
+        break;
+      case VoicePipelineState.listening:
+        setBallState(FloatingBallState.recording);
+        break;
+      case VoicePipelineState.processing:
+        setBallState(FloatingBallState.processing);
+        break;
+      case VoicePipelineState.speaking:
+        setBallState(FloatingBallState.recording);  // 播放时保持录音状态（支持打断）
+        break;
+      case VoicePipelineState.stopping:
+        // 保持当前状态
+        break;
+    }
+  }
+
+  /// 处理流水线的用户输入（连接到命令处理器）
+  Future<void> _handlePipelineProcessInput(
+    String userInput,
+    void Function(String chunk) onChunk,
+    VoidCallback onComplete,
+  ) async {
+    debugPrint('[GlobalVoiceAssistant] 流水线处理输入: $userInput');
+
+    // 首先检查是否为结束命令
+    if (_isVoiceEndCommand(userInput)) {
+      debugPrint('[GlobalVoiceAssistant] 检测到结束命令: $userInput');
+      // 播放告别语
+      const farewell = '好的，有需要随时叫我';
+      _addAssistantMessage(farewell);
+      onChunk(farewell);
+      onComplete();
+
+      // 延迟后停止流水线，让告别语有时间播放
+      Future.delayed(const Duration(milliseconds: 2000), () {
+        _stopRecordingWithPipeline();
+      });
+      return;
+    }
+
+    if (_commandProcessor != null) {
+      try {
+        final response = await _commandProcessor!(userInput);
+        if (response != null && response.isNotEmpty) {
+          // 添加助手消息
+          _addAssistantMessage(response);
+
+          // 将响应发送给流水线播放
+          onChunk(response);
+          onComplete();
+        } else {
+          onComplete();
+        }
+      } catch (e) {
+        debugPrint('[GlobalVoiceAssistant] 命令处理器错误: $e');
+        const errorMsg = '抱歉，处理失败了';
+        _addAssistantMessage(errorMsg);
+        onChunk(errorMsg);
+        onComplete();
+      }
+    } else {
+      // 没有外部处理器，使用本地即时反馈
+      final response = _getImmediateResponse(userInput);
+      _addAssistantMessage(response);
+      onChunk(response);
+      onComplete();
+    }
+  }
+
+  /// 使用流水线模式开始录音
+  Future<void> _startRecordingWithPipeline() async {
+    debugPrint('[GlobalVoiceAssistant] 使用流水线模式开始录音');
+
+    // 重置状态
+    _partialText = '';
+    _isProcessingUtterance = false;
+
+    // 启动流水线控制器
+    debugPrint('[GlobalVoiceAssistant] [1/5] 启动流水线控制器...');
+    await _pipelineController!.start();
+    debugPrint('[GlobalVoiceAssistant] [2/5] 流水线控制器已启动');
+
+    // 创建音频流广播控制器
+    _audioStreamController = StreamController<Uint8List>.broadcast();
+    debugPrint('[GlobalVoiceAssistant] [3/5] 音频流控制器已创建');
+
+    // 录音配置 - 使用PCM格式
+    const config = RecordConfig(
+      encoder: AudioEncoder.pcm16bits,
+      sampleRate: 16000,
+      numChannels: 1,
+    );
+
+    // 开始流式录音
+    debugPrint('[GlobalVoiceAssistant] [4/5] 开始调用startStream...');
+    final audioStream = await _audioRecorder!.startStream(config);
+    debugPrint('[GlobalVoiceAssistant] [5/5] startStream返回成功');
+
+    // 音频数据计数器（使用实例变量以便在重启后重置）
+    _pipelineAudioDataCount = 0;
+
+    // 订阅音频流，传输给流水线控制器
+    _audioStreamSubscription = audioStream.listen(
+      (data) {
+        final audioData = Uint8List.fromList(data);
+        _pipelineAudioDataCount++;
+
+        // 前10次每次都打印，之后每100次打印一次（约3秒一次）
+        if (_pipelineAudioDataCount <= 10 || _pipelineAudioDataCount % 100 == 0) {
+          final pipelineState = _pipelineController?.state;
+          debugPrint('[GlobalVoiceAssistant] 音频数据 #$_pipelineAudioDataCount, ballState=$_ballState, pipelineState=$pipelineState, 大小=${audioData.length}');
+        }
+
+        // 发送到流水线控制器（即使在processing状态也发送，让控制器决定是否处理）
+        _pipelineController?.feedAudioData(audioData);
+
+        // 计算振幅用于UI显示
+        _updateAmplitudeFromPCM(audioData);
+      },
+      onError: (error) {
+        debugPrint('[GlobalVoiceAssistant] 音频流错误: $error');
+        // 音频流出错，尝试重新启动
+        _handleAudioStreamError(error);
+      },
+      onDone: () {
+        debugPrint('[GlobalVoiceAssistant] 音频流结束(onDone), ballState=$_ballState, continuousMode=$_continuousMode');
+        // 如果仍在录音状态，说明音频流意外结束，需要重启
+        if (_ballState == FloatingBallState.recording && _continuousMode) {
+          debugPrint('[GlobalVoiceAssistant] 音频流意外结束，尝试重新启动');
+          _restartPipelineRecording();
+        }
+      },
+    );
+
+    _recordingStartTime = DateTime.now();
+    setBallState(FloatingBallState.recording);
+
+    debugPrint('[GlobalVoiceAssistant] 流水线模式录音已启动');
+  }
+
+  /// 音频数据计数器（流水线模式）
+  int _pipelineAudioDataCount = 0;
+
+  /// 处理音频流错误
+  void _handleAudioStreamError(Object error) {
+    debugPrint('[GlobalVoiceAssistant] 处理音频流错误: $error');
+
+    // 如果仍在连续对话模式，尝试重新启动
+    if (_continuousMode && _ballState == FloatingBallState.recording) {
+      _restartPipelineRecording();
+    } else {
+      _handleError('音频录制出错');
+    }
+  }
+
+  /// 重启原生音频录制（由流水线控制器请求时调用）
+  ///
+  /// 这是一个同步版本，用于在流水线重启过程中调用
+  Future<void> _restartNativeAudioRecording() async {
+    debugPrint('[GlobalVoiceAssistant] 重启原生音频录制...');
+
+    try {
+      // 停止当前录音订阅
+      await _audioStreamSubscription?.cancel();
+      _audioStreamSubscription = null;
+
+      // 停止当前录音器
+      await _audioRecorder?.stop();
+
+      // 重新开始录音
+      const config = RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: 16000,
+        numChannels: 1,
+      );
+
+      final audioStream = await _audioRecorder!.startStream(config);
+      _pipelineAudioDataCount = 0;
+
+      _audioStreamSubscription = audioStream.listen(
+        (data) {
+          final audioData = Uint8List.fromList(data);
+          _pipelineAudioDataCount++;
+
+          if (_pipelineAudioDataCount <= 10 || _pipelineAudioDataCount % 100 == 0) {
+            final pipelineState = _pipelineController?.state;
+            debugPrint('[GlobalVoiceAssistant] 重启后音频数据 #$_pipelineAudioDataCount, ballState=$_ballState, pipelineState=$pipelineState');
+          }
+
+          _pipelineController?.feedAudioData(audioData);
+          _updateAmplitudeFromPCM(audioData);
+        },
+        onError: (error) {
+          debugPrint('[GlobalVoiceAssistant] 重启后音频流错误: $error');
+        },
+        onDone: () {
+          debugPrint('[GlobalVoiceAssistant] 重启后音频流结束(onDone)');
+        },
+      );
+
+      debugPrint('[GlobalVoiceAssistant] 原生音频录制重启成功');
+    } catch (e) {
+      debugPrint('[GlobalVoiceAssistant] 重启原生音频录制失败: $e');
+    }
+  }
+
+  /// 重新启动流水线录音
+  Future<void> _restartPipelineRecording() async {
+    debugPrint('[GlobalVoiceAssistant] 重新启动流水线录音...');
+
+    try {
+      // 停止当前录音订阅
+      await _audioStreamSubscription?.cancel();
+      _audioStreamSubscription = null;
+
+      // 重新开始录音
+      const config = RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: 16000,
+        numChannels: 1,
+      );
+
+      final audioStream = await _audioRecorder!.startStream(config);
+      _pipelineAudioDataCount = 0;
+
+      _audioStreamSubscription = audioStream.listen(
+        (data) {
+          final audioData = Uint8List.fromList(data);
+          _pipelineAudioDataCount++;
+
+          if (_pipelineAudioDataCount <= 10 || _pipelineAudioDataCount % 100 == 0) {
+            final pipelineState = _pipelineController?.state;
+            debugPrint('[GlobalVoiceAssistant] 重启后音频数据 #$_pipelineAudioDataCount, ballState=$_ballState, pipelineState=$pipelineState');
+          }
+
+          _pipelineController?.feedAudioData(audioData);
+          _updateAmplitudeFromPCM(audioData);
+        },
+        onError: (error) {
+          debugPrint('[GlobalVoiceAssistant] 重启后音频流错误: $error');
+        },
+        onDone: () {
+          debugPrint('[GlobalVoiceAssistant] 重启后音频流结束');
+        },
+      );
+
+      debugPrint('[GlobalVoiceAssistant] 流水线录音重新启动成功');
+    } catch (e) {
+      debugPrint('[GlobalVoiceAssistant] 重新启动流水线录音失败: $e');
+      _handleError('无法重新启动录音');
+    }
+  }
+
+  /// 使用流水线模式停止录音
+  Future<void> _stopRecordingWithPipeline() async {
+    debugPrint('[GlobalVoiceAssistant] 使用流水线模式停止录音');
+
+    // 停止流水线控制器
+    await _pipelineController?.stop();
+
+    // 关闭音频流控制器
+    await _audioStreamController?.close();
+    _audioStreamController = null;
+
+    // 停止音频流订阅
+    await _audioStreamSubscription?.cancel();
+    _audioStreamSubscription = null;
+
+    // 停止录音器
+    await _audioRecorder?.stop();
+
+    // 重置状态
+    _partialText = '';
+    _amplitude = 0.0;
+
+    setBallState(FloatingBallState.idle);
+    debugPrint('[GlobalVoiceAssistant] 流水线模式录音已停止');
   }
 
   /// 处理VAD事件
@@ -434,7 +810,11 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _bargeInDetector?.notifyTTSStopped();
     _isProcessingCommand = false;
 
-    // 3. 重启ASR监听用户新输入
+    // 3. 恢复ASR输入（关键！之前漏了这一步）
+    _isMutingASRInput = false;
+    debugPrint('[GlobalVoiceAssistant] ASR输入已恢复');
+
+    // 4. 重启ASR监听用户新输入
     if (_ballState == FloatingBallState.recording &&
         _audioStreamController != null &&
         !_audioStreamController!.isClosed) {
@@ -519,6 +899,14 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       // 振动反馈
       HapticFeedback.mediumImpact();
 
+      // 流水线模式（当前唯一的语音处理模式）
+      if (_pipelineController != null) {
+        await _startRecordingWithPipeline();
+        return;
+      }
+
+      // 降级模式：流水线控制器未初始化时使用传统逻辑
+      debugPrint('[GlobalVoiceAssistant] 警告: 流水线控制器未初始化，使用降级模式');
       // 重置状态
       _partialText = '';
       _isProcessingUtterance = false;
@@ -975,8 +1363,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   /// 停止流式语音处理，清理资源
   Future<void> stopRecording() async {
     debugPrint('[GlobalVoiceAssistant] stopRecording called (手动), state=$_ballState');
-    if (_ballState != FloatingBallState.recording) {
-      debugPrint('[GlobalVoiceAssistant] 状态不是recording，忽略');
+    if (_ballState != FloatingBallState.recording &&
+        _ballState != FloatingBallState.processing) {
+      debugPrint('[GlobalVoiceAssistant] 状态不是recording/processing，忽略');
       return;
     }
 
@@ -986,6 +1375,15 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       _shouldAutoRestart = false;
       _isRestartingASR = false;  // 重置重启标志
       _isProactiveConversation = false;  // 重置主动对话标志
+
+      // 流水线模式（当前唯一的语音处理模式）
+      if (_pipelineController != null) {
+        await _stopRecordingWithPipeline();
+        return;
+      }
+
+      // 降级模式：流水线控制器未初始化时使用传统停止逻辑
+      debugPrint('[GlobalVoiceAssistant] 警告: 使用降级模式停止录音');
 
       // 记录录音时长
       final duration = DateTime.now().difference(_recordingStartTime!);
@@ -1492,6 +1890,11 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   @override
   void dispose() {
+    // 流水线相关
+    _pipelineStateSubscription?.cancel();
+    _pipelineController?.dispose();
+    _streamingTtsService?.dispose();
+
     // 流式ASR相关
     _asrResultSubscription?.cancel();
     _audioStreamController?.close();

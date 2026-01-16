@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -34,6 +35,30 @@ class AudioStreamPlayer {
   /// 初始化
   Future<void> initialize() async {
     if (_isInitialized) return;
+
+    // 配置音频会话，使用媒体播放类型
+    // 这样音量键可以控制TTS播放音量
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration(
+        avAudioSessionCategory: AVAudioSessionCategory.playback,
+        avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.duckOthers,
+        avAudioSessionMode: AVAudioSessionMode.spokenAudio,
+        avAudioSessionRouteSharingPolicy:
+            AVAudioSessionRouteSharingPolicy.defaultPolicy,
+        avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
+        androidAudioAttributes: AndroidAudioAttributes(
+          contentType: AndroidAudioContentType.speech,
+          usage: AndroidAudioUsage.media, // 使用媒体流，音量键可控制
+          flags: AndroidAudioFlags.none,
+        ),
+        androidAudioFocusGainType: AndroidAudioFocusGainType.gainTransientMayDuck,
+        androidWillPauseWhenDucked: false,
+      ));
+      debugPrint('AudioStreamPlayer: audio session configured for media playback');
+    } catch (e) {
+      debugPrint('AudioStreamPlayer: failed to configure audio session - $e');
+    }
 
     // 监听播放状态（保存订阅以便释放）
     _playerStateSubscription = _player.playerStateStream.listen((state) {

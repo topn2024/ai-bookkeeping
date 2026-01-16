@@ -21,7 +21,8 @@ class StreamingTTSService {
   final AudioStreamPlayer _streamPlayer;
 
   /// TTS设置
-  String _voice = 'xiaoyun';
+  /// 使用 zhitian_emo（知甜情感女声）- 更自然动听的年轻女性声音
+  String _voice = 'zhitian_emo';
   double _rate = 0;
   double _volume = 50;
   double _pitch = 0;
@@ -296,7 +297,21 @@ class StreamingTTSService {
     int index,
   ) async {
     try {
-      final uri = Uri.parse(tokenInfo.ttsUrl).replace(
+      // TTS REST API URL（将 wss:// WebSocket URL 转换为 https:// REST URL）
+      // wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1
+      // -> https://nls-gateway-cn-shanghai.aliyuncs.com/stream/v1/tts
+      String ttsRestUrl = tokenInfo.ttsUrl;
+      if (ttsRestUrl.startsWith('wss://')) {
+        ttsRestUrl = ttsRestUrl
+            .replaceFirst('wss://', 'https://')
+            .replaceFirst('/ws/v1', '/stream/v1/tts');
+      } else if (ttsRestUrl.startsWith('ws://')) {
+        ttsRestUrl = ttsRestUrl
+            .replaceFirst('ws://', 'http://')
+            .replaceFirst('/ws/v1', '/stream/v1/tts');
+      }
+
+      final uri = Uri.parse(ttsRestUrl).replace(
         queryParameters: {
           'appkey': tokenInfo.appKey,
           'text': text,

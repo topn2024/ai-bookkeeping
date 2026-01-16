@@ -786,6 +786,13 @@ class AliCloudASRService {
           'enable_intermediate_result': true,
           'enable_punctuation_prediction': true,
           'enable_inverse_text_normalization': true,
+          // VAD参数
+          'max_sentence_silence': 800, // 句子内最大静音时间(ms)
+          'enable_voice_detection': true, // 启用语音检测
+          // 暂时禁用disfluency过滤，以便调试
+          // 'disfluency': true, // 过滤语气词（嗯、啊等）
+          // 增加语音增强选项
+          'enable_semantic_sentence_detection': false, // 禁用语义断句，使用纯时间断句
         },
       };
 
@@ -815,26 +822,41 @@ class AliCloudASRService {
               resetSilenceTimer();
               final text = payload['result'] ?? '';
               debugPrint('[AliCloudASR] 中间结果: $text');
-              controller.add(ASRPartialResult(
-                text: text,
-                isFinal: false,
-                index: resultIndex++,
-                confidence: payload['confidence'],
-              ));
+              if (!controller.isClosed) {
+                controller.add(ASRPartialResult(
+                  text: text,
+                  isFinal: false,
+                  index: resultIndex++,
+                  confidence: payload['confidence'],
+                ));
+              }
+            } else if (name == 'SentenceBegin') {
+              debugPrint('[AliCloudASR] 句子开始: index=${payload['index']}, time=${payload['time']}');
             } else if (name == 'SentenceEnd') {
               // 句子结束
               final text = payload['result'] ?? '';
-              debugPrint('[AliCloudASR] 句子结束: $text');
-              controller.add(ASRPartialResult(
-                text: text,
-                isFinal: true,
-                index: resultIndex++,
-                confidence: payload['confidence'],
-              ));
+              final confidence = payload['confidence'];
+              final beginTime = payload['begin_time'];
+              final time = payload['time'];
+              debugPrint('[AliCloudASR] 句子结束: "$text", 置信度=$confidence, beginTime=$beginTime, time=$time');
+              debugPrint('[AliCloudASR] SentenceEnd完整payload: $payload');
+              // 只有非空结果才添加
+              if (text.trim().isNotEmpty && !controller.isClosed) {
+                controller.add(ASRPartialResult(
+                  text: text,
+                  isFinal: true,
+                  index: resultIndex++,
+                  confidence: payload['confidence'],
+                ));
+              } else if (text.trim().isEmpty) {
+                debugPrint('[AliCloudASR] 跳过空的句子结束结果');
+              }
             } else if (name == 'TranscriptionCompleted') {
               debugPrint('[AliCloudASR] 识别完成');
               markCompleted();
-              controller.close();
+              if (!controller.isClosed) {
+                controller.close();
+              }
             } else if (name == 'TaskFailed') {
               debugPrint('[AliCloudASR] 任务失败: ${header['status_text']}');
               markCompleted();
@@ -845,22 +867,28 @@ class AliCloudASRService {
                   errorCode: ASRErrorCode.serverError,
                 ));
               }
-              controller.addError(ASRException(
-                '识别失败: ${header['status_text']}',
-                errorCode: ASRErrorCode.serverError,
-              ));
-              controller.close();
+              // 检查controller是否已关闭，避免异常
+              if (!controller.isClosed) {
+                controller.addError(ASRException(
+                  '识别失败: ${header['status_text']}',
+                  errorCode: ASRErrorCode.serverError,
+                ));
+                controller.close();
+              }
             }
           }
         },
         onError: (error) {
           debugPrint('[AliCloudASR] WebSocket错误: $error');
           markCompleted();
-          controller.addError(ASRException(
-            'WebSocket错误: $error',
-            errorCode: ASRErrorCode.noConnection,
-          ));
-          controller.close();
+          // 检查controller是否已关闭，避免异常
+          if (!controller.isClosed) {
+            controller.addError(ASRException(
+              'WebSocket错误: $error',
+              errorCode: ASRErrorCode.noConnection,
+            ));
+            controller.close();
+          }
         },
         onDone: () {
           debugPrint('[AliCloudASR] WebSocket关闭');
@@ -938,6 +966,24 @@ class AliCloudASRService {
         }
 
         chunkCount++;
+
+        // 前5次每次都打印，包含音频振幅分析
+        if (chunkCount <= 5 || chunkCount % 50 == 0) {
+          // 计算音频振幅
+          int maxAmplitude = 0;
+          int sumAmplitude = 0;
+          if (chunk.length >= 2) {
+            for (int i = 0; i < chunk.length - 1; i += 2) {
+              int sample = chunk[i] | (chunk[i + 1] << 8);
+              if (sample > 32767) sample -= 65536;
+              final absValue = sample.abs();
+              if (absValue > maxAmplitude) maxAmplitude = absValue;
+              sumAmplitude += absValue;
+            }
+          }
+          final avgAmplitude = chunk.length > 2 ? sumAmplitude ~/ (chunk.length ~/ 2) : 0;
+          debugPrint('[AliCloudASR] 收到音频块 #$chunkCount, 大小=${chunk.length}, 最大振幅=$maxAmplitude, 平均振幅=$avgAmplitude, serverReady=$serverReady');
+        }
 
         // 检查服务器是否就绪
         if (!serverReady) {

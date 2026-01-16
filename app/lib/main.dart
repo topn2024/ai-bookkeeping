@@ -22,7 +22,10 @@ import 'services/database_service.dart';
 import 'services/global_voice_assistant_manager.dart';
 import 'services/voice_token_service.dart';
 import 'services/voice_context_route_observer.dart';
+import 'services/aliyun_nls_token_service.dart';
+import 'core/config/secrets.dart';
 import 'services/voice_service_coordinator.dart' show VoiceSessionResult, VoiceSessionStatus;
+import 'services/voice/config/feature_flags.dart';
 import 'providers/voice_coordinator_provider.dart';
 import 'providers/transaction_provider.dart';
 import 'widgets/global_floating_ball.dart';
@@ -99,16 +102,15 @@ void main() async {
 
   // Configure voice token service with Alibaba Cloud credentials
   // IMPORTANT: This must be done BEFORE multimodal wake-up service and voice assistant
-  // Note: For production, these should be obtained from backend
-  try {
-    VoiceTokenService().configureDirectMode(
-      token: '2d5310f789ce40999762c6092571d7c4',
-      appKey: 'C8F0dz0ihFmvKH8G',
-    );
-    logger.info('Voice token service configured with direct mode', tag: 'App');
-  } catch (e) {
-    logger.warning('Failed to configure voice token service: $e', tag: 'App');
-  }
+  // 直接使用内置Token（secrets.dart中配置）
+  VoiceTokenService().configureDirectMode(
+    token: AliyunSpeechConfig.token,
+    appKey: AliyunSpeechConfig.appKey,
+    asrUrl: AliyunSpeechConfig.asrUrl,
+    asrRestUrl: AliyunSpeechConfig.asrRestUrl,
+    ttsUrl: AliyunSpeechConfig.ttsUrl,
+  );
+  logger.info('Voice token service configured with static token', tag: 'App');
 
   // Initialize multimodal wake-up service
   try {
@@ -210,6 +212,16 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void _setupCommandProcessor() {
     final coordinator = ref.read(voiceServiceCoordinatorProvider);
 
+    // 检查是否启用流水线模式
+    final isPipelineMode = VoiceFeatureFlags.instance.usePipelineMode;
+    debugPrint('[App] 设置命令处理器，流水线模式: $isPipelineMode');
+
+    // 流水线模式下，跳过VoiceServiceCoordinator内部的TTS播放
+    // 由流水线的OutputPipeline负责TTS播放
+    if (isPipelineMode) {
+      coordinator.setSkipTTSPlayback(true);
+    }
+
     GlobalVoiceAssistantManager.instance.setCommandProcessor((command) async {
       debugPrint('[App] 处理语音命令: $command');
 
@@ -236,14 +248,20 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         debugPrint('[App] 处理完成: ${result.status}');
 
         // 根据处理结果，向聊天记录添加详细反馈
+        // 注意：流水线模式下，_handlePipelineProcessInput 已经添加了消息，
+        // 所以这里只在非流水线模式下添加消息，避免重复
         if (result.status == VoiceSessionStatus.error) {
           final errorMsg = result.errorMessage ?? '处理时遇到了问题';
           debugPrint('[App] 处理出错: $errorMsg');
-          GlobalVoiceAssistantManager.instance.addResultMessage('❌ 处理失败：$errorMsg');
+          if (!isPipelineMode) {
+            GlobalVoiceAssistantManager.instance.addResultMessage('❌ 处理失败：$errorMsg');
+          }
         } else if (result.needsConfirmation) {
           debugPrint('[App] 需要确认，等待用户回复...');
           final confirmMsg = result.message ?? '需要您确认';
-          GlobalVoiceAssistantManager.instance.addResultMessage('⏳ $confirmMsg');
+          if (!isPipelineMode) {
+            GlobalVoiceAssistantManager.instance.addResultMessage('⏳ $confirmMsg');
+          }
           // 延迟让 TTS 播放完成，然后自动开始录音
           await Future.delayed(const Duration(milliseconds: 2500));
           debugPrint('[App] 自动开始录音等待确认');
@@ -251,10 +269,13 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         } else if (result.status == VoiceSessionStatus.success) {
           debugPrint('[App] 处理成功: ${result.message}');
 
-          // 生成详细的结果反馈
-          final resultFeedback = _generateResultFeedback(result, mightBeMultiple);
-          if (resultFeedback.isNotEmpty) {
-            GlobalVoiceAssistantManager.instance.addResultMessage(resultFeedback);
+          // 非流水线模式下，生成详细的结果反馈
+          // 流水线模式下，_handlePipelineProcessInput 已添加消息，跳过
+          if (!isPipelineMode) {
+            final resultFeedback = _generateResultFeedback(result, mightBeMultiple);
+            if (resultFeedback.isNotEmpty) {
+              GlobalVoiceAssistantManager.instance.addResultMessage(resultFeedback);
+            }
           }
 
           // 刷新交易列表，确保 UI 显示最新数据
@@ -273,13 +294,28 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             }
           }
         }
+
+        // 流水线模式：返回实际响应文本，由流水线处理TTS
+        // 非流水线模式：返回空字符串，VoiceServiceCoordinator已播放TTS
+        if (isPipelineMode) {
+          final responseText = result.message ?? '';
+          debugPrint('[App] 流水线模式，返回响应: ${responseText.length > 30 ? responseText.substring(0, 30) + "..." : responseText}');
+          return responseText;
+        }
       } catch (e) {
         debugPrint('[App] 命令处理失败: $e');
-        GlobalVoiceAssistantManager.instance.addResultMessage('❌ 系统错误，请稍后重试');
+        // 流水线模式下，_handlePipelineProcessInput 会添加消息，这里跳过
+        if (!isPipelineMode) {
+          GlobalVoiceAssistantManager.instance.addResultMessage('❌ 系统错误，请稍后重试');
+        }
+
+        // 流水线模式下返回错误提示
+        if (isPipelineMode) {
+          return '抱歉，处理失败了，请再试一次';
+        }
       }
 
-      // 返回空字符串，VoiceServiceCoordinator 已经播放了 TTS
-      // GlobalVoiceAssistantManager 收到空字符串不会再播放
+      // 非流水线模式：返回空字符串，VoiceServiceCoordinator 已经播放了 TTS
       return '';
     });
 
