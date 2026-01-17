@@ -54,9 +54,9 @@ class VoicePipelineController {
 
   /// 句子聚合等待时间（毫秒）
   /// 收到ASR句子结束后等待这么长时间，如果用户继续说话则合并
-  /// 优化：从2000ms减少到500ms，参考chat-companion-app的即时处理模式
-  /// 过长的延迟会导致用户体验下降
-  static const int _sentenceAggregationDelayMs = 500;
+  /// 调整：从500ms增加到1200ms，支持用户停顿思考后继续说话
+  /// 配合 max_sentence_silence=1500ms 使用
+  static const int _sentenceAggregationDelayMs = 1200;
 
   /// 是否正在说话（基于VAD）
   bool _isUserSpeaking = false;
@@ -304,7 +304,7 @@ class VoicePipelineController {
   Future<void> _handleFinalResult(String text) async {
     if (text.trim().isEmpty) return;
 
-    debugPrint('[VoicePipelineController] 收到ASR句子: "$text", VAD说话中=$_isUserSpeaking');
+    debugPrint('[VoicePipelineController] 收到ASR句子: "$text", VAD说话中=$_isUserSpeaking, 状态=$_state');
 
     // 将句子加入缓冲区
     _sentenceBuffer.add(text);
@@ -313,12 +313,19 @@ class VoicePipelineController {
     // 通知外部（用于UI显示当前识别的内容）
     onFinalResult?.call(text);
 
+    // 如果正在处理或播放中，只缓存句子，不启动计时器
+    // 等待当前处理完成后，在 _handleOutputCompleted 中处理缓冲区
+    if (_state == VoicePipelineState.processing ||
+        _state == VoicePipelineState.speaking) {
+      debugPrint('[VoicePipelineController] 正在处理中，句子已缓存，等待处理完成后继续');
+      return;
+    }
+
     // 取消之前的计时器
     _sentenceAggregationTimer?.cancel();
 
     if (_isUserSpeaking) {
       // VAD显示用户仍在说话，启动保险计时器
-      // 优化：从2000ms减少到500ms
       debugPrint('[VoicePipelineController] 用户仍在说话，启动保险计时器 (${_sentenceAggregationDelayMs}ms)');
       _sentenceAggregationTimer = Timer(
         Duration(milliseconds: _sentenceAggregationDelayMs),
@@ -329,7 +336,6 @@ class VoicePipelineController {
       );
     } else {
       // VAD显示用户已停止说话，快速处理
-      // 优化：从1500ms减少到400ms，参考chat-companion-app的即时响应
       debugPrint('[VoicePipelineController] 用户已停止说话，启动快速处理 (400ms)');
       _sentenceAggregationTimer = Timer(
         const Duration(milliseconds: 400),
@@ -411,7 +417,7 @@ class VoicePipelineController {
   /// 处理输出完成
   Future<void> _handleOutputCompleted() async {
     debugPrint('[VoicePipelineController] ========== 输出完成回调 ==========');
-    debugPrint('[VoicePipelineController] 当前状态: $_state, feedDataCount=$_feedDataCount');
+    debugPrint('[VoicePipelineController] 当前状态: $_state, feedDataCount=$_feedDataCount, 缓冲区=${_sentenceBuffer.length}条');
 
     // 输出完成后回到监听状态
     if (_state == VoicePipelineState.speaking ||
@@ -427,6 +433,21 @@ class VoicePipelineController {
 
       // 输出完成后重启输入流水线（确保ASR正常运行）
       await _restartInputPipeline();
+
+      // 检查缓冲区是否有新的输入（用户在处理期间继续说话）
+      if (_sentenceBuffer.isNotEmpty) {
+        debugPrint('[VoicePipelineController] 发现缓冲区有${_sentenceBuffer.length}条新输入，启动延迟处理');
+        // 给用户一点时间继续说话，然后处理缓冲区
+        _sentenceAggregationTimer?.cancel();
+        _sentenceAggregationTimer = Timer(
+          Duration(milliseconds: _sentenceAggregationDelayMs),
+          () {
+            debugPrint('[VoicePipelineController] 缓冲区延迟处理触发');
+            _processAggregatedSentences();
+          },
+        );
+      }
+
       debugPrint('[VoicePipelineController] ========== 输出完成处理结束 ==========');
     } else {
       debugPrint('[VoicePipelineController] 状态不符合条件($_state)，跳过重启');
@@ -459,8 +480,12 @@ class VoicePipelineController {
       debugPrint('[VoicePipelineController] feedAudioData #$_feedDataCount, 状态=$_state, inputState=$inputState');
     }
 
+    // 在 listening、speaking 和 processing 状态下都继续接收音频
+    // processing 状态下继续接收，让用户可以在系统处理时继续说话
+    // 新的输入会被缓存到 _sentenceBuffer，处理完成后继续处理
     if (_state == VoicePipelineState.listening ||
-        _state == VoicePipelineState.speaking) {
+        _state == VoicePipelineState.speaking ||
+        _state == VoicePipelineState.processing) {
       _inputPipeline.feedAudioData(audioData);
     } else if (shouldLog) {
       debugPrint('[VoicePipelineController] 状态=$_state，跳过feedAudioData（等待状态变为listening）');

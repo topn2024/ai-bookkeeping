@@ -734,6 +734,7 @@ class AliCloudASRService {
       try {
         tokenInfo = await _tokenService.getToken();
         debugPrint('[AliCloudASR] Token获取成功');
+        debugPrint('[AliCloudASR] appKey="${tokenInfo.appKey}", token长度=${tokenInfo.token.length}');
       } on VoiceTokenException catch (e) {
         debugPrint('[AliCloudASR] Token获取失败: ${e.message}');
         throw ASRException(
@@ -787,7 +788,7 @@ class AliCloudASRService {
           'enable_punctuation_prediction': true,
           'enable_inverse_text_normalization': true,
           // VAD参数
-          'max_sentence_silence': 800, // 句子内最大静音时间(ms)
+          'max_sentence_silence': 1500, // 句子内最大静音时间(ms)，增加以支持用户停顿思考
           'enable_voice_detection': true, // 启用语音检测
           // 暂时禁用disfluency过滤，以便调试
           // 'disfluency': true, // 过滤语气词（嗯、啊等）
