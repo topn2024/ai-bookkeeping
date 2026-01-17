@@ -54,14 +54,12 @@ class VoicePipelineController {
 
   /// 句子聚合等待时间（毫秒）
   /// 收到ASR句子结束后等待这么长时间，如果用户继续说话则合并
-  /// 增加到2秒，给用户足够的时间说完多条记录
-  static const int _sentenceAggregationDelayMs = 2000;
+  /// 优化：从2000ms减少到500ms，参考chat-companion-app的即时处理模式
+  /// 过长的延迟会导致用户体验下降
+  static const int _sentenceAggregationDelayMs = 500;
 
   /// 是否正在说话（基于VAD）
   bool _isUserSpeaking = false;
-
-  /// 最后收到ASR结果的时间
-  DateTime? _lastASRResultTime;
 
   /// 回调
   /// 处理用户输入，返回LLM响应流
@@ -157,14 +155,13 @@ class VoicePipelineController {
     _isUserSpeaking = false;
     debugPrint('[VoicePipelineController] VAD: 用户停止说话');
 
-    // 如果有缓存的句子且用户已停止说话，延迟处理
-    // 注意：不要立即处理，给用户时间说下一句（多笔交易场景）
+    // 如果有缓存的句子且用户已停止说话，快速处理
+    // 优化：从1000ms减少到300ms，参考chat-companion-app的即时响应模式
     if (_sentenceBuffer.isNotEmpty) {
-      debugPrint('[VoicePipelineController] VAD检测到静音，缓冲区有${_sentenceBuffer.length}个句子，延迟1000ms处理');
+      debugPrint('[VoicePipelineController] VAD检测到静音，缓冲区有${_sentenceBuffer.length}个句子，延迟300ms处理');
       _sentenceAggregationTimer?.cancel();
-      // 延迟1000ms再处理，给用户时间说下一句
       _sentenceAggregationTimer = Timer(
-        const Duration(milliseconds: 1000),
+        const Duration(milliseconds: 300),
         () => _processAggregatedSentences(),
       );
     }
@@ -281,7 +278,6 @@ class VoicePipelineController {
       _sentenceAggregationTimer = null;
       _sentenceBuffer.clear();
       _isUserSpeaking = false;
-      _lastASRResultTime = null;
 
       await _inputPipeline.stop();
       await _outputPipeline.stop();
@@ -310,9 +306,6 @@ class VoicePipelineController {
 
     debugPrint('[VoicePipelineController] 收到ASR句子: "$text", VAD说话中=$_isUserSpeaking');
 
-    // 记录最后收到ASR结果的时间
-    _lastASRResultTime = DateTime.now();
-
     // 将句子加入缓冲区
     _sentenceBuffer.add(text);
     debugPrint('[VoicePipelineController] 句子缓冲区: $_sentenceBuffer');
@@ -324,22 +317,22 @@ class VoicePipelineController {
     _sentenceAggregationTimer?.cancel();
 
     if (_isUserSpeaking) {
-      // VAD显示用户仍在说话，启动较长的保险计时器
-      // 这是保险机制，正常情况下VAD的speechEnd会更早触发处理
+      // VAD显示用户仍在说话，启动保险计时器
+      // 优化：从2000ms减少到500ms
       debugPrint('[VoicePipelineController] 用户仍在说话，启动保险计时器 (${_sentenceAggregationDelayMs}ms)');
       _sentenceAggregationTimer = Timer(
         Duration(milliseconds: _sentenceAggregationDelayMs),
         () {
-          debugPrint('[VoicePipelineController] 保险计时器触发，强制处理');
+          debugPrint('[VoicePipelineController] 保险计时器触发，处理');
           _processAggregatedSentences();
         },
       );
     } else {
-      // VAD显示用户已停止说话，启动延迟处理
-      // 1500ms足够用户在说多笔交易时有时间说下一句
-      debugPrint('[VoicePipelineController] 用户已停止说话，启动延迟处理 (1500ms)');
+      // VAD显示用户已停止说话，快速处理
+      // 优化：从1500ms减少到400ms，参考chat-companion-app的即时响应
+      debugPrint('[VoicePipelineController] 用户已停止说话，启动快速处理 (400ms)');
       _sentenceAggregationTimer = Timer(
-        const Duration(milliseconds: 1500),
+        const Duration(milliseconds: 400),
         () => _processAggregatedSentences(),
       );
     }
@@ -486,7 +479,6 @@ class VoicePipelineController {
     _sentenceAggregationTimer = null;
     _sentenceBuffer.clear();
     _isUserSpeaking = false;
-    _lastASRResultTime = null;
 
     _inputPipeline.reset();
     _outputPipeline.reset();

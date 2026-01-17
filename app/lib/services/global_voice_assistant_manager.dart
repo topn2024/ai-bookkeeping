@@ -1471,9 +1471,11 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       sum += sample.abs();
     }
 
-    // 归一化到0-1范围
+    // 归一化到0-1范围，并放大以便UI显示
     final avgAmplitude = sum / numSamples;
-    _amplitude = (avgAmplitude / 32768).clamp(0.0, 1.0);
+    // 放大振幅值（乘以3），使波浪更明显
+    // 因为正常说话时的平均振幅通常在0.02-0.1之间
+    _amplitude = ((avgAmplitude / 32768) * 3).clamp(0.0, 1.0);
     notifyListeners();
   }
 

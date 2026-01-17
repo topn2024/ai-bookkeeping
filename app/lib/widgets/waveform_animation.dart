@@ -85,7 +85,8 @@ class _WaveformPainter extends CustomPainter {
     final maxAmplitude = size.height * 0.38; // 最大振幅高度
 
     // 检查是否有声音（振幅是否足够大）
-    final hasSound = amplitude > 0.1;
+    // 降低阈值以便更容易看到波浪
+    final hasSound = amplitude > 0.02;
 
     if (!hasSound) {
       // 无声音：画一条水平直线

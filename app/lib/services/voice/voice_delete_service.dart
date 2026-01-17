@@ -67,8 +67,11 @@ class VoiceDeleteService extends ChangeNotifier {
     required TransactionDeleteCallback deleteCallback,
     DeleteSessionContext? context,
   }) async {
+    debugPrint('[VoiceDelete] 处理删除请求: "$userInput"');
+
     // Step 1: 检查高风险操作
     if (_isHighRiskOperation(userInput)) {
+      debugPrint('[VoiceDelete] 高风险操作被阻止');
       return DeleteResult.highRiskBlocked(
         message: '这是高风险操作，无法通过语音完成',
         redirectRoute: _getHighRiskRedirectRoute(userInput),
@@ -77,6 +80,7 @@ class VoiceDeleteService extends ChangeNotifier {
 
     // Step 2: 判断是单笔还是批量删除
     final deleteType = _detectDeleteType(userInput);
+    debugPrint('[VoiceDelete] 删除类型: $deleteType');
 
     if (deleteType == DeleteType.batch) {
       return await _processBatchDelete(
@@ -87,11 +91,13 @@ class VoiceDeleteService extends ChangeNotifier {
     }
 
     // Step 3: 单笔删除 - 使用实体消歧定位目标
+    debugPrint('[VoiceDelete] 开始实体消歧...');
     final disambiguationResult = await _disambiguationService.disambiguate(
       userInput,
       queryCallback: queryCallback,
       context: context?.toDisambiguationContext(),
     );
+    debugPrint('[VoiceDelete] 消歧结果: ${disambiguationResult.status}');
 
     // Step 4: 根据消歧结果处理
     switch (disambiguationResult.status) {
@@ -335,16 +341,22 @@ class VoiceDeleteService extends ChangeNotifier {
     String userInput,
     TransactionDeleteCallback deleteCallback,
   ) async {
+    debugPrint('[VoiceDelete] 处理语音确认: "$userInput"');
+    debugPrint('[VoiceDelete] 当前会话: ${_currentSession != null ? "存在" : "不存在"}, awaitingConfirmation: ${_currentSession?.awaitingConfirmation}');
+
     if (_currentSession == null || !_currentSession!.awaitingConfirmation) {
+      debugPrint('[VoiceDelete] 错误: 没有待确认的删除操作');
       return DeleteResult.error('没有待确认的删除操作');
     }
 
     final lowerInput = userInput.toLowerCase();
+    debugPrint('[VoiceDelete] 检查是否确认: ${_isConfirmation(lowerInput)}, 是否取消: ${_isCancellation(lowerInput)}');
 
     // 检查确认
     if (_isConfirmation(lowerInput)) {
       // Level 3 不允许语音确认
       if (_currentSession!.confirmLevel == ConfirmLevel.level3) {
+        debugPrint('[VoiceDelete] Level3需要屏幕确认');
         return DeleteResult.requireScreenConfirmation(
           records: _currentSession!.targetRecords
                   ?.map((s) => s.record)
@@ -354,15 +366,18 @@ class VoiceDeleteService extends ChangeNotifier {
         );
       }
 
+      debugPrint('[VoiceDelete] 执行删除...');
       return await _executeDelete(deleteCallback);
     }
 
     // 检查取消
     if (_isCancellation(lowerInput)) {
+      debugPrint('[VoiceDelete] 用户取消删除');
       _currentSession = null;
       return DeleteResult.cancelled();
     }
 
+    debugPrint('[VoiceDelete] 未识别确认/取消，继续等待');
     return DeleteResult.awaitingConfirmation(
       records:
           _currentSession!.targetRecords?.map((s) => s.record).toList() ?? [],
@@ -393,12 +408,19 @@ class VoiceDeleteService extends ChangeNotifier {
   Future<DeleteResult> _executeDelete(
     TransactionDeleteCallback deleteCallback,
   ) async {
+    debugPrint('[VoiceDelete] _executeDelete 开始');
+
     if (_currentSession?.targetRecords == null) {
+      debugPrint('[VoiceDelete] 错误: 没有待删除的记录');
       return DeleteResult.error('没有待删除的记录');
     }
 
     final records =
         _currentSession!.targetRecords!.map((s) => s.record).toList();
+    debugPrint('[VoiceDelete] 待删除记录数: ${records.length}');
+    for (final r in records) {
+      debugPrint('[VoiceDelete]   - id=${r.id}, ${r.category} ¥${r.amount}');
+    }
 
     try {
       // 保存到删除历史（用于恢复）
@@ -411,13 +433,16 @@ class VoiceDeleteService extends ChangeNotifier {
       _addToHistory(operation);
 
       // 执行删除
+      debugPrint('[VoiceDelete] 调用 deleteCallback...');
       final success = await deleteCallback(records);
+      debugPrint('[VoiceDelete] deleteCallback 返回: $success');
 
       if (success) {
         _currentSession = null;
         notifyListeners();
 
         final isBatch = records.length > 1;
+        debugPrint('[VoiceDelete] 删除成功');
         return DeleteResult.success(
           deletedRecords: records,
           canRecover: true,
@@ -428,9 +453,11 @@ class VoiceDeleteService extends ChangeNotifier {
         );
       } else {
         _deleteHistory.removeLast();
+        debugPrint('[VoiceDelete] 删除失败: deleteCallback返回false');
         return DeleteResult.error('删除失败');
       }
     } catch (e) {
+      debugPrint('[VoiceDelete] 删除异常: $e');
       return DeleteResult.error('删除失败: $e');
     }
   }

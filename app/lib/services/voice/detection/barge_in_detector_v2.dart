@@ -46,19 +46,17 @@ class BargeInResult {
   }
 }
 
-/// 三层打断检测器
+/// 简化版打断检测器
+///
+/// 设计原则（参考chat-companion-app）：
+/// - 宁可多响应打断，不可漏掉用户真正的打断意图
+/// - VAD检测到语音 + 有内容 → 快速触发打断
+/// - 简单直接，减少复杂条件判断
 ///
 /// 层级设计：
-/// - 第1层：VAD + ASR中间结果（最快，~200ms）
-///   - 条件：VAD检测到语音 + ASR中间结果≥4字 + 相似度<0.4
-/// - 第2层：纯ASR中间结果（~500ms）
-///   - 条件：ASR中间结果≥8字 + 相似度<0.3
-/// - 第3层：完整句子 + 四层回声过滤（~1000ms）
-///   - 条件：ASR最终结果 + 通过回声过滤
-///
-/// 使用场景：
-/// 当用户在TTS播放期间说话，需要快速判断是否是有效打断
-/// 而不是回声或噪音。
+/// - 第1层：VAD + ASR（最快）
+/// - 第2层：纯ASR（较长文本）
+/// - 第3层：完整句子
 class BargeInDetectorV2 {
   final PipelineConfig _config;
   final SimilarityCalculator _similarity = SimilarityCalculator();
@@ -73,9 +71,6 @@ class BargeInDetectorV2 {
 
   /// 冷却控制
   DateTime? _lastBargeInTime;
-
-  /// 节流控制
-  DateTime? _lastCheckTime;
 
   /// 统计信息
   int _layer1Triggers = 0;
@@ -140,29 +135,22 @@ class BargeInDetectorV2 {
 
   /// 处理ASR中间结果
   ///
-  /// 检查第1层和第2层打断条件
-  ///
-  /// 优化（from chat-companion-app）：
-  /// - 添加回声过滤冷却检查，刚过滤回声后不触发打断
+  /// 简化版检测逻辑（参考chat-companion-app）：
+  /// - VAD检测到语音 + 有足够内容 → 快速触发
+  /// - 宁可多触发，不可漏掉用户打断
   BargeInResult handlePartialResult(String text) {
     if (!_isTTSPlaying) return BargeInResult.notTriggered;
-    if (!_canCheck()) return BargeInResult.notTriggered;
     if (!_canBargeIn()) return BargeInResult.notTriggered;
-
-    // 回声过滤冷却检查（from chat-companion-app）
-    // 如果刚过滤了回声，忽略这个打断（可能是回声触发的）
-    if (_echoFilter.isInEchoFilterCooldown) {
-      debugPrint('[BargeInDetectorV2] 回声过滤冷却中，忽略打断检测');
-      return BargeInResult.notTriggered;
-    }
 
     _totalChecks++;
     final cleanText = _cleanText(text);
     if (cleanText.isEmpty) return BargeInResult.notTriggered;
 
-    // 第1层：VAD + ASR联合检测（最快）
+    // 第1层：VAD + ASR联合检测（最快，最重要）
+    // 如果VAD检测到语音且有一定内容，直接触发打断
     if (_vadSpeechDetected && cleanText.length >= _config.bargeInLayer1MinChars) {
       final similarity = _similarity.calculate(cleanText, _cleanText(_currentTTSText));
+      // 使用较高的阈值（更容易通过），宁可多触发
       if (similarity < _config.bargeInLayer1Threshold) {
         _layer1Triggers++;
         final result = BargeInResult(
@@ -176,7 +164,7 @@ class BargeInDetectorV2 {
       }
     }
 
-    // 第2层：纯ASR中间结果检测
+    // 第2层：纯ASR中间结果检测（较长文本）
     if (cleanText.length >= _config.bargeInLayer2MinChars) {
       final similarity = _similarity.calculate(cleanText, _cleanText(_currentTTSText));
       if (similarity < _config.bargeInLayer2Threshold) {
@@ -232,23 +220,6 @@ class BargeInDetectorV2 {
     return elapsed.inMilliseconds > _config.bargeInCooldownMs;
   }
 
-  /// 节流检查
-  bool _canCheck() {
-    final now = DateTime.now();
-    if (_lastCheckTime == null) {
-      _lastCheckTime = now;
-      return true;
-    }
-
-    final elapsed = now.difference(_lastCheckTime!);
-    if (elapsed.inMilliseconds < _config.similarityThrottleMs) {
-      return false;
-    }
-
-    _lastCheckTime = now;
-    return true;
-  }
-
   /// 触发打断
   void _triggerBargeIn(BargeInResult result) {
     _lastBargeInTime = DateTime.now();
@@ -269,7 +240,6 @@ class BargeInDetectorV2 {
     _currentTTSText = '';
     _vadSpeechDetected = false;
     _lastBargeInTime = null;
-    _lastCheckTime = null;
     _echoFilter.reset();
     debugPrint('[BargeInDetectorV2] 重置');
   }

@@ -3806,6 +3806,9 @@ class DatabaseService implements IDatabaseService {
     final whereConditions = <String>[];
     final whereArgs = <dynamic>[];
 
+    // 排除已删除的记录
+    whereConditions.add('isDeleted = 0');
+
     // 时间范围过滤
     if (startDate != null) {
       whereConditions.add('date >= ?');

@@ -2400,14 +2400,21 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 删除交易记录的回调方法
   Future<bool> _deleteTransactions(List<TransactionRecord> records) async {
+    debugPrint('[VoiceCoordinator] _deleteTransactions 开始, 记录数: ${records.length}');
     try {
       for (final record in records) {
+        debugPrint('[VoiceCoordinator] 软删除记录: id=${record.id}, ${record.category} ¥${record.amount}');
         final rowsAffected = await _databaseService.softDeleteTransaction(record.id);
-        if (rowsAffected <= 0) return false;
+        debugPrint('[VoiceCoordinator] softDeleteTransaction 返回: $rowsAffected');
+        if (rowsAffected <= 0) {
+          debugPrint('[VoiceCoordinator] 删除失败: rowsAffected=$rowsAffected');
+          return false;
+        }
       }
+      debugPrint('[VoiceCoordinator] 所有记录删除成功');
       return true;
     } catch (e) {
-      debugPrint('删除交易记录失败: $e');
+      debugPrint('[VoiceCoordinator] 删除交易记录异常: $e');
       return false;
     }
   }
