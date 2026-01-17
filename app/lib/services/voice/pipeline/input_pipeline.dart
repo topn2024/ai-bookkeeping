@@ -193,11 +193,9 @@ class InputPipeline {
     _currentPartialText = text;
     onPartialResult?.call(text);
 
-    // 更新打断检测器
-    final bargeInResult = _bargeInDetector.handlePartialResult(text);
-    if (bargeInResult.triggered) {
-      onBargeIn?.call(bargeInResult);
-    }
+    // 更新打断检测器（检测器内部会通过 onBargeIn 回调触发打断）
+    // 注意：不要在这里再次调用 onBargeIn，避免重复触发
+    _bargeInDetector.handlePartialResult(text);
   }
 
   /// 处理ASR最终结果
@@ -210,12 +208,15 @@ class InputPipeline {
       return;
     }
 
-    // 先检查打断
+    // 检查打断（用于触发打断回调）
+    // 注意：即使是打断，也不要丢弃用户输入！
+    // 用户在TTS播放期间说的话应该被处理，而不是被丢弃
     if (_bargeInDetector.isEnabled) {
       final bargeInResult = _bargeInDetector.handleFinalResult(text);
       if (bargeInResult.triggered) {
-        onBargeIn?.call(bargeInResult);
-        return;
+        debugPrint('[InputPipeline] 检测到打断，但仍然传递用户输入: "$text"');
+        // 打断已经通过检测器内部的 _triggerBargeIn 触发
+        // 继续处理用户输入，不要丢弃！
       }
     }
 

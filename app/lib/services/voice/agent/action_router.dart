@@ -14,8 +14,10 @@ import '../../../core/contracts/i_database_service.dart';
 import '../../../models/transaction.dart';
 import '../../voice_navigation_service.dart';
 import '../../voice_navigation_executor.dart';
+import '../entity_disambiguation_service.dart';
 import 'action_registry.dart';
 import 'hybrid_intent_router.dart';
+import 'safety_confirmation_service.dart';
 
 /// 行为路由器
 ///
@@ -33,6 +35,9 @@ class ActionRouter {
   /// 行为注册表
   final ActionRegistry _registry;
 
+  /// 实体消歧服务
+  final EntityDisambiguationService _disambiguationService;
+
   /// 页面导航回调
   void Function(String route)? onNavigate;
 
@@ -43,9 +48,11 @@ class ActionRouter {
     IDatabaseService? databaseService,
     VoiceNavigationService? navigationService,
     ActionRegistry? registry,
+    EntityDisambiguationService? disambiguationService,
   })  : _databaseService = databaseService ?? sl<IDatabaseService>(),
         _navigationService = navigationService ?? VoiceNavigationService(),
-        _registry = registry ?? ActionRegistry.instance {
+        _registry = registry ?? ActionRegistry.instance,
+        _disambiguationService = disambiguationService ?? EntityDisambiguationService() {
     // 注册所有内置行为
     _registerBuiltInActions();
   }
@@ -111,15 +118,172 @@ class ActionRouter {
       return ActionResult.unsupported(intent.intentId ?? 'unknown');
     }
 
+    // 对于需要目标记录的操作（删除、修改），使用消歧服务解析指代
+    var entities = Map<String, dynamic>.from(intent.entities);
+    if (_needsDisambiguation(action.id, entities)) {
+      debugPrint('[ActionRouter] 需要消歧: ${action.id}');
+      final disambiguationResult = await _disambiguateTargetWithResult(intent.rawInput, entities);
+
+      if (disambiguationResult.success) {
+        entities = disambiguationResult.entities!;
+      } else {
+        // 消歧失败，返回需要澄清的结果
+        debugPrint('[ActionRouter] 消歧失败: ${disambiguationResult.prompt}');
+        return ActionResult.needParams(
+          missing: ['transactionId'],
+          prompt: disambiguationResult.prompt ?? '要操作哪笔记录？',
+          actionId: action.id,
+        );
+      }
+    }
+
     // 执行行为
     try {
-      return await action.execute(intent.entities);
+      return await action.execute(entities);
     } catch (e) {
       debugPrint('[ActionRouter] 执行失败: $e');
       return ActionResult.failure(
         '执行失败: ${e.toString()}',
         actionId: action.id,
       );
+    }
+  }
+
+  /// 检查是否需要消歧
+  bool _needsDisambiguation(String actionId, Map<String, dynamic> entities) {
+    // 删除和修改操作需要 transactionId
+    const needsTargetActions = ['transaction.delete', 'transaction.modify'];
+    if (!needsTargetActions.contains(actionId)) {
+      return false;
+    }
+    // 如果已经有 transactionId，不需要消歧
+    if (entities['transactionId'] != null) {
+      return false;
+    }
+    return true;
+  }
+
+  /// 消歧结果（带提示信息）
+  Future<_DisambiguationResultWithPrompt> _disambiguateTargetWithResult(
+    String userInput,
+    Map<String, dynamic> entities,
+  ) async {
+    debugPrint('[ActionRouter] 开始消歧: "$userInput"');
+
+    try {
+      final result = await _disambiguationService.disambiguate(
+        userInput,
+        queryCallback: (conditions) async {
+          return await _queryTransactions(conditions);
+        },
+      );
+
+      debugPrint('[ActionRouter] 消歧结果: ${result.status}');
+
+      switch (result.status) {
+        case DisambiguationStatus.resolved:
+          final resolvedRecord = result.resolvedRecord;
+          if (resolvedRecord != null) {
+            debugPrint('[ActionRouter] 消歧成功: transactionId=${resolvedRecord.id}');
+            return _DisambiguationResultWithPrompt.success({
+              ...entities,
+              'transactionId': resolvedRecord.id,
+              '_resolvedRecord': resolvedRecord,
+            });
+          }
+          return _DisambiguationResultWithPrompt.failure('找不到匹配的记录');
+
+        case DisambiguationStatus.needClarification:
+          // 需要追问澄清，使用消歧服务返回的提示
+          final prompt = result.clarificationPrompt ?? '你说的是哪一笔？';
+          debugPrint('[ActionRouter] 需要澄清: $prompt');
+          return _DisambiguationResultWithPrompt.failure(prompt);
+
+        case DisambiguationStatus.needMoreInfo:
+          return _DisambiguationResultWithPrompt.failure('请说得更具体一些，比如"昨天那笔"或"午餐35块那笔"');
+
+        case DisambiguationStatus.noMatch:
+          return _DisambiguationResultWithPrompt.failure('没有找到这笔记录，请确认后重试');
+
+        case DisambiguationStatus.noReference:
+          // 没有指代词，尝试获取最近的记录
+          debugPrint('[ActionRouter] 没有指代词，尝试获取最近记录');
+          final recentRecord = await _getRecentRecord();
+          if (recentRecord != null) {
+            debugPrint('[ActionRouter] 使用最近记录: transactionId=${recentRecord.id}');
+            return _DisambiguationResultWithPrompt.success({
+              ...entities,
+              'transactionId': recentRecord.id,
+              '_resolvedRecord': recentRecord,
+            });
+          }
+          return _DisambiguationResultWithPrompt.failure('没有最近的记录可以操作');
+      }
+    } catch (e) {
+      debugPrint('[ActionRouter] 消歧错误: $e');
+      return _DisambiguationResultWithPrompt.failure('查询记录时出错');
+    }
+  }
+
+  /// 查询候选交易记录
+  Future<List<TransactionRecord>> _queryTransactions(QueryConditions conditions) async {
+    try {
+      final transactions = await _databaseService.queryTransactions(
+        startDate: conditions.startDate,
+        endDate: conditions.endDate,
+        category: conditions.categoryHint,
+        merchant: conditions.merchantHint,
+        minAmount: conditions.amountMin,
+        maxAmount: conditions.amountMax,
+        limit: 20,
+      );
+
+      // 转换为消歧服务使用的记录格式
+      return transactions.map((t) => TransactionRecord(
+        id: t.id,
+        amount: t.amount,
+        category: t.category,
+        description: t.note,
+        merchant: t.rawMerchant,
+        date: t.date,
+        type: t.type.name,
+      )).toList();
+    } catch (e) {
+      debugPrint('[ActionRouter] 查询交易失败: $e');
+      return [];
+    }
+  }
+
+  /// 获取最近一条记录
+  Future<TransactionRecord?> _getRecentRecord() async {
+    try {
+      final now = DateTime.now();
+      final transactions = await _databaseService.queryTransactions(
+        startDate: now.subtract(const Duration(hours: 24)),
+        endDate: now,
+        limit: 10,
+      );
+
+      if (transactions.isEmpty) {
+        return null;
+      }
+
+      // 按创建时间排序，取最近的一条
+      transactions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final t = transactions.first;
+
+      return TransactionRecord(
+        id: t.id,
+        amount: t.amount,
+        category: t.category,
+        description: t.note,
+        merchant: t.rawMerchant,
+        date: t.date,
+        type: t.type.name,
+      );
+    } catch (e) {
+      debugPrint('[ActionRouter] 获取最近记录失败: $e');
+      return null;
     }
   }
 
@@ -311,11 +475,23 @@ class _TransactionIncomeAction extends Action {
   }
 }
 
-/// 修改交易行为
+/// 修改交易行为（支持8字段修改）
+///
+/// 支持的字段：
+/// 1. amount - 金额
+/// 2. category - 分类
+/// 3. subCategory - 子分类
+/// 4. description/note - 备注
+/// 5. date - 日期
+/// 6. account - 账户
+/// 7. tags - 标签
+/// 8. transactionType/type - 交易类型（支出/收入/转账）
 class _TransactionModifyAction extends Action {
   final IDatabaseService _db;
+  final SafetyConfirmationService _safetyService;
 
-  _TransactionModifyAction(this._db);
+  _TransactionModifyAction(this._db)
+      : _safetyService = SafetyConfirmationService();
 
   @override
   String get id => 'transaction.modify';
@@ -324,10 +500,17 @@ class _TransactionModifyAction extends Action {
   String get name => '修改交易';
 
   @override
-  String get description => '修改一笔交易记录';
+  String get description => '修改一笔交易记录，支持8个字段的修改';
 
   @override
-  List<String> get triggerPatterns => ['改成', '修改', '更新', '改为'];
+  List<String> get triggerPatterns => [
+        '改成',
+        '修改',
+        '更新',
+        '改为',
+        '换成',
+        '调整',
+      ];
 
   @override
   bool get requiresConfirmation => true;
@@ -343,23 +526,102 @@ class _TransactionModifyAction extends Action {
 
   @override
   List<ActionParam> get optionalParams => [
+        // 1. 金额
         const ActionParam(
           name: 'amount',
           type: ActionParamType.number,
           required: false,
           description: '新金额',
         ),
+        // 2. 分类
         const ActionParam(
           name: 'category',
           type: ActionParamType.string,
           required: false,
           description: '新分类',
         ),
+        // 3. 子分类
+        const ActionParam(
+          name: 'subCategory',
+          type: ActionParamType.string,
+          required: false,
+          description: '新子分类（如：早餐、午餐、晚餐）',
+        ),
+        // 4. 备注/描述
+        const ActionParam(
+          name: 'description',
+          type: ActionParamType.string,
+          required: false,
+          description: '新备注/描述',
+        ),
+        const ActionParam(
+          name: 'note',
+          type: ActionParamType.string,
+          required: false,
+          description: '新备注（同description）',
+        ),
+        // 5. 日期
+        const ActionParam(
+          name: 'date',
+          type: ActionParamType.dateTime,
+          required: false,
+          description: '新日期',
+        ),
+        // 6. 账户
+        const ActionParam(
+          name: 'account',
+          type: ActionParamType.string,
+          required: false,
+          description: '新账户',
+        ),
+        // 7. 标签
+        const ActionParam(
+          name: 'tags',
+          type: ActionParamType.list,
+          required: false,
+          description: '新标签列表',
+        ),
+        const ActionParam(
+          name: 'addTag',
+          type: ActionParamType.string,
+          required: false,
+          description: '添加标签',
+        ),
+        const ActionParam(
+          name: 'removeTag',
+          type: ActionParamType.string,
+          required: false,
+          description: '移除标签',
+        ),
+        // 8. 交易类型
+        const ActionParam(
+          name: 'transactionType',
+          type: ActionParamType.string,
+          required: false,
+          description: '新交易类型（expense/income/transfer）',
+        ),
+        const ActionParam(
+          name: 'type',
+          type: ActionParamType.string,
+          required: false,
+          description: '新类型（同transactionType）',
+        ),
+        // 内部参数
+        const ActionParam(
+          name: '_skipConfirmation',
+          type: ActionParamType.boolean,
+          required: false,
+          description: '跳过确认（已经确认过）',
+        ),
       ];
 
   @override
   Future<ActionResult> execute(Map<String, dynamic> params) async {
     final transactionId = params['transactionId'] as String?;
+    final skipConfirmation = params['_skipConfirmation'] as bool? ?? false;
+
+    debugPrint('[ModifyAction] 执行修改，transactionId: $transactionId');
+
     if (transactionId == null) {
       return ActionResult.needParams(
         missing: ['transactionId'],
@@ -369,39 +631,263 @@ class _TransactionModifyAction extends Action {
     }
 
     try {
-      // 通过 ID 查找交易记录
+      // 1. 查找交易记录
       final transactions = await _db.getTransactions();
       final transaction = transactions.where((t) => t.id == transactionId).firstOrNull;
       if (transaction == null) {
         return ActionResult.failure('找不到这笔记录', actionId: id);
       }
 
-      final newAmount = params['amount'] as num?;
-      final newCategory = params['category'] as String?;
+      // 2. 收集修改字段
+      final modifications = <String, dynamic>{};
 
-      final updated = transaction.copyWith(
-        amount: newAmount?.toDouble() ?? transaction.amount,
-        category: newCategory ?? transaction.category,
+      // 金额
+      if (params.containsKey('amount') && params['amount'] != null) {
+        modifications['amount'] = params['amount'];
+      }
+
+      // 分类
+      if (params.containsKey('category') && params['category'] != null) {
+        modifications['category'] = params['category'];
+      }
+
+      // 子分类
+      if (params.containsKey('subCategory') && params['subCategory'] != null) {
+        modifications['subCategory'] = params['subCategory'];
+      }
+
+      // 备注/描述
+      final note = params['description'] ?? params['note'];
+      if (note != null) {
+        modifications['note'] = note;
+      }
+
+      // 日期
+      if (params.containsKey('date') && params['date'] != null) {
+        var dateValue = params['date'];
+        if (dateValue is String) {
+          dateValue = DateTime.tryParse(dateValue) ?? _parseRelativeDate(dateValue);
+        }
+        if (dateValue != null) {
+          modifications['date'] = dateValue;
+        }
+      }
+
+      // 账户
+      if (params.containsKey('account') && params['account'] != null) {
+        modifications['account'] = params['account'];
+      }
+
+      // 标签
+      if (params.containsKey('tags') && params['tags'] != null) {
+        modifications['tags'] = params['tags'];
+      }
+      if (params.containsKey('addTag') && params['addTag'] != null) {
+        modifications['addTag'] = params['addTag'];
+      }
+      if (params.containsKey('removeTag') && params['removeTag'] != null) {
+        modifications['removeTag'] = params['removeTag'];
+      }
+
+      // 交易类型
+      final newType = params['transactionType'] ?? params['type'];
+      if (newType != null) {
+        modifications['transactionType'] = newType;
+      }
+
+      if (modifications.isEmpty) {
+        return ActionResult.needParams(
+          missing: ['amount', 'category', 'note'],
+          prompt: '要修改什么？可以修改金额、分类、备注、日期、账户、标签或类型',
+          actionId: id,
+        );
+      }
+
+      debugPrint('[ModifyAction] 修改字段: ${modifications.keys.join(", ")}');
+
+      // 3. 转换为消歧服务使用的记录格式
+      final record = TransactionRecord(
+        id: transaction.id,
+        amount: transaction.amount,
+        category: transaction.category,
+        description: transaction.note,
+        merchant: transaction.rawMerchant,
+        date: transaction.date,
+        type: transaction.type.name,
       );
+
+      // 4. 评估确认级别
+      final safetyResult = _safetyService.evaluateModifyConfirmation(record, modifications);
+      debugPrint('[ModifyAction] 确认级别: ${safetyResult.level}');
+
+      // 5. 如果需要确认且未跳过确认
+      if (!skipConfirmation && safetyResult.level != ConfirmationLevel.none) {
+        switch (safetyResult.level) {
+          case ConfirmationLevel.light:
+            return ActionResult.lightConfirmation(
+              message: safetyResult.confirmPrompt,
+              data: {
+                ...modifications,
+                'transactionId': transactionId,
+              },
+              actionId: id,
+            );
+
+          case ConfirmationLevel.standard:
+            return ActionResult.standardConfirmation(
+              message: safetyResult.confirmPrompt,
+              data: {
+                ...modifications,
+                'transactionId': transactionId,
+              },
+              actionId: id,
+            );
+
+          case ConfirmationLevel.strict:
+            return ActionResult.strictConfirmation(
+              message: safetyResult.confirmPrompt,
+              data: {
+                ...modifications,
+                'transactionId': transactionId,
+              },
+              actionId: id,
+            );
+
+          case ConfirmationLevel.voiceProhibited:
+            return ActionResult.blocked(
+              reason: safetyResult.blockReason ?? '此操作需要手动确认',
+              redirectRoute: '/transaction/$transactionId',
+              actionId: id,
+            );
+
+          case ConfirmationLevel.none:
+            break;
+        }
+      }
+
+      // 6. 执行修改
+      var updated = transaction;
+
+      if (modifications.containsKey('amount')) {
+        updated = updated.copyWith(amount: (modifications['amount'] as num).toDouble());
+      }
+      if (modifications.containsKey('category')) {
+        updated = updated.copyWith(category: modifications['category'] as String);
+      }
+      if (modifications.containsKey('note')) {
+        updated = updated.copyWith(note: modifications['note'] as String);
+      }
+      if (modifications.containsKey('date')) {
+        updated = updated.copyWith(date: modifications['date'] as DateTime);
+      }
+      if (modifications.containsKey('transactionType')) {
+        final typeStr = modifications['transactionType'] as String;
+        TransactionType? type;
+        if (typeStr.contains('支出') || typeStr == 'expense') {
+          type = TransactionType.expense;
+        } else if (typeStr.contains('收入') || typeStr == 'income') {
+          type = TransactionType.income;
+        } else if (typeStr.contains('转账') || typeStr == 'transfer') {
+          type = TransactionType.transfer;
+        }
+        if (type != null) {
+          updated = updated.copyWith(type: type);
+        }
+      }
 
       await _db.updateTransaction(updated);
 
+      // 7. 生成响应
+      final changedFields = modifications.keys.where((k) => !k.startsWith('_')).toList();
+      final responseText = changedFields.length == 1
+          ? '好的，已将${_getFieldName(changedFields.first)}改为${_formatValue(changedFields.first, modifications[changedFields.first])}'
+          : '好的，已修改${changedFields.length}个字段';
+
       return ActionResult.success(
-        data: {'transactionId': transactionId},
-        responseText: '好的，已修改',
+        data: {
+          'transactionId': transactionId,
+          'modifications': modifications,
+        },
+        responseText: responseText,
         actionId: id,
       );
     } catch (e) {
+      debugPrint('[ModifyAction] 修改失败: $e');
       return ActionResult.failure('修改失败: $e', actionId: id);
     }
   }
+
+  /// 解析相对日期
+  DateTime? _parseRelativeDate(String text) {
+    final now = DateTime.now();
+
+    if (text.contains('今天')) {
+      return DateTime(now.year, now.month, now.day);
+    }
+    if (text.contains('昨天')) {
+      return DateTime(now.year, now.month, now.day - 1);
+    }
+    if (text.contains('前天')) {
+      return DateTime(now.year, now.month, now.day - 2);
+    }
+
+    // 解析 "X月X日" 格式
+    final dateMatch = RegExp(r'(\d+)月(\d+)[日号]').firstMatch(text);
+    if (dateMatch != null) {
+      final month = int.tryParse(dateMatch.group(1) ?? '');
+      final day = int.tryParse(dateMatch.group(2) ?? '');
+      if (month != null && day != null) {
+        return DateTime(now.year, month, day);
+      }
+    }
+
+    return null;
+  }
+
+  /// 获取字段中文名
+  String _getFieldName(String field) {
+    const fieldNames = {
+      'amount': '金额',
+      'category': '分类',
+      'subCategory': '子分类',
+      'description': '备注',
+      'note': '备注',
+      'date': '日期',
+      'account': '账户',
+      'tags': '标签',
+      'addTag': '标签',
+      'removeTag': '标签',
+      'transactionType': '类型',
+      'type': '类型',
+    };
+    return fieldNames[field] ?? field;
+  }
+
+  /// 格式化值显示
+  String _formatValue(String field, dynamic value) {
+    if (field == 'amount' && value is num) {
+      return '¥${value.toStringAsFixed(2)}';
+    }
+    if (field == 'date' && value is DateTime) {
+      return '${value.month}月${value.day}日';
+    }
+    return value.toString();
+  }
 }
 
-/// 删除交易行为
+/// 删除交易行为（支持4级确认系统）
+///
+/// 确认级别：
+/// - Level 1: 轻量确认（单笔小额<100元，24小时内）
+/// - Level 2: 标准确认（大额≥100元或历史记录）
+/// - Level 3: 严格确认（批量删除≥2笔）
+/// - Level 4: 禁止语音（清空回收站、删除账本等高风险操作）
 class _TransactionDeleteAction extends Action {
   final IDatabaseService _db;
+  final SafetyConfirmationService _safetyService;
 
-  _TransactionDeleteAction(this._db);
+  _TransactionDeleteAction(this._db)
+      : _safetyService = SafetyConfirmationService();
 
   @override
   String get id => 'transaction.delete';
@@ -410,10 +896,17 @@ class _TransactionDeleteAction extends Action {
   String get name => '删除交易';
 
   @override
-  String get description => '删除一笔交易记录';
+  String get description => '删除一笔或多笔交易记录，支持4级确认系统';
 
   @override
-  List<String> get triggerPatterns => ['删除', '删掉', '去掉', '移除'];
+  List<String> get triggerPatterns => [
+        '删除',
+        '删掉',
+        '去掉',
+        '移除',
+        '清空',
+        '批量删除',
+      ];
 
   @override
   bool get requiresConfirmation => true;
@@ -423,15 +916,51 @@ class _TransactionDeleteAction extends Action {
         const ActionParam(
           name: 'transactionId',
           type: ActionParamType.string,
-          description: '交易ID',
+          description: '交易ID（单笔删除）或多个ID用逗号分隔',
         ),
       ];
 
   @override
-  List<ActionParam> get optionalParams => [];
+  List<ActionParam> get optionalParams => [
+        const ActionParam(
+          name: '_rawInput',
+          type: ActionParamType.string,
+          required: false,
+          description: '原始用户输入（用于检测高风险操作）',
+        ),
+        const ActionParam(
+          name: '_resolvedRecord',
+          type: ActionParamType.map,
+          required: false,
+          description: '消歧后的记录对象',
+        ),
+        const ActionParam(
+          name: '_skipConfirmation',
+          type: ActionParamType.boolean,
+          required: false,
+          description: '跳过确认（已经确认过）',
+        ),
+      ];
 
   @override
   Future<ActionResult> execute(Map<String, dynamic> params) async {
+    final rawInput = params['_rawInput'] as String? ?? '';
+    final skipConfirmation = params['_skipConfirmation'] as bool? ?? false;
+
+    debugPrint('[DeleteAction] 执行删除，rawInput: $rawInput, skipConfirmation: $skipConfirmation');
+
+    // 1. 检查高风险操作
+    final confirmResult = _safetyService.evaluateDeleteConfirmation(rawInput, []);
+    if (confirmResult.isBlocked) {
+      debugPrint('[DeleteAction] 高风险操作被阻止');
+      return ActionResult.blocked(
+        reason: confirmResult.blockReason ?? '此操作无法通过语音完成',
+        redirectRoute: confirmResult.redirectRoute ?? '/settings',
+        actionId: id,
+      );
+    }
+
+    // 2. 获取目标记录
     final transactionId = params['transactionId'] as String?;
     if (transactionId == null) {
       return ActionResult.needParams(
@@ -442,14 +971,105 @@ class _TransactionDeleteAction extends Action {
     }
 
     try {
-      await _db.deleteTransaction(transactionId);
+      // 查找交易记录
+      final transactions = await _db.getTransactions();
+
+      // 支持多个ID（用逗号分隔）
+      final ids = transactionId.split(',').map((s) => s.trim()).toList();
+      final targetTransactions = transactions.where((t) => ids.contains(t.id)).toList();
+
+      if (targetTransactions.isEmpty) {
+        return ActionResult.failure('找不到要删除的记录', actionId: id);
+      }
+
+      // 转换为消歧服务使用的记录格式
+      final records = targetTransactions.map((t) => TransactionRecord(
+        id: t.id,
+        amount: t.amount,
+        category: t.category,
+        description: t.note,
+        merchant: t.rawMerchant,
+        date: t.date,
+        type: t.type.name,
+      )).toList();
+
+      // 3. 评估确认级别
+      final safetyResult = _safetyService.evaluateDeleteConfirmation(rawInput, records);
+      debugPrint('[DeleteAction] 确认级别: ${safetyResult.level}');
+
+      // 4. 如果需要确认且未跳过确认
+      if (!skipConfirmation && safetyResult.level != ConfirmationLevel.none) {
+        // 返回需要确认的结果
+        switch (safetyResult.level) {
+          case ConfirmationLevel.light:
+            return ActionResult.lightConfirmation(
+              message: safetyResult.confirmPrompt,
+              data: {
+                ...?safetyResult.data,
+                'transactionId': transactionId,
+                '_rawInput': rawInput,
+              },
+              actionId: id,
+            );
+
+          case ConfirmationLevel.standard:
+            return ActionResult.standardConfirmation(
+              message: safetyResult.confirmPrompt,
+              data: {
+                ...?safetyResult.data,
+                'transactionId': transactionId,
+                '_rawInput': rawInput,
+              },
+              actionId: id,
+            );
+
+          case ConfirmationLevel.strict:
+            return ActionResult.strictConfirmation(
+              message: safetyResult.confirmPrompt,
+              data: {
+                ...?safetyResult.data,
+                'transactionId': transactionId,
+                '_rawInput': rawInput,
+              },
+              actionId: id,
+            );
+
+          case ConfirmationLevel.voiceProhibited:
+            return ActionResult.blocked(
+              reason: safetyResult.blockReason ?? '此操作无法通过语音完成',
+              redirectRoute: safetyResult.redirectRoute ?? '/settings',
+              actionId: id,
+            );
+
+          case ConfirmationLevel.none:
+            break;
+        }
+      }
+
+      // 5. 执行删除
+      for (final t in targetTransactions) {
+        await _db.deleteTransaction(t.id);
+      }
+
+      // 生成响应
+      final count = targetTransactions.length;
+      final totalAmount = targetTransactions.fold<double>(0, (sum, t) => sum + t.amount);
+      final responseText = count == 1
+          ? '好的，已删除，可在回收站恢复'
+          : '已删除${count}笔记录，共¥${totalAmount.toStringAsFixed(2)}，可在回收站恢复';
 
       return ActionResult.success(
-        data: {'transactionId': transactionId},
-        responseText: '好的，已删除',
+        data: {
+          'transactionIds': ids,
+          'count': count,
+          'totalAmount': totalAmount,
+          'canRecover': true,
+        },
+        responseText: responseText,
         actionId: id,
       );
     } catch (e) {
+      debugPrint('[DeleteAction] 删除失败: $e');
       return ActionResult.failure('删除失败: $e', actionId: id);
     }
   }
@@ -960,5 +1580,43 @@ class _ThemeConfigAction extends Action {
     } catch (e) {
       return ActionResult.failure('切换失败: $e', actionId: id);
     }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 内部辅助类
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// 消歧结果（带提示信息）
+class _DisambiguationResultWithPrompt {
+  /// 是否成功
+  final bool success;
+
+  /// 解析后的实体（成功时有值）
+  final Map<String, dynamic>? entities;
+
+  /// 提示信息（失败时有值）
+  final String? prompt;
+
+  _DisambiguationResultWithPrompt._({
+    required this.success,
+    this.entities,
+    this.prompt,
+  });
+
+  /// 创建成功结果
+  factory _DisambiguationResultWithPrompt.success(Map<String, dynamic> entities) {
+    return _DisambiguationResultWithPrompt._(
+      success: true,
+      entities: entities,
+    );
+  }
+
+  /// 创建失败结果
+  factory _DisambiguationResultWithPrompt.failure(String prompt) {
+    return _DisambiguationResultWithPrompt._(
+      success: false,
+      prompt: prompt,
+    );
   }
 }

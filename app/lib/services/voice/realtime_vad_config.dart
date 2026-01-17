@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 ///
 /// 基于设计文档优化的VAD参数：
 /// - 语音开始阈值: 200ms（快速检测到用户开始说话）
-/// - 语音结束阈值: 500ms（静音500ms判定用户说完）
+/// - 语音结束阈值: 800ms（静音800ms判定用户说完，适应自然停顿）
 /// - 背景噪音自适应: 根据环境动态调整阈值
 class RealtimeVADConfig {
   /// 语音开始检测阈值（毫秒）
@@ -15,6 +15,7 @@ class RealtimeVADConfig {
 
   /// 语音结束检测阈值（毫秒）
   /// 静音超过此时长认为用户说话结束
+  /// 注意：值太小会导致用户还没说完就被打断，值太大会增加响应延迟
   final int speechEndThresholdMs;
 
   /// 能量阈值（0.0-1.0）
@@ -43,7 +44,7 @@ class RealtimeVADConfig {
 
   const RealtimeVADConfig({
     this.speechStartThresholdMs = 200,
-    this.speechEndThresholdMs = 500,
+    this.speechEndThresholdMs = 800,  // 从500ms增加到800ms，适应自然停顿
     this.energyThreshold = 0.02,
     this.adaptiveThreshold = true,
     this.adaptiveUpdatePeriodMs = 3000,
@@ -72,10 +73,20 @@ class RealtimeVADConfig {
       );
 
   /// 快速响应配置（牺牲准确性换取速度）
+  /// 适用于简短指令场景
   factory RealtimeVADConfig.fastResponse() => const RealtimeVADConfig(
         speechStartThresholdMs: 100,
-        speechEndThresholdMs: 300,
+        speechEndThresholdMs: 500,  // 快速响应时可以短一些
         turnEndPauseMs: 1000,
+      );
+
+  /// 连续对话配置（适应自然语速和停顿）
+  /// 适用于用户需要思考或说较长句子的场景
+  factory RealtimeVADConfig.continuousConversation() => const RealtimeVADConfig(
+        speechStartThresholdMs: 200,
+        speechEndThresholdMs: 1000,  // 1秒静音才判定说话结束
+        turnEndPauseMs: 2000,        // 更长的轮次停顿等待
+        silenceTimeoutMs: 8000,      // 更长的沉默超时
       );
 
   RealtimeVADConfig copyWith({

@@ -7,6 +7,7 @@ import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'voice_recognition_engine.dart';
+import 'voice_token_service.dart';
 import 'tts_service.dart';
 import 'streaming_tts_service.dart';
 import 'voice_context_service.dart';
@@ -136,6 +137,11 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   bool _isVisible = true;
   Offset _position = Offset.zero;
   bool _isInitialized = false;
+
+  // 预加载状态
+  bool _isPreloading = false;
+  bool _isPreloaded = false;
+  DateTime? _preloadStartTime;
 
   // 对话历史
   final List<ChatMessage> _conversationHistory = [];
@@ -328,24 +334,116 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
       notifyListeners();
       debugPrint('[GlobalVoiceAssistant] 初始化完成');
+
+      // 在后台异步预加载语音服务，不阻塞初始化
+      _schedulePreload();
     } catch (e) {
       debugPrint('[GlobalVoiceAssistant] 初始化失败: $e');
       rethrow;
     }
   }
 
+  /// 调度预加载（延迟执行，避免影响应用启动）
+  void _schedulePreload() {
+    // 延迟3秒后开始预加载，给应用启动留出时间
+    Future.delayed(const Duration(seconds: 3), () async {
+      debugPrint('[GlobalVoiceAssistant] 开始后台预加载...');
+      await preload();
+    });
+  }
+
+  /// 预加载语音服务（在后台提前初始化，避免首次使用时的延迟）
+  ///
+  /// 预加载内容：
+  /// - 语音服务Token（需要网络请求）
+  /// - TTS服务初始化
+  /// - 音频播放器初始化
+  /// - 麦克风权限检查（不弹窗）
+  ///
+  /// 调用时机：
+  /// - 应用启动后在后台调用
+  /// - 用户进入可能使用语音的页面时
+  /// - 悬浮球显示时
+  ///
+  /// 返回值：预加载是否成功完成
+  Future<bool> preload() async {
+    // 避免重复预加载
+    if (_isPreloading) {
+      debugPrint('[GlobalVoiceAssistant] 预加载进行中，跳过');
+      return false;
+    }
+    if (_isPreloaded) {
+      debugPrint('[GlobalVoiceAssistant] 已预加载，跳过');
+      return true;
+    }
+
+    _isPreloading = true;
+    _preloadStartTime = DateTime.now();
+    debugPrint('[GlobalVoiceAssistant] ===== 开始预加载语音服务 =====');
+
+    try {
+      // 1. 预加载语音Token（最耗时的网络请求）
+      debugPrint('[GlobalVoiceAssistant] [预加载] 1/4 获取语音Token...');
+      try {
+        await VoiceTokenService().getToken();
+        debugPrint('[GlobalVoiceAssistant] [预加载] 1/4 语音Token已获取');
+      } catch (e) {
+        debugPrint('[GlobalVoiceAssistant] [预加载] 1/4 Token获取失败（将在使用时重试）: $e');
+      }
+
+      // 2. 预初始化TTS服务
+      debugPrint('[GlobalVoiceAssistant] [预加载] 2/4 初始化TTS服务...');
+      _ttsService = TTSService.instance;
+      await _ttsService!.initialize();
+      await _ttsService!.enableStreamingMode();
+      debugPrint('[GlobalVoiceAssistant] [预加载] 2/4 TTS服务已初始化');
+
+      // 3. 预初始化流式TTS服务和音频播放器
+      debugPrint('[GlobalVoiceAssistant] [预加载] 3/4 初始化流式TTS服务...');
+      _streamingTtsService = StreamingTTSService();
+      await _streamingTtsService!.initialize();
+      debugPrint('[GlobalVoiceAssistant] [预加载] 3/4 流式TTS服务已初始化');
+
+      // 4. 检查麦克风权限（不弹窗请求）
+      debugPrint('[GlobalVoiceAssistant] [预加载] 4/4 检查麦克风权限...');
+      final permissionStatus = await Permission.microphone.status;
+      debugPrint('[GlobalVoiceAssistant] [预加载] 4/4 麦克风权限状态: $permissionStatus');
+
+      final elapsed = DateTime.now().difference(_preloadStartTime!);
+      _isPreloaded = true;
+      debugPrint('[GlobalVoiceAssistant] ===== 预加载完成 (耗时${elapsed.inMilliseconds}ms) =====');
+
+      return true;
+    } catch (e) {
+      debugPrint('[GlobalVoiceAssistant] 预加载失败: $e');
+      return false;
+    } finally {
+      _isPreloading = false;
+    }
+  }
+
+  /// 是否已预加载
+  bool get isPreloaded => _isPreloaded;
+
   /// 确保语音服务已初始化
   Future<void> _ensureVoiceServicesInitialized() async {
     if (_audioRecorder != null) return;
 
+    final startTime = DateTime.now();
+    debugPrint('[GlobalVoiceAssistant] 开始初始化语音服务 (已预加载=$_isPreloaded)...');
+
     _audioRecorder = AudioRecorder();
     _recognitionEngine = VoiceRecognitionEngine();
-    _ttsService = TTSService.instance;  // 使用单例
-    await _ttsService!.initialize();
 
-    // 启用流式TTS模式（降低首字延迟）
-    await _ttsService!.enableStreamingMode();
-    debugPrint('[GlobalVoiceAssistant] 流式TTS已启用');
+    // TTS服务（如果预加载已初始化则跳过）
+    if (_ttsService == null) {
+      _ttsService = TTSService.instance;
+      await _ttsService!.initialize();
+      await _ttsService!.enableStreamingMode();
+      debugPrint('[GlobalVoiceAssistant] TTS服务初始化完成');
+    } else {
+      debugPrint('[GlobalVoiceAssistant] TTS服务已预加载，跳过初始化');
+    }
 
     // 初始化VAD服务
     // speechEndThresholdMs权衡：太短会截断用户思考，太长会响应迟钝
@@ -375,17 +473,22 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 初始化流水线模式（当前唯一的语音处理模式）
     await _initializePipelineMode();
 
-    debugPrint('[GlobalVoiceAssistant] 语音服务延迟初始化完成 (VAD+BargeIn已启用, 流水线模式=true)');
+    final elapsed = DateTime.now().difference(startTime);
+    debugPrint('[GlobalVoiceAssistant] 语音服务初始化完成，耗时=${elapsed.inMilliseconds}ms (已预加载=$_isPreloaded, VAD+BargeIn已启用)');
   }
 
   /// 初始化流水线模式
   Future<void> _initializePipelineMode() async {
     debugPrint('[GlobalVoiceAssistant] 初始化流水线模式...');
 
-    // 初始化流式TTS服务
-    _streamingTtsService = StreamingTTSService();
-    await _streamingTtsService!.initialize();
-    debugPrint('[GlobalVoiceAssistant] 流式TTS服务已初始化');
+    // 流式TTS服务（如果预加载已初始化则跳过）
+    if (_streamingTtsService == null) {
+      _streamingTtsService = StreamingTTSService();
+      await _streamingTtsService!.initialize();
+      debugPrint('[GlobalVoiceAssistant] 流式TTS服务初始化完成');
+    } else {
+      debugPrint('[GlobalVoiceAssistant] 流式TTS服务已预加载，跳过初始化');
+    }
 
     // 创建流水线控制器
     _pipelineController = VoicePipelineController(
@@ -419,6 +522,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
     // 最终结果回调（添加用户消息到历史）
     _pipelineController!.onFinalResult = (text) {
+      debugPrint('[GlobalVoiceAssistant] [PIPELINE] onFinalResult 收到: "$text"');
       _partialText = '';
       _addUserMessage(text);
       notifyListeners();
@@ -976,7 +1080,14 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   void _startStreamingASR() {
     if (_audioStreamController == null || _recognitionEngine == null) return;
 
-    debugPrint('[GlobalVoiceAssistant] 启动流式ASR');
+    // 警告：流水线模式下不应该调用此方法
+    if (_pipelineController != null) {
+      debugPrint('[GlobalVoiceAssistant] ⚠️ 警告: 流水线模式下调用了 _startStreamingASR，这可能导致重复消息！');
+      // 打印调用堆栈帮助定位问题
+      debugPrint(StackTrace.current.toString().split('\n').take(10).join('\n'));
+    }
+
+    debugPrint('[GlobalVoiceAssistant] [LEGACY] 启动流式ASR');
 
     // 订阅流式ASR结果
     _asrResultSubscription = _recognitionEngine!
@@ -1070,7 +1181,15 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   /// 处理最终ASR结果
   Future<void> _handleFinalASRResult(String recognizedText) async {
-    debugPrint('[GlobalVoiceAssistant] 处理最终识别结果: $recognizedText');
+    // 警告：流水线模式下不应该调用此方法
+    if (_pipelineController != null) {
+      debugPrint('[GlobalVoiceAssistant] ⚠️ 警告: 流水线模式下调用了 _handleFinalASRResult，这可能导致重复消息！');
+      debugPrint('[GlobalVoiceAssistant] 调用堆栈:');
+      debugPrint(StackTrace.current.toString().split('\n').take(15).join('\n'));
+      // 继续执行以便观察问题
+    }
+
+    debugPrint('[GlobalVoiceAssistant] [LEGACY] 处理最终识别结果: $recognizedText');
 
     // 设置处理中标志，忽略后续ASR结果（避免TTS回声）
     _isProcessingCommand = true;
@@ -1809,6 +1928,21 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   /// 添加消息到历史
   void _addMessage(ChatMessage message) {
+    // 调试：追踪消息来源，打印调用堆栈
+    debugPrint('[GlobalVoiceAssistant] 添加消息: type=${message.type}, content="${message.content}"');
+
+    // 检查是否有重复消息（仅日志，不阻止）
+    final recentDuplicate = _conversationHistory.where((m) =>
+        m.type == message.type &&
+        m.content == message.content &&
+        DateTime.now().difference(m.timestamp).inSeconds < 5).toList();
+    if (recentDuplicate.isNotEmpty) {
+      debugPrint('[GlobalVoiceAssistant] ⚠️ 检测到5秒内的重复消息！');
+      debugPrint('[GlobalVoiceAssistant] 已有消息时间: ${recentDuplicate.map((m) => m.timestamp).join(", ")}');
+      debugPrint('[GlobalVoiceAssistant] 调用堆栈:');
+      debugPrint(StackTrace.current.toString().split('\n').take(15).join('\n'));
+    }
+
     _conversationHistory.add(message);
 
     // 限制历史记录数量

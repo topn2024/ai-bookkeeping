@@ -76,6 +76,24 @@ enum ActionParamType {
   map,
 }
 
+/// 确认级别（用于4级确认系统）
+enum ActionConfirmLevel {
+  /// 无需确认
+  none,
+
+  /// Level 1: 轻量确认（语音确认即可）
+  light,
+
+  /// Level 2: 标准确认（语音或屏幕确认）
+  standard,
+
+  /// Level 3: 严格确认（必须屏幕点击）
+  strict,
+
+  /// Level 4: 禁止语音（必须手动操作）
+  voiceProhibited,
+}
+
 /// 行为执行结果
 class ActionResult {
   /// 是否成功
@@ -92,6 +110,21 @@ class ActionResult {
 
   /// 确认消息
   final String? confirmationMessage;
+
+  /// 确认级别（4级确认系统）
+  final ActionConfirmLevel confirmLevel;
+
+  /// 是否允许语音确认
+  final bool allowVoiceConfirm;
+
+  /// 是否需要屏幕确认
+  final bool requireScreenConfirm;
+
+  /// 是否被阻止（Level 4）
+  final bool isBlocked;
+
+  /// 重定向路由（被阻止时）
+  final String? redirectRoute;
 
   /// 是否需要补充参数
   final bool needsMoreParams;
@@ -114,6 +147,11 @@ class ActionResult {
     this.error,
     this.needsConfirmation = false,
     this.confirmationMessage,
+    this.confirmLevel = ActionConfirmLevel.none,
+    this.allowVoiceConfirm = true,
+    this.requireScreenConfirm = false,
+    this.isBlocked = false,
+    this.redirectRoute,
     this.needsMoreParams = false,
     this.missingParams,
     this.followUpPrompt,
@@ -144,7 +182,7 @@ class ActionResult {
     );
   }
 
-  /// 需要确认
+  /// 需要确认（基础版，默认Level 2标准确认）
   factory ActionResult.confirmation({
     required String message,
     Map<String, dynamic>? data,
@@ -154,7 +192,83 @@ class ActionResult {
       success: false,
       needsConfirmation: true,
       confirmationMessage: message,
+      confirmLevel: ActionConfirmLevel.standard,
+      allowVoiceConfirm: true,
+      requireScreenConfirm: true,
       data: data,
+      actionId: actionId,
+    );
+  }
+
+  /// Level 1: 轻量确认（语音确认即可）
+  factory ActionResult.lightConfirmation({
+    required String message,
+    Map<String, dynamic>? data,
+    String? actionId,
+  }) {
+    return ActionResult(
+      success: false,
+      needsConfirmation: true,
+      confirmationMessage: message,
+      confirmLevel: ActionConfirmLevel.light,
+      allowVoiceConfirm: true,
+      requireScreenConfirm: false,
+      data: data,
+      actionId: actionId,
+    );
+  }
+
+  /// Level 2: 标准确认（语音或屏幕确认）
+  factory ActionResult.standardConfirmation({
+    required String message,
+    Map<String, dynamic>? data,
+    String? actionId,
+  }) {
+    return ActionResult(
+      success: false,
+      needsConfirmation: true,
+      confirmationMessage: message,
+      confirmLevel: ActionConfirmLevel.standard,
+      allowVoiceConfirm: true,
+      requireScreenConfirm: true,
+      data: data,
+      actionId: actionId,
+    );
+  }
+
+  /// Level 3: 严格确认（必须屏幕点击）
+  factory ActionResult.strictConfirmation({
+    required String message,
+    Map<String, dynamic>? data,
+    String? actionId,
+  }) {
+    return ActionResult(
+      success: false,
+      needsConfirmation: true,
+      confirmationMessage: message,
+      confirmLevel: ActionConfirmLevel.strict,
+      allowVoiceConfirm: false,
+      requireScreenConfirm: true,
+      data: data,
+      actionId: actionId,
+    );
+  }
+
+  /// Level 4: 禁止语音执行（高风险操作）
+  factory ActionResult.blocked({
+    required String reason,
+    required String redirectRoute,
+    String? actionId,
+  }) {
+    return ActionResult(
+      success: false,
+      needsConfirmation: false,
+      confirmationMessage: reason,
+      confirmLevel: ActionConfirmLevel.voiceProhibited,
+      allowVoiceConfirm: false,
+      requireScreenConfirm: false,
+      isBlocked: true,
+      redirectRoute: redirectRoute,
       actionId: actionId,
     );
   }

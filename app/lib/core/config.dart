@@ -7,6 +7,7 @@
 import 'package:flutter/foundation.dart';
 import '../services/http_service.dart';
 import 'config/config.dart';
+import 'config/secrets.dart';
 
 /// Application configuration
 class AppConfig {
@@ -24,9 +25,15 @@ class AppConfig {
   /// Backend API URL - 使用集中化配置
   String get apiBaseUrl => ApiEndpoints.apiBaseUrl;
 
-  /// Get Qwen API Key (compile-time only for security)
+  /// Get Qwen API Key
+  /// 优先使用编译时环境变量，否则使用内置密钥
   String get qwenApiKey {
-    return const String.fromEnvironment('QWEN_API_KEY', defaultValue: '');
+    const envKey = String.fromEnvironment('QWEN_API_KEY', defaultValue: '');
+    if (envKey.isNotEmpty) {
+      return envKey;
+    }
+    // 使用内置密钥（Release构建时会被混淆）
+    return kQwenApiKey;
   }
 
   /// Get Zhipu API Key (compile-time only for security)

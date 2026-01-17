@@ -2,7 +2,15 @@
 ///
 /// 用于打断检测和回声过滤中的文本相似度计算。
 /// 使用多种算法综合计算相似度，平衡准确性和性能。
+///
+/// 算法参考chat-companion-app：
+/// - Jaccard相似度（字符集合交并比）
+/// - 最长公共子串比率（LCS）
+/// - 取两者最大值作为最终相似度
 class SimilarityCalculator {
+  /// 是否启用调试日志
+  bool debugMode = false;
+
   /// 计算两段文本的相似度
   ///
   /// 返回值：0.0（完全不同）~ 1.0（完全相同）
@@ -29,8 +37,15 @@ class SimilarityCalculator {
     // 3. 最长公共子串比率
     final lcsRatio = _calculateLCSRatio(clean1, clean2);
 
-    // 取最大值
-    return jaccard > lcsRatio ? jaccard : lcsRatio;
+    // 取最大值（与chat-companion-app一致）
+    final result = jaccard > lcsRatio ? jaccard : lcsRatio;
+
+    if (debugMode) {
+      // ignore: avoid_print
+      print('[SimilarityCalculator] "$clean1" vs "$clean2": jaccard=$jaccard, lcs=$lcsRatio, result=$result');
+    }
+
+    return result;
   }
 
   /// 快速相似度检查（用于高频调用场景）

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/onboarding_provider.dart';
+import '../services/voice_navigation_executor.dart';
 import 'onboarding_welcome_page.dart';
 import 'onboarding_features_page.dart';
 import 'onboarding_first_transaction_page.dart';
 import 'onboarding_complete_page.dart';
-import 'main_navigation.dart';
 import 'enhanced_voice_assistant_page.dart';
 import 'budget_management_page.dart';
 import 'import_page.dart';
@@ -36,50 +36,44 @@ class _OnboardingFlowPageState extends ConsumerState<OnboardingFlowPage> {
 
   Future<void> _completeOnboarding() async {
     // Mark onboarding as completed
+    // main.dart will automatically switch to MainNavigation based on state change
     await ref.read(onboardingProvider.notifier).completeOnboarding();
-
-    // Navigate to main navigation
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigation()),
-      );
-    }
   }
 
   Future<void> _completeAndNavigateToVoice() async {
-    // Mark onboarding as completed
+    // Mark onboarding as completed first
     await ref.read(onboardingProvider.notifier).completeOnboarding();
 
-    // Navigate to voice assistant
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const EnhancedVoiceAssistantPage()),
-      );
-    }
+    // Wait for state change to propagate, then navigate using global navigator
+    await Future.delayed(const Duration(milliseconds: 100));
+    final navigatorKey = VoiceNavigationExecutor.instance.navigatorKey;
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (_) => const EnhancedVoiceAssistantPage()),
+    );
   }
 
   Future<void> _completeAndNavigateToBudget() async {
-    // Mark onboarding as completed
+    // Mark onboarding as completed first
     await ref.read(onboardingProvider.notifier).completeOnboarding();
 
-    // Navigate to budget management
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const BudgetManagementPage()),
-      );
-    }
+    // Wait for state change to propagate, then navigate using global navigator
+    await Future.delayed(const Duration(milliseconds: 100));
+    final navigatorKey = VoiceNavigationExecutor.instance.navigatorKey;
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (_) => const BudgetManagementPage()),
+    );
   }
 
   Future<void> _completeAndNavigateToImport() async {
-    // Mark onboarding as completed
+    // Mark onboarding as completed first
     await ref.read(onboardingProvider.notifier).completeOnboarding();
 
-    // Navigate to import page
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ImportPage()),
-      );
-    }
+    // Wait for state change to propagate, then navigate using global navigator
+    await Future.delayed(const Duration(milliseconds: 100));
+    final navigatorKey = VoiceNavigationExecutor.instance.navigatorKey;
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (_) => const ImportPage()),
+    );
   }
 
   @override

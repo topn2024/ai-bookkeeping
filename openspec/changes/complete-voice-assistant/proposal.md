@@ -1,55 +1,67 @@
-# 变更：完善语音智能助手实现
+# 变更提案：实时对话系统架构升级
 
-## 为什么
+## 变更ID
+`complete-voice-assistant`
 
-当前语音智能助手的架构设计完整，但核心的语音识别(ASR)和语音合成(TTS)服务仍为模拟实现，无法在生产环境中提供真实的语音交互功能。此外还存在多个未完成的TODO项和功能缺失，影响用户体验的完整性。
+## 概述
+将语音智能助手从当前的半双工模式升级为支持自然流畅对话的全双工系统，实现边说边听、智能打断、主动发起对话等能力。
 
-## 变更内容
+## 动机
+当前语音助手存在以下问题：
+1. **响应延迟高**：TTS需等待完整音频生成，启动延迟1.5-3.5秒
+2. **半双工模式**：说话时无法监听用户输入，交互不自然
+3. **缺乏打断机制**：用户无法中途打断AI说话
+4. **无主动对话**：只能被动响应，无法主动发起话题
+5. **对话层与执行层耦合**：操作执行阻塞对话流程
 
-### 高优先级（必须）
-- 实现阿里云ASR真实API调用（HTTP REST和WebSocket流式识别）
-- 实现阿里云TTS真实API调用
-- 集成Flutter TTS系统级语音合成
-- 实现API密钥安全管理和Token刷新机制
-- 完善权限检查逻辑
+## 目标
+- **响应延迟**: 从3-5秒降低到1-1.5秒
+- **首字延迟**: < 500ms
+- **打断响应**: < 200ms
+- **并发模式**: 全双工（说话时可监听）
+- **主动发起**: 5秒无输入后智能体主动说话
+- **后台操作**: 操作不打断对话流程
+- **自动结束**: 检测结束意图后优雅关闭
 
-### 中优先级（重要）
-- 集成端侧唤醒词检测引擎（Porcupine或Snowboy）
-- 实现确认流程UI反馈
-- 完成命令历史显示功能
-- 完善网络错误和API限流处理
+## 核心设计原则
+**对话层与执行层分离**：
+- 对话层负责意图识别、自然对话、上下文管理
+- 执行层负责记账、查询等操作的后台执行
+- 执行结果异步注入对话上下文
 
-### 低优先级（优化）
-- 实现音频流缓冲优化
-- 添加识别超时机制
-- 增强测试覆盖
-- 完善API文档
+## 受影响规范
+- `voice-assistant` (扩展)
+- `realtime-voice` (新建)
 
-## 影响
+## 复用现有模块
+| 模块 | 文件 | 复用方式 |
+|------|------|---------|
+| UserProfileService | `lib/services/user_profile_service.dart` | 直接复用，扩展对话偏好 |
+| ProfileDrivenDialogService | `lib/services/profile_driven_dialog_service.dart` | 直接复用 |
+| EntityDisambiguationService | `lib/services/voice/entity_disambiguation_service.dart` | 扩展操作指代 |
+| ActionRouter | `lib/services/agent/action_router.dart` | 直接复用 |
+| ActionExecutor | `lib/services/agent/action_executor.dart` | 直接复用 |
 
-- 受影响规范：voice-assistant（新建）
-- 受影响代码：
-  - `app/lib/services/voice_recognition_engine.dart` - ASR实现
-  - `app/lib/services/tts_service.dart` - TTS实现
-  - `app/lib/services/voice_wake_word_service.dart` - 唤醒词服务
-  - `app/lib/services/voice_service_provider.dart` - 服务提供者
-  - `app/lib/pages/enhanced_voice_assistant_page.dart` - 增强助手页面
-  - `app/lib/pages/voice_recognition_page.dart` - 语音识别页面
+## 新增组件
+| 组件 | 职责 |
+|------|------|
+| RealtimeConversationSession | 实时对话会话控制，管理状态流转 |
+| ConversationActionBridge | 对话层与执行层的桥接器 |
+| BackgroundOperationExecutor | 后台异步执行器 |
+| ConversationMemory | 会话级短期记忆 |
+| VoiceExceptionHandler | 异常分类与处理策略 |
+| FrequencyLimiter | 频率限制与重复检测 |
+| InterruptRecoveryManager | 中断恢复管理 |
+| StreamingTtsService | 流式TTS合成 |
+| VoiceStateMachine | 层次化并发状态机 |
+| BargeInDetector | 打断检测 |
 
-## 风险评估
-
-| 风险 | 影响 | 缓解措施 |
-|------|------|----------|
-| 阿里云API调用失败 | 高 | 实现离线ASR降级机制 |
-| 唤醒词检测精度不足 | 中 | 支持灵敏度调节 |
-| API密钥泄露 | 高 | 使用flutter_secure_storage |
-| 网络延迟影响体验 | 中 | 实现流式识别和本地缓存 |
+## 实施计划
+分四批实施：
+1. **P0核心对话体验**: 音频流传输、VAD优化、会话控制器、桥接器、后台执行器、流式TTS
+2. **P1个性化体验**: 短期记忆、用户画像集成、个性化对话
+3. **P1完整交互**: 并发状态机、打断检测、主动话题、结束检测、异常处理
+4. **P2增强体验**: 语音自然度、画像学习、高频输入优化
 
 ## 验收标准
-
-1. 用户可以使用语音进行真实的记账操作
-2. 语音识别准确率达到95%以上（普通话环境）
-3. TTS播报流畅自然，延迟小于500ms
-4. 唤醒词检测可在后台运行
-5. 无网络时自动切换到离线识别
-6. 所有TODO项已完成或有明确的处理方案
+详见 `tasks.md`

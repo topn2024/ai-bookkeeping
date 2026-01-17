@@ -134,15 +134,27 @@ class BargeInDetectorV2 {
   /// 更新VAD状态
   void updateVADState(bool isSpeechDetected) {
     _vadSpeechDetected = isSpeechDetected;
+    // 同步VAD状态到回声过滤器（用于动态阈值）
+    _echoFilter.updateVADState(isSpeechDetected);
   }
 
   /// 处理ASR中间结果
   ///
   /// 检查第1层和第2层打断条件
+  ///
+  /// 优化（from chat-companion-app）：
+  /// - 添加回声过滤冷却检查，刚过滤回声后不触发打断
   BargeInResult handlePartialResult(String text) {
     if (!_isTTSPlaying) return BargeInResult.notTriggered;
     if (!_canCheck()) return BargeInResult.notTriggered;
     if (!_canBargeIn()) return BargeInResult.notTriggered;
+
+    // 回声过滤冷却检查（from chat-companion-app）
+    // 如果刚过滤了回声，忽略这个打断（可能是回声触发的）
+    if (_echoFilter.isInEchoFilterCooldown) {
+      debugPrint('[BargeInDetectorV2] 回声过滤冷却中，忽略打断检测');
+      return BargeInResult.notTriggered;
+    }
 
     _totalChecks++;
     final cleanText = _cleanText(text);

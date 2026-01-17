@@ -8,6 +8,7 @@ import '../pages/account_list_page.dart';
 import '../pages/ai/ai_learning_report_page.dart';
 import '../pages/voice_learning_report_page.dart';
 import '../pages/voice_assistant_settings_page.dart';
+import '../pages/quick_entry_page.dart';
 import 'voice_navigation_service.dart';
 
 /// 语音导航执行器
@@ -135,6 +136,10 @@ class VoiceNavigationExecutor {
   Widget? _getPageForRoute(String route) {
     // 主要页面路由映射
     final pageMap = <String, Widget Function()>{
+      // 快速记账
+      '/quick-add': () => const QuickEntryPage(),
+      '/quick-entry': () => const QuickEntryPage(),
+
       // 设置相关
       '/settings': () => const SettingsPage(),
       '/settings/general': () => const SettingsPage(),

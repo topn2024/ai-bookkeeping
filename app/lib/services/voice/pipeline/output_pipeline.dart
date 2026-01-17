@@ -184,6 +184,9 @@ class OutputPipeline {
     _state = OutputPipelineState.stopped;
     _stateController.add(_state);
 
+    // 标记响应被打断（参考chat-companion-app的playback confirmation机制）
+    _responseTracker.markInterrupted(_currentResponseId);
+
     await _ttsQueueWorker.stop();
     _sentenceBuffer.clear();
 
@@ -198,6 +201,10 @@ class OutputPipeline {
   Future<void> fadeOutAndStop() async {
     _state = OutputPipelineState.fading;
     _stateController.add(_state);
+
+    // 标记响应被打断（参考chat-companion-app的playback confirmation机制）
+    // 这样后续的playback_complete事件会被忽略
+    _responseTracker.markInterrupted(_currentResponseId);
 
     await _ttsQueueWorker.fadeOutAndStop();
     _sentenceBuffer.clear();
@@ -223,6 +230,9 @@ class OutputPipeline {
     _state = OutputPipelineState.speaking;
     _stateController.add(_state);
 
+    // 标记开始播放（参考chat-companion-app的playback confirmation机制）
+    _responseTracker.markPlaybackStarted(_currentResponseId);
+
     // 更新打断检测器
     _bargeInDetector.updateTTSState(
       isPlaying: true,
@@ -232,6 +242,14 @@ class OutputPipeline {
 
   /// TTS播放完成回调
   void _onTTSCompleted() {
+    // 确认播放完成（参考chat-companion-app的playback confirmation机制）
+    // 只有当响应ID匹配且未被打断时才接受完成事件
+    final accepted = _responseTracker.confirmPlaybackComplete(_currentResponseId);
+    if (!accepted) {
+      debugPrint('[OutputPipeline] 播放完成事件被拒绝（响应已过期或已被打断）');
+      return;
+    }
+
     _state = OutputPipelineState.idle;
     _stateController.add(_state);
 

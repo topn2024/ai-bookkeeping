@@ -200,7 +200,7 @@ class _GlassNavItem extends StatelessWidget {
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutBack,
+              curve: Curves.easeOut,  // 使用不会overshoot的曲线，避免boxShadow lerp产生负值
               padding: EdgeInsets.symmetric(
                 horizontal: isSelected ? 16 : 0,
                 vertical: isSelected ? 4 : 0,
@@ -210,7 +210,7 @@ class _GlassNavItem extends StatelessWidget {
                     ? selectedColor.withValues(alpha: 0.12)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: isSelected ? AntigravityShadows.l2 : null,
+                boxShadow: isSelected ? AntigravityShadows.l2 : AntigravityShadows.l2Zero,
               ),
               child: Icon(icon, color: color, size: 24),
             ),

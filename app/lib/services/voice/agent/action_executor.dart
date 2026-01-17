@@ -5,8 +5,14 @@
 /// 核心职责：
 /// - 参数验证：检测缺失参数
 /// - 执行控制：调用行为执行
-/// - 确认机制：敏感操作需要确认
+/// - 确认机制：支持4级确认系统（轻量/标准/严格/禁止）
 /// - 追问生成：缺少参数时生成追问
+///
+/// 4级确认系统：
+/// - Level 1 (light): 轻量确认 - 语音确认即可
+/// - Level 2 (standard): 标准确认 - 语音或屏幕确认
+/// - Level 3 (strict): 严格确认 - 必须屏幕点击
+/// - Level 4 (voiceProhibited): 禁止语音 - 必须手动操作
 library;
 
 import 'package:flutter/foundation.dart';
@@ -48,6 +54,15 @@ class PendingAction {
   /// 确认消息
   final String? confirmationMessage;
 
+  /// 确认级别（4级确认系统）
+  final ActionConfirmLevel confirmLevel;
+
+  /// 是否允许语音确认
+  final bool allowVoiceConfirm;
+
+  /// 是否需要屏幕确认
+  final bool requireScreenConfirm;
+
   /// 创建时间
   final DateTime createdAt;
 
@@ -59,6 +74,9 @@ class PendingAction {
     required this.params,
     this.missingParams = const [],
     this.confirmationMessage,
+    this.confirmLevel = ActionConfirmLevel.standard,
+    this.allowVoiceConfirm = true,
+    this.requireScreenConfirm = false,
     int? timeoutSeconds,
   })  : createdAt = DateTime.now(),
         timeoutSeconds = timeoutSeconds ?? 60;
@@ -76,6 +94,141 @@ class PendingAction {
       confirmationMessage != null && missingParams.isEmpty;
 }
 
+/// 多意图待确认项
+class MultiIntentItem {
+  /// 意图
+  final IntentResult intent;
+
+  /// 关联的行为
+  final Action? action;
+
+  /// 参数
+  final Map<String, dynamic> params;
+
+  /// 缺失的参数
+  final List<String> missingParams;
+
+  /// 执行状态
+  bool executed;
+
+  /// 执行结果
+  ActionResult? result;
+
+  MultiIntentItem({
+    required this.intent,
+    this.action,
+    required this.params,
+    this.missingParams = const [],
+    this.executed = false,
+    this.result,
+  });
+
+  /// 是否完整（可执行）
+  bool get isComplete => missingParams.isEmpty && action != null;
+
+  /// 获取描述
+  String get description {
+    final amount = params['amount'];
+    final category = params['category'] ?? '支出';
+    final merchant = params['merchant'];
+
+    if (amount != null) {
+      final desc = '$category ${amount}元';
+      return merchant != null ? '$desc ($merchant)' : desc;
+    }
+    return intent.rawInput;
+  }
+}
+
+/// 多意图待确认状态
+class MultiIntentPendingAction {
+  /// 所有意图项
+  final List<MultiIntentItem> items;
+
+  /// 原始输入
+  final String rawInput;
+
+  /// 创建时间
+  final DateTime createdAt;
+
+  /// 超时时间（秒）
+  final int timeoutSeconds;
+
+  MultiIntentPendingAction({
+    required this.items,
+    required this.rawInput,
+    int? timeoutSeconds,
+  })  : createdAt = DateTime.now(),
+        timeoutSeconds = timeoutSeconds ?? 120;
+
+  /// 是否已超时
+  bool get isExpired {
+    return DateTime.now().difference(createdAt).inSeconds > timeoutSeconds;
+  }
+
+  /// 完整的意图项
+  List<MultiIntentItem> get completeItems =>
+      items.where((item) => item.isComplete).toList();
+
+  /// 不完整的意图项（需要补充参数）
+  List<MultiIntentItem> get incompleteItems =>
+      items.where((item) => !item.isComplete).toList();
+
+  /// 是否有不完整的意图
+  bool get hasIncomplete => incompleteItems.isNotEmpty;
+
+  /// 总金额
+  double get totalAmount {
+    double total = 0;
+    for (final item in completeItems) {
+      final amount = item.params['amount'];
+      if (amount is num) {
+        total += amount.toDouble();
+      }
+    }
+    return total;
+  }
+
+  /// 生成确认提示
+  String generatePrompt() {
+    final buffer = StringBuffer();
+
+    if (completeItems.isNotEmpty) {
+      buffer.writeln('识别到${completeItems.length}条记录：');
+      for (var i = 0; i < completeItems.length; i++) {
+        buffer.writeln('  ${i + 1}. ${completeItems[i].description}');
+      }
+      buffer.writeln('共${_formatAmount(totalAmount)}');
+    }
+
+    if (incompleteItems.isNotEmpty) {
+      if (buffer.isNotEmpty) buffer.writeln();
+      buffer.writeln('以下内容需要补充金额：');
+      for (var i = 0; i < incompleteItems.length; i++) {
+        buffer.writeln('  ${i + 1}. ${incompleteItems[i].description}');
+      }
+    }
+
+    if (completeItems.isNotEmpty) {
+      buffer.writeln();
+      if (incompleteItems.isNotEmpty) {
+        buffer.write('请补充金额或说"确认"记录已有内容');
+      } else {
+        buffer.write('确认记录吗？');
+      }
+    }
+
+    return buffer.toString();
+  }
+
+  String _formatAmount(double amount) {
+    if (amount == amount.roundToDouble()) {
+      return '${amount.round()}元';
+    }
+    return '${amount.toStringAsFixed(2)}元';
+  }
+}
+
 /// 行为执行器
 class ActionExecutor {
   /// 行为注册表
@@ -86,6 +239,9 @@ class ActionExecutor {
 
   /// 待处理的行为
   PendingAction? _pendingAction;
+
+  /// 多意图待处理
+  MultiIntentPendingAction? _multiIntentPending;
 
   /// 大金额确认阈值
   final double largeAmountThreshold;
@@ -108,9 +264,16 @@ class ActionExecutor {
   /// 获取待处理的行为
   PendingAction? get pendingAction => _pendingAction;
 
+  /// 获取多意图待处理
+  MultiIntentPendingAction? get multiIntentPending => _multiIntentPending;
+
   /// 是否有待处理的行为
   bool get hasPendingAction =>
       _pendingAction != null && !_pendingAction!.isExpired;
+
+  /// 是否有多意图待处理
+  bool get hasMultiIntentPending =>
+      _multiIntentPending != null && !_multiIntentPending!.isExpired;
 
   /// 执行意图
   ///
@@ -188,21 +351,29 @@ class ActionExecutor {
         }
       }
 
-      // 2. 确认检查
-      if (_needsConfirmation(action, params)) {
-        final confirmMsg = _generateConfirmationMessage(action, params);
-        _setPendingAction(action, params, [], confirmMsg);
-        _state = ExecutionState.waitingForConfirmation;
+      // 2. 执行行为（Action会返回带确认级别的结果）
+      final result = await action.execute(params);
 
-        return ActionResult.confirmation(
-          message: confirmMsg,
-          data: params,
-          actionId: action.id,
+      // 3. 如果Action返回需要确认，设置待处理状态
+      if (result.needsConfirmation) {
+        _setPendingAction(
+          action,
+          result.data ?? params,
+          [],
+          result.confirmationMessage,
+          result.confirmLevel,
+          result.allowVoiceConfirm,
+          result.requireScreenConfirm,
         );
+        _state = ExecutionState.waitingForConfirmation;
+        return result;
       }
 
-      // 3. 执行行为
-      final result = await action.execute(params);
+      // 4. 如果Action返回被阻止，直接返回
+      if (result.isBlocked) {
+        _state = ExecutionState.failed;
+        return result;
+      }
 
       _state = result.success ? ExecutionState.completed : ExecutionState.failed;
       _clearPendingAction();
@@ -279,15 +450,38 @@ class ActionExecutor {
     PendingAction pending,
     IntentResult intent,
   ) async {
-    debugPrint('[ActionExecutor] 处理确认');
+    debugPrint('[ActionExecutor] 处理确认，确认级别: ${pending.confirmLevel}');
 
     // 检查是否是确认意图
     final isConfirm = _isConfirmIntent(intent);
     final isCancel = _isCancelIntent(intent);
 
     if (isConfirm) {
+      // 检查确认级别是否允许语音确认
+      if (pending.confirmLevel == ActionConfirmLevel.strict) {
+        // Level 3: 严格确认，不允许语音确认
+        debugPrint('[ActionExecutor] 严格确认级别，语音确认被拒绝');
+        return ActionResult.strictConfirmation(
+          message: '此操作需要在屏幕上点击确认按钮',
+          data: pending.params,
+          actionId: pending.action.id,
+        );
+      }
+
+      if (pending.confirmLevel == ActionConfirmLevel.voiceProhibited) {
+        // Level 4: 禁止语音执行
+        debugPrint('[ActionExecutor] 禁止语音级别，操作被阻止');
+        return ActionResult.blocked(
+          reason: '此操作无法通过语音完成，请在设置中手动操作',
+          redirectRoute: pending.params['_redirectRoute'] as String? ?? '/settings',
+          actionId: pending.action.id,
+        );
+      }
+
+      // Level 1/2: 允许语音确认
       _clearPendingAction();
-      return _forceExecuteAction(pending.action, pending.params);
+      final paramsWithSkip = {...pending.params, '_skipConfirmation': true};
+      return _forceExecuteAction(pending.action, paramsWithSkip);
     }
 
     if (isCancel) {
@@ -304,6 +498,28 @@ class ActionExecutor {
     // 取消当前待处理，执行新意图
     _clearPendingAction();
     return execute(intent);
+  }
+
+  /// 处理屏幕确认（点击确认按钮）
+  Future<ActionResult> handleScreenConfirmation() async {
+    if (_pendingAction == null || _pendingAction!.isExpired) {
+      return ActionResult.failure('没有待确认的操作');
+    }
+
+    final pending = _pendingAction!;
+    _clearPendingAction();
+
+    // 屏幕确认可以绕过所有确认级别（除了Level 4）
+    if (pending.confirmLevel == ActionConfirmLevel.voiceProhibited) {
+      return ActionResult.blocked(
+        reason: '此操作需要在设置中手动完成',
+        redirectRoute: pending.params['_redirectRoute'] as String? ?? '/settings',
+        actionId: pending.action.id,
+      );
+    }
+
+    final paramsWithSkip = {...pending.params, '_skipConfirmation': true};
+    return _forceExecuteAction(pending.action, paramsWithSkip);
   }
 
   /// 强制执行（跳过确认）
@@ -422,12 +638,18 @@ class ActionExecutor {
     Map<String, dynamic> params,
     List<String> missingParams, [
     String? confirmationMessage,
+    ActionConfirmLevel confirmLevel = ActionConfirmLevel.standard,
+    bool allowVoiceConfirm = true,
+    bool requireScreenConfirm = false,
   ]) {
     _pendingAction = PendingAction(
       action: action,
       params: params,
       missingParams: missingParams,
       confirmationMessage: confirmationMessage,
+      confirmLevel: confirmLevel,
+      allowVoiceConfirm: allowVoiceConfirm,
+      requireScreenConfirm: requireScreenConfirm,
     );
   }
 
@@ -437,14 +659,266 @@ class ActionExecutor {
     _state = ExecutionState.idle;
   }
 
+  /// 清除多意图待处理
+  void _clearMultiIntentPending() {
+    _multiIntentPending = null;
+    _state = ExecutionState.idle;
+  }
+
   /// 取消当前待处理行为
   void cancelPending() {
     _clearPendingAction();
+    _clearMultiIntentPending();
   }
 
   /// 重置状态
   void reset() {
     _clearPendingAction();
+    _clearMultiIntentPending();
     _state = ExecutionState.idle;
+  }
+
+  // ==================== 多意图处理 ====================
+
+  /// 执行多意图
+  ///
+  /// [intents] 多个意图结果
+  /// [autoExecute] 是否自动执行（不需要确认）
+  /// Returns 执行结果
+  Future<ActionResult> executeMultiIntent(
+    List<IntentResult> intents, {
+    bool autoExecute = true,
+  }) async {
+    if (intents.isEmpty) {
+      return ActionResult.failure('没有意图需要执行');
+    }
+
+    if (intents.length == 1) {
+      return execute(intents.first);
+    }
+
+    debugPrint('[ActionExecutor] 执行多意图: ${intents.length}个');
+
+    // 构建多意图项
+    final items = <MultiIntentItem>[];
+    for (final intent in intents) {
+      final action = _findAction(intent);
+      final missingParams = <String>[];
+
+      if (action != null) {
+        final validation = action.validateParams(intent.entities);
+        if (!validation.isValid) {
+          missingParams.addAll(validation.missingParams);
+        }
+      }
+
+      items.add(MultiIntentItem(
+        intent: intent,
+        action: action,
+        params: Map.from(intent.entities),
+        missingParams: missingParams,
+      ));
+    }
+
+    // 创建多意图待处理对象
+    _multiIntentPending = MultiIntentPendingAction(
+      items: items,
+      rawInput: intents.map((i) => i.rawInput).join('；'),
+    );
+
+    // 检查是否所有项都完整且不需要特殊确认
+    final allComplete = _multiIntentPending!.incompleteItems.isEmpty;
+    final needsConfirmation = _checkMultiIntentNeedsConfirmation(_multiIntentPending!);
+
+    // 如果所有项完整且允许自动执行且不需要特殊确认，直接执行
+    if (autoExecute && allComplete && !needsConfirmation) {
+      debugPrint('[ActionExecutor] 多意图自动执行，无需确认');
+      return _executeMultiIntentBatch(_multiIntentPending!);
+    }
+
+    // 否则要求确认
+    _state = ExecutionState.waitingForConfirmation;
+
+    // 返回确认提示
+    return ActionResult.confirmation(
+      message: _multiIntentPending!.generatePrompt(),
+      data: {
+        'multiIntent': true,
+        'count': items.length,
+        'totalAmount': _multiIntentPending!.totalAmount,
+        'hasIncomplete': _multiIntentPending!.hasIncomplete,
+      },
+    );
+  }
+
+  /// 检查多意图是否需要确认
+  bool _checkMultiIntentNeedsConfirmation(MultiIntentPendingAction pending) {
+    // 检查总金额是否超过阈值
+    if (pending.totalAmount > largeAmountThreshold) {
+      debugPrint('[ActionExecutor] 多意图总金额${pending.totalAmount}超过阈值$largeAmountThreshold，需要确认');
+      return true;
+    }
+
+    // 检查是否有需要确认的行为类型
+    for (final item in pending.completeItems) {
+      if (item.action != null && _confirmRequiredActions.contains(item.action!.id)) {
+        debugPrint('[ActionExecutor] 多意图包含需要确认的行为: ${item.action!.id}');
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// 处理多意图确认
+  Future<ActionResult> handleMultiIntentConfirmation(IntentResult intent) async {
+    if (_multiIntentPending == null || _multiIntentPending!.isExpired) {
+      _clearMultiIntentPending();
+      return execute(intent);
+    }
+
+    final pending = _multiIntentPending!;
+
+    // 检查是否是确认意图
+    final isConfirm = _isConfirmIntent(intent);
+    final isCancel = _isCancelIntent(intent);
+
+    if (isConfirm) {
+      return _executeMultiIntentBatch(pending);
+    }
+
+    if (isCancel) {
+      _clearMultiIntentPending();
+      return ActionResult(
+        success: true,
+        responseText: '好的，已取消全部',
+      );
+    }
+
+    // 不是确认也不是取消，可能是补充参数或新意图
+    // 尝试补充参数
+    final supplemented = _trySupplementMultiIntentParams(pending, intent);
+    if (supplemented) {
+      // 参数已补充，更新提示
+      return ActionResult.confirmation(
+        message: pending.generatePrompt(),
+        data: {
+          'multiIntent': true,
+          'count': pending.items.length,
+          'totalAmount': pending.totalAmount,
+          'hasIncomplete': pending.hasIncomplete,
+        },
+      );
+    }
+
+    // 无法补充，视为新意图，取消当前多意图
+    _clearMultiIntentPending();
+    return execute(intent);
+  }
+
+  /// 尝试补充多意图参数
+  bool _trySupplementMultiIntentParams(
+    MultiIntentPendingAction pending,
+    IntentResult intent,
+  ) {
+    // 检查是否有可补充的参数
+    final entities = intent.entities;
+    if (entities.isEmpty) return false;
+
+    // 尝试补充不完整的意图项
+    for (final item in pending.incompleteItems) {
+      for (final param in item.missingParams.toList()) {
+        if (entities.containsKey(param)) {
+          item.params[param] = entities[param];
+          item.missingParams.remove(param);
+        }
+      }
+    }
+
+    // 如果提供了金额但没有明确目标，尝试补充到第一个缺金额的项
+    if (entities.containsKey('amount')) {
+      for (final item in pending.incompleteItems) {
+        if (item.missingParams.contains('amount')) {
+          item.params['amount'] = entities['amount'];
+          item.missingParams.remove('amount');
+          return true;
+        }
+      }
+    }
+
+    return pending.incompleteItems.length < pending.items.length;
+  }
+
+  /// 批量执行多意图
+  Future<ActionResult> _executeMultiIntentBatch(
+    MultiIntentPendingAction pending,
+  ) async {
+    debugPrint('[ActionExecutor] 批量执行多意图: ${pending.completeItems.length}个');
+    _state = ExecutionState.executing;
+
+    final results = <ActionResult>[];
+    var successCount = 0;
+    var failCount = 0;
+
+    for (final item in pending.completeItems) {
+      if (item.action == null) {
+        item.executed = true;
+        item.result = ActionResult.failure('未找到对应行为');
+        failCount++;
+        continue;
+      }
+
+      try {
+        final result = await item.action!.execute(item.params);
+        item.executed = true;
+        item.result = result;
+        results.add(result);
+
+        if (result.success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (e) {
+        item.executed = true;
+        item.result = ActionResult.failure('执行失败: $e');
+        failCount++;
+      }
+    }
+
+    _clearMultiIntentPending();
+    _state = ExecutionState.completed;
+
+    // 生成汇总响应
+    if (failCount == 0) {
+      return ActionResult(
+        success: true,
+        responseText: '已记录$successCount笔，共${_formatAmount(pending.totalAmount)}',
+        data: {
+          'multiIntent': true,
+          'successCount': successCount,
+          'totalAmount': pending.totalAmount,
+        },
+      );
+    } else if (successCount == 0) {
+      return ActionResult.failure('记录失败，请重试');
+    } else {
+      return ActionResult(
+        success: true,
+        responseText: '已记录$successCount笔，${failCount}笔失败',
+        data: {
+          'multiIntent': true,
+          'successCount': successCount,
+          'failCount': failCount,
+        },
+      );
+    }
+  }
+
+  String _formatAmount(double amount) {
+    if (amount == amount.roundToDouble()) {
+      return '${amount.round()}元';
+    }
+    return '${amount.toStringAsFixed(2)}元';
   }
 }

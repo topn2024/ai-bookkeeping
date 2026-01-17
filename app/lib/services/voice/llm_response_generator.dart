@@ -84,6 +84,107 @@ class LLMResponseGenerator {
     return _fallbackResponse(action, result, success);
   }
 
+  /// 生成闲聊回复
+  ///
+  /// [userInput] 用户输入
+  /// [chatIntent] 检测到的闲聊意图（可选，用于引导回复方向）
+  /// [chatHistory] 之前的对话历史（用于多轮对话）
+  Future<String> generateCasualChatResponse({
+    required String userInput,
+    String? chatIntent,
+    String? chatHistory,
+  }) async {
+    if (!isAvailable) {
+      return _fallbackCasualChatResponse(userInput, chatIntent);
+    }
+
+    try {
+      final hour = DateTime.now().hour;
+      String timeContext;
+      if (hour >= 5 && hour < 12) {
+        timeContext = '早上';
+      } else if (hour >= 12 && hour < 18) {
+        timeContext = '下午';
+      } else {
+        timeContext = '晚上';
+      }
+
+      final prompt = '''
+你是小记，一个可爱、活泼的记账助手。用户在和你闲聊，请用自然、亲切的方式回应。
+
+当前时间：$timeContext
+${chatHistory != null && chatHistory.isNotEmpty ? '\n$chatHistory\n' : ''}
+用户现在说：$userInput
+${chatIntent != null ? '（检测到的意图：$chatIntent）' : ''}
+
+要求：
+1. 简短自然（15-30字，最多不超过50字）
+2. 口语化，像朋友聊天
+3. 可以用语气词如"嗯"、"哈哈"、"呀"、"~"等
+4. 保持积极友好的态度
+5. 根据上下文自然回应，保持对话连贯性
+6. 可以适当引导到记账话题，但不要强行转换
+7. 不要说"我是AI"或"我是机器人"
+8. 如果用户表达情绪，先共情再回应
+9. 如果用户想结束对话（说再见/拜拜），温馨告别
+
+直接输出回复内容，不要加引号：''';
+
+      final response = await _qwenService.chat(prompt).timeout(const Duration(seconds: 5));
+      if (response != null && response.isNotEmpty) {
+        final cleaned = _cleanResponse(response);
+        if (cleaned.isNotEmpty) {
+          debugPrint('[LLMResponse] 闲聊回复: $cleaned');
+          return cleaned;
+        }
+      }
+    } catch (e) {
+      debugPrint('[LLMResponse] 闲聊回复生成失败: $e');
+    }
+
+    return _fallbackCasualChatResponse(userInput, chatIntent);
+  }
+
+  /// 闲聊模板回复（降级方案）
+  String _fallbackCasualChatResponse(String userInput, String? chatIntent) {
+    final lowerInput = userInput.toLowerCase();
+
+    // 问候
+    if (lowerInput.contains('你好') || lowerInput.contains('hi') || lowerInput.contains('hello')) {
+      final hour = DateTime.now().hour;
+      if (hour >= 5 && hour < 12) return '早上好呀~有什么需要帮忙的吗？';
+      if (hour >= 12 && hour < 18) return '下午好~要记一笔账吗？';
+      return '晚上好~今天花了多少呀？';
+    }
+
+    // 感谢
+    if (lowerInput.contains('谢谢') || lowerInput.contains('感谢')) {
+      return '不客气~有需要随时找我';
+    }
+
+    // 再见
+    if (lowerInput.contains('再见') || lowerInput.contains('拜拜') || lowerInput.contains('晚安')) {
+      return '拜拜~记得常来记账哦';
+    }
+
+    // 心情
+    if (lowerInput.contains('累') || lowerInput.contains('烦') || lowerInput.contains('郁闷')) {
+      return '辛苦啦~要不要看看这个月省了多少钱开心一下？';
+    }
+
+    if (lowerInput.contains('开心') || lowerInput.contains('高兴')) {
+      return '开心就好~顺便记一笔账吧？';
+    }
+
+    // 询问能力
+    if (lowerInput.contains('你能') || lowerInput.contains('你会') || lowerInput.contains('你是谁')) {
+      return '我是小记呀~帮你记账、查账、管预算，这些我都行！';
+    }
+
+    // 默认
+    return '嗯嗯~要记账还是查账呢？';
+  }
+
   /// 生成错误/异常回复
   Future<String> generateErrorResponse({
     required String errorType,

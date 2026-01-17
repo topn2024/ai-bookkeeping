@@ -46,6 +46,23 @@ class VoicePipelineController {
 
   VoicePipelineState _state = VoicePipelineState.idle;
 
+  /// 句子聚合缓冲区（用于连续对话）
+  final List<String> _sentenceBuffer = [];
+
+  /// 句子聚合计时器
+  Timer? _sentenceAggregationTimer;
+
+  /// 句子聚合等待时间（毫秒）
+  /// 收到ASR句子结束后等待这么长时间，如果用户继续说话则合并
+  /// 增加到2秒，给用户足够的时间说完多条记录
+  static const int _sentenceAggregationDelayMs = 2000;
+
+  /// 是否正在说话（基于VAD）
+  bool _isUserSpeaking = false;
+
+  /// 最后收到ASR结果的时间
+  DateTime? _lastASRResultTime;
+
   /// 回调
   /// 处理用户输入，返回LLM响应流
   Future<void> Function(String userInput, void Function(String chunk) onChunk, VoidCallback onComplete)? onProcessInput;
@@ -122,9 +139,35 @@ class VoicePipelineController {
     _inputPipeline.onFinalResult = _handleFinalResult;
     _inputPipeline.onBargeIn = _handleBargeIn;
     _inputPipeline.onError = _handleInputError;  // ASR错误处理
+    _inputPipeline.onSpeechStart = _handleSpeechStart;
+    _inputPipeline.onSpeechEnd = _handleSpeechEnd;
 
     // 输出流水线回调
     _outputPipeline.onCompleted = _handleOutputCompleted;
+  }
+
+  /// 处理语音开始（VAD检测）
+  void _handleSpeechStart() {
+    _isUserSpeaking = true;
+    debugPrint('[VoicePipelineController] VAD: 用户开始说话');
+  }
+
+  /// 处理语音结束（VAD检测）
+  void _handleSpeechEnd() {
+    _isUserSpeaking = false;
+    debugPrint('[VoicePipelineController] VAD: 用户停止说话');
+
+    // 如果有缓存的句子且用户已停止说话，延迟处理
+    // 注意：不要立即处理，给用户时间说下一句（多笔交易场景）
+    if (_sentenceBuffer.isNotEmpty) {
+      debugPrint('[VoicePipelineController] VAD检测到静音，缓冲区有${_sentenceBuffer.length}个句子，延迟1000ms处理');
+      _sentenceAggregationTimer?.cancel();
+      // 延迟1000ms再处理，给用户时间说下一句
+      _sentenceAggregationTimer = Timer(
+        const Duration(milliseconds: 1000),
+        () => _processAggregatedSentences(),
+      );
+    }
   }
 
   /// 是否正在重启输入流水线（防止重复重启）
@@ -233,6 +276,13 @@ class VoicePipelineController {
     _setState(VoicePipelineState.stopping);
 
     try {
+      // 取消句子聚合计时器
+      _sentenceAggregationTimer?.cancel();
+      _sentenceAggregationTimer = null;
+      _sentenceBuffer.clear();
+      _isUserSpeaking = false;
+      _lastASRResultTime = null;
+
       await _inputPipeline.stop();
       await _outputPipeline.stop();
       _responseTracker.reset();
@@ -249,10 +299,61 @@ class VoicePipelineController {
   }
 
   /// 处理ASR最终结果
+  ///
+  /// 使用句子聚合机制 + VAD辅助判断：
+  /// 1. 收到ASR句子结束时，先缓存句子
+  /// 2. 如果VAD显示用户仍在说话，只缓存不启动计时器
+  /// 3. 如果VAD显示用户停止说话，启动短延迟（500ms）后处理
+  /// 4. 保险机制：无论VAD状态，2秒后强制处理（防止VAD失灵）
   Future<void> _handleFinalResult(String text) async {
     if (text.trim().isEmpty) return;
 
+    debugPrint('[VoicePipelineController] 收到ASR句子: "$text", VAD说话中=$_isUserSpeaking');
+
+    // 记录最后收到ASR结果的时间
+    _lastASRResultTime = DateTime.now();
+
+    // 将句子加入缓冲区
+    _sentenceBuffer.add(text);
+    debugPrint('[VoicePipelineController] 句子缓冲区: $_sentenceBuffer');
+
+    // 通知外部（用于UI显示当前识别的内容）
     onFinalResult?.call(text);
+
+    // 取消之前的计时器
+    _sentenceAggregationTimer?.cancel();
+
+    if (_isUserSpeaking) {
+      // VAD显示用户仍在说话，启动较长的保险计时器
+      // 这是保险机制，正常情况下VAD的speechEnd会更早触发处理
+      debugPrint('[VoicePipelineController] 用户仍在说话，启动保险计时器 (${_sentenceAggregationDelayMs}ms)');
+      _sentenceAggregationTimer = Timer(
+        Duration(milliseconds: _sentenceAggregationDelayMs),
+        () {
+          debugPrint('[VoicePipelineController] 保险计时器触发，强制处理');
+          _processAggregatedSentences();
+        },
+      );
+    } else {
+      // VAD显示用户已停止说话，启动延迟处理
+      // 1500ms足够用户在说多笔交易时有时间说下一句
+      debugPrint('[VoicePipelineController] 用户已停止说话，启动延迟处理 (1500ms)');
+      _sentenceAggregationTimer = Timer(
+        const Duration(milliseconds: 1500),
+        () => _processAggregatedSentences(),
+      );
+    }
+  }
+
+  /// 处理聚合后的句子
+  Future<void> _processAggregatedSentences() async {
+    if (_sentenceBuffer.isEmpty) return;
+
+    // 合并所有缓存的句子
+    final aggregatedText = _sentenceBuffer.join('');
+    _sentenceBuffer.clear();
+
+    debugPrint('[VoicePipelineController] 句子聚合完成，开始处理: "$aggregatedText"');
 
     // 开始处理
     _setState(VoicePipelineState.processing);
@@ -265,7 +366,7 @@ class VoicePipelineController {
     if (onProcessInput != null) {
       try {
         await onProcessInput!(
-          text,
+          aggregatedText,
           (chunk) {
             // LLM输出块 → 输出流水线
             _outputPipeline.addChunk(chunk);
@@ -380,6 +481,13 @@ class VoicePipelineController {
 
   /// 重置流水线
   void reset() {
+    // 取消句子聚合计时器
+    _sentenceAggregationTimer?.cancel();
+    _sentenceAggregationTimer = null;
+    _sentenceBuffer.clear();
+    _isUserSpeaking = false;
+    _lastASRResultTime = null;
+
     _inputPipeline.reset();
     _outputPipeline.reset();
     _responseTracker.reset();

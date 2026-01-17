@@ -36,7 +36,7 @@ class VoiceFeedbackSystem extends ChangeNotifier {
 
   VoiceFeedbackSystem({
     TTSService? ttsService,
-  }) : _ttsService = ttsService ?? TTSService();
+  }) : _ttsService = ttsService ?? TTSService.instance;
 
   /// 当前反馈状态
   VoiceFeedbackState get state => _state;
