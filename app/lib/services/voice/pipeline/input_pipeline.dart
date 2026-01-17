@@ -208,17 +208,23 @@ class InputPipeline {
       return;
     }
 
-    // 检查打断（用于触发打断回调）
-    // 注意：即使是打断，也不要丢弃用户输入！
-    // 用户在TTS播放期间说的话应该被处理，而不是被丢弃
+    // 检查打断和回声过滤
+    // 当TTS正在播放时，需要区分：
+    // 1. 真正的用户打断 → 触发打断并传递用户输入
+    // 2. 回声（TTS输出被ASR识别） → 丢弃
     if (_bargeInDetector.isEnabled) {
       final bargeInResult = _bargeInDetector.handleFinalResult(text);
       if (bargeInResult.triggered) {
-        debugPrint('[InputPipeline] 检测到打断，但仍然传递用户输入: "$text"');
-        // 打断已经通过检测器内部的 _triggerBargeIn 触发
-        // 继续处理用户输入，不要丢弃！
+        // 触发了打断，说明是真正的用户输入（通过了回声过滤）
+        debugPrint('[InputPipeline] 检测到打断，传递用户输入: "$text"');
+        // 打断回调已经通过检测器内部的 _triggerBargeIn 触发
+      } else {
+        // TTS播放中但没有触发打断，说明被回声过滤了
+        debugPrint('[InputPipeline] TTS播放中，回声过滤丢弃: "$text"');
+        return;  // 丢弃回声，不传递
       }
     }
+    // TTS没有播放（isEnabled=false），正常传递用户输入
 
     onFinalResult?.call(text);
   }

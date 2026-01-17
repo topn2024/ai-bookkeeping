@@ -177,8 +177,10 @@ class BuildInfo {
         ? ['build', 'apk', '--release', '--no-tree-shake-icons', ...dartDefines]
         : ['build', 'apk', '--debug', ...dartDefines];
 
+    final flutterCommand = Platform.isWindows ? 'flutter.bat' : 'flutter';
+
     final result = await Process.run(
-      'D:/flutter/bin/flutter.bat',
+      flutterCommand,
       buildArgs,
       workingDirectory: 'app',
       runInShell: true,

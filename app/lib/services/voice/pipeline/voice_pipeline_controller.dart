@@ -241,8 +241,25 @@ class VoicePipelineController {
 
   /// 启动流水线
   Future<void> start() async {
+    // 如果正在停止中，等待一小段时间或强制重置
+    if (_state == VoicePipelineState.stopping) {
+      debugPrint('[VoicePipelineController] 正在停止中，等待100ms...');
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // 如果还是 stopping，强制重置
+      if (_state == VoicePipelineState.stopping) {
+        debugPrint('[VoicePipelineController] 强制重置 stopping -> idle');
+        _state = VoicePipelineState.idle;
+        _sentenceAggregationTimer?.cancel();
+        _sentenceAggregationTimer = null;
+        _sentenceBuffer.clear();
+        _isUserSpeaking = false;
+        _inputPipeline.reset();
+      }
+    }
+
     if (_state != VoicePipelineState.idle) {
-      debugPrint('[VoicePipelineController] 已在运行中');
+      debugPrint('[VoicePipelineController] 已在运行中，状态=$_state');
       return;
     }
 
