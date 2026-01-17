@@ -157,17 +157,19 @@ class SentenceSplitter {
         final hasAction = _hasActionVerb(trimmed);
         final hasAmount = RegExp(r'\d+|[一二三四五六七八九十百千万两]+').hasMatch(trimmed);
 
-        if (hasAction && hasAmount) {
-          // 这是一个独立的交易记录
+        // 修复：有金额的片段应该被视为独立的交易记录
+        // 例如 "咖啡36" 虽然没有动作动词，但有金额，应该作为独立交易
+        if (hasAmount) {
+          // 有金额，视为独立的交易记录
           if (buffer.isNotEmpty) {
-            // 先把 buffer 中的内容加到这个部分前面
+            // buffer 中可能是没有金额的修饰语，合并到当前片段
             validParts.add('$buffer，$trimmed');
             buffer = '';
           } else {
             validParts.add(trimmed);
           }
-        } else if (hasAction || hasAmount) {
-          // 有动作或金额但不完整，暂存
+        } else if (hasAction) {
+          // 有动作但没有金额（如"打车"），暂存等待后续金额
           if (buffer.isNotEmpty) {
             buffer = '$buffer，$trimmed';
           } else {
