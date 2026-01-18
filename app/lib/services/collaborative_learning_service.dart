@@ -5,13 +5,16 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
 
+import 'privacy/differential_privacy/differential_privacy_engine.dart';
+import 'privacy/anomaly_detection/anomaly_detector.dart';
+
 /// 协同学习服务
 ///
 /// 功能：
 /// 1. 本地规则脱敏上报
 /// 2. 下载协同规则
 /// 3. 规则融合
-/// 4. 隐私保护
+/// 4. 隐私保护（差分隐私 + 异常检测）
 class CollaborativeLearningService {
   final CollaborativeApiClient _apiClient;
   final LocalRuleStorage _ruleStorage;
@@ -19,13 +22,37 @@ class CollaborativeLearningService {
   Timer? _syncTimer;
   bool _isEnabled = true;
 
+  /// 差分隐私引擎（可选）
+  final DifferentialPrivacyEngine? _privacyEngine;
+
+  /// 异常检测器（可选）
+  final AnomalyDetector? _anomalyDetector;
+
+  /// 当前用户ID（用于异常追踪）
+  String? _currentUserId;
+
   CollaborativeLearningService({
     required CollaborativeApiClient apiClient,
     required LocalRuleStorage ruleStorage,
     Duration? syncInterval,
+    DifferentialPrivacyEngine? privacyEngine,
+    AnomalyDetector? anomalyDetector,
+    String? currentUserId,
   })  : _apiClient = apiClient,
         _ruleStorage = ruleStorage,
-        _syncInterval = syncInterval ?? const Duration(hours: 6);
+        _syncInterval = syncInterval ?? const Duration(hours: 6),
+        _privacyEngine = privacyEngine,
+        _anomalyDetector = anomalyDetector,
+        _currentUserId = currentUserId;
+
+  /// 差分隐私引擎
+  DifferentialPrivacyEngine? get privacyEngine => _privacyEngine;
+
+  /// 异常检测器
+  AnomalyDetector? get anomalyDetector => _anomalyDetector;
+
+  /// 设置当前用户ID
+  set currentUserId(String? userId) => _currentUserId = userId;
 
   /// 是否启用协同学习
   bool get isEnabled => _isEnabled;
@@ -60,23 +87,41 @@ class CollaborativeLearningService {
       return SyncResult(success: false, reason: '协同学习已禁用');
     }
 
+    // 检查隐私预算是否耗尽
+    if (_privacyEngine != null && !_privacyEngine.canPerformOperation) {
+      debugPrint('协同学习：隐私预算已耗尽，跳过本次同步');
+      return SyncResult(
+        success: false,
+        reason: '隐私预算已耗尽',
+        privacyBudgetExhausted: true,
+      );
+    }
+
     try {
-      // 1. 上报本地脱敏数据
-      final uploadCount = await _uploadAnonymizedPatterns();
+      // 1. 上报本地脱敏数据（含差分隐私保护）
+      final uploadResult = await _uploadAnonymizedPatterns();
 
       // 2. 下载协同规则
       final collaborativeRules = await _downloadCollaborativeRules();
 
-      // 3. 融合到本地
-      final mergedCount = await _mergeCollaborativeRules(collaborativeRules);
+      // 3. 融合到本地（含异常检测）
+      final mergeResult = await _mergeCollaborativeRules(collaborativeRules);
 
-      debugPrint('协同学习同步成功: 上传$uploadCount条，下载${collaborativeRules.length}条，融合$mergedCount条');
+      debugPrint(
+        '协同学习同步成功: 上传${uploadResult.uploadedCount}条'
+        '${uploadResult.protectedCount > 0 ? "(差分隐私保护${uploadResult.protectedCount}条)" : ""}, '
+        '下载${collaborativeRules.length}条, '
+        '融合${mergeResult.mergedCount}条'
+        '${mergeResult.filteredCount > 0 ? "(过滤异常${mergeResult.filteredCount}条)" : ""}',
+      );
 
       return SyncResult(
         success: true,
-        uploadedCount: uploadCount,
+        uploadedCount: uploadResult.uploadedCount,
         downloadedCount: collaborativeRules.length,
-        mergedCount: mergedCount,
+        mergedCount: mergeResult.mergedCount,
+        protectedCount: uploadResult.protectedCount,
+        filteredAnomalyCount: mergeResult.filteredCount,
       );
     } catch (e) {
       debugPrint('协同学习同步失败: $e');
@@ -89,26 +134,54 @@ class CollaborativeLearningService {
     return await _syncWithCloud();
   }
 
-  /// 上报脱敏模式
-  Future<int> _uploadAnonymizedPatterns() async {
+  /// 上报脱敏模式（含差分隐私保护）
+  Future<_UploadResult> _uploadAnonymizedPatterns() async {
     final localRules = await _ruleStorage.getAllRules();
-    if (localRules.isEmpty) return 0;
+    if (localRules.isEmpty) {
+      return const _UploadResult(uploadedCount: 0, protectedCount: 0);
+    }
 
-    // 脱敏处理
+    // 筛选符合条件的规则
+    final eligibleRules = localRules
+        .where((rule) => rule.confidence >= 0.8 && rule.hitCount >= 5)
+        .toList();
+
+    if (eligibleRules.isEmpty) {
+      return const _UploadResult(uploadedCount: 0, protectedCount: 0);
+    }
+
+    // 如果启用了差分隐私，对规则进行保护
     final anonymizedRules = <Map<String, dynamic>>[];
-    for (final rule in localRules) {
-      // 只上报高置信度的规则
-      if (rule.confidence >= 0.8 && rule.hitCount >= 5) {
+    int protectedCount = 0;
+
+    if (_privacyEngine != null && _privacyEngine.canPerformOperation) {
+      // 使用差分隐私保护规则
+      final protectedRules = await _privacyEngine.protectRules(eligibleRules);
+      protectedCount = protectedRules.length;
+
+      for (final protectedRule in protectedRules) {
+        anonymizedRules.add(protectedRule.toUploadData());
+      }
+
+      debugPrint('差分隐私：保护了 $protectedCount 条规则');
+    } else {
+      // 不使用差分隐私，直接脱敏处理
+      for (final rule in eligibleRules) {
         anonymizedRules.add(_anonymizeRule(rule));
       }
     }
 
-    if (anonymizedRules.isEmpty) return 0;
+    if (anonymizedRules.isEmpty) {
+      return const _UploadResult(uploadedCount: 0, protectedCount: 0);
+    }
 
     // 上报到云端
     await _apiClient.uploadPatterns(anonymizedRules);
 
-    return anonymizedRules.length;
+    return _UploadResult(
+      uploadedCount: anonymizedRules.length,
+      protectedCount: protectedCount,
+    );
   }
 
   /// 规则脱敏处理
@@ -152,11 +225,59 @@ class CollaborativeLearningService {
     }
   }
 
-  /// 融合协同规则到本地
-  Future<int> _mergeCollaborativeRules(List<CollaborativeRule> rules) async {
-    int mergedCount = 0;
+  /// 融合协同规则到本地（含异常检测）
+  Future<_MergeResult> _mergeCollaborativeRules(
+      List<CollaborativeRule> rules) async {
+    if (rules.isEmpty) {
+      return const _MergeResult(mergedCount: 0, filteredCount: 0);
+    }
 
-    for (final rule in rules) {
+    int mergedCount = 0;
+    int filteredCount = 0;
+
+    // 如果启用了异常检测，先转换为 LearnedRule 进行检测
+    List<CollaborativeRule> rulesToMerge = rules;
+
+    if (_anomalyDetector != null) {
+      // 将 CollaborativeRule 转换为 LearnedRule 以进行异常检测
+      final learnedRules = rules
+          .map((r) => LearnedRule(
+                id: r.patternHash,
+                type: r.type,
+                pattern: r.patternHash,
+                category: r.category,
+                confidence: r.confidence,
+                hitCount: r.aggregatedCount,
+                source: RuleSource.collaborative,
+                createdAt: DateTime.now(),
+              ))
+          .toList();
+
+      // 执行异常检测
+      final detectionResult = await _anomalyDetector.detectAnomalies(
+        learnedRules,
+        userId: _currentUserId,
+      );
+
+      // 过滤出正常规则
+      final normalPatterns =
+          detectionResult.normalRules.map((r) => r.pattern).toSet();
+      rulesToMerge = rules
+          .where((r) => normalPatterns.contains(r.patternHash))
+          .toList();
+
+      filteredCount = rules.length - rulesToMerge.length;
+
+      if (filteredCount > 0) {
+        debugPrint(
+          '异常检测：过滤了 $filteredCount 条异常规则，'
+          '异常率 ${(detectionResult.anomalyRate * 100).toStringAsFixed(1)}%',
+        );
+      }
+    }
+
+    // 融合正常规则
+    for (final rule in rulesToMerge) {
       // 检查是否已存在相同规则
       final existingRule = await _ruleStorage.findByPattern(rule.patternHash);
 
@@ -173,7 +294,7 @@ class CollaborativeLearningService {
           type: rule.type,
           pattern: rule.patternHash, // 使用哈希作为模式标识
           category: rule.category,
-          confidence: rule.confidence * 0.6, // 协同规则初始置信��打折
+          confidence: rule.confidence * 0.6, // 协同规则初始置信度打折
           hitCount: 0,
           source: RuleSource.collaborative,
           createdAt: DateTime.now(),
@@ -182,7 +303,7 @@ class CollaborativeLearningService {
       }
     }
 
-    return mergedCount;
+    return _MergeResult(mergedCount: mergedCount, filteredCount: filteredCount);
   }
 
   /// 获取协同学习状态
@@ -191,12 +312,23 @@ class CollaborativeLearningService {
     final collaborativeRules =
         localRules.where((r) => r.source == RuleSource.collaborative).toList();
 
+    // 获取隐私预算信息
+    double? remainingBudgetPercent;
+    bool privacyBudgetExhausted = false;
+
+    if (_privacyEngine != null) {
+      remainingBudgetPercent = _privacyEngine.budgetManager.remainingBudgetPercent;
+      privacyBudgetExhausted = _privacyEngine.budgetManager.isExhausted;
+    }
+
     return CollaborativeStatus(
       isEnabled: _isEnabled,
       localRuleCount: localRules.length,
       collaborativeRuleCount: collaborativeRules.length,
       lastSyncTime: await _ruleStorage.getLastSyncTime(),
       syncInterval: _syncInterval,
+      remainingBudgetPercent: remainingBudgetPercent,
+      privacyBudgetExhausted: privacyBudgetExhausted,
     );
   }
 
@@ -381,12 +513,24 @@ class SyncResult {
   final int downloadedCount;
   final int mergedCount;
 
+  /// 差分隐私保护的规则数量
+  final int protectedCount;
+
+  /// 异常检测过滤的规则数量
+  final int filteredAnomalyCount;
+
+  /// 隐私预算是否耗尽
+  final bool privacyBudgetExhausted;
+
   const SyncResult({
     required this.success,
     this.reason,
     this.uploadedCount = 0,
     this.downloadedCount = 0,
     this.mergedCount = 0,
+    this.protectedCount = 0,
+    this.filteredAnomalyCount = 0,
+    this.privacyBudgetExhausted = false,
   });
 }
 
@@ -398,12 +542,20 @@ class CollaborativeStatus {
   final DateTime? lastSyncTime;
   final Duration syncInterval;
 
+  /// 剩余隐私预算百分比（0-100）
+  final double? remainingBudgetPercent;
+
+  /// 隐私预算是否耗尽
+  final bool privacyBudgetExhausted;
+
   const CollaborativeStatus({
     required this.isEnabled,
     required this.localRuleCount,
     required this.collaborativeRuleCount,
     this.lastSyncTime,
     required this.syncInterval,
+    this.remainingBudgetPercent,
+    this.privacyBudgetExhausted = false,
   });
 }
 
@@ -506,4 +658,28 @@ class MockCollaborativeApiClient implements CollaborativeApiClient {
       ),
     ];
   }
+}
+
+// ==================== 内部辅助类 ====================
+
+/// 上传结果（内部使用）
+class _UploadResult {
+  final int uploadedCount;
+  final int protectedCount;
+
+  const _UploadResult({
+    required this.uploadedCount,
+    required this.protectedCount,
+  });
+}
+
+/// 合并结果（内部使用）
+class _MergeResult {
+  final int mergedCount;
+  final int filteredCount;
+
+  const _MergeResult({
+    required this.mergedCount,
+    required this.filteredCount,
+  });
 }
