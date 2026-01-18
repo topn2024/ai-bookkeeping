@@ -849,7 +849,8 @@
       "Bash(timeout 60 adb:*)",
       "Bash(git config:*)",
       "Bash(git tag:*)",
-      "Bash(timeout 90 adb:*)"
+      "Bash(timeout 90 adb:*)",
+      "Bash(osascript:*)"
     ]
   }
 }

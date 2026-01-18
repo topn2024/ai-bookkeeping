@@ -345,7 +345,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       debugPrint('[VoiceCoordinator] TTS跳过（流水线模式）: ${text.length > 30 ? text.substring(0, 30) + "..." : text}');
       return;
     }
-    await _speakWithSkipCheck(text);
+    await _ttsService.speak(text);
   }
 
   /// 语音按钮按下时的预热

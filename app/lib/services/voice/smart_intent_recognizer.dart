@@ -42,7 +42,7 @@ class SmartIntentRecognizer {
         _navigationService = navigationService ?? VoiceNavigationService();
 
   /// LLM调用超时时间（毫秒）
-  static const int _llmTimeoutMs = 5000;
+  static const int _llmTimeoutMs = 3000;
 
   /// 识别意图（LLM优先，规则兜底）
   Future<SmartIntentResult> recognize(
@@ -92,6 +92,252 @@ class SmartIntentRecognizer {
     } catch (e) {
       debugPrint('[SmartIntent] LLM调用超时或失败: $e');
       return null;
+    }
+  }
+
+  /// 识别多操作意图（支持一次输入包含多个操作）
+  Future<MultiOperationResult> recognizeMultiOperation(
+    String input, {
+    String? pageContext,
+  }) async {
+    if (input.trim().isEmpty) {
+      return MultiOperationResult.error('输入为空');
+    }
+
+    final normalizedInput = _normalize(input);
+    debugPrint('[SmartIntent] 开始多操作识别: $input');
+
+    // ═══════════════════════════════════════════════════════════════
+    // 主路径: LLM识别（优先）
+    // ═══════════════════════════════════════════════════════════════
+    if (_qwenService.isAvailable) {
+      debugPrint('[SmartIntent] 尝试LLM多操作识别...');
+      final llmResult = await _tryMultiOperationLLMWithTimeout(input, pageContext);
+      if (llmResult != null && llmResult.isSuccess && llmResult.confidence >= 0.7) {
+        debugPrint('[SmartIntent] LLM多操作识别成功: ${llmResult.operations.length}个操作, 置信度: ${llmResult.confidence}');
+        return llmResult;
+      }
+      debugPrint('[SmartIntent] LLM多操作识别失败或置信度不足，使用规则兜底');
+    } else {
+      debugPrint('[SmartIntent] LLM不可用（未配置API Key），使用规则兜底');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 兜底路径: 使用现有单操作识别
+    // ═══════════════════════════════════════════════════════════════
+    final singleResult = await _fallbackToRules(normalizedInput, input, pageContext);
+    if (singleResult.isSuccess) {
+      return MultiOperationResult(
+        operations: [_convertToOperation(singleResult)],
+        chatContent: null,
+        confidence: singleResult.confidence,
+        source: singleResult.source,
+        originalInput: input,
+      );
+    }
+
+    return MultiOperationResult.error('无法理解您的指令');
+  }
+
+  /// 带超时的多操作LLM调用
+  Future<MultiOperationResult?> _tryMultiOperationLLMWithTimeout(
+    String input,
+    String? pageContext,
+  ) async {
+    try {
+      return await _multiOperationLLMRecognition(input, pageContext)
+          .timeout(Duration(milliseconds: _llmTimeoutMs));
+    } catch (e) {
+      debugPrint('[SmartIntent] 多操作LLM调用超时或失败: $e');
+      return null;
+    }
+  }
+
+  /// 多操作LLM识别
+  Future<MultiOperationResult?> _multiOperationLLMRecognition(
+    String input,
+    String? pageContext,
+  ) async {
+    try {
+      final prompt = _buildMultiOperationLLMPrompt(input, pageContext);
+      final response = await _qwenService.chat(prompt);
+
+      if (response == null || response.isEmpty) {
+        return null;
+      }
+
+      return _parseMultiOperationLLMResponse(response, input);
+    } catch (e) {
+      debugPrint('[SmartIntent] 多操作LLM调用失败: $e');
+      return null;
+    }
+  }
+
+  /// 构建多操作LLM Prompt
+  String _buildMultiOperationLLMPrompt(String input, String? pageContext) {
+    final highAdaptPages = _navigationService.highAdaptationPages;
+    final pageList = highAdaptPages
+        .take(30)
+        .map((p) => '${p.name}(${p.route})')
+        .join('、');
+
+    return '''
+你是一个记账助手，请理解用户输入并返回JSON。用户可能一次说出多个操作，也可能混合操作和对话内容。
+
+【用户输入】$input
+【页面上下文】${pageContext ?? '首页'}
+
+【操作类型】
+- add_transaction: 记账（需要金额）
+- navigate: 导航（打开某页面）
+- query: 查询统计
+- modify: 修改记录
+- delete: 删除记录
+
+【优先级】
+- immediate: 导航操作（立即执行）
+- normal: 查询操作（快速执行）
+- deferred: 记账操作（可聚合）
+
+【返回格式】
+{
+  "operations": [
+    {"type":"操作类型","priority":"优先级","params":{"amount":金额,"category":"分类","targetPage":"页面名"}}
+  ],
+  "chat_content": "对话内容（如果有）"
+}
+
+【分类】餐饮、交通、购物、娱乐、居住、医疗、其他
+【常用页面】$pageList
+
+【示例】
+输入："打车35，吃饭50"
+输出：{"operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":35,"category":"交通"}},{"type":"add_transaction","priority":"deferred","params":{"amount":50,"category":"餐饮"}}],"chat_content":null}
+
+输入："打车35，顺便问一下我这个月还能花多少"
+输出：{"operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":35,"category":"交通"}},{"type":"query","priority":"normal","params":{"queryType":"budget_remaining"}}],"chat_content":"顺便问一下我这个月还能花多少"}
+
+只返回JSON，不要其他内容：''';
+  }
+
+  /// 解析多操作LLM响应
+  MultiOperationResult? _parseMultiOperationLLMResponse(String response, String originalInput) {
+    try {
+      final jsonStr = _extractJson(response);
+      if (jsonStr == null) return null;
+
+      final json = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final operationsJson = json['operations'] as List<dynamic>? ?? [];
+      final chatContent = json['chat_content'] as String?;
+
+      final operations = <Operation>[];
+      for (final opJson in operationsJson) {
+        final opMap = opJson as Map<String, dynamic>;
+        final type = opMap['type'] as String? ?? 'unknown';
+        final priority = opMap['priority'] as String? ?? 'normal';
+        final params = opMap['params'] as Map<String, dynamic>? ?? {};
+
+        operations.add(Operation(
+          type: _parseOperationType(type),
+          priority: _parseOperationPriority(priority),
+          params: params,
+          originalText: originalInput,
+        ));
+      }
+
+      // 如果没有识别出任何操作，返回null
+      if (operations.isEmpty) {
+        return null;
+      }
+
+      return MultiOperationResult(
+        operations: operations,
+        chatContent: chatContent,
+        confidence: 0.9,
+        source: RecognitionSource.llmFallback,
+        originalInput: originalInput,
+      );
+    } catch (e) {
+      debugPrint('[SmartIntent] 解析多操作LLM响应失败: $e');
+      return null;
+    }
+  }
+
+  /// 将SmartIntentResult转换为Operation
+  Operation _convertToOperation(SmartIntentResult result) {
+    return Operation(
+      type: _mapSmartIntentToOperationType(result.intentType),
+      priority: _inferOperationPriority(result.intentType),
+      params: result.entities,
+      originalText: result.originalInput,
+    );
+  }
+
+  /// 映射SmartIntentType到OperationType
+  OperationType _mapSmartIntentToOperationType(SmartIntentType type) {
+    switch (type) {
+      case SmartIntentType.addTransaction:
+        return OperationType.addTransaction;
+      case SmartIntentType.navigate:
+        return OperationType.navigate;
+      case SmartIntentType.query:
+        return OperationType.query;
+      case SmartIntentType.modify:
+        return OperationType.modify;
+      case SmartIntentType.delete:
+        return OperationType.delete;
+      default:
+        return OperationType.unknown;
+    }
+  }
+
+  /// 推断操作优先级
+  OperationPriority _inferOperationPriority(SmartIntentType type) {
+    switch (type) {
+      case SmartIntentType.navigate:
+        return OperationPriority.immediate;
+      case SmartIntentType.query:
+        return OperationPriority.normal;
+      case SmartIntentType.addTransaction:
+      case SmartIntentType.modify:
+      case SmartIntentType.delete:
+        return OperationPriority.deferred;
+      default:
+        return OperationPriority.normal;
+    }
+  }
+
+  /// 解析操作类型字符串
+  OperationType _parseOperationType(String type) {
+    switch (type.toLowerCase()) {
+      case 'add_transaction':
+        return OperationType.addTransaction;
+      case 'navigate':
+        return OperationType.navigate;
+      case 'query':
+        return OperationType.query;
+      case 'modify':
+        return OperationType.modify;
+      case 'delete':
+        return OperationType.delete;
+      default:
+        return OperationType.unknown;
+    }
+  }
+
+  /// 解析操作优先级字符串
+  OperationPriority _parseOperationPriority(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'immediate':
+        return OperationPriority.immediate;
+      case 'normal':
+        return OperationPriority.normal;
+      case 'deferred':
+        return OperationPriority.deferred;
+      case 'background':
+        return OperationPriority.background;
+      default:
+        return OperationPriority.normal;
     }
   }
 
@@ -1166,4 +1412,83 @@ class LearnedPattern {
       'isUserCorrection': isUserCorrection,
     };
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 多操作识别数据模型
+// ═══════════════════════════════════════════════════════════════
+
+/// 多操作识别结果
+class MultiOperationResult {
+  final List<Operation> operations;
+  final String? chatContent;
+  final double confidence;
+  final RecognitionSource source;
+  final String originalInput;
+  final String? errorMessage;
+
+  const MultiOperationResult({
+    required this.operations,
+    required this.chatContent,
+    required this.confidence,
+    required this.source,
+    required this.originalInput,
+    this.errorMessage,
+  });
+
+  factory MultiOperationResult.error(String message) {
+    return MultiOperationResult(
+      operations: [],
+      chatContent: null,
+      confidence: 0,
+      source: RecognitionSource.error,
+      originalInput: '',
+      errorMessage: message,
+    );
+  }
+
+  bool get isSuccess => errorMessage == null && operations.isNotEmpty;
+
+  @override
+  String toString() {
+    return 'MultiOperationResult(operations: ${operations.length}, confidence: $confidence, source: $source)';
+  }
+}
+
+/// 操作
+class Operation {
+  final OperationType type;
+  final OperationPriority priority;
+  final Map<String, dynamic> params;
+  final String originalText;
+
+  const Operation({
+    required this.type,
+    required this.priority,
+    required this.params,
+    required this.originalText,
+  });
+
+  @override
+  String toString() {
+    return 'Operation(type: $type, priority: $priority, params: $params)';
+  }
+}
+
+/// 操作类型
+enum OperationType {
+  addTransaction,
+  navigate,
+  query,
+  modify,
+  delete,
+  unknown,
+}
+
+/// 操作优先级
+enum OperationPriority {
+  immediate,   // 立即执行（导航）
+  normal,      // 快速执行（查询）
+  deferred,    // 延迟执行（记账，可聚合）
+  background,  // 后台执行（批量操作）
 }

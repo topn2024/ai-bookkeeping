@@ -459,8 +459,7 @@ class VoicePipelineController {
       debugPrint('[VoicePipelineController] feedAudioData #$_feedDataCount, 状态=$_state, inputState=$inputState');
     }
 
-    if (_state == VoicePipelineState.listening ||
-        _state == VoicePipelineState.speaking) {
+    if (_state == VoicePipelineState.listening) {
       _inputPipeline.feedAudioData(audioData);
     } else if (shouldLog) {
       debugPrint('[VoicePipelineController] 状态=$_state，跳过feedAudioData（等待状态变为listening）');

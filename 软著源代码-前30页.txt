@@ -1,0 +1,1683 @@
+================================================================================
+                                     第1页                                      
+================================================================================
+// 文件: app/lib/main.dart
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'theme/app_theme.dart';
+import 'pages/main_navigation.dart';
+import 'providers/theme_provider.dart';
+import 'providers/locale_provider.dart';
+import 'l10n/app_localizations.dart';
+import 'l10n/generated/app_localizations.dart' as gen;
+import 'core/logger.dart';
+import 'core/di/service_locator.dart';
+import 'services/cleanup_scheduler.dart';
+import 'services/app_config_service.dart';
+import 'services/http_service.dart';
+import 'services/app_upgrade_service.dart';
+import 'services/auto_sync_service.dart';
+import 'services/multimodal_wakeup_service.dart';
+import 'services/secure_storage_service.dart';
+import 'services/database_service.dart';
+import 'services/global_voice_assistant_manager.dart';
+import 'services/voice_token_service.dart';
+import 'services/voice_context_route_observer.dart';
+import 'services/aliyun_nls_token_service.dart';
+import 'core/config/secrets.dart';
+import 'services/voice_service_coordinator.dart' show VoiceSessionResult, VoiceSessionStatus;
+import 'services/voice/config/feature_flags.dart';
+import 'providers/voice_coordinator_provider.dart';
+import 'providers/transaction_provider.dart';
+import 'widgets/global_floating_ball.dart';
+import 'models/ledger.dart';
+import 'services/voice_navigation_executor.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize logging system
+  await logger.init(
+    config: LogConfig(
+      maxFileSize: 5 * 1024 * 1024, // 5MB per file
+      retentionDays: 7, // Keep logs for 7 days
+      maxTotalSize: 50 * 1024 * 1024, // 50MB total max
+      persistToFile: true,
+      fileLogLevel: kDebugMode ? LogLevel.debug : LogLevel.info,
+    ),
+  );
+
+  // Set system UI overlay style
+  SystemChrome.setSystemUIOverlayStyle(
+
+================================================================================
+                                     第2页                                      
+================================================================================
+// 文件: app/lib/main.dart
+// （续上页）
+
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
+
+  // Log app startup
+  logger.info('Application started', tag: 'App');
+
+  // Initialize service locator (dependency injection)
+  try {
+    await initServiceLocator();
+    logger.info('Service locator initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize service locator: $e', tag: 'App');
+  }
+
+  // Initialize app configuration from server
+  try {
+    await AppConfigService().initialize();
+    logger.info('App config service initialized', tag: 'App');
+    // Reinitialize HTTP service with new config
+    HttpService().reinitialize();
+    logger.info('HTTP service reinitialized with server config', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize app config: $e', tag: 'App');
+  }
+
+  // Initialize HTTP service (load auth token from secure storage)
+  try {
+    await HttpService().initialize();
+    logger.info('HTTP service initialized with auth token', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize HTTP service: $e', tag: 'App');
+  }
+
+  // Initialize cleanup scheduler for source files
+  try {
+    await CleanupScheduler().initialize();
+    logger.info('Cleanup scheduler initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize cleanup scheduler: $e', tag: 'App');
+  }
+
+  // Initialize auto-sync service
+  try {
+    await AutoSyncService().initialize();
+    logger.info('Auto-sync service initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize auto-sync service: $e', tag: 'App');
+
+================================================================================
+                                     第3页                                      
+================================================================================
+// 文件: app/lib/main.dart
+// （续上页）
+
+  }
+
+  // Configure voice token service with Alibaba Cloud credentials
+  // IMPORTANT: This must be done BEFORE multimodal wake-up service and voice assistant
+  // 直接使用内置Token（secrets.dart中配置）
+  VoiceTokenService().configureDirectMode(
+    token: AliyunSpeechConfig.token,
+    appKey: AliyunSpeechConfig.appKey,
+    asrUrl: AliyunSpeechConfig.asrUrl,
+    asrRestUrl: AliyunSpeechConfig.asrRestUrl,
+    ttsUrl: AliyunSpeechConfig.ttsUrl,
+  );
+  logger.info('Voice token service configured with static token', tag: 'App');
+
+  // Initialize multimodal wake-up service
+  try {
+    await MultimodalWakeUpService().initialize();
+    logger.info('Multimodal wake-up service initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize multimodal wake-up service: $e', tag: 'App');
+  }
+
+  // Initialize default ledger for guest/anonymous users
+  try {
+    await _initializeDefaultLedger();
+    logger.info('Default ledger initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize default ledger: $e', tag: 'App');
+  }
+
+  // Initialize global voice assistant
+  try {
+    await GlobalVoiceAssistantManager.instance.initialize();
+    logger.info('Global voice assistant initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize global voice assistant: $e', tag: 'App');
+  }
+
+  // Check for app updates (non-blocking)
+  AppUpgradeService().checkUpdate().then((result) {
+    if (result.hasUpdate) {
+      logger.info(
+        'App update available: ${result.latestVersion?.versionName ?? "unknown"}, '
+        'force=${result.isForceUpdate}',
+        tag: 'App',
+      );
+    }
+  }).catchError((e) {
+    logger.warning('Failed to check for updates: $e', tag: 'App');
+  });
+
+================================================================================
+                                     第4页                                      
+================================================================================
+// 文件: app/lib/main.dart
+// （续上页）
+
+
+  runApp(const ProviderScope(child: MyApp()));
+}
+
+/// 初始化默认账本（用于未登录用户）
+Future<void> _initializeDefaultLedger() async {
+  final secureStorage = SecureStorageService();
+  final db = await DatabaseService().database;
+
+  // 检查是否已有用户ID（已登录）
+  String? userId = await secureStorage.getUserId();
+
+  // 如果没有用户ID，使用guest ID
+  if (userId == null || userId.isEmpty) {
+    userId = 'guest';
+  }
+
+  // 检查是否已有账本
+  final existingLedgers = await db.query(
+    'ledgers',
+    where: 'ownerId = ?',
+    whereArgs: [userId],
+  );
+
+  // 如果没有账本，创建默认账本
+  if (existingLedgers.isEmpty) {
+    final defaultLedger = DefaultLedgers.defaultLedger(userId);
+    await db.insert('ledgers', defaultLedger.toMap());
+    logger.info('Created default ledger for user: $userId', tag: 'App');
+  }
+}
+
+/// Root application widget with lifecycle observer
+class MyApp extends ConsumerStatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
+  // 路由观察器
+  final _voiceContextRouteObserver = VoiceContextRouteObserver();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // 在第一帧之后设置命令处理器
+
+================================================================================
+                                     第5页                                      
+================================================================================
+// 文件: app/lib/main.dart
+// （续上页）
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupCommandProcessor();
+    });
+  }
+
+  /// 设置命令处理器，将 GlobalVoiceAssistantManager 与 VoiceServiceCoordinator 集成
+  ///
+  /// 交互策略：LLM 优先处理
+  /// 1. 收到语音输入后，使用 VoiceServiceCoordinator 处理（内部调用 SmartIntentRecognizer）
+  /// 2. VoiceServiceCoordinator 内部会播放 LLM 生成的自然语言响应
+  /// 3. 返回空字符串，避免 GlobalVoiceAssistantManager 重复播放 TTS
+  void _setupCommandProcessor() {
+    final coordinator = ref.read(voiceServiceCoordinatorProvider);
+
+    // 检查是否启用流水线模式
+    final isPipelineMode = VoiceFeatureFlags.instance.usePipelineMode;
+    debugPrint('[App] 设置命令处理器，流水线模式: $isPipelineMode');
+
+    // 流水线模式下，跳过VoiceServiceCoordinator内部的TTS播放
+    // 由流水线的OutputPipeline负责TTS播放
+    if (isPipelineMode) {
+      coordinator.setSkipTTSPlayback(true);
+    }
+
+    GlobalVoiceAssistantManager.instance.setCommandProcessor((command) async {
+      debugPrint('[App] 处理语音命令: $command');
+
+      try {
+        // 检查是否可能包含多个意图
+        final intentRouter = coordinator.intentRouter;
+        final mightBeMultiple = intentRouter.mightContainMultipleIntents(command);
+        debugPrint('[App] 是否多意图: $mightBeMultiple');
+
+        VoiceSessionResult result;
+        if (mightBeMultiple) {
+          result = await coordinator.processMultiIntentCommand(command);
+          // 多意图处理后自动确认执行（仅当确实有待确认的多意图时）
+          if (result.status == VoiceSessionStatus.success && coordinator.hasPendingMultiIntent) {
+            debugPrint('[App] 多意图识别成功，自动确认执行');
+            final confirmResult = await coordinator.confirmMultiIntents();
+            debugPrint('[App] 多意图执行结果: ${confirmResult.status} - ${confirmResult.message}');
+            result = confirmResult;
+          }
+        } else {
+          result = await coordinator.processVoiceCommand(command);
+        }
+
+        debugPrint('[App] 处理完成: ${result.status}');
+
+        // 根据处理结果，向聊天记录添加详细反馈
+
+================================================================================
+                                     第6页                                      
+================================================================================
+// 文件: app/lib/main.dart
+// （续上页）
+
+        // 注意：流水线模式下，_handlePipelineProcessInput 已经添加了消息，
+        // 所以这里只在非流水线模式下添加消息，避免重复
+        if (result.status == VoiceSessionStatus.error) {
+          final errorMsg = result.errorMessage ?? '处理时遇到了问题';
+          debugPrint('[App] 处理出错: $errorMsg');
+          if (!isPipelineMode) {
+            GlobalVoiceAssistantManager.instance.addResultMessage('❌ 处理失败：$errorMsg');
+          }
+        } else if (result.needsConfirmation) {
+          debugPrint('[App] 需要确认，等待用户回复...');
+          final confirmMsg = result.message ?? '需要您确认';
+          if (!isPipelineMode) {
+            GlobalVoiceAssistantManager.instance.addResultMessage('⏳ $confirmMsg');
+          }
+          // 延迟让 TTS 播放完成，然后自动开始录音
+          await Future.delayed(const Duration(milliseconds: 2500));
+          debugPrint('[App] 自动开始录音等待确认');
+          GlobalVoiceAssistantManager.instance.startRecording();
+        } else if (result.status == VoiceSessionStatus.success) {
+          debugPrint('[App] 处理成功: ${result.message}');
+
+          // 非流水线模式下，生成详细的结果反馈
+          // 流水线模式下，_handlePipelineProcessInput 已添加消息，跳过
+          if (!isPipelineMode) {
+            final resultFeedback = _generateResultFeedback(result, mightBeMultiple);
+            if (resultFeedback.isNotEmpty) {
+              GlobalVoiceAssistantManager.instance.addResultMessage(resultFeedback);
+            }
+          }
+
+          // 刷新交易列表，确保 UI 显示最新数据
+          debugPrint('[App] 刷新交易列表...');
+          await ref.read(transactionProvider.notifier).refresh();
+          debugPrint('[App] 交易列表已刷新');
+
+          // 如果结果包含导航路由，执行实际导航
+          final data = result.data;
+          if (data is Map<String, dynamic> && data.containsKey('route')) {
+            final route = data['route'] as String?;
+            if (route != null) {
+              debugPrint('[App] 执行导航: $route');
+              final success = await VoiceNavigationExecutor.instance.navigateToRoute(route);
+              debugPrint('[App] 导航结果: $success');
+            }
+          }
+        }
+
+        // 流水线模式：返回实际响应文本，由流水线处理TTS
+        // 非流水线模式：返回空字符串，VoiceServiceCoordinator已播放TTS
+        if (isPipelineMode) {
+
+================================================================================
+                                     第7页                                      
+================================================================================
+// 文件: app/lib/main.dart
+// （续上页）
+
+          final responseText = result.message ?? '';
+          debugPrint('[App] 流水线模式，返回响应: ${responseText.length > 30 ? responseText.substring(0, 30) + "..." : responseText}');
+          return responseText;
+        }
+      } catch (e) {
+        debugPrint('[App] 命令处理失败: $e');
+        // 流水线模式下，_handlePipelineProcessInput 会添加消息，这里跳过
+        if (!isPipelineMode) {
+          GlobalVoiceAssistantManager.instance.addResultMessage('❌ 系统错误，请稍后重试');
+        }
+
+        // 流水线模式下返回错误提示
+        if (isPipelineMode) {
+          return '抱歉，处理失败了，请再试一次';
+        }
+      }
+
+      // 非流水线模式：返回空字符串，VoiceServiceCoordinator 已经播放了 TTS
+      return '';
+    });
+
+    logger.info('Command processor setup completed', tag: 'App');
+  }
+
+  /// 生成详细的结果反馈
+  ///
+  /// 根据处理结果生成用户友好的反馈信息，以要点形式呈现
+  String _generateResultFeedback(VoiceSessionResult result, bool isMultiIntent) {
+    final data = result.data;
+    final message = result.message ?? '';
+    final buffer = StringBuffer();
+
+    // 检查是否有交易记录信息
+    if (data is Map<String, dynamic>) {
+      // 多笔交易记录
+      if (data.containsKey('transactions') && data['transactions'] is List) {
+        final transactions = data['transactions'] as List;
+        buffer.writeln('✅ 已成功记录 ${transactions.length} 笔交易：');
+        for (var i = 0; i < transactions.length; i++) {
+          final tx = transactions[i];
+          if (tx is Map<String, dynamic>) {
+            final amount = tx['amount'] ?? 0;
+            final category = tx['category'] ?? '其他';
+            final note = tx['note'] ?? '';
+            buffer.writeln('  • $category $amount元${note.isNotEmpty ? " ($note)" : ""}');
+          }
+        }
+        return buffer.toString().trim();
+      }
+
+
+================================================================================
+                                     第8页                                      
+================================================================================
+// 文件: app/lib/main.dart
+// （续上页）
+
+      // 单笔交易记录
+      if (data.containsKey('amount')) {
+        final amount = data['amount'];
+        final category = data['category'] ?? '其他';
+        final note = data['note'] ?? '';
+        buffer.writeln('✅ 已记录：');
+        buffer.writeln('  • $category $amount元${note.isNotEmpty ? " ($note)" : ""}');
+        return buffer.toString().trim();
+      }
+
+      // 导航操作
+      if (data.containsKey('route')) {
+        final route = data['route'] as String?;
+        final routeName = _getRouteDisplayName(route ?? '');
+        return '✅ 已打开：$routeName';
+      }
+
+      // 查询结果
+      if (data.containsKey('queryResult')) {
+        return '✅ 查询完成：${data['queryResult']}';
+      }
+    }
+
+    // 从消息中提取交易信息（兜底方案）
+    if (message.contains('记录') || message.contains('记了')) {
+      // 尝试解析消息中的交易信息
+      final amountMatch = RegExp(r'(\d+(?:\.\d+)?)\s*(?:块|元)').firstMatch(message);
+      if (amountMatch != null) {
+        return '✅ $message';
+      }
+    }
+
+    // 默认返回原始消息，加上成功标记
+    if (message.isNotEmpty) {
+      return '✅ $message';
+    }
+
+    return '';
+  }
+
+  /// 获取路由的显示名称
+  String _getRouteDisplayName(String route) {
+    final routeNames = {
+      '/settings': '设置',
+      '/budget': '预算管理',
+      '/statistics': '统计报表',
+      '/accounts': '账户管理',
+      '/categories': '分类管理',
+      '/transactions': '交易记录',
+      '/savings': '储蓄目标',
+
+================================================================================
+                                     第9页                                      
+================================================================================
+// 文件: app/lib/main.dart
+// （续上页）
+
+      '/': '首页',
+    };
+    return routeNames[route] ?? route;
+  }
+
+  @override
+  void dispose() {
+    // 清除命令处理器
+    GlobalVoiceAssistantManager.instance.setCommandProcessor(null);
+    WidgetsBinding.instance.removeObserver(this);
+    logger.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Trigger log cleanup check when app resumes from background
+      logger.onAppResumed();
+      logger.debug('App resumed from background', tag: 'App');
+    } else if (state == AppLifecycleState.paused) {
+      logger.debug('App paused (entering background)', tag: 'App');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 监听主题状态变化，确保主题切换时 UI 会重建
+    final themeState = ref.watch(themeProvider);
+    final themeNotifier = ref.read(themeProvider.notifier);
+    final localeState = ref.watch(localeProvider);
+    final l10n = ref.watch(localeProvider.notifier).l10n;
+
+    // 根据是否使用自定义主题选择对应的 ThemeData
+    final lightTheme = themeState.isUsingCustomTheme
+        ? themeNotifier.getLightTheme()
+        : AppTheme.createLightTheme(themeNotifier.primaryColor);
+    final darkTheme = themeState.isUsingCustomTheme
+        ? themeNotifier.getDarkTheme()
+        : AppTheme.createDarkTheme(themeNotifier.primaryColor);
+
+    return MaterialApp(
+      title: l10n.appName,
+      debugShowCheckedModeBanner: false,
+      navigatorKey: VoiceNavigationExecutor.instance.navigatorKey,
+      theme: lightTheme,
+      darkTheme: darkTheme,
+      themeMode: themeNotifier.themeMode,
+      locale: localeState.locale,
+
+================================================================================
+                                     第10页                                     
+================================================================================
+// 文件: app/lib/main.dart
+// （续上页）
+
+      supportedLocales: gen.S.supportedLocales,
+      localizationsDelegates: [
+        gen.S.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        AppLocalizationsDelegate(localeState.effectiveLanguage),
+      ],
+      navigatorObservers: [
+        _voiceContextRouteObserver,
+      ],
+      builder: (context, child) {
+        // 包装全局悬浮球
+        return GlobalFloatingBallOverlay(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+      // 新引导方式：直接进入主页面，使用悬浮引导
+      // 功能引导会在 HomePage 中通过 FeatureGuideService 显示
+      home: const MainNavigation(),
+    );
+  }
+}
+
+// 文件结束，共 23 行
+
+================================================================================
+                                     第11页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+
+import 'dart:convert';
+
+import 'package:collection/collection.dart'; // ignore: depend_on_referenced_packages
+import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
+
+// ==================== OCR学习数据模型 ====================
+
+/// OCR学习样本
+class OCRLearningSample {
+  final String id;
+  final String userId;
+  final OCRImageType imageType;
+  final String ocrRawText;
+  final OCRParseResult? systemResult;
+  final OCRParseResult? userCorrectedResult;
+  final OCRCorrectionType correctionType;
+  final double confidence;
+  final Map<String, dynamic> imageMetadata;
+  final DateTime timestamp;
+
+  const OCRLearningSample({
+    required this.id,
+    required this.userId,
+    required this.imageType,
+    required this.ocrRawText,
+    this.systemResult,
+    this.userCorrectedResult,
+    required this.correctionType,
+    required this.confidence,
+    this.imageMetadata = const {},
+    required this.timestamp,
+  });
+
+  bool get wasCorrect =>
+      userCorrectedResult == null ||
+      (systemResult?.amount == userCorrectedResult?.amount &&
+          systemResult?.merchant == userCorrectedResult?.merchant);
+
+  double get qualityScore {
+    var score = 0.0;
+    if (correctionType == OCRCorrectionType.confirmed) score += 0.5;
+    if (correctionType == OCRCorrectionType.corrected) score += 0.4;
+    if (confidence > 0.9) score += 0.2;
+    if (userCorrectedResult != null) score += 0.2;
+    return score.clamp(0.0, 1.0);
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+
+================================================================================
+                                     第12页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+        'user_id': userId,
+        'image_type': imageType.name,
+        'ocr_raw_text': ocrRawText,
+        'system_result': systemResult?.toJson(),
+        'user_corrected_result': userCorrectedResult?.toJson(),
+        'correction_type': correctionType.name,
+        'confidence': confidence,
+        'image_metadata': imageMetadata,
+        'timestamp': timestamp.toIso8601String(),
+      };
+}
+
+/// OCR图片类型
+enum OCRImageType {
+  receipt, // 小票
+  invoice, // 发票
+  screenshot, // 截图
+  bankStatement, // 银行对账单
+  other, // 其他
+}
+
+/// OCR修正类型
+enum OCRCorrectionType {
+  confirmed, // 用户确认
+  corrected, // 用户修正
+  rejected, // 用户拒绝
+  partial, // 部分修正
+}
+
+/// OCR解析结果
+class OCRParseResult {
+  final double? amount;
+  final String? merchant;
+  final String? category;
+  final DateTime? date;
+  final List<OCRLineItem> items;
+  final Map<String, dynamic> extra;
+
+  const OCRParseResult({
+    this.amount,
+    this.merchant,
+    this.category,
+    this.date,
+    this.items = const [],
+    this.extra = const {},
+  });
+
+  Map<String, dynamic> toJson() => {
+        'amount': amount,
+        'merchant': merchant,
+
+================================================================================
+                                     第13页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+        'category': category,
+        'date': date?.toIso8601String(),
+        'items': items.map((i) => i.toJson()).toList(),
+        'extra': extra,
+      };
+}
+
+/// OCR行项目
+class OCRLineItem {
+  final String name;
+  final double price;
+  final int quantity;
+
+  const OCRLineItem({
+    required this.name,
+    required this.price,
+    this.quantity = 1,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'price': price,
+        'quantity': quantity,
+      };
+}
+
+// ==================== OCR学习规则 ====================
+
+/// OCR学习规则
+class OCRLearnedRule {
+  final String ruleId;
+  final OCRImageType imageType;
+  final OCRRuleType ruleType;
+  final String pattern;
+  final String extractionTarget;
+  final double confidence;
+  final OCRRuleSource source;
+  final int hitCount;
+  final int successCount;
+  final DateTime createdAt;
+
+  OCRLearnedRule({
+    required this.ruleId,
+    required this.imageType,
+    required this.ruleType,
+    required this.pattern,
+    required this.extractionTarget,
+    required this.confidence,
+    required this.source,
+    this.hitCount = 0,
+
+================================================================================
+                                     第14页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+    this.successCount = 0,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
+
+  double get successRate => hitCount > 0 ? successCount / hitCount : 0;
+
+  OCRLearnedRule copyWith({
+    double? confidence,
+    int? hitCount,
+    int? successCount,
+  }) {
+    return OCRLearnedRule(
+      ruleId: ruleId,
+      imageType: imageType,
+      ruleType: ruleType,
+      pattern: pattern,
+      extractionTarget: extractionTarget,
+      confidence: confidence ?? this.confidence,
+      source: source,
+      hitCount: hitCount ?? this.hitCount,
+      successCount: successCount ?? this.successCount,
+      createdAt: createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'rule_id': ruleId,
+        'image_type': imageType.name,
+        'rule_type': ruleType.name,
+        'pattern': pattern,
+        'extraction_target': extractionTarget,
+        'confidence': confidence,
+        'source': source.name,
+        'hit_count': hitCount,
+        'success_count': successCount,
+        'created_at': createdAt.toIso8601String(),
+      };
+}
+
+/// OCR规则类型
+enum OCRRuleType {
+  amountExtraction, // 金额提取
+  merchantExtraction, // 商家提取
+  dateExtraction, // 日期提取
+  categoryInference, // 分类推断
+  layoutRecognition, // 布局识别
+}
+
+/// OCR规则来源
+enum OCRRuleSource {
+
+================================================================================
+                                     第15页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+  userLearned, // 用户学习
+  collaborative, // 协同学习
+  systemDefault, // 系统默认
+}
+
+// ==================== OCR学习阶段 ====================
+
+/// OCR学习阶段
+enum OCRLearningStage {
+  coldStart, // 冷启动
+  collecting, // 样本收集中
+  active, // 正常运行
+}
+
+// ==================== OCR自学习服务 ====================
+
+/// OCR自学习服务
+class OCRLearningService {
+  final OCRDataStore _dataStore;
+  final List<OCRLearnedRule> _learnedRules = [];
+  final Map<String, _MerchantPattern> _merchantPatterns = {};
+
+  // 配置
+  static const int _minSamplesForLearning = 5;
+  static const int _minSamplesForRule = 3;
+  static const double _minConfidenceThreshold = 0.7;
+
+  String get moduleId => 'ocr_learning';
+  OCRLearningStage stage = OCRLearningStage.coldStart;
+  double accuracy = 0.0;
+
+  OCRLearningService({
+    OCRDataStore? dataStore,
+  }) : _dataStore = dataStore ?? InMemoryOCRDataStore();
+
+  /// 学习OCR样本
+  Future<void> learn(OCRLearningSample sample) async {
+    await _dataStore.saveSample(sample);
+
+    // 更新商家模式
+    if (sample.userCorrectedResult?.merchant != null ||
+        sample.systemResult?.merchant != null) {
+      _updateMerchantPattern(sample);
+    }
+
+    // 检查学习阶段
+    final sampleCount = await _dataStore.getSampleCount();
+    if (sampleCount >= _minSamplesForLearning &&
+        stage == OCRLearningStage.coldStart) {
+      stage = OCRLearningStage.collecting;
+
+================================================================================
+                                     第16页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+    }
+
+    if (sampleCount >= _minSamplesForLearning * 2) {
+      await _triggerRuleLearning();
+      stage = OCRLearningStage.active;
+    }
+  }
+
+  void _updateMerchantPattern(OCRLearningSample sample) {
+    final merchant = sample.userCorrectedResult?.merchant ??
+        sample.systemResult?.merchant;
+    if (merchant == null) return;
+
+    // 提取商家名称的特征词
+    final keywords = _extractKeywords(sample.ocrRawText);
+    for (final keyword in keywords) {
+      _merchantPatterns.putIfAbsent(keyword, () => _MerchantPattern());
+      _merchantPatterns[keyword]!.addMerchant(merchant);
+    }
+  }
+
+  List<String> _extractKeywords(String text) {
+    final words = text.split(RegExp(r'\s+'));
+    return words
+        .where((w) => w.length >= 2 && w.length <= 10)
+        .take(10)
+        .toList();
+  }
+
+  /// 触发规则学习
+  Future<void> _triggerRuleLearning() async {
+    final samples = await _dataStore.getAllSamples(months: 6);
+    if (samples.isEmpty) return;
+
+    _learnedRules.clear();
+
+    // 学习金额提取规则
+    await _learnAmountRules(samples);
+
+    // 学习商家提取规则
+    await _learnMerchantRules(samples);
+
+    // 学习分类推断规则
+    await _learnCategoryRules(samples);
+
+    debugPrint('Learned ${_learnedRules.length} OCR rules');
+  }
+
+  Future<void> _learnAmountRules(List<OCRLearningSample> samples) async {
+    // 按图片类型分组
+
+================================================================================
+                                     第17页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+    final byType = groupBy(samples, (s) => s.imageType);
+
+    for (final entry in byType.entries) {
+      final typeSamples = entry.value;
+      if (typeSamples.length < _minSamplesForRule) continue;
+
+      // 分析金额提取模式
+      final amountPatterns = <String, int>{};
+      for (final sample in typeSamples) {
+        final amount = sample.userCorrectedResult?.amount ??
+            sample.systemResult?.amount;
+        if (amount == null) continue;
+
+        // 查找金额在原文中的位置和上下文
+        final pattern = _findAmountPattern(sample.ocrRawText, amount);
+        if (pattern != null) {
+          amountPatterns[pattern] = (amountPatterns[pattern] ?? 0) + 1;
+        }
+      }
+
+      // 生成规则
+      for (final patternEntry in amountPatterns.entries) {
+        if (patternEntry.value >= _minSamplesForRule) {
+          _learnedRules.add(OCRLearnedRule(
+            ruleId: 'amount_${entry.key.name}_${DateTime.now().millisecondsSinceEpoch}',
+            imageType: entry.key,
+            ruleType: OCRRuleType.amountExtraction,
+            pattern: patternEntry.key,
+            extractionTarget: 'amount',
+            confidence: patternEntry.value / typeSamples.length,
+            source: OCRRuleSource.userLearned,
+            hitCount: patternEntry.value,
+            successCount: patternEntry.value,
+          ));
+        }
+      }
+    }
+  }
+
+  String? _findAmountPattern(String text, double amount) {
+    // amountStr 和 amountInt 用于未来扩展精确金额匹配
+    // ignore: unused_local_variable
+    final amountStr = amount.toStringAsFixed(2);
+    // ignore: unused_local_variable
+    final amountInt = amount.toInt().toString();
+
+    // 查找金额关键词
+    final keywords = ['合计', '总计', '实付', '金额', '总额', 'TOTAL', '应付'];
+    for (final keyword in keywords) {
+      if (text.contains(keyword)) {
+
+================================================================================
+                                     第18页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+        return '$keyword.*{amount}';
+      }
+    }
+
+    // 检查是否有货币符号
+    if (text.contains('¥') || text.contains('￥')) {
+      return '¥{amount}';
+    }
+    if (text.contains('元')) {
+      return '{amount}元';
+    }
+
+    return null;
+  }
+
+  Future<void> _learnMerchantRules(List<OCRLearningSample> samples) async {
+    // 提取高频商家-关键词映射
+    for (final entry in _merchantPatterns.entries) {
+      if (entry.value.count >= _minSamplesForRule) {
+        final topMerchant = entry.value.getMostFrequent();
+        if (topMerchant != null) {
+          _learnedRules.add(OCRLearnedRule(
+            ruleId: 'merchant_${entry.key.hashCode}_${DateTime.now().millisecondsSinceEpoch}',
+            imageType: OCRImageType.receipt,
+            ruleType: OCRRuleType.merchantExtraction,
+            pattern: entry.key,
+            extractionTarget: topMerchant,
+            confidence: entry.value.getConfidence(topMerchant),
+            source: OCRRuleSource.userLearned,
+            hitCount: entry.value.count,
+            successCount: entry.value.getMerchantCount(topMerchant),
+          ));
+        }
+      }
+    }
+  }
+
+  Future<void> _learnCategoryRules(List<OCRLearningSample> samples) async {
+    // 按商家-分类对分组
+    final merchantCategory = <String, Map<String, int>>{};
+
+    for (final sample in samples) {
+      final merchant = sample.userCorrectedResult?.merchant ??
+          sample.systemResult?.merchant;
+      final category = sample.userCorrectedResult?.category ??
+          sample.systemResult?.category;
+
+      if (merchant != null && category != null) {
+        merchantCategory.putIfAbsent(merchant, () => {});
+        merchantCategory[merchant]![category] =
+
+================================================================================
+                                     第19页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+            (merchantCategory[merchant]![category] ?? 0) + 1;
+      }
+    }
+
+    // 生成分类推断规则
+    for (final entry in merchantCategory.entries) {
+      final total = entry.value.values.fold(0, (a, b) => a + b);
+      if (total >= _minSamplesForRule) {
+        final topCategory = entry.value.entries
+            .reduce((a, b) => a.value > b.value ? a : b);
+
+        if (topCategory.value / total >= _minConfidenceThreshold) {
+          _learnedRules.add(OCRLearnedRule(
+            ruleId: 'category_${entry.key.hashCode}_${DateTime.now().millisecondsSinceEpoch}',
+            imageType: OCRImageType.receipt,
+            ruleType: OCRRuleType.categoryInference,
+            pattern: entry.key,
+            extractionTarget: topCategory.key,
+            confidence: topCategory.value / total,
+            source: OCRRuleSource.userLearned,
+            hitCount: total,
+            successCount: topCategory.value,
+          ));
+        }
+      }
+    }
+  }
+
+  /// 应用学习规则增强OCR结果
+  Future<OCRParseResult> enhance(
+    OCRParseResult original,
+    String ocrText,
+    OCRImageType imageType,
+  ) async {
+    var enhanced = original;
+
+    // 应用商家识别规则
+    if (enhanced.merchant == null) {
+      enhanced = _applyMerchantRules(enhanced, ocrText, imageType);
+    }
+
+    // 应用分类推断规则
+    if (enhanced.category == null && enhanced.merchant != null) {
+      enhanced = _applyCategoryRules(enhanced, imageType);
+    }
+
+    return enhanced;
+  }
+
+  OCRParseResult _applyMerchantRules(
+
+================================================================================
+                                     第20页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+    OCRParseResult result,
+    String ocrText,
+    OCRImageType imageType,
+  ) {
+    final merchantRules = _learnedRules.where(
+      (r) => r.ruleType == OCRRuleType.merchantExtraction &&
+          (r.imageType == imageType || r.imageType == OCRImageType.other),
+    );
+
+    for (final rule in merchantRules) {
+      if (ocrText.contains(rule.pattern)) {
+        return OCRParseResult(
+          amount: result.amount,
+          merchant: rule.extractionTarget,
+          category: result.category,
+          date: result.date,
+          items: result.items,
+          extra: {...result.extra, 'merchant_source': 'learned_rule'},
+        );
+      }
+    }
+
+    return result;
+  }
+
+  OCRParseResult _applyCategoryRules(
+    OCRParseResult result,
+    OCRImageType imageType,
+  ) {
+    if (result.merchant == null) return result;
+
+    final categoryRules = _learnedRules.where(
+      (r) => r.ruleType == OCRRuleType.categoryInference &&
+          r.pattern == result.merchant,
+    );
+
+    for (final rule in categoryRules) {
+      if (rule.confidence >= _minConfidenceThreshold) {
+        return OCRParseResult(
+          amount: result.amount,
+          merchant: result.merchant,
+          category: rule.extractionTarget,
+          date: result.date,
+          items: result.items,
+          extra: {...result.extra, 'category_source': 'learned_rule'},
+        );
+      }
+    }
+
+    return result;
+
+================================================================================
+                                     第21页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+  }
+
+  /// 用户反馈
+  Future<void> feedback(OCRLearningSample sample, bool positive) async {
+    // 更新规则置信度
+    for (int i = 0; i < _learnedRules.length; i++) {
+      final rule = _learnedRules[i];
+      if (sample.ocrRawText.contains(rule.pattern)) {
+        _learnedRules[i] = rule.copyWith(
+          hitCount: rule.hitCount + 1,
+          successCount: positive ? rule.successCount + 1 : rule.successCount,
+          confidence: positive
+              ? (rule.confidence * 1.02).clamp(0.0, 1.0)
+              : (rule.confidence * 0.98).clamp(0.0, 1.0),
+        );
+      }
+    }
+
+    await _updateAccuracy();
+  }
+
+  Future<void> _updateAccuracy() async {
+    final recentSamples = await _dataStore.getRecentSamples(limit: 100);
+    if (recentSamples.isEmpty) return;
+
+    final correct = recentSamples.where((s) => s.wasCorrect).length;
+    accuracy = correct / recentSamples.length;
+  }
+
+  /// 导出规则
+  Future<List<OCRLearnedRule>> exportRules() async {
+    return List.unmodifiable(_learnedRules);
+  }
+
+  /// 获取统计
+  Future<OCRLearningStats> getStats() async {
+    return OCRLearningStats(
+      moduleId: moduleId,
+      stage: stage,
+      accuracy: accuracy,
+      rulesCount: _learnedRules.length,
+      merchantPatternsCount: _merchantPatterns.length,
+    );
+  }
+}
+
+class _MerchantPattern {
+  final Map<String, int> _merchants = {};
+  int count = 0;
+
+
+================================================================================
+                                     第22页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+  void addMerchant(String merchant) {
+    _merchants[merchant] = (_merchants[merchant] ?? 0) + 1;
+    count++;
+  }
+
+  String? getMostFrequent() {
+    if (_merchants.isEmpty) return null;
+    return _merchants.entries
+        .reduce((a, b) => a.value > b.value ? a : b)
+        .key;
+  }
+
+  double getConfidence(String merchant) {
+    if (count == 0) return 0;
+    return (_merchants[merchant] ?? 0) / count;
+  }
+
+  int getMerchantCount(String merchant) {
+    return _merchants[merchant] ?? 0;
+  }
+}
+
+/// OCR学习统计
+class OCRLearningStats {
+  final String moduleId;
+  final OCRLearningStage stage;
+  final double accuracy;
+  final int rulesCount;
+  final int merchantPatternsCount;
+
+  const OCRLearningStats({
+    required this.moduleId,
+    required this.stage,
+    required this.accuracy,
+    required this.rulesCount,
+    required this.merchantPatternsCount,
+  });
+}
+
+// ==================== 脱敏数据模型 ====================
+
+/// 脱敏后的OCR模式
+class SanitizedOCRPattern {
+  final OCRImageType imageType;
+  final String layoutPattern;
+  final String amountPattern;
+  final String? merchantPrefix;
+  final String? category;
+  final String userHash;
+  final DateTime timestamp;
+
+================================================================================
+                                     第23页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+
+  const SanitizedOCRPattern({
+    required this.imageType,
+    required this.layoutPattern,
+    required this.amountPattern,
+    this.merchantPrefix,
+    this.category,
+    required this.userHash,
+    required this.timestamp,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'image_type': imageType.name,
+        'layout_pattern': layoutPattern,
+        'amount_pattern': amountPattern,
+        'merchant_prefix': merchantPrefix,
+        'category': category,
+        'user_hash': userHash,
+        'timestamp': timestamp.toIso8601String(),
+      };
+}
+
+// ==================== 全局OCR洞察 ====================
+
+/// 全局OCR洞察
+class GlobalOCRInsights {
+  final Map<OCRImageType, OCRTypeInsight> typeInsights;
+  final Map<String, String> commonMerchantCategories;
+  final List<String> popularAmountPatterns;
+  final DateTime generatedAt;
+
+  const GlobalOCRInsights({
+    required this.typeInsights,
+    required this.commonMerchantCategories,
+    required this.popularAmountPatterns,
+    required this.generatedAt,
+  });
+}
+
+/// OCR类型洞察
+class OCRTypeInsight {
+  final OCRImageType imageType;
+  final List<String> commonLayoutPatterns;
+  final List<String> commonAmountPatterns;
+  final double averageAccuracy;
+  final int sampleCount;
+
+  const OCRTypeInsight({
+    required this.imageType,
+    required this.commonLayoutPatterns,
+
+================================================================================
+                                     第24页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+    required this.commonAmountPatterns,
+    required this.averageAccuracy,
+    required this.sampleCount,
+  });
+}
+
+// ==================== OCR协同学习服务 ====================
+
+/// OCR协同学习服务
+class OCRCollaborativeLearningService {
+  final GlobalOCRInsightsAggregator _aggregator;
+  final OCRPatternReporter _reporter;
+  final String _currentUserId; // ignore: unused_field
+
+  // 本地缓存
+  GlobalOCRInsights? _insightsCache;
+  DateTime? _lastInsightsUpdate;
+
+  // 配置
+  static const Duration _cacheExpiry = Duration(hours: 24);
+
+  OCRCollaborativeLearningService({
+    GlobalOCRInsightsAggregator? aggregator,
+    OCRPatternReporter? reporter,
+    String? currentUserId,
+  })  : _aggregator = aggregator ?? GlobalOCRInsightsAggregator(),
+        _reporter = reporter ?? InMemoryOCRPatternReporter(),
+        _currentUserId = currentUserId ?? 'anonymous';
+
+  /// 上报OCR模式（隐私保护）
+  Future<void> reportOCRPattern(OCRLearningSample sample) async {
+    if (sample.qualityScore < 0.5) return;
+
+    final pattern = SanitizedOCRPattern(
+      imageType: sample.imageType,
+      layoutPattern: _extractLayoutPattern(sample.ocrRawText),
+      amountPattern: _extractAmountPattern(sample.ocrRawText),
+      merchantPrefix: _extractMerchantPrefix(
+        sample.userCorrectedResult?.merchant ?? sample.systemResult?.merchant,
+      ),
+      category: sample.userCorrectedResult?.category ?? sample.systemResult?.category,
+      userHash: _hashValue(sample.userId),
+      timestamp: DateTime.now(),
+    );
+
+    await _reporter.report(pattern);
+    debugPrint('Reported OCR pattern: ${pattern.imageType.name}');
+  }
+
+  String _extractLayoutPattern(String text) {
+
+================================================================================
+                                     第25页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+    // 提取布局特征（行数、关键词位置等）
+    final lines = text.split('\n');
+    final lineCount = lines.length;
+
+    final hasTotal = text.contains(RegExp(r'合计|总计|TOTAL', caseSensitive: false));
+    final hasCurrency = text.contains(RegExp(r'¥|￥|元'));
+
+    return 'lines:$lineCount,total:$hasTotal,currency:$hasCurrency';
+  }
+
+  String _extractAmountPattern(String text) {
+    // 提取金额格式模式
+    if (text.contains(RegExp(r'¥\d+\.\d{2}'))) return '¥X.XX';
+    if (text.contains(RegExp(r'￥\d+\.\d{2}'))) return '￥X.XX';
+    if (text.contains(RegExp(r'\d+\.\d{2}元'))) return 'X.XX元';
+    if (text.contains(RegExp(r'\d+元'))) return 'X元';
+    return 'unknown';
+  }
+
+  String? _extractMerchantPrefix(String? merchant) {
+    if (merchant == null) return null;
+    // 只保留前4个字符
+    return merchant.length > 4 ? merchant.substring(0, 4) : merchant;
+  }
+
+  String _hashValue(String value) {
+    final bytes = utf8.encode(value);
+    final digest = sha256.convert(bytes);
+    return digest.toString().substring(0, 16);
+  }
+
+  /// 获取全局OCR洞察
+  Future<GlobalOCRInsights> getGlobalInsights({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _insightsCache != null &&
+        _lastInsightsUpdate != null &&
+        DateTime.now().difference(_lastInsightsUpdate!) < _cacheExpiry) {
+      return _insightsCache!;
+    }
+
+    _insightsCache = await _aggregator.aggregate();
+    _lastInsightsUpdate = DateTime.now();
+    return _insightsCache!;
+  }
+
+  /// 获取商家的常见分类
+  Future<String?> suggestCategoryForMerchant(String merchant) async {
+    final insights = await getGlobalInsights();
+    final prefix = _extractMerchantPrefix(merchant);
+    if (prefix == null) return null;
+
+================================================================================
+                                     第26页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+
+    return insights.commonMerchantCategories[prefix];
+  }
+
+  /// 获取图片类型的常见模式
+  Future<OCRTypeInsight?> getTypeInsight(OCRImageType imageType) async {
+    final insights = await getGlobalInsights();
+    return insights.typeInsights[imageType];
+  }
+
+  /// 批量上报
+  Future<void> reportBatch(List<OCRLearningSample> samples) async {
+    for (final sample in samples) {
+      await reportOCRPattern(sample);
+    }
+  }
+}
+
+// ==================== 模式上报器 ====================
+
+/// OCR模式上报器接口
+abstract class OCRPatternReporter {
+  Future<void> report(SanitizedOCRPattern pattern);
+  Future<List<SanitizedOCRPattern>> getAllPatterns();
+}
+
+/// 内存OCR模式上报器
+class InMemoryOCRPatternReporter implements OCRPatternReporter {
+  final List<SanitizedOCRPattern> _patterns = [];
+
+  @override
+  Future<void> report(SanitizedOCRPattern pattern) async {
+    _patterns.add(pattern);
+  }
+
+  @override
+  Future<List<SanitizedOCRPattern>> getAllPatterns() async {
+    return List.unmodifiable(_patterns);
+  }
+
+  void clear() => _patterns.clear();
+}
+
+// ==================== 全局OCR洞察聚合 ====================
+
+/// 全局OCR洞察聚合器
+class GlobalOCRInsightsAggregator {
+  final OCRPatternReporter _db;
+
+  GlobalOCRInsightsAggregator({OCRPatternReporter? db})
+
+================================================================================
+                                     第27页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+      : _db = db ?? InMemoryOCRPatternReporter();
+
+  Future<GlobalOCRInsights> aggregate() async {
+    final patterns = await _db.getAllPatterns();
+
+    return GlobalOCRInsights(
+      typeInsights: _aggregateTypeInsights(patterns),
+      commonMerchantCategories: _aggregateMerchantCategories(patterns),
+      popularAmountPatterns: _aggregateAmountPatterns(patterns),
+      generatedAt: DateTime.now(),
+    );
+  }
+
+  Map<OCRImageType, OCRTypeInsight> _aggregateTypeInsights(
+    List<SanitizedOCRPattern> patterns,
+  ) {
+    final result = <OCRImageType, OCRTypeInsight>{};
+
+    final byType = groupBy(patterns, (p) => p.imageType);
+
+    for (final entry in byType.entries) {
+      final typePatterns = entry.value;
+
+      final layoutCounts = <String, int>{};
+      final amountCounts = <String, int>{};
+
+      for (final p in typePatterns) {
+        layoutCounts[p.layoutPattern] =
+            (layoutCounts[p.layoutPattern] ?? 0) + 1;
+        amountCounts[p.amountPattern] =
+            (amountCounts[p.amountPattern] ?? 0) + 1;
+      }
+
+      final sortedLayouts = layoutCounts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      final sortedAmounts = amountCounts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+      result[entry.key] = OCRTypeInsight(
+        imageType: entry.key,
+        commonLayoutPatterns: sortedLayouts.take(3).map((e) => e.key).toList(),
+        commonAmountPatterns: sortedAmounts.take(3).map((e) => e.key).toList(),
+        averageAccuracy: 0.85,
+        sampleCount: typePatterns.length,
+      );
+    }
+
+    // 添加默认洞察
+    _addDefaultTypeInsights(result);
+
+
+================================================================================
+                                     第28页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+    return result;
+  }
+
+  void _addDefaultTypeInsights(Map<OCRImageType, OCRTypeInsight> result) {
+    result.putIfAbsent(
+      OCRImageType.receipt,
+      () => const OCRTypeInsight(
+        imageType: OCRImageType.receipt,
+        commonLayoutPatterns: [
+          'lines:10-20,total:true,currency:true',
+          'lines:5-10,total:true,currency:true',
+        ],
+        commonAmountPatterns: ['¥X.XX', 'X.XX元'],
+        averageAccuracy: 0.88,
+        sampleCount: 100,
+      ),
+    );
+
+    result.putIfAbsent(
+      OCRImageType.screenshot,
+      () => const OCRTypeInsight(
+        imageType: OCRImageType.screenshot,
+        commonLayoutPatterns: [
+          'lines:5-10,total:false,currency:true',
+        ],
+        commonAmountPatterns: ['¥X.XX', '-X.XX'],
+        averageAccuracy: 0.92,
+        sampleCount: 100,
+      ),
+    );
+
+    result.putIfAbsent(
+      OCRImageType.invoice,
+      () => const OCRTypeInsight(
+        imageType: OCRImageType.invoice,
+        commonLayoutPatterns: [
+          'lines:20-30,total:true,currency:true',
+        ],
+        commonAmountPatterns: ['¥X.XX', '￥X.XX'],
+        averageAccuracy: 0.85,
+        sampleCount: 50,
+      ),
+    );
+  }
+
+  Map<String, String> _aggregateMerchantCategories(
+    List<SanitizedOCRPattern> patterns,
+  ) {
+    final result = <String, String>{};
+
+
+================================================================================
+                                     第29页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+    final byMerchant = groupBy(
+      patterns.where((p) => p.merchantPrefix != null && p.category != null),
+      (p) => p.merchantPrefix!,
+    );
+
+    for (final entry in byMerchant.entries) {
+      if (entry.value.length >= 2) {
+        final categoryCounts = <String, int>{};
+        for (final p in entry.value) {
+          if (p.category != null) {
+            categoryCounts[p.category!] =
+                (categoryCounts[p.category!] ?? 0) + 1;
+          }
+        }
+
+        if (categoryCounts.isNotEmpty) {
+          final topCategory = categoryCounts.entries
+              .reduce((a, b) => a.value > b.value ? a : b);
+          if (topCategory.value >= entry.value.length * 0.6) {
+            result[entry.key] = topCategory.key;
+          }
+        }
+      }
+    }
+
+    // 添加默认映射
+    _addDefaultMerchantCategories(result);
+
+    return result;
+  }
+
+  void _addDefaultMerchantCategories(Map<String, String> result) {
+    final defaults = <String, String>{
+      '星巴克': '餐饮',
+      '麦当劳': '餐饮',
+      '肯德基': '餐饮',
+      '永辉超': '购物',
+      '沃尔玛': '购物',
+      '滴滴出': '交通',
+      '中国石': '交通',
+    };
+
+    for (final entry in defaults.entries) {
+      result.putIfAbsent(entry.key, () => entry.value);
+    }
+  }
+
+  List<String> _aggregateAmountPatterns(List<SanitizedOCRPattern> patterns) {
+    final patternCounts = <String, int>{};
+
+
+================================================================================
+                                     第30页                                     
+================================================================================
+// 文件: app/lib/services/learning/ocr_learning_service.dart
+// （续上页）
+
+    for (final p in patterns) {
+      patternCounts[p.amountPattern] =
+          (patternCounts[p.amountPattern] ?? 0) + 1;
+    }
+
+    final sorted = patternCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final result = sorted.take(5).map((e) => e.key).toList();
+
+    if (result.isEmpty) {
+      result.addAll(['¥X.XX', 'X.XX元', '￥X.XX']);
+    }
+
+    return result;
+  }
+}
+
+// ==================== 数据存储 ====================
+
+/// OCR数据存储接口
+abstract class OCRDataStore {
+  Future<void> saveSample(OCRLearningSample sample);
+  Future<List<OCRLearningSample>> getAllSamples({int? months});
+  Future<List<OCRLearningSample>> getRecentSamples({int limit = 100});
+  Future<int> getSampleCount();
+}
+
+/// 内存OCR数据存储
+class InMemoryOCRDataStore implements OCRDataStore {
+  final List<OCRLearningSample> _samples = [];
+
+  @override
+  Future<void> saveSample(OCRLearningSample sample) async {
+    _samples.add(sample);
+  }
+
+  @override
+  Future<List<OCRLearningSample>> getAllSamples({int? months}) async {
+    if (months == null) return List.unmodifiable(_samples);
+
+    final cutoff = DateTime.now().subtract(Duration(days: months * 30));
+    return _samples.where((s) => s.timestamp.isAfter(cutoff)).toList();
+  }
+
+  @override
+  Future<List<OCRLearningSample>> getRecentSamples({int limit = 100}) async {
+    final sorted = _samples.toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return sorted.take(limit).toList();
+
