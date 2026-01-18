@@ -17,6 +17,9 @@ import 'voice/ai_intent_decomposer.dart';
 import 'voice/smart_intent_recognizer.dart';
 import 'voice/llm_response_generator.dart';
 import 'voice/agent/agent.dart';
+import 'voice/intelligence_engine/intelligence_engine.dart';
+import 'voice/adapters/bookkeeping_operation_adapter.dart';
+import 'voice/adapters/bookkeeping_feedback_adapter.dart';
 import 'voice_recognition_engine.dart';
 import 'tts_service.dart';
 import 'voice_navigation_service.dart';
@@ -68,6 +71,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 对话式智能体（边聊边做模式）
   ConversationalAgent? _conversationalAgent;
+
+  /// 智能引擎（多操作识别、双通道处理、智能聚合）
+  IntelligenceEngine? _intelligenceEngine;
 
   /// 是否启用对话式智能体模式
   bool _agentModeEnabled = false;
@@ -211,10 +217,16 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 使用对话式智能体处理语音输入
   ///
-  /// 将语音输入传递给 ConversationalAgent 进行处理，
-  /// 支持 LLM 优先的意图识别和自然对话
+  /// 将语音输入传递给 IntelligenceEngine 进行处理，
+  /// 支持多操作识别、双通道处理和智能聚合
   Future<VoiceSessionResult> _processWithAgent(String voiceInput) async {
     try {
+      // 优先使用智能引擎
+      if (_intelligenceEngine != null) {
+        return await _processWithIntelligenceEngine(voiceInput);
+      }
+
+      // 降级到旧Agent
       final agent = _conversationalAgent!;
 
       // 记录命令历史
@@ -277,6 +289,51 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     }
   }
 
+  /// 使用智能引擎处理语音输入
+  Future<VoiceSessionResult> _processWithIntelligenceEngine(String voiceInput) async {
+    final engine = _intelligenceEngine!;
+
+    // 记录命令历史
+    final command = VoiceCommand(
+      input: voiceInput,
+      timestamp: DateTime.now(),
+    );
+    _addToHistory(command);
+
+    try {
+      // 使用智能引擎处理
+      final result = await engine.process(voiceInput);
+
+      debugPrint('[VoiceCoordinator] IntelligenceEngine响应: success=${result.success}, message=${result.message}');
+
+      // 构建响应文本
+      String responseText = result.message ?? '';
+
+      // 播放语音响应
+      if (responseText.isNotEmpty) {
+        await _speakWithSkipCheck(responseText);
+      }
+
+      _sessionState = VoiceSessionState.idle;
+      notifyListeners();
+
+      if (result.success) {
+        return VoiceSessionResult.success(responseText, {
+          'intelligenceEngine': true,
+        });
+      } else {
+        return VoiceSessionResult.error(responseText);
+      }
+    } catch (e) {
+      debugPrint('[VoiceCoordinator] IntelligenceEngine处理失败: $e');
+      // 降级到旧Agent
+      if (_conversationalAgent != null) {
+        return await _processWithAgent(voiceInput);
+      }
+      rethrow;
+    }
+  }
+
   /// 启用流式TTS模式
   Future<void> enableStreamingTTS() async {
     _streamingTTSEnabled = true;
@@ -311,6 +368,15 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       _conversationalAgent = ConversationalAgent();
       await _conversationalAgent!.initialize();
     }
+
+    // 初始化智能引擎
+    if (_intelligenceEngine == null) {
+      _intelligenceEngine = IntelligenceEngine(
+        operationAdapter: BookkeepingOperationAdapter(),
+        feedbackAdapter: BookkeepingFeedbackAdapter(),
+      );
+    }
+
     _agentModeEnabled = true;
     notifyListeners();
     debugPrint('[VoiceCoordinator] 对话式智能体模式已启用');
@@ -2872,6 +2938,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     // 释放对话式智能体
     _conversationalAgent?.dispose();
     _conversationalAgent = null;
+
+    // 清空智能引擎引用
+    _intelligenceEngine = null;
 
     // 清理命令历史防止内存泄漏
     _commandHistory.clear();
