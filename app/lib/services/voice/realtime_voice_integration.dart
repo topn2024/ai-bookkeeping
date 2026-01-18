@@ -154,6 +154,13 @@ class RealtimeVoiceIntegration {
   Future<void> processUserInput(String text) async {
     if (!_isInitialized) return;
 
+    // 如果会话正在结束或已结束，忽略用户输入
+    if (_session.state == RealtimeSessionState.ending ||
+        _session.state == RealtimeSessionState.ended) {
+      debugPrint('[RealtimeVoiceIntegration] 会话结束中，忽略用户输入: $text');
+      return;
+    }
+
     debugPrint('[RealtimeVoiceIntegration] 处理用户输入: $text');
 
     // 频率检查
@@ -268,6 +275,13 @@ class RealtimeVoiceIntegration {
 
   /// 处理VAD事件
   void _handleVADEvent(VADEvent event) {
+    // 如果会话正在结束或已结束，忽略 VAD 事件
+    if (_session.state == RealtimeSessionState.ending ||
+        _session.state == RealtimeSessionState.ended) {
+      debugPrint('[RealtimeVoiceIntegration] 会话结束中，忽略VAD事件: ${event.type}');
+      return;
+    }
+
     switch (event.type) {
       case VADEventType.speechStart:
         _session.onUserSpeechStart();

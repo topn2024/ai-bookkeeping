@@ -57,11 +57,14 @@ class EntityDisambiguationService extends ChangeNotifier {
     ],
     // 描述指代
     ReferenceType.description: [
-      RegExp(r'(早餐|午餐|晚餐|外卖|夜宵)'),
-      RegExp(r'(打车|地铁|公交|加油|停车)'),
-      RegExp(r'(超市|淘宝|京东|购物)'),
-      RegExp(r'(电影|游戏|旅游|娱乐)'),
-      RegExp(r'(工资|奖金|收入|入账|捡到|中奖|返现|退款)'),
+      // 一级分类名称（用于"删除交通记录"这类表达）
+      RegExp(r'(餐饮|交通|购物|娱乐|居住|医疗|教育|通讯|服饰|美容|宠物)'),
+      // 二级分类/具体描述
+      RegExp(r'(早餐|午餐|晚餐|外卖|夜宵|零食|饮料|水果|咖啡|奶茶)'),
+      RegExp(r'(打车|地铁|公交|加油|停车|火车|飞机|出租车|滴滴)'),
+      RegExp(r'(超市|淘宝|京东|购物|日用品|数码|家电)'),
+      RegExp(r'(电影|游戏|旅游|娱乐|运动|健身|KTV)'),
+      RegExp(r'(工资|奖金|收入|入账|捡到|中奖|返现|退款|红包|报销)'),
     ],
     // 金额指代
     ReferenceType.amount: [
@@ -317,14 +320,33 @@ class EntityDisambiguationService extends ChangeNotifier {
   }
 
   /// 解析分类指代
+  /// 返回英文分类ID（与数据库中存储的分类ID一致）
   String? _parseCategoryReference(DetectedReference ref) {
     final text = ref.rawText;
+    // 分类映射：中文关键词 -> 英文分类ID
+    // 一级分类ID: food, transport, shopping, entertainment, housing, medical, education, communication, clothing, beauty, pet
+    // 收入分类ID: salary, bonus, investment, parttime, redpacket, reimburse, business
     const categoryMap = {
-      '早餐': '餐饮', '午餐': '餐饮', '晚餐': '餐饮', '外卖': '餐饮', '夜宵': '餐饮',
-      '打车': '交通', '地铁': '交通', '公交': '交通', '加油': '交通', '停车': '交通',
-      '超市': '购物', '淘宝': '购物', '京东': '购物', '购物': '购物',
-      '电影': '娱乐', '游戏': '娱乐', '旅游': '娱乐', '娱乐': '娱乐',
-      '工资': '收入', '奖金': '收入', '收入': '收入', '入账': '收入', '捡到': '收入', '中奖': '收入', '返现': '收入', '退款': '收入',
+      // 一级分类名称直接映射到ID
+      '餐饮': 'food', '交通': 'transport', '购物': 'shopping', '娱乐': 'entertainment',
+      '居住': 'housing', '医疗': 'medical', '教育': 'education', '通讯': 'communication',
+      '服饰': 'clothing', '美容': 'beauty', '宠物': 'pet',
+      // 餐饮相关
+      '早餐': 'food', '午餐': 'food', '晚餐': 'food', '外卖': 'food', '夜宵': 'food',
+      '零食': 'food', '饮料': 'food', '水果': 'food', '咖啡': 'food', '奶茶': 'food',
+      // 交通相关
+      '打车': 'transport', '地铁': 'transport', '公交': 'transport', '加油': 'transport',
+      '停车': 'transport', '火车': 'transport', '飞机': 'transport', '出租车': 'transport', '滴滴': 'transport',
+      // 购物相关
+      '超市': 'shopping', '淘宝': 'shopping', '京东': 'shopping', '日用品': 'shopping',
+      '数码': 'shopping', '家电': 'shopping',
+      // 娱乐相关
+      '电影': 'entertainment', '游戏': 'entertainment', '旅游': 'entertainment',
+      '运动': 'entertainment', '健身': 'entertainment', 'KTV': 'entertainment',
+      // 收入相关（映射到收入一级分类）
+      '工资': 'salary', '奖金': 'bonus', '收入': 'salary', '入账': 'salary',
+      '捡到': 'investment', '中奖': 'investment', '返现': 'reimburse', '退款': 'reimburse',
+      '红包': 'redpacket', '报销': 'reimburse',
     };
 
     for (final entry in categoryMap.entries) {
@@ -332,7 +354,7 @@ class EntityDisambiguationService extends ChangeNotifier {
         return entry.value;
       }
     }
-    return text;
+    return null; // 未识别的分类返回null，而不是原始文本
   }
 
   /// 解析金额指代

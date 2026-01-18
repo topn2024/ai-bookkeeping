@@ -94,7 +94,11 @@ class CasualChatService {
     }
 
     // 再见
-    if (_matchesAny(lowerInput, ['再见', '拜拜', '88', '晚安', '下次见'])) {
+    if (_matchesAny(lowerInput, [
+      '再见', '拜拜', '88', '晚安', '下次见', 'bye',
+      '关闭对话', '结束对话', '退出对话', '关闭语音',
+      '不聊了', '不说了', '先这样', '退出',
+    ])) {
       return CasualChatIntent.goodbye;
     }
 

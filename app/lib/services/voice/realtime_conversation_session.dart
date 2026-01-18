@@ -306,6 +306,12 @@ class RealtimeConversationSession {
   void onUserSpeechStart() {
     if (!isActive) return;
 
+    // 如果正在结束中，忽略用户说话（不打断告别语）
+    if (_sessionState == RealtimeSessionState.ending) {
+      debugPrint('[RealtimeSession] 正在结束中，忽略用户说话');
+      return;
+    }
+
     // 取消所有等待定时器
     _cancelWaitingTimers();
 
@@ -325,18 +331,29 @@ class RealtimeConversationSession {
   Future<void> onUserSpeechEnd(String transcribedText) async {
     if (!isActive) return;
 
+    // 如果正在结束中，忽略新的输入
+    if (_sessionState == RealtimeSessionState.ending) {
+      debugPrint('[RealtimeSession] 正在结束中，忽略用户输入: $transcribedText');
+      return;
+    }
+
     _setState(RealtimeSessionState.thinkingAfterUser);
     debugPrint('[RealtimeSession] 用户说完: $transcribedText');
 
     // 使用对话结束检测器检查结束意图
     final endResult = _endDetector.detectEndIntent(transcribedText);
     if (endResult.shouldEnd) {
-      debugPrint('[RealtimeSession] 检测到结束意图: ${endResult.keyword}');
+      debugPrint('[RealtimeSession] 检测到结束意图: ${endResult.keyword}, 置信度: ${endResult.confidence}');
+      // 立即设置为结束中状态，防止后续输入干扰
+      _setState(RealtimeSessionState.ending);
       // 使用自然度服务生成多样化的结束语
       _emitResponseText(endResult.suggestedResponse ?? _naturalnessService.getGoodbyeResponse());
-      _startAgentSpeaking();
+      _stateMachine.startSpeaking();
       // 等待响应播放完成后再结束
-      _endingTimer = Timer(Duration(milliseconds: config.endingDelayMs + 1500), () {
+      final delayMs = config.endingDelayMs + 1500;
+      debugPrint('[RealtimeSession] 设置结束定时器: ${delayMs}ms 后关闭会话');
+      _endingTimer = Timer(Duration(milliseconds: delayMs), () {
+        debugPrint('[RealtimeSession] 结束定时器触发，准备关闭会话');
         _closeSession();
       });
       return;
@@ -434,6 +451,12 @@ class RealtimeConversationSession {
 
   /// 处理打断
   void _handleInterrupt() {
+    // 如果正在结束中，忽略打断事件
+    if (_sessionState == RealtimeSessionState.ending) {
+      debugPrint('[RealtimeSession] 正在结束中，忽略打断事件');
+      return;
+    }
+
     // 取消当前智能体响应
     _cancelWaitingTimers();
 
@@ -614,6 +637,7 @@ class RealtimeConversationSession {
 
   /// 关闭会话
   void _closeSession() {
+    debugPrint('[RealtimeSession] _closeSession() 被调用，当前状态: $_sessionState');
     _clearTimers();
     _stateMachine.endSession();
     _agent.endSession();
@@ -622,7 +646,7 @@ class RealtimeConversationSession {
     _learnFromSession();
 
     _setState(RealtimeSessionState.ended);
-    debugPrint('[RealtimeSession] 对话结束');
+    debugPrint('[RealtimeSession] 对话已结束，状态已设置为 ended');
   }
 
   /// 从会话学习

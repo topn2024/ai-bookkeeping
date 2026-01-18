@@ -1324,30 +1324,54 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   /// 检测是否为语音结束命令
   ///
-  /// 支持的结束词："结束"、"停止"、"好了"、"谢谢"、"拜拜"、"再见"、"没了"
+  /// 支持的结束词：拜拜、再见、结束对话、关闭对话、不聊了、不说了等
   bool _isVoiceEndCommand(String text) {
     if (text.isEmpty) return false;
 
+    final normalizedText = text.replaceAll(RegExp(r'[。，！？,.!?\s]'), '').trim().toLowerCase();
+
+    // 高优先级：完整短语匹配（优先检查，避免被部分匹配干扰）
+    const exactPhrases = [
+      '结束对话',
+      '关闭对话',
+      '退出对话',
+      '关闭语音',
+      '不聊了',
+      '不说了',
+      '先这样',
+      '就这样',
+      '下次见',
+      '晚安',
+    ];
+
+    for (final phrase in exactPhrases) {
+      if (normalizedText.contains(phrase)) {
+        debugPrint('[GlobalVoiceAssistant] 匹配到结束短语: $phrase');
+        return true;
+      }
+    }
+
     // 结束命令关键词（精确匹配或包含）
     const endKeywords = [
+      '拜拜',
+      '再见',
       '结束',
       '停止',
       '好了',
       '谢谢',
-      '拜拜',
-      '再见',
       '没了',
       '退出',
       '关闭',
+      '88',
+      'bye',
     ];
-
-    final normalizedText = text.replaceAll(RegExp(r'[。，！？,.!?]'), '').trim();
 
     // 检查是否以结束词结尾或完全匹配
     for (final keyword in endKeywords) {
       if (normalizedText == keyword ||
           normalizedText.endsWith(keyword) ||
-          (normalizedText.length <= keyword.length + 2 && normalizedText.contains(keyword))) {
+          (normalizedText.length <= keyword.length + 3 && normalizedText.contains(keyword))) {
+        debugPrint('[GlobalVoiceAssistant] 匹配到结束关键词: $keyword');
         return true;
       }
     }

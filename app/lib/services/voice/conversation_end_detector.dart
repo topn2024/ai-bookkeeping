@@ -196,12 +196,24 @@ class ConversationEndDetector {
     EndPattern(keyword: '多谢', confidence: 0.9, responseType: EndResponseType.thanks),
     EndPattern(keyword: '谢啦', confidence: 0.9, responseType: EndResponseType.thanks),
 
-    // 告别类
+    // 告别类（高置信度）
     EndPattern(keyword: '拜拜', confidence: 0.95, responseType: EndResponseType.bye),
     EndPattern(keyword: '再见', confidence: 0.95, responseType: EndResponseType.bye),
+    EndPattern(keyword: '晚安', confidence: 0.95, responseType: EndResponseType.bye),
+    EndPattern(keyword: '下次见', confidence: 0.95, responseType: EndResponseType.bye),
     EndPattern(keyword: '拜', confidence: 0.8, responseType: EndResponseType.bye),
     EndPattern(keyword: '88', confidence: 0.8, responseType: EndResponseType.bye),
     EndPattern(keyword: 'bye', confidence: 0.8, responseType: EndResponseType.bye),
+
+    // 显式退出类（最高置信度）
+    EndPattern(keyword: '关闭对话', confidence: 0.98, responseType: EndResponseType.bye),
+    EndPattern(keyword: '结束对话', confidence: 0.98, responseType: EndResponseType.bye),
+    EndPattern(keyword: '退出对话', confidence: 0.98, responseType: EndResponseType.bye),
+    EndPattern(keyword: '关闭语音', confidence: 0.98, responseType: EndResponseType.bye),
+    EndPattern(keyword: '退出', confidence: 0.9, responseType: EndResponseType.bye),
+    EndPattern(keyword: '不聊了', confidence: 0.95, responseType: EndResponseType.bye),
+    EndPattern(keyword: '不说了', confidence: 0.95, responseType: EndResponseType.bye),
+    EndPattern(keyword: '先这样', confidence: 0.9, responseType: EndResponseType.bye),
 
     // 完成类
     EndPattern(keyword: '好了', confidence: 0.85, responseType: EndResponseType.done),

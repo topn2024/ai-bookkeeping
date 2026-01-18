@@ -3819,10 +3819,9 @@ class DatabaseService implements IDatabaseService {
       whereArgs.add(endDate.millisecondsSinceEpoch);
     }
 
-    // 分类过滤
+    // 分类过滤（注意：transactions表没有subcategory列，只有category）
     if (category != null && category.isNotEmpty) {
-      whereConditions.add('(category LIKE ? OR sub_category LIKE ?)');
-      whereArgs.add('%$category%');
+      whereConditions.add('category LIKE ?');
       whereArgs.add('%$category%');
     }
 
@@ -3883,18 +3882,18 @@ class DatabaseService implements IDatabaseService {
         type: model.TransactionType.values[map['type'] as int? ?? 0],
         amount: map['amount'] as double,
         category: map['category'] as String? ?? '',
-        subcategory: map['sub_category'] as String?,
-        rawMerchant: map['merchant'] as String?,
-        note: map['description'] as String?,
+        subcategory: null, // transactions表没有subcategory列
+        rawMerchant: map['rawMerchant'] as String?,
+        note: map['note'] as String?,
         date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
-        accountId: map['account'] as String? ?? '',
+        accountId: map['accountId'] as String? ?? '',
         tags: (map['tags'] as String?)?.split(',').where((tag) => tag.isNotEmpty).toList() ?? [],
         splits: splits,
-        createdAt: map['created_at'] != null ?
-          DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int) :
+        createdAt: map['createdAt'] != null ?
+          DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int) :
           DateTime.now(),
-        updatedAt: map['updated_at'] != null ?
-          DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int) :
+        updatedAt: map['updatedAt'] != null ?
+          DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int) :
           DateTime.now(),
       ));
     }
