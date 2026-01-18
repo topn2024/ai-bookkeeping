@@ -18,6 +18,12 @@ import '../../services/secure_storage_service.dart';
 import '../../repositories/contracts/contracts.dart';
 import '../../repositories/impl/impl.dart';
 
+// 隐私服务
+import '../../services/privacy/differential_privacy/privacy_budget_manager.dart';
+import '../../services/privacy/differential_privacy/differential_privacy_engine.dart';
+import '../../services/privacy/anomaly_detection/malicious_user_tracker.dart';
+import '../../services/privacy/anomaly_detection/anomaly_detector.dart';
+
 /// 全局服务定位器实例
 final sl = GetIt.instance;
 
@@ -50,6 +56,9 @@ Future<void> initServiceLocator() async {
 
   // 注册数据访问层 (Repository)
   _registerRepositories();
+
+  // 注册隐私服务
+  _registerPrivacyServices();
 
   _isInitialized = true;
 }
@@ -92,6 +101,33 @@ void _registerRepositories() {
   // 分类 Repository
   sl.registerLazySingleton<ICategoryRepository>(
     () => CategoryRepository(sl<IDatabaseService>()),
+  );
+}
+
+/// 注册隐私服务
+void _registerPrivacyServices() {
+  // 隐私预算管理器
+  sl.registerLazySingleton<PrivacyBudgetManager>(
+    () => PrivacyBudgetManager(),
+  );
+
+  // 差分隐私引擎
+  sl.registerLazySingleton<DifferentialPrivacyEngine>(
+    () => DifferentialPrivacyEngine(
+      budgetManager: sl<PrivacyBudgetManager>(),
+    ),
+  );
+
+  // 恶意用户追踪器
+  sl.registerLazySingleton<MaliciousUserTracker>(
+    () => MaliciousUserTracker(),
+  );
+
+  // 异常检测器
+  sl.registerLazySingleton<AnomalyDetector>(
+    () => AnomalyDetector(
+      userTracker: sl<MaliciousUserTracker>(),
+    ),
   );
 }
 
