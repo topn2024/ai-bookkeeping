@@ -1,0 +1,45 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant APP as 应用
+    participant ALGO as 算法引擎
+    participant SEASON as 季节性分析
+    participant INSIGHT as 洞察生成
+
+    U->>APP: 查看下月消费预测
+    APP->>ALGO: 开始预测计算
+
+    Note right of ALGO: 历史数据:<br/>1月: 5000元<br/>2月: 6500元(春节)<br/>3月: 4500元<br/>4月: 5200元<br/>5月: 5500元<br/>6月: 6000元(618)
+
+    ALGO->>ALGO: SMA_6 = 5,450元
+    ALGO->>ALGO: WMA = 5,699元 (近期权重高)
+    ALGO->>ALGO: 线性趋势 = +150元/月
+    ALGO->>ALGO: 融合预测 = 5,590元
+
+    ALGO->>SEASON: 请求季节性因子
+    SEASON->>SEASON: 7月因子 = 1.0 (正常)
+    SEASON-->>ALGO: 因子: 1.0
+
+    ALGO->>ALGO: 最终预测: 5,590×1.0 = 5,590元
+    ALGO->>ALGO: 置信区间: [4,800 - 6,380]元
+
+    ALGO-->>APP: 预测结果
+
+    APP->>INSIGHT: 生成消费洞察
+
+    INSIGHT->>INSIGHT: 小额消费占比: 35% > 30%
+    INSIGHT->>INSIGHT: 洞察1: 拿铁因子明显
+
+    INSIGHT->>INSIGHT: 周末消费占比: 45% < 50%
+    INSIGHT->>INSIGHT: 消费趋势: +3%/月
+
+    INSIGHT-->>APP: 洞察列表
+
+    APP->>APP: 预警检查
+    APP->>APP: 预算: 5,500元
+    APP->>APP: 预测: 5,590元 > 预算
+    APP->>APP: 预警级别: 提示
+
+    APP-->>U: 预测报告
+    Note right of U: 7月预测: 5,590元<br/>置信区间: 4,800-6,380元<br/><br/>洞察:<br/>1. 拿铁因子明显,建议减少小额消费<br/>2. 消费呈上升趋势(+3%/月)<br/><br/>预警: 可能超预算90元
+

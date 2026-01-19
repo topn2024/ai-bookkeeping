@@ -1,0 +1,123 @@
+{
+  "patent_id": "P13",
+  "patent_dir": "patents/P13-家庭协作记账",
+  "disclaimer": "⚠️ 以下为AI辅助分析意见,非最终法律结论",
+  "analysis": {
+    "technical_features": {
+      "name": "技术特征提取",
+      "type": "AI分析",
+      "features": [
+        {
+          "type": "算法",
+          "name": "权限检查与控制",
+          "description": "权限检查与控制\n输入:用户 User, 操作 Operation, 目标数据 Target\n输出:是否允许 Boolean\n\n预定义角色权限:\n1. 所有者(Owner):\n   - 全部权限\n   - 可以删除账本\n   - 可以转让所有权\n\n2. 管理员(Admin):\n   - 查看、添加、编辑、删除(全部数据)\n   - 可以邀请成员\n   - 可以管理成员(除所有者外)\n   - 不能删..."
+        },
+        {
+          "type": "算法",
+          "name": "多人协作冲突检测",
+          "description": "多人协作冲突检测\n输入:操作 Operation, 本地版本 LocalVersion, 服务器版本 ServerVersion\n输出:冲突类型 ConflictType, 解决策略 Resolution\n\n冲突类型:\n1. 编辑冲突:\n   - 两个用户同时编辑同一条记录\n   - 检测:version_conflict(local, server)\n\n2. 删除冲突:\n   - 用户A编辑,用..."
+        },
+        {
+          "type": "算法",
+          "name": "个人与家庭数据隔离",
+          "description": "个人与家庭数据隔离\n输入:用户 User\n输出:可见数据集 VisibleData\n\n数据分类:\n1. 个人账本:\n   - 仅用户自己可见\n   - 不与家庭成员共享\n   - 独立的预算和统计\n\n2. 家庭账本:\n   - 家庭成员可见(根据权限)\n   - 共享预算和统计\n   - 支持协作记账\n\n3. 共享记录:\n   - 特定记录可以从个人账本共享到家庭账本\n   - 共享后保留原始记录..."
+        },
+        {
+          "type": "算法",
+          "name": "多人消费智能分摊",
+          "description": "多人消费智能分摊\n输入:消费记录 Expense, 参与成员 Participants, 分摊规则 Rule\n输出:分摊结果 SplitResult\n\n分摊规则:\n1. 平均分摊(AA制):\n   - 每人金额 = 总金额 / 人数\n   - 适用于:聚餐、团购等\n\n2. 按比例分摊:\n   - 每人金额 = 总金额 × 比例\n   - 适用于:按收入比例分摊房租等\n\n3. 按份额分摊:\n   -..."
+        },
+        {
+          "type": "算法",
+          "name": "成员邀请与管理",
+          "description": "成员邀请与管理\n输入:操作者 Operator, 操作类型 OperationType\n输出:操作结果 Result\n\n成员邀请流程:\nfunction invite_member(inviter, invitee_email, role):\n  // 1. 权限检查\n  if not check_permission(inviter, \"invite\", family_book):\n    ra..."
+        }
+      ]
+    },
+    "technical_problem": {
+      "name": "技术问题识别",
+      "type": "AI判断",
+      "technical_problems": [],
+      "business_problems": [],
+      "risk_level": "high"
+    },
+    "technical_effects": {
+      "name": "技术效果分析",
+      "type": "AI判断",
+      "technical_effects": [
+        {
+          "keyword": "响应时间",
+          "context": "...权限控制精度100%,相比现有技术(无权限控制或粗粒度控制,精度<60%)提升40个百分点;权限验证响应时间<20ms,支持实时权限检查。\n\n2. **冲突解决率提升**:采用智能冲突检测和自动解决算法,自动...",
+          "quantified": true
+        },
+        {
+          "keyword": "准确率",
+          "context": "...隐私保护率100%,相比现有技术(无数据隔离,隐私泄露风险>30%)提升100个百分点;数据访问控制准确率>99%,有效防止隐私泄露。\n\n4. **分摊计算准确率提升**:采用自动分摊计算算法(等额、按比例...",
+          "quantified": true
+        }
+      ],
+      "business_effects": [
+        {
+          "keyword": "用户满意度",
+          "context": "...技术(手动计算,错误率15%)提升15个百分点;计算响应时间<50ms,支持实时分摊。\n\n5. **用户满意度提升**:采用智能协作和自动同步机制,用户满意度达到86%,相比现有技术(手动协作,满意度<65%)..."
+        },
+        {
+          "keyword": "活跃度",
+          "context": "...满意度达到86%,相比现有技术(手动协作,满意度<65%)提升21个百分点,提升32.3%;家庭记账活跃度提升>45%。\n\n6. **系统响应时间优化**:采用高效的权限验证和冲突检测算法,系统响应时间<1..."
+        }
+      ],
+      "quantified": true,
+      "risk_level": "medium"
+    },
+    "technical_means": {
+      "name": "技术手段分析",
+      "type": "AI分析",
+      "algorithms": {
+        "count": 5,
+        "found": true
+      },
+      "data_structures": [
+        "struct",
+        "数据结构"
+      ],
+      "system_architecture": [
+        "架构",
+        "模块"
+      ]
+    }
+  },
+  "ai_opinions": [
+    {
+      "type": "no_technical_problem",
+      "severity": "high",
+      "message": "AI判断:未明确识别到技术问题",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节",
+      "recommendation": "必须明确说明解决的技术问题"
+    },
+    {
+      "type": "business_effect_risk",
+      "severity": "medium",
+      "message": "AI判断:技术效果中包含2个商业指标",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节",
+      "recommendation": "建议删除商业指标,仅保留技术指标"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "high",
+      "type": "必须改进",
+      "message": "发现1个高风险问题,必须解决",
+      "items": [
+        "必须明确说明解决的技术问题"
+      ]
+    },
+    {
+      "priority": "medium",
+      "type": "建议优化",
+      "message": "发现1个中风险问题,建议优化",
+      "items": [
+        "建议删除商业指标,仅保留技术指标"
+      ]
+    }
+  ]
+}

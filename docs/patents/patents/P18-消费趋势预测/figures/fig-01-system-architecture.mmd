@@ -1,0 +1,79 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 数据输入层
+        HISTORY[历史消费数据]
+        CATEGORY[分类数据]
+        BUDGET[预算数据]
+    end
+
+    subgraph 多算法融合引擎
+        SMA[简单移动平均]
+        WMA[加权移动平均]
+        EMA[指数移动平均]
+        LR[线性回归趋势]
+        FUSION[融合预测器]
+    end
+
+    subgraph 季节性分析
+        MONTHLY[月度平均]
+        YEARLY[年度平均]
+        FACTOR[季节性因子]
+        CHINA[中国市场调整]
+    end
+
+    subgraph 置信区间
+        ERROR[误差计算]
+        STD[标准差]
+        INTERVAL[95%置信区间]
+        CONF[置信度评估]
+    end
+
+    subgraph 洞察生成
+        LATTE[拿铁因子]
+        WEEKEND[周末消费]
+        LARGE[大额消费]
+        TREND[趋势分析]
+        TOP[分类分析]
+    end
+
+    subgraph 预警系统
+        PROGRESS[进度计算]
+        PREDICT[超支预测]
+        ALERT[预警触发]
+        SUGGEST[建议生成]
+    end
+
+    HISTORY --> SMA
+    HISTORY --> WMA
+    HISTORY --> EMA
+    HISTORY --> LR
+
+    SMA --> FUSION
+    WMA --> FUSION
+    EMA --> FUSION
+    LR --> FUSION
+
+    HISTORY --> MONTHLY
+    MONTHLY --> YEARLY
+    YEARLY --> FACTOR
+    FACTOR --> CHINA
+
+    CHINA --> FUSION
+
+    FUSION --> ERROR
+    ERROR --> STD
+    STD --> INTERVAL
+    INTERVAL --> CONF
+
+    HISTORY --> LATTE
+    HISTORY --> WEEKEND
+    HISTORY --> LARGE
+    FUSION --> TREND
+    CATEGORY --> TOP
+
+    BUDGET --> PROGRESS
+    FUSION --> PREDICT
+    PROGRESS --> ALERT
+    PREDICT --> ALERT
+    ALERT --> SUGGEST
+

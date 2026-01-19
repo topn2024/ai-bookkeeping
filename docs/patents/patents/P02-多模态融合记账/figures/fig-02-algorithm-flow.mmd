@@ -1,0 +1,32 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Input[/接收多模态输入/]
+    Input --> Detect{检测输入模态}
+
+    Detect -->|语音| ASR[ASR语音识别]
+    Detect -->|图像| OCR[OCR图像识别]
+    Detect -->|文本| NLP[NLP文本解析]
+
+    ASR --> Extract1[提取记账要素]
+    OCR --> Extract2[提取记账要素]
+    NLP --> Extract3[提取记账要素]
+
+    Extract1 --> Conf1[计算置信度]
+    Extract2 --> Conf2[计算置信度]
+    Extract3 --> Conf3[计算置信度]
+
+    Conf1 --> Align[特征向量对齐]
+    Conf2 --> Align
+    Conf3 --> Align
+
+    Align --> Attention[跨模态注意力计算]
+    Attention --> Weight[置信度动态加权]
+    Weight --> Fuse[信息融合]
+
+    Fuse --> Conflict{存在冲突?}
+    Conflict -->|是| Resolve[冲突解决策略]
+    Resolve --> Decode[解码生成结果]
+    Conflict -->|否| Decode
+
+    Decode --> Output[/输出: 记账记录/]
+    Output --> End([结束])

@@ -1,0 +1,67 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 家庭账本 {
+        +UUID book_id
+        +String book_name
+        +String owner_id
+        +List members
+        +DateTime created_at
+        +创建账本() void
+        +添加成员() void
+        +移除成员() void
+    }
+
+    class 成员 {
+        +String user_id
+        +Enum role
+        +Permissions permissions
+        +DateTime joined_at
+        +String invited_by
+        +检查权限() Boolean
+    }
+
+    class 权限配置 {
+        +Boolean can_view
+        +Boolean can_add
+        +Boolean can_edit
+        +Boolean can_delete
+        +Enum view_scope
+        +Enum edit_scope
+        +验证权限() Boolean
+    }
+
+    class 分摊记录 {
+        +UUID expense_id
+        +Decimal total_amount
+        +String payer
+        +List participants
+        +Enum split_type
+        +Map amounts
+        +计算分摊() Map
+    }
+
+    class 债务关系 {
+        +String debtor
+        +String creditor
+        +Decimal amount
+        +Boolean settled
+        +计算净支付() Map
+        +最小化转账() List
+    }
+
+    class 操作日志 {
+        +UUID log_id
+        +String operation
+        +String operator_id
+        +DateTime timestamp
+        +JSON details
+        +记录日志() void
+        +回滚操作() void
+    }
+
+    家庭账本 --> 成员 : 包含
+    成员 --> 权限配置 : 拥有
+    家庭账本 --> 分摊记录 : 关联
+    分摊记录 --> 债务关系 : 生成
+    家庭账本 --> 操作日志 : 记录
+

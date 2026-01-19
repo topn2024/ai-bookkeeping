@@ -1,0 +1,41 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Input[/输入: 新交易记录/]
+    Input --> Extract[提取六维特征向量]
+
+    Extract --> Index[查询候选索引<br/>时间窗口内的交易]
+    Index --> HasCandidate{存在候选交易?}
+
+    HasCandidate -->|否| NoConflict[标记为新交易]
+    NoConflict --> Save[保存并更新索引]
+    Save --> End
+
+    HasCandidate -->|是| Loop[遍历候选交易]
+
+    Loop --> Score1[计算金额相似度]
+    Score1 --> Score2[计算时间相似度]
+    Score2 --> Score3[计算商户相似度]
+    Score3 --> Score4[计算类别相似度]
+    Score4 --> Score5[计算描述相似度]
+    Score5 --> Score6[计算来源相似度]
+
+    Score6 --> Weight[加权求和总分]
+    Weight --> Compare{总分 >= 阈值?}
+
+    Compare -->|否| Next{还有候选?}
+    Next -->|是| Loop
+    Next -->|否| NoConflict
+
+    Compare -->|是| Duplicate[标记为重复]
+    Duplicate --> AutoMerge{自动合并?}
+
+    AutoMerge -->|是| Merge[执行合并策略]
+    Merge --> UpdateIndex[更新索引]
+    UpdateIndex --> End
+
+    AutoMerge -->|否| Notify[/通知用户确认/]
+    Notify --> UserDecision{用户决定}
+    UserDecision -->|合并| Merge
+    UserDecision -->|保留两条| NoConflict
+
+    End([结束])

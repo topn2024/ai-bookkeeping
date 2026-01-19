@@ -1,0 +1,37 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant IMP as 数据导入
+    participant FE as 特征提取器
+    participant IDX as 候选索引
+    participant SCORE as 评分引擎
+    participant UI as 用户界面
+    participant DB as 数据库
+
+    IMP->>FE: 新交易: 星巴克 ¥38 14:30
+    FE->>FE: 提取六维特征向量
+
+    FE->>IDX: 查询候选(金额38, 时间14:00-15:00)
+    IDX-->>FE: 返回候选: [星巴克 ¥38 14:28]
+
+    FE->>SCORE: 计算相似度
+    SCORE->>SCORE: 金额因子: 1.0 (完全相同)
+    SCORE->>SCORE: 时间因子: 0.98 (相差2分钟)
+    SCORE->>SCORE: 商户因子: 1.0 (完全相同)
+    SCORE->>SCORE: 类别因子: 1.0 (餐饮)
+    SCORE->>SCORE: 描述因子: 0.85
+    SCORE->>SCORE: 来源因子: 0.5 (不同来源)
+
+    SCORE->>SCORE: 加权总分: 0.92
+
+    SCORE-->>FE: 相似度 0.92 > 阈值 0.85
+
+    FE->>UI: 检测到可能重复的交易
+    UI-->>UI: 显示对比界面
+
+    UI->>UI: 用户选择: 合并
+    UI->>DB: 执行合并
+    DB->>DB: 保留较早记录
+    DB->>DB: 合并备注信息
+    DB->>IDX: 更新索引
+
+    DB-->>UI: 合并成功

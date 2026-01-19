@@ -1,0 +1,61 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 设备A
+        LOCAL_A[本地存储]
+        WAL_A[写前日志]
+        OP_A[操作日志]
+    end
+
+    subgraph 设备B
+        LOCAL_B[本地存储]
+        WAL_B[写前日志]
+        OP_B[操作日志]
+    end
+
+    subgraph 同步引擎
+        CRDT[CRDT数据结构]
+        MERGE[合并引擎]
+        CONFLICT[冲突解决器]
+    end
+
+    subgraph 金额精度保护
+        DECIMAL[Decimal类型]
+        CHECKSUM[校验和验证]
+        ATOMIC[原子性保证]
+    end
+
+    subgraph 一致性验证
+        BALANCE[余额一致性]
+        BUDGET[预算一致性]
+        POOL[资金池一致性]
+    end
+
+    subgraph 云端
+        SERVER[同步服务器]
+        BACKUP[数据备份]
+    end
+
+    LOCAL_A --> WAL_A
+    WAL_A --> OP_A
+    LOCAL_B --> WAL_B
+    WAL_B --> OP_B
+
+    OP_A --> CRDT
+    OP_B --> CRDT
+    CRDT --> MERGE
+    MERGE --> CONFLICT
+
+    CONFLICT --> DECIMAL
+    DECIMAL --> CHECKSUM
+    CHECKSUM --> ATOMIC
+
+    ATOMIC --> BALANCE
+    BALANCE --> BUDGET
+    BUDGET --> POOL
+
+    POOL --> SERVER
+    SERVER --> BACKUP
+
+    SERVER --> LOCAL_A
+    SERVER --> LOCAL_B
+

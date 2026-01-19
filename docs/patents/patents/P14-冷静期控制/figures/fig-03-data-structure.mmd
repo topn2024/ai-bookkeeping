@@ -1,0 +1,60 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 冷静期记录 {
+        +UUID id
+        +String user_id
+        +String item_name
+        +Decimal amount
+        +String category
+        +DateTime created_time
+        +Integer cooling_period
+        +DateTime expire_time
+        +Enum status
+        +String reason
+        +Integer extended_count
+        +创建记录() void
+        +延长冷静期() void
+    }
+
+    class 触发规则 {
+        +Map amount_rules
+        +List exempt_categories
+        +Float urgency_factor
+        +Float history_factor
+        +判定触发() Boolean
+        +计算冷静期() Integer
+    }
+
+    class 提醒配置 {
+        +Integer remind_before
+        +String template
+        +List options
+        +生成提醒内容() String
+        +发送提醒() void
+    }
+
+    class 效果统计 {
+        +Integer total_count
+        +Integer cancel_count
+        +Integer buy_count
+        +Decimal saved_amount
+        +Float cancel_rate
+        +计算取消率() Float
+        +计算节省金额() Decimal
+        +生成报告() Report
+    }
+
+    class 个性化配置 {
+        +Float self_control_score
+        +Float income_factor
+        +Float budget_factor
+        +Float time_factor
+        +计算自控力() Float
+        +调整冷静期() Integer
+    }
+
+    冷静期记录 --> 触发规则 : 使用
+    冷静期记录 --> 提醒配置 : 关联
+    冷静期记录 --> 效果统计 : 更新
+    效果统计 --> 个性化配置 : 影响
+

@@ -1,0 +1,69 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 数据层
+        FIN[财务数据]
+        TRANS[交易记录]
+        BUDGET[预算数据]
+        GOAL[目标数据]
+    end
+
+    subgraph 六维度评分引擎
+        D1[收支平衡 20分]
+        D2[预算执行 20分]
+        D3[储蓄能力 15分]
+        D4[债务健康 15分]
+        D5[消费结构 15分]
+        D6[目标达成 15分]
+        AGG[综合评分器]
+    end
+
+    subgraph 预警系统
+        LEVEL[四级预警判定]
+        GREEN[正常-绿色]
+        YELLOW[提示-黄色]
+        ORANGE[警告-橙色]
+        RED[严重-红色]
+        PREDICT[预测性预警]
+    end
+
+    subgraph 建议引擎
+        DIAG[问题诊断]
+        GEN[建议生成]
+        PRIO[优先级管理]
+    end
+
+    subgraph 目标追踪
+        DECOMP[目标分解]
+        TRACK[进度追踪]
+        INCENT[智能激励]
+    end
+
+    FIN --> D1
+    TRANS --> D2
+    BUDGET --> D3
+    GOAL --> D4
+    FIN --> D5
+    GOAL --> D6
+
+    D1 --> AGG
+    D2 --> AGG
+    D3 --> AGG
+    D4 --> AGG
+    D5 --> AGG
+    D6 --> AGG
+
+    AGG --> LEVEL
+    LEVEL --> GREEN
+    LEVEL --> YELLOW
+    LEVEL --> ORANGE
+    LEVEL --> RED
+    LEVEL --> PREDICT
+
+    AGG --> DIAG
+    DIAG --> GEN
+    GEN --> PRIO
+
+    GOAL --> DECOMP
+    DECOMP --> TRACK
+    TRACK --> INCENT
+

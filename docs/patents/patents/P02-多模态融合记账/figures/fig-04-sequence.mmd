@@ -1,0 +1,32 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant UI as 界面
+    participant ASR as 语音识别
+    participant OCR as 图像识别
+    participant FUS as 融合引擎
+    participant DB as 数据库
+
+    U->>UI: 语音+拍照输入
+
+    par 并行识别
+        UI->>ASR: 语音数据
+        ASR->>ASR: 语音转文字
+        ASR->>ASR: 提取记账要素
+        ASR-->>FUS: 语音结果(置信度0.85)
+    and
+        UI->>OCR: 图像数据
+        OCR->>OCR: OCR文字识别
+        OCR->>OCR: 票据信息提取
+        OCR-->>FUS: 图像结果(置信度0.92)
+    end
+
+    FUS->>FUS: 特征向量对齐
+    FUS->>FUS: 计算注意力权重
+    FUS->>FUS: 置信度加权融合
+    FUS->>FUS: 冲突检测与解决
+
+    FUS->>DB: 保存记账记录
+    DB-->>FUS: 确认保存
+    FUS-->>UI: 返回融合结果
+    UI-->>U: 显示记账确认

@@ -1,0 +1,46 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant APP as 应用
+    participant HEALTH as 健康评估
+    participant STRATEGY as 策略引擎
+    participant PLAN as 计划生成
+
+    U->>APP: 录入债务数据
+    Note right of U: 信用卡A: 15000元, 18%<br/>信用卡B: 8000元, 15%<br/>消费贷: 20000元, 12%
+
+    APP->>HEALTH: 评估债务健康
+
+    HEALTH->>HEALTH: 总债务: 43,000元
+    HEALTH->>HEALTH: 月还款: 3,500元
+    HEALTH->>HEALTH: DTI: 35% (还款比)
+    HEALTH->>HEALTH: 等级: 轻度负债(黄色)
+
+    HEALTH-->>APP: 健康评分: 70分
+
+    APP->>U: 展示健康状况和策略选择
+    U->>APP: 选择: 雪崩法(节省利息)
+
+    APP->>STRATEGY: 应用雪崩法
+
+    STRATEGY->>STRATEGY: 按利率排序
+    STRATEGY->>STRATEGY: 1. 信用卡A 18%
+    STRATEGY->>STRATEGY: 2. 信用卡B 15%
+    STRATEGY->>STRATEGY: 3. 消费贷 12%
+
+    STRATEGY-->>PLAN: 排序完成
+
+    PLAN->>PLAN: 可用金额: 4,000元/月
+    PLAN->>PLAN: 最低还款: 3,500元
+    PLAN->>PLAN: 剩余: 500元 → 信用卡A
+
+    PLAN->>PLAN: 模拟计算
+    PLAN->>PLAN: 雪崩法: 11个月, 利息2,800元
+    PLAN->>PLAN: 雪球法: 12个月, 利息3,200元
+    PLAN->>PLAN: 节省: 400元
+
+    PLAN-->>APP: 还款计划生成
+
+    APP-->>U: 计划: 11个月还清, 节省利息400元
+    Note right of U: 第1个月:<br/>信用卡A: 1500+500=2000元<br/>信用卡B: 800元<br/>消费贷: 1200元
+

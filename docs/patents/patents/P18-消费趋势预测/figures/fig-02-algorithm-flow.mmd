@@ -1,0 +1,48 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Collect[/收集6个月历史数据/]
+    Collect --> CalcSMA[计算简单移动平均 SMA]
+    CalcSMA --> CalcWMA[计算加权移动平均 WMA]
+    CalcWMA --> CalcEMA[计算指数移动平均 EMA]
+    CalcEMA --> CalcLR[计算线性回归趋势]
+
+    CalcLR --> Fusion[多算法融合]
+    Fusion --> FusionFormula[base = 0.2×SMA + 0.3×WMA + 0.2×EMA + 0.3×LR]
+
+    FusionFormula --> SeasonCheck{有12个月数据?}
+    SeasonCheck -->|是| CalcSeason[计算季节性因子]
+    SeasonCheck -->|否| DefaultSeason[使用默认因子]
+
+    CalcSeason --> MonthlyAvg[月度平均/年度平均]
+    MonthlyAvg --> ChinaAdj[中国市场调整]
+    ChinaAdj --> ApplySeason[应用季节性: final = base × factor]
+    DefaultSeason --> ApplySeason
+
+    ApplySeason --> CalcError[计算历史预测误差]
+    CalcError --> CalcStd[计算标准差]
+    CalcStd --> CalcInterval[95%置信区间 = ±1.96×std]
+
+    CalcInterval --> GenInsight[生成消费洞察]
+    GenInsight --> Latte{小额消费>30%?}
+    Latte -->|是| InsightLatte[洞察: 拿铁因子明显]
+    Latte -->|否| Weekend{周末消费>50%?}
+
+    InsightLatte --> Weekend
+    Weekend -->|是| InsightWeekend[洞察: 周末消费占比高]
+    Weekend -->|否| Large{大额消费?}
+
+    InsightWeekend --> Large
+    Large -->|是| InsightLarge[洞察: 关注大额支出]
+    Large -->|否| TrendCheck{增长>10%?}
+
+    InsightLarge --> TrendCheck
+    TrendCheck -->|是| InsightTrend[洞察: 消费上升趋势]
+    TrendCheck -->|否| Output[/输出预测结果/]
+
+    InsightTrend --> Output
+
+    Output --> AlertCheck{预计超支?}
+    AlertCheck -->|是| SendAlert[发送预算预警]
+    AlertCheck -->|否| End([结束])
+    SendAlert --> End
+

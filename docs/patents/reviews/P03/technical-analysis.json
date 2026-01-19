@@ -1,0 +1,94 @@
+{
+  "patent_id": "P03",
+  "patent_dir": "docs/patents/patents/P03-差分隐私学习",
+  "disclaimer": "⚠️ 以下为AI辅助分析意见,非最终法律结论",
+  "analysis": {
+    "technical_features": {
+      "name": "技术特征提取",
+      "type": "AI分析",
+      "features": [
+        {
+          "type": "算法",
+          "name": "商户名称标准化",
+          "description": "商户名称标准化\n   输入：原始商户名称（如\"美团外卖-张三餐厅\"）\n   输出：标准化商户名称（如\"张三餐厅\"）\n\n   步骤：\n   1. 去除平台前缀（美团、饿了么等）\n   2. 去除订单号、时间戳等噪声\n   3. 提取核心商户名称\n   4. 建立商户别名映射\n   ```\n\n3. **个性化分类规则**\n   - 基于用户历史行为生成规则\n   - 规则优先级动态调整\n   - 规则..."
+        },
+        {
+          "type": "算法",
+          "name": "规则相似度评分",
+          "description": "规则相似度评分\n   输入：规则A, 规则B\n   输出：相似度分数 [0, 1]\n\n   相似度 = w1 * 商户名称相似度 + w2 * 分类一致性 + w3 * 置信度相似度\n\n   其中：\n   - 商户名称相似度：使用编辑距离计算\n   - 分类一致性：相同分类为1，不同为0\n   - 置信度相似度：1 - |置信度A - 置信度B|\n   ```\n\n3. **快速冷启动**\n   -..."
+        },
+        {
+          "type": "算法",
+          "name": "基于逆变换采样的拉普拉斯噪声生成",
+          "description": "基于逆变换采样的拉普拉斯噪声生成\n   输入：敏感度 Δf, 隐私参数 ε, 分布中心 μ（默认0）\n   输出：拉普拉斯噪声值 X\n\n   步骤：\n   1. 计算尺度参数：b = Δf/ε\n   2. 生成均匀分布随机数 U ∈ (0, 1)，排除边界值\n   3. 逆变换采样：X = μ - b × sign(U - 0.5) × ln(1 - 2|U - 0.5|)\n   4. 噪声方差：..."
+        },
+        {
+          "type": "算法",
+          "name": "规则噪声注入",
+          "description": "规则噪声注入\n   输入：原始规则 r（包含pattern, category, confidence）\n   输出：隐私规则 r'\n\n   步骤：\n   1. 敏感度计算：置信度范围[0,1]，Δf = 1\n   2. 获取 ε：从预算管理器获取对应敏感度级别的 ε\n   3. 消耗预算：检查并扣除 ε 额度\n   4. 生成噪声：noise = Laplace(μ=0, b=Δf/ε)..."
+        },
+        {
+          "type": "算法",
+          "name": "数值数据差分隐私保护",
+          "description": "数值数据差分隐私保护\n\n   (1) 单值保护：\n       - 敏感度：Δf = maxValue - minValue\n       - 噪声：Laplace(b=Δf/ε)\n       - 输出：clamp(value + noise, minValue, maxValue)\n\n   (2) 均值查询保护：\n       - 敏感度：Δf = (maxValue - minValue)..."
+        }
+      ]
+    },
+    "technical_problem": {
+      "name": "技术问题识别",
+      "type": "AI判断",
+      "technical_problems": [],
+      "business_problems": [],
+      "risk_level": "high"
+    },
+    "technical_effects": {
+      "name": "技术效果分析",
+      "type": "AI判断",
+      "technical_effects": [
+        {
+          "keyword": "准确率",
+          "context": "与现有技术相比，本发明具有以下优势：\n\n1. **分类准确率提升**：\n   - 纯规则引擎：60-70%\n   - 本发明：85-90%（提升15-20%）...",
+          "quantified": true
+        }
+      ],
+      "business_effects": [],
+      "quantified": true,
+      "risk_level": "low"
+    },
+    "technical_means": {
+      "name": "技术手段分析",
+      "type": "AI分析",
+      "algorithms": {
+        "count": 6,
+        "found": true
+      },
+      "data_structures": [
+        "struct",
+        "数据结构"
+      ],
+      "system_architecture": [
+        "架构",
+        "模块"
+      ]
+    }
+  },
+  "ai_opinions": [
+    {
+      "type": "no_technical_problem",
+      "severity": "high",
+      "message": "AI判断:未明确识别到技术问题",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节",
+      "recommendation": "必须明确说明解决的技术问题"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "high",
+      "type": "必须改进",
+      "message": "发现1个高风险问题,必须解决",
+      "items": [
+        "必须明确说明解决的技术问题"
+      ]
+    }
+  ]
+}

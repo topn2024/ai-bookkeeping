@@ -1,0 +1,40 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Input[/获取用户财务数据/]
+    Input --> Calc[计算六维度评分]
+
+    Calc --> D1[收支平衡: 结余率计算]
+    D1 --> D2[预算执行: 执行率计算]
+    D2 --> D3[储蓄能力: 储蓄率计算]
+    D3 --> D4[债务健康: 债务收入比]
+    D4 --> D5[消费结构: 必需品占比]
+    D5 --> D6[目标达成: 达成率计算]
+
+    D6 --> Sum[综合评分: S = Σ维度分数]
+    Sum --> Grade{健康等级判定}
+
+    Grade -->|90-100| Excellent[优秀]
+    Grade -->|80-89| Good[良好]
+    Grade -->|70-79| Medium[中等]
+    Grade -->|60-69| Poor[较差]
+    Grade -->|0-59| Bad[差]
+
+    Excellent --> Trend[趋势分析]
+    Good --> Trend
+    Medium --> Trend
+    Poor --> Trend
+    Bad --> Trend
+
+    Trend --> Alert{预警级别判定}
+    Alert -->|消费进度正常| Normal[正常-无提醒]
+    Alert -->|超10%| Yellow[提示-周提醒]
+    Alert -->|超20%| Orange[警告-3天提醒]
+    Alert -->|即将耗尽| Red[严重-每日提醒]
+
+    Normal --> Suggest[生成个性化建议]
+    Yellow --> Suggest
+    Orange --> Suggest
+    Red --> Suggest
+
+    Suggest --> End([结束])
+

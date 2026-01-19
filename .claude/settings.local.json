@@ -850,7 +850,8 @@
       "Bash(git config:*)",
       "Bash(git tag:*)",
       "Bash(timeout 90 adb:*)",
-      "Bash(osascript:*)"
+      "Bash(osascript:*)",
+      "Bash(openspec-cn change show:*)"
     ]
   }
 }

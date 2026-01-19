@@ -1,0 +1,71 @@
+{
+  "patent_id": "P04",
+  "patent_dir": "docs/patents/patents/P04-自适应预算",
+  "disclaimer": "⚠️ 以下为AI辅助分析意见,非最终法律结论",
+  "analysis": {
+    "technical_features": {
+      "name": "技术特征提取",
+      "type": "AI分析",
+      "features": []
+    },
+    "technical_problem": {
+      "name": "技术问题识别",
+      "type": "AI判断",
+      "technical_problems": [],
+      "business_problems": [],
+      "risk_level": "high"
+    },
+    "technical_effects": {
+      "name": "技术效果分析",
+      "type": "AI判断",
+      "technical_effects": [
+        {
+          "keyword": "响应时间",
+          "context": "...动的多约束优化算法，计算复杂度从O(n²)降低到O(n log n)，当预算项目数量为20个时，分配响应时间<50ms，相比现有技术（人工调整>30分钟）效率提升99.7%以上。\n\n2. **季节性识别准确率...",
+          "quantified": true
+        },
+        {
+          "keyword": "准确率",
+          "context": "...应时间<50ms，相比现有技术（人工调整>30分钟）效率提升99.7%以上。\n\n2. **季节性识别准确率提升**：采用时间序列分解算法，季节性模式识别准确率>90%，相比现有技术（<70%）提升20个百分...",
+          "quantified": true
+        }
+      ],
+      "business_effects": [],
+      "quantified": true,
+      "risk_level": "low"
+    },
+    "technical_means": {
+      "name": "技术手段分析",
+      "type": "AI分析",
+      "algorithms": {
+        "count": 0,
+        "found": false
+      },
+      "data_structures": [
+        "数据结构"
+      ],
+      "system_architecture": [
+        "架构"
+      ]
+    }
+  },
+  "ai_opinions": [
+    {
+      "type": "no_technical_problem",
+      "severity": "high",
+      "message": "AI判断:未明确识别到技术问题",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节",
+      "recommendation": "必须明确说明解决的技术问题"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "high",
+      "type": "必须改进",
+      "message": "发现1个高风险问题,必须解决",
+      "items": [
+        "必须明确说明解决的技术问题"
+      ]
+    }
+  ]
+}

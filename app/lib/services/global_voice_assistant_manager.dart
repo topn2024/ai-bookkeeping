@@ -16,6 +16,8 @@ import 'voice/barge_in_detector.dart';
 import 'voice/config/feature_flags.dart';
 import 'voice/config/pipeline_config.dart';
 import 'voice/pipeline/voice_pipeline_controller.dart';
+import 'voice/agent/hybrid_intent_router.dart' show ProactiveNetworkMonitor, NetworkStatus;
+import 'qwen_service.dart';
 
 /// 麦克风权限状态
 enum MicrophonePermissionStatus {
@@ -128,6 +130,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   StreamingTTSService? _streamingTtsService;
   VoicePipelineController? _pipelineController;
   StreamSubscription<VoicePipelineState>? _pipelineStateSubscription;
+
+  // 网络监控器
+  ProactiveNetworkMonitor? _networkMonitor;
 
   // 录音器
   AudioRecorder? _audioRecorder;
@@ -382,36 +387,52 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     debugPrint('[GlobalVoiceAssistant] ===== 开始预加载语音服务 =====');
 
     try {
+      // 0. 初始化网络监控器
+      debugPrint('[GlobalVoiceAssistant] [预加载] 0/5 初始化网络监控...');
+      _networkMonitor = ProactiveNetworkMonitor();
+
+      // 配置LLM可用性检测回调
+      _networkMonitor!.configure(
+        llmAvailabilityChecker: _checkLLMAvailability,
+      );
+
+      await _networkMonitor!.initializeOnAppStart();
+      final networkStatus = _networkMonitor!.cachedStatus;
+      debugPrint('[GlobalVoiceAssistant] [预加载] 0/5 网络监控已初始化: online=${networkStatus.isOnline}, llm=${networkStatus.llmAvailable}');
+
       // 1. 预加载语音Token（最耗时的网络请求）
-      debugPrint('[GlobalVoiceAssistant] [预加载] 1/4 获取语音Token...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 1/5 获取语音Token...');
       try {
         await VoiceTokenService().getToken();
-        debugPrint('[GlobalVoiceAssistant] [预加载] 1/4 语音Token已获取');
+        debugPrint('[GlobalVoiceAssistant] [预加载] 1/5 语音Token已获取');
       } catch (e) {
-        debugPrint('[GlobalVoiceAssistant] [预加载] 1/4 Token获取失败（将在使用时重试）: $e');
+        debugPrint('[GlobalVoiceAssistant] [预加载] 1/5 Token获取失败（将在使用时重试）: $e');
       }
 
       // 2. 预初始化TTS服务
-      debugPrint('[GlobalVoiceAssistant] [预加载] 2/4 初始化TTS服务...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 2/5 初始化TTS服务...');
       _ttsService = TTSService.instance;
       await _ttsService!.initialize();
       await _ttsService!.enableStreamingMode();
-      debugPrint('[GlobalVoiceAssistant] [预加载] 2/4 TTS服务已初始化');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 2/5 TTS服务已初始化');
 
       // 3. 预初始化流式TTS服务和音频播放器
-      debugPrint('[GlobalVoiceAssistant] [预加载] 3/4 初始化流式TTS服务...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 3/5 初始化流式TTS服务...');
       _streamingTtsService = StreamingTTSService();
       await _streamingTtsService!.initialize();
-      debugPrint('[GlobalVoiceAssistant] [预加载] 3/4 流式TTS服务已初始化');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 3/5 流式TTS服务已初始化');
 
       // 4. 检查麦克风权限（不弹窗请求）
-      debugPrint('[GlobalVoiceAssistant] [预加载] 4/4 检查麦克风权限...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 4/5 检查麦克风权限...');
       final permissionStatus = await Permission.microphone.status;
-      debugPrint('[GlobalVoiceAssistant] [预加载] 4/4 麦克风权限状态: $permissionStatus');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 4/5 麦克风权限状态: $permissionStatus');
 
       final elapsed = DateTime.now().difference(_preloadStartTime!);
       _isPreloaded = true;
       debugPrint('[GlobalVoiceAssistant] ===== 预加载完成 (耗时${elapsed.inMilliseconds}ms) =====');
+
+      // 通知监听者预加载完成，以便UI可以更新网络状态等
+      notifyListeners();
 
       return true;
     } catch (e) {
@@ -424,6 +445,55 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   /// 是否已预加载
   bool get isPreloaded => _isPreloaded;
+
+  /// 获取网络状态
+  NetworkStatus? get networkStatus => _networkMonitor?.cachedStatus;
+
+  /// 获取网络状态变化流
+  Stream<NetworkStatus>? get networkStatusStream => _networkMonitor?.statusStream;
+
+  /// 主动检查LLM可用性（用户点击悬浮球时调用）
+  Future<bool> checkLLMAvailability() async {
+    if (_networkMonitor == null) {
+      debugPrint('[GlobalVoiceAssistant] 网络监控器未初始化');
+      return false;
+    }
+    return await _networkMonitor!.checkLLMAvailability();
+  }
+
+  /// LLM是否可用
+  bool get isLLMAvailable => _networkMonitor?.cachedStatus.llmAvailable ?? false;
+
+  /// 检测LLM服务是否可用（内部回调方法）
+  ///
+  /// 检测逻辑：
+  /// 1. 检查API Key是否已配置
+  /// 2. 尝试连接LLM服务（轻量级请求）
+  Future<bool> _checkLLMAvailability() async {
+    try {
+      final qwenService = QwenService();
+
+      // 1. 检查API Key是否配置
+      if (!qwenService.isAvailable) {
+        debugPrint('[GlobalVoiceAssistant] LLM不可用: API Key未配置');
+        return false;
+      }
+
+      // 2. 尝试一个轻量级的LLM请求来验证连接
+      // 使用简单的聊天请求，超时时间短
+      final result = await qwenService.chat('hi').timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => null,
+      );
+
+      final isAvailable = result != null && result.isNotEmpty;
+      debugPrint('[GlobalVoiceAssistant] LLM可用性检测: $isAvailable');
+      return isAvailable;
+    } catch (e) {
+      debugPrint('[GlobalVoiceAssistant] LLM可用性检测失败: $e');
+      return false;
+    }
+  }
 
   /// 确保语音服务已初始化
   Future<void> _ensureVoiceServicesInitialized() async {
@@ -723,6 +793,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
       // 停止当前录音器
       await _audioRecorder?.stop();
+
+      // 等待音频设备完全释放（避免音频饱和问题）
+      await Future.delayed(const Duration(milliseconds: 100));
 
       // 重新开始录音
       const config = RecordConfig(

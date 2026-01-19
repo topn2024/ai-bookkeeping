@@ -1,0 +1,46 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Input[/用户添加待购商品/]
+    Input --> GetInfo[获取金额、分类、紧急程度]
+
+    GetInfo --> AmountCheck{金额判定}
+    AmountCheck -->|<100元| NoTrigger[不触发冷静期]
+    AmountCheck -->|100-500元| P24[基础冷静期: 24小时]
+    AmountCheck -->|500-1000元| P48[基础冷静期: 48小时]
+    AmountCheck -->|>1000元| P72[基础冷静期: 72小时]
+
+    P24 --> CategoryCheck{分类判定}
+    P48 --> CategoryCheck
+    P72 --> CategoryCheck
+
+    CategoryCheck -->|必需品| NoTrigger
+    CategoryCheck -->|可选品| UrgencyCheck{紧急程度}
+
+    UrgencyCheck -->|紧急| Shorten[缩短50%]
+    UrgencyCheck -->|不紧急| Normal[标准冷静期]
+
+    Shorten --> HistoryCheck[历史行为判定]
+    Normal --> HistoryCheck
+
+    HistoryCheck --> HistoryRatio{取消率>50%?}
+    HistoryRatio -->|是| Extend[延长50%]
+    HistoryRatio -->|否| FinalPeriod[确定最终冷静期]
+    Extend --> FinalPeriod
+
+    FinalPeriod --> CreateRecord[创建冷静期记录]
+    CreateRecord --> Wait[等待冷静期结束]
+
+    Wait --> Remind[到期前1小时提醒]
+    Remind --> ShowAssist[展示决策辅助信息]
+    ShowAssist --> Decision{用户决策}
+
+    Decision -->|立即购买| Buy[标记已购买]
+    Decision -->|延长冷静期| ExtendMore[延长24小时]
+    Decision -->|取消购买| Cancel[标记已取消]
+
+    ExtendMore --> Wait
+    Buy --> Stats[更新统计]
+    Cancel --> Stats
+    NoTrigger --> End([结束])
+    Stats --> End
+

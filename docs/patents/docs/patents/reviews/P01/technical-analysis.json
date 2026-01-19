@@ -1,0 +1,76 @@
+{
+  "patent_id": "P01",
+  "patent_dir": "patents/P01-FIFO钱龄计算",
+  "disclaimer": "⚠️ 以下为AI辅助分析意见,非最终法律结论",
+  "analysis": {
+    "technical_features": {
+      "name": "技术特征提取",
+      "type": "AI分析",
+      "features": []
+    },
+    "technical_problem": {
+      "name": "技术问题识别",
+      "type": "AI判断",
+      "technical_problems": [],
+      "business_problems": [],
+      "risk_level": "high"
+    },
+    "technical_effects": {
+      "name": "技术效果分析",
+      "type": "AI判断",
+      "technical_effects": [
+        {
+          "keyword": "响应时间",
+          "context": "...源识别准确率从<70%提升到>95%,提升25个百分点以上;能够精确追踪资金流向。\n\n3. **扣除响应时间缩短**:采用优先队列算法,扣除响应时间从>500ms缩短到<100ms,缩短80%;扣除准确率>9...",
+          "quantified": true
+        },
+        {
+          "keyword": "计算时间",
+          "context": "...率提升**:采用双端队列数据结构,计算复杂度从O(n²)降低到O(1),当交易记录为10000条时,计算时间从>5秒缩短到<50ms,缩短99%;入池操作时间复杂度O(1),资源单元管理效率>95%。\n\n2....",
+          "quantified": true
+        },
+        {
+          "keyword": "准确率",
+          "context": "...<50ms,缩短99%;入池操作时间复杂度O(1),资源单元管理效率>95%。\n\n2. **钱龄计算准确率提升**:采用增量计算算法,钱龄计算误差从>15%降低到<2%,降低86.7%;资金来源识别准确率从...",
+          "quantified": true
+        }
+      ],
+      "business_effects": [],
+      "quantified": true,
+      "risk_level": "low"
+    },
+    "technical_means": {
+      "name": "技术手段分析",
+      "type": "AI分析",
+      "algorithms": {
+        "count": 0,
+        "found": false
+      },
+      "data_structures": [
+        "数据结构"
+      ],
+      "system_architecture": [
+        "架构"
+      ]
+    }
+  },
+  "ai_opinions": [
+    {
+      "type": "no_technical_problem",
+      "severity": "high",
+      "message": "AI判断:未明确识别到技术问题",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节",
+      "recommendation": "必须明确说明解决的技术问题"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "high",
+      "type": "必须改进",
+      "message": "发现1个高风险问题,必须解决",
+      "items": [
+        "必须明确说明解决的技术问题"
+      ]
+    }
+  ]
+}

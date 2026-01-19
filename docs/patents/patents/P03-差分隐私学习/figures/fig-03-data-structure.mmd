@@ -1,0 +1,45 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 隐私预算管理器 {
+        +Float 总预算ε
+        +Float 已消耗预算
+        +Float 剩余预算
+        +检查预算(消耗量) Boolean
+        +消耗预算(消耗量)
+        +重置预算()
+    }
+
+    class 差分隐私参数 {
+        +Float epsilon
+        +Float delta
+        +Float 噪声标准差
+        +Float 裁剪阈值
+        +计算噪声量() Float
+    }
+
+    class 加密梯度 {
+        +String 客户端ID
+        +Vector 加密向量
+        +Float 隐私消耗
+        +DateTime 时间戳
+        +String 签名
+    }
+
+    class 聚合结果 {
+        +Integer 参与客户端数
+        +Vector 聚合梯度
+        +Float 平均隐私消耗
+        +List~异常记录~ 异常列表
+    }
+
+    class 分类学习模型 {
+        +Dict 商户映射规则
+        +Dict 类别置信度
+        +Integer 版本号
+        +更新规则(反馈)
+        +预测类别(商户) String
+    }
+
+    隐私预算管理器 --> 差分隐私参数 : 使用
+    加密梯度 --> 聚合结果 : 聚合为
+    分类学习模型 --> 加密梯度 : 生成

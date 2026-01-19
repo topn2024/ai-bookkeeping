@@ -1,0 +1,77 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 数据采集层
+        INCOME[收入数据]
+        SOURCE[来源分类]
+        TYPE[类型判定]
+    end
+
+    subgraph 稳定性评估引擎
+        CV[变异系数计算]
+        FIXED[固定收入占比]
+        DIVERSE[来源多样性]
+        REGULAR[周期性规律]
+        SCORE[综合评分]
+    end
+
+    subgraph 自适应预算
+        RATIO[可用比例计算]
+        BASE[基准收入选择]
+        BUDGET[月度预算生成]
+        ADJUST[动态调整]
+    end
+
+    subgraph 收入平滑
+        BUFFER[缓冲账户]
+        SALARY[固定工资发放]
+        EXCESS[超额处理]
+        SHORTAGE[不足处理]
+    end
+
+    subgraph 应急规划
+        MONTHS[应急月数计算]
+        TARGET[目标资金]
+        GAP[缺口分析]
+        PLAN[储蓄计划]
+    end
+
+    subgraph 收入预测
+        TREND[趋势分析]
+        SEASON[季节性分析]
+        PREDICT[预测计算]
+        CONF[置信区间]
+    end
+
+    INCOME --> SOURCE
+    SOURCE --> TYPE
+
+    TYPE --> CV
+    TYPE --> FIXED
+    TYPE --> DIVERSE
+    TYPE --> REGULAR
+
+    CV --> SCORE
+    FIXED --> SCORE
+    DIVERSE --> SCORE
+    REGULAR --> SCORE
+
+    SCORE --> RATIO
+    RATIO --> BASE
+    BASE --> BUDGET
+    BUDGET --> ADJUST
+
+    BUDGET --> BUFFER
+    BUFFER --> SALARY
+    SALARY --> EXCESS
+    SALARY --> SHORTAGE
+
+    SCORE --> MONTHS
+    MONTHS --> TARGET
+    TARGET --> GAP
+    GAP --> PLAN
+
+    INCOME --> TREND
+    TREND --> SEASON
+    SEASON --> PREDICT
+    PREDICT --> CONF
+

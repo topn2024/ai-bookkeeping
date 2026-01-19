@@ -1,0 +1,38 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant LOC as 位置服务
+    participant GEO as 地理围栏引擎
+    participant POI as POI服务
+    participant AI as 推荐引擎
+    participant UI as 通知界面
+
+    Note over U,UI: 用户进入超市区域
+
+    LOC->>LOC: 持续定位
+    LOC->>GEO: 上报位置更新
+
+    GEO->>GEO: 检测地理围栏
+    GEO->>GEO: 发现进入"永辉超市"围栏
+
+    GEO->>POI: 查询POI信息
+    POI-->>GEO: 返回: 永辉超市, 购物
+
+    GEO->>AI: 请求记账建议
+    AI->>AI: 查询历史消费
+    AI->>AI: 计算平均消费: ¥156
+    AI->>AI: 生成建议
+
+    AI-->>UI: 推送记账建议
+    UI-->>U: 显示通知:<br/>"检测到您在永辉超市,<br/>是否记录本次购物?"
+
+    U->>UI: 点击确认
+    UI->>AI: 用户确认
+    AI->>AI: 创建待确认记录
+
+    Note over U,UI: 用户离开超市后
+
+    U->>UI: 输入实际金额: ¥168
+    UI->>AI: 完成记账
+    AI->>AI: 更新商户统计
+    AI-->>UI: 记账成功

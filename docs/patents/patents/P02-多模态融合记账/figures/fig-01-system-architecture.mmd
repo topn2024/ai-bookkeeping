@@ -1,0 +1,37 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 输入层
+        V[语音输入]
+        I[图像输入]
+        T[文本输入]
+    end
+
+    subgraph 识别层
+        ASR[语音识别模块<br/>ASR]
+        OCR[图像识别模块<br/>OCR]
+        NLP[文本解析模块<br/>NLP]
+    end
+
+    subgraph 融合层
+        FE[特征提取器]
+        ATT[跨模态注意力机制]
+        WGT[置信度加权器]
+    end
+
+    subgraph 输出层
+        DEC[解码器]
+        OUT[记账结果]
+    end
+
+    V --> ASR
+    I --> OCR
+    T --> NLP
+
+    ASR --> FE
+    OCR --> FE
+    NLP --> FE
+
+    FE --> ATT
+    ATT --> WGT
+    WGT --> DEC
+    DEC --> OUT

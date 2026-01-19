@@ -1,0 +1,48 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 语音交互会话 {
+        +String 会话ID
+        +DateTime 开始时间
+        +String 当前维度
+        +List~对话轮次~ 对话历史
+        +切换维度(维度)
+        +添加轮次(轮次)
+    }
+
+    class 意图识别结果 {
+        +String 原始文本
+        +String 意图类型
+        +String 交互维度
+        +Dict 参数列表
+        +Float 置信度
+        +Integer 识别层级
+    }
+
+    class 规则匹配器 {
+        +List~精确规则~ 精确规则库
+        +List~模糊规则~ 模糊规则库
+        +精确匹配(文本) 结果
+        +模糊匹配(文本) 结果
+    }
+
+    class 自学习缓存 {
+        +Dict 模式映射
+        +Integer 命中次数
+        +Float 置信阈值
+        +添加模式(输入, 意图)
+        +查询模式(输入) 意图
+        +更新置信度(模式)
+    }
+
+    class LLM识别器 {
+        +String 模型名称
+        +String 系统提示
+        +Integer 超时时间
+        +识别意图(文本) 结果
+        +解析响应(响应) 意图
+    }
+
+    语音交互会话 "1" *-- "n" 意图识别结果 : 包含
+    规则匹配器 --> 意图识别结果 : 生成
+    自学习缓存 --> 规则匹配器 : 扩展
+    LLM识别器 --> 自学习缓存 : 更新

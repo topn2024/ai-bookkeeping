@@ -410,6 +410,40 @@ class VoiceIntentRouter {
       scores[VoiceIntentType.clarifySelection] =
           (scores[VoiceIntentType.clarifySelection] ?? 0.0) + 0.4;
     }
+
+    // 修改意图增强：包含明确的修改关键词
+    final hasModifyKeyword = RegExp(r'修改|更改|改成|换成|调整|把.*改|改.*为|改.*成').hasMatch(input);
+    if (hasModifyKeyword) {
+      scores[VoiceIntentType.modifyTransaction] =
+          (scores[VoiceIntentType.modifyTransaction] ?? 0.0) + 0.4;
+    }
+
+    // 导航意图增强：包含明确的导航关键词
+    final hasNavigateKeyword = RegExp(r'打开|进入|跳转|切换|返回|回到').hasMatch(input);
+    final hasPageKeyword = RegExp(r'页面|界面|首页|主页|统计|账单|设置|报告|分析').hasMatch(input);
+    if (hasNavigateKeyword) {
+      scores[VoiceIntentType.navigateToPage] =
+          (scores[VoiceIntentType.navigateToPage] ?? 0.0) + 0.3;
+      // 如果同时有页面关键词，进一步增强
+      if (hasPageKeyword) {
+        scores[VoiceIntentType.navigateToPage] =
+            (scores[VoiceIntentType.navigateToPage] ?? 0.0) + 0.2;
+      }
+    }
+
+    // 查询意图增强：包含明确的查询关键词
+    final hasQueryKeyword = RegExp(r'查看|查询|显示|统计|分析|多少钱|多少块|汇总|报告').hasMatch(input);
+    if (hasQueryKeyword) {
+      scores[VoiceIntentType.queryTransaction] =
+          (scores[VoiceIntentType.queryTransaction] ?? 0.0) + 0.4;
+    }
+
+    // 删除意图增强：包含明确的删除关键词
+    final hasDeleteKeyword = RegExp(r'删除|删掉|去掉|移除|清除|撤销|撤回').hasMatch(input);
+    if (hasDeleteKeyword) {
+      scores[VoiceIntentType.deleteTransaction] =
+          (scores[VoiceIntentType.deleteTransaction] ?? 0.0) + 0.4;
+    }
   }
 
   /// 获取最佳匹配意图

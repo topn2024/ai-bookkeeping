@@ -1,0 +1,41 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant UI as 界面
+    participant PARSE as 解析引擎
+    participant PREC as 精度保护
+    participant DEDUP as 去重引擎
+    participant DB as 数据库
+
+    U->>UI: 上传账单文件(5MB CSV)
+    UI->>PARSE: 开始解析
+
+    PARSE->>PARSE: 检测文件大小: 5MB
+    PARSE->>PARSE: 分片策略: 10片
+
+    loop 并行解析每片
+        PARSE->>PARSE: 解析交易记录
+        PARSE->>PREC: 转换金额精度
+        PREC->>PREC: String → Decimal
+        PREC->>PREC: 银行家舍入
+        PREC-->>PARSE: 精确金额
+    end
+
+    PARSE->>PARSE: 合并结果: 1200笔交易
+    PARSE->>DEDUP: 去重检测
+
+    DEDUP->>DEDUP: 哈希索引构建
+    DEDUP->>DEDUP: 布隆过滤器预筛选
+    DEDUP->>DEDUP: 发现潜在重复: 50笔
+    DEDUP->>DEDUP: 精确相似度计算
+    DEDUP->>DEDUP: 确认重复: 30笔
+    DEDUP-->>PARSE: 去重后: 1170笔
+
+    PARSE->>DB: 批量导入(batch_size=1000)
+    DB->>DB: 第1批: 1000笔
+    DB->>DB: 第2批: 170笔
+    DB-->>PARSE: 导入完成
+
+    PARSE-->>UI: 导入报告
+    UI-->>U: 成功导入1170笔, 去重30笔, 用时15秒
+

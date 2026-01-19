@@ -1,0 +1,45 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Op[/用户发起操作/]
+    Op --> GetRole[获取用户角色]
+
+    GetRole --> CheckPerm{权限检查}
+    CheckPerm -->|无权限| Deny[拒绝操作]
+    CheckPerm -->|有权限| DoOp[执行操作]
+
+    DoOp --> Sync[同步到服务器]
+    Sync --> Conflict{是否冲突?}
+
+    Conflict -->|无冲突| Apply[直接应用]
+    Conflict -->|版本冲突| Analyze[冲突分析]
+
+    Analyze --> FieldType{冲突字段类型}
+    FieldType -->|金额| Manual[手动解决]
+    FieldType -->|分类| Manual
+    FieldType -->|备注| AutoMerge[自动合并]
+    FieldType -->|标签| AutoMerge
+
+    Manual --> UserChoice[/用户选择/]
+    UserChoice --> Apply
+    AutoMerge --> Apply
+
+    Apply --> Split{是否需要分摊?}
+    Split -->|是| CalcSplit[计算分摊金额]
+    Split -->|否| Log[记录操作日志]
+
+    CalcSplit --> SplitType{分摊类型}
+    SplitType -->|平均| AA[每人金额 = 总额/人数]
+    SplitType -->|比例| Ratio[每人金额 = 总额×比例]
+    SplitType -->|自定义| Custom[手动指定金额]
+
+    AA --> CalcDebt[计算债务关系]
+    Ratio --> CalcDebt
+    Custom --> CalcDebt
+
+    CalcDebt --> MinTrans[最小化转账次数]
+    MinTrans --> Log
+
+    Log --> Notify[通知相关成员]
+    Deny --> End([结束])
+    Notify --> End
+

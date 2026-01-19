@@ -1,0 +1,55 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 地理围栏 {
+        +String 围栏ID
+        +String 名称
+        +Point 中心点
+        +Float 半径米
+        +String 类型
+        +Boolean 启用
+        +检测进入(位置) Boolean
+        +检测离开(位置) Boolean
+    }
+
+    class 位置数据 {
+        +Float 经度
+        +Float 纬度
+        +Float 精度
+        +DateTime 时间戳
+        +String 来源
+        +计算距离(位置) Float
+    }
+
+    class 商户映射 {
+        +String 映射ID
+        +地理围栏 围栏
+        +String 商户名称
+        +String 消费类别
+        +Decimal 平均消费
+        +Integer 访问次数
+        +更新统计(消费记录)
+    }
+
+    class 记账建议 {
+        +String 建议ID
+        +String 商户名称
+        +String 推荐类别
+        +Decimal 预估金额
+        +Float 置信度
+        +String 备注模板
+        +DateTime 触发时间
+    }
+
+    class 位置触发器 {
+        +String 触发器ID
+        +地理围栏 关联围栏
+        +String 触发条件
+        +String 动作类型
+        +Boolean 启用
+        +触发(位置事件)
+    }
+
+    地理围栏 "1" --> "n" 商户映射 : 关联
+    位置触发器 --> 地理围栏 : 监控
+    商户映射 --> 记账建议 : 生成
+    位置数据 --> 地理围栏 : 检测

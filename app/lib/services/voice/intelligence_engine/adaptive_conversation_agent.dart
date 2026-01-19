@@ -78,6 +78,10 @@ class AdaptiveConversationAgent {
 
       case ConversationMode.mixed:
         return _generateMixedResponse(results, chatContent);
+
+      case ConversationMode.clarify:
+        // clarify 模式由 IntelligenceEngine 直接处理，这里作为防御性编程
+        return chatContent ?? '请问您具体想要做什么呢？';
     }
   }
 
@@ -136,6 +140,8 @@ class AdaptiveConversationAgent {
         return ResponseLengthLimit(min: 5, max: 10);
       case ConversationMode.mixed:
         return ResponseLengthLimit(min: 20, max: 50);
+      case ConversationMode.clarify:
+        return ResponseLengthLimit(min: 15, max: 40);
     }
   }
 }

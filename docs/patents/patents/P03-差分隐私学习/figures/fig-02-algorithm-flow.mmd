@@ -1,0 +1,28 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Init[初始化本地模型]
+    Init --> Collect[收集本地训练数据]
+    Collect --> Train[本地模型训练]
+    Train --> Gradient[计算模型梯度]
+
+    Gradient --> Clip[梯度裁剪<br/>限制敏感度]
+    Clip --> Noise[添加高斯噪声<br/>差分隐私保护]
+    Noise --> Budget{隐私预算<br/>是否充足?}
+
+    Budget -->|否| Skip[跳过本轮更新]
+    Skip --> Wait[等待预算恢复]
+    Wait --> Collect
+
+    Budget -->|是| Encrypt[加密处理]
+    Encrypt --> Upload[上传至服务端]
+    Upload --> Aggregate[安全聚合]
+    Aggregate --> Validate{恶意检测<br/>是否通过?}
+
+    Validate -->|否| Reject[拒绝该更新]
+    Reject --> Log[记录异常]
+    Log --> Download
+
+    Validate -->|是| Update[更新全局模型]
+    Update --> Download[下载新模型]
+    Download --> Apply[应用模型更新]
+    Apply --> End([结束])

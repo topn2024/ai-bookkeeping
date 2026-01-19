@@ -1,0 +1,40 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant UI as 界面
+    participant PROG as 渐进披露引擎
+    participant ADAPT as 自适应选择器
+    participant RENDER as 渲染器
+
+    U->>UI: 打开财务概览
+    UI->>PROG: 请求初始视图
+
+    PROG->>PROG: 评估数据复杂度
+    PROG->>PROG: 确定初始层级: L1
+
+    PROG->>ADAPT: 请求图表配置
+    ADAPT->>ADAPT: 分析数据特征
+    ADAPT-->>PROG: 推荐: 摘要卡片 + 饼图
+
+    PROG->>RENDER: 渲染L1视图
+    RENDER-->>UI: 显示核心摘要
+    UI-->>U: 展示: 总收支、结余、趋势
+
+    U->>UI: 点击"支出分类"
+    UI->>PROG: 下钻请求
+
+    PROG->>PROG: 切换到L2层级
+    PROG->>ADAPT: 请求图表配置
+    ADAPT-->>PROG: 推荐: 柱状图 + 列表
+
+    PROG->>RENDER: 渲染L2视图
+    RENDER-->>UI: 显示分类概览
+    UI-->>U: 展示: 各类支出对比
+
+    U->>UI: 点击"餐饮"类别
+    UI->>PROG: 继续下钻
+
+    PROG->>PROG: 切换到L3层级
+    PROG->>RENDER: 渲染详细视图
+    RENDER-->>UI: 显示餐饮明细
+    UI-->>U: 展示: 交易列表、商户分布

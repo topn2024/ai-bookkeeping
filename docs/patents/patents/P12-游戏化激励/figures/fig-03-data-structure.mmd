@@ -1,0 +1,62 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 用户行为 {
+        +String user_id
+        +Enum behavior_type
+        +DateTime timestamp
+        +Float quality_score
+        +Float difficulty
+        +Float contribution
+        +评估质量() Float
+        +计算贡献() Float
+    }
+
+    class 用户画像 {
+        +String user_id
+        +Enum user_level
+        +Map behavior_scores
+        +Float total_contribution
+        +Integer active_days
+        +Integer streak_days
+        +判定等级() Enum
+        +更新连续天数() void
+    }
+
+    class 自适应奖励 {
+        +Float base_points
+        +Float level_multiplier
+        +Float streak_bonus
+        +Float fatigue_factor
+        +Float final_points
+        +计算基础奖励() Float
+        +应用等级系数() Float
+        +应用防疲劳() Float
+    }
+
+    class 成就系统 {
+        +List bronze_achievements
+        +List silver_achievements
+        +List gold_achievements
+        +List platinum_achievements
+        +List hidden_achievements
+        +检查解锁条件() Boolean
+        +解锁成就() void
+        +发放奖励() void
+    }
+
+    class 异常检测 {
+        +Integer freq_score
+        +Integer pattern_score
+        +Integer quality_score
+        +Integer device_score
+        +Integer total_score
+        +检测频率异常() Integer
+        +检测模式异常() Integer
+        +判定作弊() Boolean
+    }
+
+    用户行为 --> 用户画像 : 更新
+    用户画像 --> 自适应奖励 : 计算
+    用户画像 --> 成就系统 : 追踪
+    用户行为 --> 异常检测 : 检测
+

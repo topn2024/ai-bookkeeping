@@ -1,0 +1,29 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 客户端
+        LC[本地学习模块]
+        DP[差分隐私模块]
+        UP[上传模块]
+    end
+
+    subgraph 服务端
+        AGG[安全聚合模块]
+        VAL[验证模块]
+        GM[全局模型]
+    end
+
+    subgraph 隐私保护层
+        NOISE[噪声注入]
+        CLIP[梯度裁剪]
+        BUDGET[隐私预算管理]
+    end
+
+    LC -->|本地梯度| DP
+    DP --> NOISE
+    NOISE --> CLIP
+    CLIP --> BUDGET
+    BUDGET -->|加密梯度| UP
+    UP -->|安全传输| AGG
+    AGG --> VAL
+    VAL -->|验证通过| GM
+    GM -->|模型更新| LC

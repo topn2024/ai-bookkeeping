@@ -1,0 +1,83 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 数据输入层
+        TRANS[交易记录]
+        GROUP[商户分组]
+        INTERVAL[间隔分析]
+    end
+
+    subgraph 周期性识别引擎
+        DETECT[周期检测器]
+        WEEK[周订阅]
+        MONTH[月订阅]
+        QUARTER[季订阅]
+        YEAR[年订阅]
+    end
+
+    subgraph 稳定性分析
+        AMOUNT_CV[金额稳定性]
+        TIME_CV[时间稳定性]
+        DURATION[持续性评分]
+        STABILITY[综合稳定性]
+    end
+
+    subgraph 使用评估
+        DIRECT[直接使用数据]
+        INDIRECT[间接推断]
+        DECAY[时间衰减模型]
+        STATUS[使用状态]
+    end
+
+    subgraph 浪费检测
+        UNUSED[完全未使用]
+        RARELY[很少使用]
+        DUPLICATE[重复订阅]
+        OVERLAP[功能重叠]
+        WASTE[浪费判定]
+    end
+
+    subgraph 智能提醒
+        SCHEDULE[提醒调度]
+        CONTENT[提醒内容]
+        SUGGEST[操作建议]
+        LEARN[用户反馈学习]
+    end
+
+    TRANS --> GROUP
+    GROUP --> INTERVAL
+
+    INTERVAL --> DETECT
+    DETECT --> WEEK
+    DETECT --> MONTH
+    DETECT --> QUARTER
+    DETECT --> YEAR
+
+    WEEK --> AMOUNT_CV
+    MONTH --> AMOUNT_CV
+    QUARTER --> AMOUNT_CV
+    YEAR --> AMOUNT_CV
+
+    AMOUNT_CV --> TIME_CV
+    TIME_CV --> DURATION
+    DURATION --> STABILITY
+
+    STABILITY --> DIRECT
+    STABILITY --> INDIRECT
+    DIRECT --> DECAY
+    INDIRECT --> DECAY
+    DECAY --> STATUS
+
+    STATUS --> UNUSED
+    STATUS --> RARELY
+    STATUS --> DUPLICATE
+    STATUS --> OVERLAP
+    UNUSED --> WASTE
+    RARELY --> WASTE
+    DUPLICATE --> WASTE
+    OVERLAP --> WASTE
+
+    WASTE --> SCHEDULE
+    SCHEDULE --> CONTENT
+    CONTENT --> SUGGEST
+    SUGGEST --> LEARN
+

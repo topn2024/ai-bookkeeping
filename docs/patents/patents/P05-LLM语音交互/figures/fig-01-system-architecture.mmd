@@ -1,0 +1,46 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 语音输入层
+        MIC[麦克风]
+        VAD[语音活动检测]
+        ASR[语音识别]
+    end
+
+    subgraph 四维交互框架
+        D1[记账维度]
+        D2[查询维度]
+        D3[配置维度]
+        D4[导航维度]
+    end
+
+    subgraph 意图识别层
+        L1[精确规则匹配]
+        L2[模糊规则匹配]
+        L3[LLM兜底识别]
+        CACHE[自学习缓存]
+    end
+
+    subgraph 执行层
+        EXEC[执行引擎]
+        TTS[语音合成]
+    end
+
+    MIC --> VAD
+    VAD --> ASR
+    ASR --> L1
+
+    L1 -->|命中| D1
+    L1 -->|命中| D2
+    L1 -->|命中| D3
+    L1 -->|命中| D4
+    L1 -->|未命中| L2
+    L2 -->|命中| D1
+    L2 -->|未命中| L3
+    L3 --> CACHE
+    CACHE --> L1
+
+    D1 --> EXEC
+    D2 --> EXEC
+    D3 --> EXEC
+    D4 --> EXEC
+    EXEC --> TTS

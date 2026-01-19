@@ -9,6 +9,9 @@ import 'models.dart';
 /// 包含：
 /// - ExecutionChannel: 执行通道（后台处理操作队列）
 /// - ConversationChannel: 对话通道（维护对话流）
+///
+/// 两个通道自动连接：ExecutionChannel 执行完操作后，
+/// 结果会自动传递给 ConversationChannel。
 class DualChannelProcessor {
   final ExecutionChannel executionChannel;
   final ConversationChannel conversationChannel;
@@ -16,21 +19,35 @@ class DualChannelProcessor {
   DualChannelProcessor({
     required this.executionChannel,
     required this.conversationChannel,
-  });
+  }) {
+    // 关键：连接两个通道 - 将执行结果自动传递给对话通道
+    executionChannel.registerCallback((result) {
+      debugPrint('[DualChannelProcessor] 执行结果回调: success=${result.success}');
+      conversationChannel.addExecutionResult(result);
+    });
+  }
 
   /// 处理多操作结果
   Future<void> process(MultiOperationResult result) async {
     debugPrint('[DualChannelProcessor] 处理${result.operations.length}个操作');
+    debugPrint('[DualChannelProcessor] operations详情: ${result.operations.map((op) => '${op.type}(${op.priority})').join(', ')}');
 
     // 将操作分发到执行通道
     for (final operation in result.operations) {
+      debugPrint('[DualChannelProcessor] 准备入队操作: ${operation.type}, priority=${operation.priority}');
       await executionChannel.enqueue(operation);
+      debugPrint('[DualChannelProcessor] 操作入队完成: ${operation.type}');
     }
+
+    // 确保所有deferred操作也执行完成
+    await executionChannel.flush();
 
     // 将对话内容传递到对话通道
     if (result.chatContent != null) {
       conversationChannel.addChatContent(result.chatContent!);
     }
+
+    debugPrint('[DualChannelProcessor] process()完成');
   }
 }
 
@@ -182,6 +199,18 @@ class ExecutionChannel {
     }
   }
 
+  /// 刷新队列，确保所有待执行操作都完成
+  Future<void> flush() async {
+    debugPrint('[ExecutionChannel] flush(): 执行所有待处理操作');
+
+    // 执行所有deferred操作
+    if (_deferredQueue.isNotEmpty) {
+      await _executeDeferredQueue();
+    }
+
+    debugPrint('[ExecutionChannel] flush()完成');
+  }
+
   /// 清理资源
   void dispose() {
     _aggregationTimer?.cancel();
@@ -222,12 +251,16 @@ class ConversationChannel {
   /// 生成响应
   Future<String> generateResponse(ConversationMode mode) async {
     debugPrint('[ConversationChannel] 生成响应, 模式: $mode');
+    debugPrint('[ConversationChannel] 当前执行结果数量: ${_executionResults.length}');
+    debugPrint('[ConversationChannel] 执行结果详情: ${_executionResults.map((r) => 'success=${r.success}').join(', ')}');
 
     final response = await adapter.generateFeedback(
       mode,
       _executionResults,
       _chatContent,
     );
+
+    debugPrint('[ConversationChannel] 生成的响应: $response');
 
     // 清空状态
     _executionResults.clear();

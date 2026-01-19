@@ -1,0 +1,86 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 行为采集层
+        LOG[行为日志]
+        EVENT[事件追踪]
+        QUALITY[质量评估]
+    end
+
+    subgraph 八维度行为分析
+        D1[记账频率]
+        D2[金额准确度]
+        D3[分类完整度]
+        D4[备注详细度]
+        D5[照片凭证]
+        D6[标签使用]
+        D7[预算遵守]
+        D8[数据修正]
+        SCORE[行为评分器]
+    end
+
+    subgraph 自适应奖励引擎
+        LEVEL[用户等级判定]
+        BASE[基础奖励计算]
+        STREAK[连续奖励]
+        FATIGUE[防疲劳因子]
+        FINAL[最终奖励]
+    end
+
+    subgraph 成就系统
+        BRONZE[青铜成就]
+        SILVER[白银成就]
+        GOLD[黄金成就]
+        PLATINUM[铂金成就]
+        HIDDEN[隐藏成就]
+    end
+
+    subgraph 社交激励
+        RANK[分层排行榜]
+        FRIEND[好友竞争]
+        SOCIAL[社交奖励]
+    end
+
+    subgraph 防刷检测
+        FREQ[频率检测]
+        PATTERN[模式检测]
+        ANOMALY[异常评分]
+    end
+
+    LOG --> D1
+    EVENT --> D2
+    QUALITY --> D3
+    LOG --> D4
+    EVENT --> D5
+    LOG --> D6
+    QUALITY --> D7
+    EVENT --> D8
+
+    D1 --> SCORE
+    D2 --> SCORE
+    D3 --> SCORE
+    D4 --> SCORE
+    D5 --> SCORE
+    D6 --> SCORE
+    D7 --> SCORE
+    D8 --> SCORE
+
+    SCORE --> LEVEL
+    LEVEL --> BASE
+    BASE --> STREAK
+    STREAK --> FATIGUE
+    FATIGUE --> FINAL
+
+    SCORE --> BRONZE
+    BRONZE --> SILVER
+    SILVER --> GOLD
+    GOLD --> PLATINUM
+    GOLD --> HIDDEN
+
+    FINAL --> RANK
+    RANK --> FRIEND
+    FRIEND --> SOCIAL
+
+    LOG --> FREQ
+    FREQ --> PATTERN
+    PATTERN --> ANOMALY
+

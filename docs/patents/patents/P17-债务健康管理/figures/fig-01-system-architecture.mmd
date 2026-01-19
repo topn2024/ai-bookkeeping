@@ -1,0 +1,75 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 数据输入层
+        CREDIT[信用卡]
+        LOAN[消费贷]
+        MORTGAGE[房贷]
+        CARLOAN[车贷]
+    end
+
+    subgraph 健康评估引擎
+        DTI[债务收入比]
+        PAYMENT[还款比]
+        INTEREST[利息分析]
+        LEVEL[健康等级]
+    end
+
+    subgraph 还款策略
+        SNOWBALL[雪球法]
+        AVALANCHE[雪崩法]
+        HYBRID[混合策略]
+        PRIORITY[优先级排序]
+    end
+
+    subgraph 计划生成
+        MIN_PAY[最低还款]
+        EXTRA[额外还款分配]
+        SCHEDULE[还款计划]
+        SIMULATE[模拟计算]
+    end
+
+    subgraph 利息追踪
+        MONTHLY[月利息计算]
+        TOTAL[累计利息]
+        COMPARE[策略对比]
+        SAVE[节省潜力]
+    end
+
+    subgraph 动态调整
+        INCOME_CHG[收入变化]
+        DEBT_CHG[债务变化]
+        ADJUST[计划调整]
+        ALERT[预警通知]
+    end
+
+    CREDIT --> DTI
+    LOAN --> DTI
+    MORTGAGE --> DTI
+    CARLOAN --> DTI
+
+    DTI --> PAYMENT
+    PAYMENT --> INTEREST
+    INTEREST --> LEVEL
+
+    LEVEL --> SNOWBALL
+    LEVEL --> AVALANCHE
+    LEVEL --> HYBRID
+    SNOWBALL --> PRIORITY
+    AVALANCHE --> PRIORITY
+    HYBRID --> PRIORITY
+
+    PRIORITY --> MIN_PAY
+    MIN_PAY --> EXTRA
+    EXTRA --> SCHEDULE
+    SCHEDULE --> SIMULATE
+
+    SIMULATE --> MONTHLY
+    MONTHLY --> TOTAL
+    TOTAL --> COMPARE
+    COMPARE --> SAVE
+
+    SCHEDULE --> INCOME_CHG
+    INCOME_CHG --> DEBT_CHG
+    DEBT_CHG --> ADJUST
+    ADJUST --> ALERT
+

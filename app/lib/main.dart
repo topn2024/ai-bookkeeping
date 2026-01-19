@@ -222,6 +222,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       coordinator.setSkipTTSPlayback(true);
     }
 
+    // 连接网络状态提供者，让SmartIntentRecognizer能感知网络状态
+    // 返回null时表示网络状态未初始化，将允许LLM调用
+    coordinator.setNetworkStatusProvider(
+      () => GlobalVoiceAssistantManager.instance.networkStatus,
+    );
+
     GlobalVoiceAssistantManager.instance.setCommandProcessor((command) async {
       debugPrint('[App] 处理语音命令: $command');
 

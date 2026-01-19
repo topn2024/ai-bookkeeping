@@ -1,0 +1,36 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant APP as 应用
+    participant ENGINE as 冷静期引擎
+    participant STATS as 效果统计
+
+    U->>APP: 添加待购商品: 外套 680元
+    APP->>ENGINE: 触发冷静期判定
+
+    ENGINE->>ENGINE: 金额判定: 680元 → 48小时
+    ENGINE->>ENGINE: 分类判定: 服装(可选品) → 触发
+    ENGINE->>ENGINE: 历史取消率: 55% → 延长10%
+    ENGINE->>ENGINE: 最终冷静期: 48×1.1 = 53小时
+
+    ENGINE-->>APP: 创建冷静期记录
+    APP-->>U: 已加入冷静期, 53小时后可购买
+
+    Note over U,STATS: 53小时后...
+
+    APP->>U: 冷静期到期提醒
+    APP->>APP: 生成决策辅助信息
+
+    APP-->>U: 提醒内容
+    Note right of U: 商品: 外套 680元<br/>预算剩余: 320元(不足)<br/>历史取消率: 55%<br/>[立即购买] [延长] [取消]
+
+    U->>APP: 选择: 取消购买
+
+    APP->>STATS: 更新统计
+    STATS->>STATS: 取消数+1
+    STATS->>STATS: 节省金额+680元
+    STATS->>STATS: 取消率 = 60%
+
+    STATS-->>APP: 统计更新完成
+    APP-->>U: 已取消, 本次节省680元, 累计节省3,200元
+

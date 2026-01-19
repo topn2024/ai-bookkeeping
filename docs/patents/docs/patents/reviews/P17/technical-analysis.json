@@ -1,0 +1,132 @@
+{
+  "patent_id": "P17",
+  "patent_dir": "patents/P17-债务健康管理",
+  "disclaimer": "⚠️ 以下为AI辅助分析意见,非最终法律结论",
+  "analysis": {
+    "technical_features": {
+      "name": "技术特征提取",
+      "type": "AI分析",
+      "features": [
+        {
+          "type": "算法",
+          "name": "债务健康等级评估",
+          "description": "债务健康等级评估\n输入:债务列表 Debts, 月收入 MonthlyIncome\n输出:健康等级 HealthLevel, 健康评分 HealthScore\n\n评估维度:\n1. 债务收入比(DTI)计算:\n   - total_debt = Σ(debt.balance)\n   - monthly_payment = Σ(debt.monthly_payment)\n   - DTI = tota..."
+        },
+        {
+          "type": "算法",
+          "name": "雪球还款法(Debt Snowball)",
+          "description": "雪球还款法(Debt Snowball)\n输入:债务列表 Debts, 可用还款金额 AvailableAmount\n输出:还款计划 PaymentPlan\n\n策略原理:\n- 优先偿还余额最小的债务\n- 获得心理激励,增强还款信心\n- 适合债务较多、需要激励的用户\n\n算法步骤:\n1. 按余额升序排序:\n   sorted_debts = sort(Debts, key=balance, ascen..."
+        },
+        {
+          "type": "算法",
+          "name": "雪崩还款法(Debt Avalanche)",
+          "description": "雪崩还款法(Debt Avalanche)\n输入:债务列表 Debts, 可用还款金额 AvailableAmount\n输出:还款计划 PaymentPlan\n\n策略原理:\n- 优先偿还利率最高的债务\n- 节省最多利息成本\n- 适合理性、追求最优解的用户\n\n算法步骤:\n1. 按利率降序排序:\n   sorted_debts = sort(Debts, key=interest_rate, desc..."
+        },
+        {
+          "type": "算法",
+          "name": "智能还款计划生成",
+          "description": "智能还款计划生成\n输入:债务列表 Debts, 月收入 Income, 用户偏好 Preference\n输出:最优还款计划 OptimalPlan\n\n优化策略:\n1. 用户偏好识别:\n   - 心理型:偏好雪球法(快速减少债务数量)\n   - 理性型:偏好雪崩法(最小化利息成本)\n   - 平衡型:混合策略\n\n2. 混合策略算法:\n   - 先还清1-2笔小额债务(雪球法,获得激励)\n   - 再..."
+        },
+        {
+          "type": "算法",
+          "name": "月利息成本追踪",
+          "description": "月利息成本追踪\n输入:债务列表 Debts\n输出:月利息成本 MonthlyInterest, 累计利息 TotalInterest\n\n计算方法:\n1. 单笔债务月利息:\n   monthly_interest = balance × (annual_rate / 12)\n\n2. 总月利息:\n   total_monthly = Σ(debt.monthly_interest)\n\n3. 累计利息:..."
+        }
+      ]
+    },
+    "technical_problem": {
+      "name": "技术问题识别",
+      "type": "AI判断",
+      "technical_problems": [],
+      "business_problems": [
+        {
+          "keyword": "收入",
+          "context": "...)需要手动输入数据;(2)仅计算单笔债务;(3)无多债务优化策略;(4)无动态调整;(5)不考虑用户收入情况。\n\n[0005] **现有技术三(财务规划软件)**:专业财务规划软件提供债务管理功能。技术缺..."
+        }
+      ],
+      "risk_level": "high"
+    },
+    "technical_effects": {
+      "name": "技术效果分析",
+      "type": "AI判断",
+      "technical_effects": [
+        {
+          "keyword": "响应时间",
+          "context": "...、债务结构、逾期风险),债务健康评估准确率>90%,相比现有技术(无量化评估)提升90个百分点;评估响应时间<80ms,支持实时监控。\n\n2. **还款优化效果提升**:采用雪崩法和雪球法智能还款策略,雪崩法...",
+          "quantified": true
+        },
+        {
+          "keyword": "准确率",
+          "context": "[0016] 与现有技术相比,本发明具有以下有益效果:\n\n1. **债务健康评估准确率提升**:采用5维度综合评估算法(债务收入比、利息负担率、还款压力、债务结构、逾期风险),债务健康评...",
+          "quantified": false
+        }
+      ],
+      "business_effects": [
+        {
+          "keyword": "用户满意度",
+          "context": "...债务6-12个月,相比现有技术缩短还款周期50-100%;还款计划优化准确率>88%。\n\n3. **用户满意度提升**:采用智能债务管理和自动提醒,用户满意度达到82%,相比现有技术(手动管理,满意度55%)提..."
+        },
+        {
+          "keyword": "收入",
+          "context": "...相比,本发明具有以下有益效果:\n\n1. **债务健康评估准确率提升**:采用5维度综合评估算法(债务收入比、利息负担率、还款压力、债务结构、逾期风险),债务健康评估准确率>90%,相比现有技术(无量化评估..."
+        },
+        {
+          "keyword": "成本",
+          "context": "...**:采用雪崩法和雪球法智能还款策略,雪崩法节省利息15-30%,相比现有技术(无优化策略)节省利息成本;雪球法提前还清债务6-12个月,相比现有技术缩短还款周期50-100%;还款计划优化准确率>88%..."
+        }
+      ],
+      "quantified": true,
+      "risk_level": "medium"
+    },
+    "technical_means": {
+      "name": "技术手段分析",
+      "type": "AI分析",
+      "algorithms": {
+        "count": 5,
+        "found": true
+      },
+      "data_structures": [
+        "struct",
+        "数据结构"
+      ],
+      "system_architecture": [
+        "架构",
+        "模块"
+      ]
+    }
+  },
+  "ai_opinions": [
+    {
+      "type": "technical_problem_risk",
+      "severity": "high",
+      "message": "AI判断:背景技术中商业问题描述多于技术问题,存在被认定为商业方法的风险",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节",
+      "recommendation": "建议重点强调技术问题,如计算效率、系统性能、算法创新等"
+    },
+    {
+      "type": "business_effect_risk",
+      "severity": "medium",
+      "message": "AI判断:技术效果中包含3个商业指标",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节",
+      "recommendation": "建议删除商业指标,仅保留技术指标"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "high",
+      "type": "必须改进",
+      "message": "发现1个高风险问题,必须解决",
+      "items": [
+        "建议重点强调技术问题,如计算效率、系统性能、算法创新等"
+      ]
+    },
+    {
+      "priority": "medium",
+      "type": "建议优化",
+      "message": "发现1个中风险问题,建议优化",
+      "items": [
+        "建议删除商业指标,仅保留技术指标"
+      ]
+    }
+  ]
+}

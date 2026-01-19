@@ -4,6 +4,20 @@ library;
 /// 操作（已在 smart_intent_recognizer.dart 中定义，此处重新导出）
 export '../smart_intent_recognizer.dart' show Operation, OperationType, OperationPriority;
 
+/// LLM识别结果类型
+///
+/// 四种情况：
+/// - operation: 有操作意图，需要执行
+/// - chat: 闲聊/提问，无需操作
+/// - clarify: 意图模糊，需要反问澄清
+/// - failed: LLM不可用，需要规则兜底（离线场景）
+enum RecognitionResultType {
+  operation,  // 有操作
+  chat,       // 闲聊（无需操作）
+  clarify,    // 需要澄清
+  failed,     // LLM不可用（离线）
+}
+
 /// 执行结果
 class ExecutionResult {
   final bool success;

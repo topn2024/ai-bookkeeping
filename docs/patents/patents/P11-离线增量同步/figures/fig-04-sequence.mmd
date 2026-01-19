@@ -1,0 +1,43 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant A as 设备A(手机)
+    participant B as 设备B(平板)
+    participant S as 云端服务器
+
+    Note over A,B: 离线场景: 两设备同时编辑同一笔交易
+
+    A->>A: 离线编辑: 金额=35元
+    A->>A: 写入WAL
+    A->>A: 记录操作日志
+
+    B->>B: 离线编辑: 金额=38元
+    B->>B: 写入WAL
+    B->>B: 记录操作日志
+
+    Note over A,B: 恢复网络连接
+
+    A->>S: 推送变更(金额=35, 时间=12:30)
+    S->>S: 记录版本A
+
+    B->>S: 推送变更(金额=38, 时间=12:35)
+    S->>S: 检测冲突: 金额字段
+
+    S->>S: 冲突解决策略: MVR(多值保留)
+    S->>S: 保留两个版本供用户选择
+
+    S-->>A: 同步冲突通知
+    S-->>B: 同步冲突通知
+
+    A->>A: 显示冲突: 35元 vs 38元
+    A->>A: 用户选择: 38元
+    A->>S: 确认解决方案
+
+    S->>S: 应用解决方案
+    S-->>A: 同步完成
+    S-->>B: 同步完成
+
+    A->>A: 一致性验证
+    A->>A: 余额检查: 通过
+    B->>B: 一致性验证
+    B->>B: 余额检查: 通过
+

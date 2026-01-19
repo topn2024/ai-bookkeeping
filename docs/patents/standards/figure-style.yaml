@@ -1,0 +1,215 @@
+# 专利流程图样式配置
+# 本配置文件定义了专利流程图的标准样式，确保符合国家知识产权局要求
+
+# 文档信息
+metadata:
+  version: "1.0"
+  last_updated: "2026-01-18"
+  description: "专利流程图样式规范"
+
+# 颜色配置（黑白/灰度，符合专利局要求）
+colors:
+  background: "#FFFFFF"      # 白色背景
+  primary: "#000000"         # 黑色（主要线条）
+  secondary: "#666666"       # 深灰色（辅助线条）
+  tertiary: "#999999"        # 中灰色（次要元素）
+  text: "#000000"            # 黑色文字
+  border: "#000000"          # 黑色边框
+  fill:
+    default: "#FFFFFF"       # 白色填充
+    highlight: "#E0E0E0"     # 浅灰色高亮
+
+# 字体配置
+fonts:
+  family:
+    primary: "SimHei, Heiti SC, Microsoft YaHei, Arial, sans-serif"  # 黑体优先
+    fallback: "Arial, Helvetica, sans-serif"
+  size:
+    title: "16pt"            # 图标题
+    subtitle: "14pt"         # 子标题
+    label: "12pt"            # 节点标签
+    annotation: "10pt"       # 注释文字
+    small: "9pt"             # 小字号
+  weight:
+    normal: 400
+    bold: 700
+  min_size: "3.5mm"          # 专利局要求的最小字号
+
+# 形状配置
+shapes:
+  # 矩形（处理步骤）
+  rectangle:
+    width: "120px"
+    height: "60px"
+    min_width: "80px"
+    max_width: "200px"
+    border_width: "2px"
+    border_style: "solid"
+    border_radius: "4px"
+    padding: "8px 12px"
+
+  # 菱形（判断）
+  diamond:
+    width: "100px"
+    height: "100px"
+    border_width: "2px"
+    border_style: "solid"
+
+  # 椭圆（开始/结束）
+  ellipse:
+    width: "100px"
+    height: "50px"
+    border_width: "2px"
+    border_style: "solid"
+
+  # 平行四边形（数据输入/输出）
+  parallelogram:
+    width: "120px"
+    height: "50px"
+    skew: "10deg"
+    border_width: "2px"
+    border_style: "solid"
+
+  # 圆形（连接点）
+  circle:
+    diameter: "30px"
+    border_width: "2px"
+    border_style: "solid"
+
+  # 子流程（预定义处理）
+  subprocess:
+    width: "120px"
+    height: "60px"
+    border_width: "2px"
+    border_style: "solid"
+    inner_border_offset: "8px"
+
+# 连接线配置
+lines:
+  width: "2px"
+  style: "solid"
+  arrow:
+    size: "8px"
+    type: "filled"           # filled, open, diamond
+  curve:
+    type: "basis"            # basis, linear, step
+    tension: 0.5
+
+# 布局配置
+layout:
+  direction: "TB"            # TB (top-bottom), LR (left-right)
+  spacing:
+    horizontal: "80px"
+    vertical: "60px"
+    node: "40px"
+  margin:
+    top: "40px"
+    right: "40px"
+    bottom: "40px"
+    left: "40px"
+  alignment: "center"
+
+# 输出配置
+output:
+  # SVG 配置（源文件）
+  svg:
+    width: "auto"
+    height: "auto"
+    max_width: "800px"
+
+  # PNG 配置（提交文件）
+  png:
+    dpi: 300                 # 专利局要求至少300 DPI
+    width: "2480px"          # A4 @ 300 DPI: 210mm = 2480px
+    height: "3508px"         # A4 @ 300 DPI: 297mm = 3508px
+    background: "#FFFFFF"
+    quality: 100
+
+  # 颜色模式
+  color_mode: "grayscale"    # grayscale, monochrome
+
+# Mermaid 主题配置
+mermaid:
+  theme: "base"
+  themeVariables:
+    # 基础颜色
+    primaryColor: "#FFFFFF"
+    primaryTextColor: "#000000"
+    primaryBorderColor: "#000000"
+
+    # 线条
+    lineColor: "#000000"
+
+    # 背景
+    background: "#FFFFFF"
+    mainBkg: "#FFFFFF"
+
+    # 字体
+    fontFamily: "SimHei, Arial, sans-serif"
+    fontSize: "14px"
+
+    # 节点
+    nodeBorder: "#000000"
+    nodeTextColor: "#000000"
+
+    # 流程图特定
+    edgeLabelBackground: "#FFFFFF"
+    clusterBkg: "#F5F5F5"
+    clusterBorder: "#000000"
+
+    # 时序图特定
+    actorBkg: "#FFFFFF"
+    actorBorder: "#000000"
+    actorTextColor: "#000000"
+    actorLineColor: "#000000"
+    signalColor: "#000000"
+    signalTextColor: "#000000"
+
+# 流程图类型模板
+templates:
+  # 系统架构图
+  system_architecture:
+    layout: "TB"
+    node_style: "rectangle"
+    use_subgraphs: true
+
+  # 算法流程图
+  algorithm_flow:
+    layout: "TB"
+    decision_labels: ["是", "否"]
+    use_numbered_steps: true
+
+  # 数据结构图
+  data_structure:
+    layout: "TB"
+    class_style: true
+    show_types: true
+
+  # 时序图
+  sequence:
+    layout: "LR"
+    participant_style: "rectangle"
+    show_activation: true
+
+# 导出前处理
+preprocessing:
+  # 文字替换（确保中文）
+  text_replacements:
+    "Yes": "是"
+    "No": "否"
+    "True": "是"
+    "False": "否"
+    "Start": "开始"
+    "End": "结束"
+    "Input": "输入"
+    "Output": "输出"
+    "Process": "处理"
+    "Decision": "判断"
+
+# 验证规则
+validation:
+  min_dpi: 300
+  max_colors: 4              # 限制颜色数量（黑白灰）
+  required_formats: ["svg", "png"]
+  text_language: "zh-CN"
+  max_text_length: 20        # 单个节点最大文字长度

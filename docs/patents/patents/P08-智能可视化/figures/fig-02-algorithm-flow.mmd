@@ -1,0 +1,33 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Input[/用户进入财务概览/]
+    Input --> Context[分析用户上下文]
+    Context --> Assess[评估数据复杂度]
+
+    Assess --> Level{复杂度级别}
+    Level -->|简单| L1[第一层: 核心摘要]
+    Level -->|中等| L2[第二层: 分类概览]
+    Level -->|复杂| L3[第三层: 详细分析]
+
+    L1 --> Render1[渲染摘要卡片]
+    L2 --> Render2[渲染分类图表]
+    L3 --> Render3[渲染详细视图]
+
+    Render1 --> Interact{用户交互}
+    Render2 --> Interact
+    Render3 --> Interact
+
+    Interact -->|下钻| DrillDown[进入下一层级]
+    DrillDown --> SelectChart[自适应选择图表类型]
+    SelectChart --> Optimize[布局优化]
+    Optimize --> Render[渲染新视图]
+    Render --> Interact
+
+    Interact -->|筛选| Filter[应用筛选条件]
+    Filter --> Refresh[刷新数据]
+    Refresh --> Render
+
+    Interact -->|返回| GoBack[返回上一层]
+    GoBack --> Render
+
+    Interact -->|完成| End([结束])

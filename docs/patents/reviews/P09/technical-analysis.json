@@ -1,0 +1,109 @@
+{
+  "patent_id": "P09",
+  "patent_dir": "docs/patents/patents/P09-财务健康评分",
+  "disclaimer": "⚠️ 以下为AI辅助分析意见,非最终法律结论",
+  "analysis": {
+    "technical_features": {
+      "name": "技术特征提取",
+      "type": "AI分析",
+      "features": [
+        {
+          "type": "算法",
+          "name": "财务健康综合评分",
+          "description": "财务健康综合评分\n   输入:用户财务数据 D\n   输出:健康评分 S ∈ [0, 100]\n\n   评分维度:\n   1. 收支平衡(20分):\n      - 计算:结余率 = (收入-支出)/收入\n      - 评分:结余率>20% → 20分\n              结余率10-20% → 15分\n              结余率0-10% → 10分..."
+        },
+        {
+          "type": "算法",
+          "name": "预警级别判定",
+          "description": "预警级别判定\n   输入:预算执行情况、消费速度、剩余天数\n   输出:预警级别 L ∈ {正常,提示,警告,严重}\n\n   预警规则:\n   1. 正常(绿色):\n      - 条件:消费进度 < 时间进度 + 10%\n      - 示例:月中消费40%,时间进度50%\n      - 操作:无需提醒\n\n   2. 提示(黄色):\n      - 条件:消费进度 > 时间进度 + 10%..."
+        },
+        {
+          "type": "算法",
+          "name": "预算耗尽预测",
+          "description": "预算耗尽预测\n   输入:当前消费速度、剩余预算、剩余天数\n   输出:预计耗尽日期\n\n   预测方法:\n   1. 计算日均消费:avg = 已消费金额 / 已过天数\n   2. 预计耗尽天数:days = 剩余预算 / avg\n   3. 预计耗尽日期:date = 今天 + days\n   4. 如果days < 7,触发预警\n   ```\n\n**技术创新点**:\n- 四级预警:精细化预警管..."
+        },
+        {
+          "type": "算法",
+          "name": "财务问题识别",
+          "description": "财务问题识别\n   输入:财务健康评分 S,各维度分数 D\n   输出:问题列表 P\n\n   诊断规则:\n   1. 收支失衡:结余率<0%\n      - 问题:入不敷出\n      - 建议:增加收入或减少支出\n\n   2. 预算超支:执行率>120%\n      - 问题:预算控制不力\n      - 建议:调整预算或控制消费\n\n   3. 储蓄不足:储蓄率<10%\n      - 问题:缺..."
+        },
+        {
+          "type": "算法",
+          "name": "目标智能分解",
+          "description": "目标智能分解\n   输入:长期目标 G,目标金额 A,目标期限 T\n   输出:分解计划 P\n\n   分解策略:\n   1. 储蓄目标:\n      - 月度目标 = A / T(月)\n      - 周度目标 = 月度目标 / 4\n      - 日度目标 = 月度目标 / 30\n\n   2. 减支目标:\n      - 识别可削减分类\n      - 设置分类预算上限\n      - 逐月递减..."
+        }
+      ]
+    },
+    "technical_problem": {
+      "name": "技术问题识别",
+      "type": "AI判断",
+      "technical_problems": [],
+      "business_problems": [],
+      "risk_level": "high"
+    },
+    "technical_effects": {
+      "name": "技术效果分析",
+      "type": "AI判断",
+      "technical_effects": [
+        {
+          "keyword": "准确率",
+          "context": "...:提前7天预警,预警及时性显著提升\n\n3. **建议准确性提升**:\n   - 传统方案:通用建议,准确率较低\n   - 本发明:个性化建议,建议准确率较高\n\n4. **目标达成率提升**:\n   - 传统...",
+          "quantified": false
+        }
+      ],
+      "business_effects": [],
+      "quantified": false,
+      "risk_level": "low"
+    },
+    "technical_means": {
+      "name": "技术手段分析",
+      "type": "AI分析",
+      "algorithms": {
+        "count": 6,
+        "found": true
+      },
+      "data_structures": [
+        "struct",
+        "数据结构"
+      ],
+      "system_architecture": [
+        "架构",
+        "模块"
+      ]
+    }
+  },
+  "ai_opinions": [
+    {
+      "type": "no_technical_problem",
+      "severity": "high",
+      "message": "AI判断:未明确识别到技术问题",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节",
+      "recommendation": "必须明确说明解决的技术问题"
+    },
+    {
+      "type": "effect_not_quantified",
+      "severity": "medium",
+      "message": "AI判断:技术效果未量化",
+      "legal_basis": "《专利审查指南》第二部分第二章第2.2.3节",
+      "recommendation": "建议量化技术效果,如'响应时间<80ms'、'准确率>95%'"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "high",
+      "type": "必须改进",
+      "message": "发现1个高风险问题,必须解决",
+      "items": [
+        "必须明确说明解决的技术问题"
+      ]
+    },
+    {
+      "priority": "medium",
+      "type": "建议优化",
+      "message": "发现1个中风险问题,建议优化",
+      "items": [
+        "建议量化技术效果,如'响应时间<80ms'、'准确率>95%'"
+      ]
+    }
+  ]
+}

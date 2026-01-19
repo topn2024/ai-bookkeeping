@@ -1,0 +1,163 @@
+{
+  "patent_id": "P09",
+  "patent_dir": "docs/patents/patents/P09-财务健康评分",
+  "checks": {
+    "file_structure": {
+      "name": "文件结构检查",
+      "passed": true,
+      "details": {
+        "specification.md": {
+          "description": "说明书",
+          "exists": true,
+          "path": "docs/patents/patents/P09-财务健康评分/specification.md"
+        },
+        "claims.md": {
+          "description": "权利要求书",
+          "exists": true,
+          "path": "docs/patents/patents/P09-财务健康评分/claims.md"
+        },
+        "abstract.md": {
+          "description": "摘要",
+          "exists": true,
+          "path": "docs/patents/patents/P09-财务健康评分/abstract.md"
+        },
+        "metadata.json": {
+          "description": "元数据",
+          "exists": true,
+          "path": "docs/patents/patents/P09-财务健康评分/metadata.json"
+        }
+      }
+    },
+    "specification": {
+      "name": "说明书结构检查",
+      "passed": false,
+      "details": {
+        "技术领域": {
+          "found": false,
+          "required": true
+        },
+        "背景技术": {
+          "found": false,
+          "required": true
+        },
+        "发明内容": {
+          "found": false,
+          "required": true
+        },
+        "附图说明": {
+          "found": false,
+          "required": true
+        },
+        "具体实施方式": {
+          "found": false,
+          "required": true
+        }
+      }
+    },
+    "claims": {
+      "name": "权利要求书结构检查",
+      "passed": true,
+      "details": {
+        "independent_claims": {
+          "count": 2,
+          "found": true
+        },
+        "total_claims": 9
+      }
+    },
+    "abstract": {
+      "name": "摘要检查",
+      "passed": true,
+      "details": {
+        "length": {
+          "characters": 255,
+          "recommended_range": "150-300字"
+        }
+      }
+    },
+    "figures": {
+      "name": "附图检查",
+      "passed": true,
+      "details": {
+        "figures_dir_exists": true,
+        "image_files": {
+          "png_jpg_count": 0,
+          "svg_count": 4,
+          "files": [
+            "fig-02-algorithm-flow.svg",
+            "fig-03-data-structure.svg",
+            "fig-04-sequence.svg",
+            "fig-01-system-architecture.svg"
+          ]
+        }
+      }
+    }
+  },
+  "issues": [
+    {
+      "type": "missing_section",
+      "severity": "error",
+      "section": "技术领域",
+      "message": "说明书缺少必需章节: 技术领域",
+      "legal_basis": "《专利审查指南》第二部分第二章第2.1节"
+    },
+    {
+      "type": "missing_section",
+      "severity": "error",
+      "section": "背景技术",
+      "message": "说明书缺少必需章节: 背景技术",
+      "legal_basis": "《专利审查指南》第二部分第二章第2.1节"
+    },
+    {
+      "type": "missing_section",
+      "severity": "error",
+      "section": "发明内容",
+      "message": "说明书缺少必需章节: 发明内容",
+      "legal_basis": "《专利审查指南》第二部分第二章第2.1节"
+    },
+    {
+      "type": "missing_section",
+      "severity": "error",
+      "section": "附图说明",
+      "message": "说明书缺少必需章节: 附图说明",
+      "legal_basis": "《专利审查指南》第二部分第二章第2.1节"
+    },
+    {
+      "type": "missing_section",
+      "severity": "error",
+      "section": "具体实施方式",
+      "message": "说明书缺少必需章节: 具体实施方式",
+      "legal_basis": "《专利审查指南》第二部分第二章第2.1节"
+    }
+  ],
+  "warnings": [
+    {
+      "type": "missing_subsection",
+      "severity": "warning",
+      "section": "发明目的",
+      "message": "发明内容建议包含: 发明目的",
+      "legal_basis": "《专利审查指南》第二部分第二章第2.2.2节"
+    },
+    {
+      "type": "missing_subsection",
+      "severity": "warning",
+      "section": "技术方案",
+      "message": "发明内容建议包含: 技术方案",
+      "legal_basis": "《专利审查指南》第二部分第二章第2.2.2节"
+    },
+    {
+      "type": "svg_only",
+      "severity": "warning",
+      "message": "仅有SVG格式图片,专利局要求提交PNG或JPG格式",
+      "legal_basis": "《专利审查指南》第一部分第一章第4.2节"
+    }
+  ],
+  "passed": false,
+  "summary": {
+    "total_checks": 5,
+    "passed_checks": 4,
+    "total_issues": 5,
+    "total_warnings": 3,
+    "overall_passed": false
+  }
+}

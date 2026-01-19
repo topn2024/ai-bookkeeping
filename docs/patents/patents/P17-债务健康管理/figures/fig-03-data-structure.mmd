@@ -1,0 +1,67 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 债务记录 {
+        +UUID id
+        +Enum debt_type
+        +String creditor
+        +Decimal principal
+        +Decimal balance
+        +Float interest_rate
+        +Decimal min_payment
+        +Date due_date
+        +Decimal total_interest
+        +计算月利息() Decimal
+        +更新余额() void
+    }
+
+    class 健康评估 {
+        +Decimal total_debt
+        +Decimal monthly_income
+        +Float dti_ratio
+        +Float payment_ratio
+        +String health_level
+        +Integer health_score
+        +计算DTI() Float
+        +评估等级() String
+    }
+
+    class 还款策略 {
+        +Enum strategy_type
+        +List sorted_debts
+        +Decimal available_amount
+        +按余额排序() List
+        +按利率排序() List
+        +混合排序() List
+    }
+
+    class 还款计划 {
+        +Integer month
+        +Map min_payments
+        +Map extra_payments
+        +Decimal total_payment
+        +生成月计划() Map
+        +模拟还清时间() Integer
+    }
+
+    class 利息追踪 {
+        +Decimal monthly_interest
+        +Decimal total_paid_interest
+        +Decimal future_interest
+        +Decimal saving_potential
+        +计算月利息() Decimal
+        +对比策略() Map
+    }
+
+    class 动态调整 {
+        +Decimal new_income
+        +Decimal new_debt
+        +调整计划() void
+        +触发预警() void
+    }
+
+    债务记录 --> 健康评估 : 输入
+    健康评估 --> 还款策略 : 影响
+    还款策略 --> 还款计划 : 生成
+    还款计划 --> 利息追踪 : 计算
+    还款计划 --> 动态调整 : 触发
+

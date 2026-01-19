@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import '../pages/voice_chat_page.dart';
 import '../providers/global_voice_assistant_provider.dart';
 import '../providers/voice_coordinator_provider.dart';
 import '../services/global_voice_assistant_manager.dart';
+import '../services/voice/agent/hybrid_intent_router.dart' show NetworkStatus;
 import 'waveform_animation.dart';
 
 /// 全局悬浮球组件
@@ -36,6 +39,15 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
   late AnimationController _snapController;
   Animation<Offset>? _snapAnimation;
 
+  /// LLM是否可用
+  bool _isLLMAvailable = true;
+
+  /// 网络状态订阅
+  StreamSubscription<NetworkStatus>? _networkStatusSubscription;
+
+  /// 是否正在检查LLM状态
+  bool _isCheckingLLM = false;
+
   // 悬浮球尺寸
   static const double _ballSize = 50.0;
   static const double _ballSizeExpanded = 60.0;
@@ -59,13 +71,47 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final manager = ref.read(globalVoiceAssistantProvider);
       manager.onPermissionRequired = _handlePermissionRequired;
+
+      // 尝试订阅网络状态（如果预加载已完成）
+      _trySubscribeNetworkStatus(manager);
     });
+  }
+
+  /// 尝试订阅网络状态流
+  void _trySubscribeNetworkStatus(GlobalVoiceAssistantManager manager) {
+    // 已经订阅过了，跳过
+    if (_networkStatusSubscription != null) return;
+
+    // 尝试订阅网络状态变化
+    final stream = manager.networkStatusStream;
+    if (stream != null) {
+      // 获取当前LLM状态并更新UI
+      final currentStatus = manager.isLLMAvailable;
+      if (_isLLMAvailable != currentStatus) {
+        setState(() {
+          _isLLMAvailable = currentStatus;
+        });
+        debugPrint('[GlobalFloatingBall] 初始LLM状态: $_isLLMAvailable');
+      }
+
+      // 订阅后续状态变化
+      _networkStatusSubscription = stream.listen((status) {
+        if (mounted) {
+          setState(() {
+            _isLLMAvailable = status.llmAvailable;
+          });
+          debugPrint('[GlobalFloatingBall] LLM状态变化: $_isLLMAvailable');
+        }
+      });
+      debugPrint('[GlobalFloatingBall] 已订阅网络状态流');
+    }
   }
 
   @override
   void dispose() {
-    // 清理权限回调
+    // 清理权限回调和网络状态订阅
     ref.read(globalVoiceAssistantProvider).onPermissionRequired = null;
+    _networkStatusSubscription?.cancel();
     _snapController.dispose();
     super.dispose();
   }
@@ -118,13 +164,15 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
     final settings = ref.watch(floatingBallSettingsProvider);
     final shouldHide = ref.watch(shouldHideFloatingBallProvider);
 
-    // 初始化位置
+    // 初始化位置和网络状态订阅
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final positionNotifier = ref.read(floatingBallPositionProvider.notifier);
       if (!positionNotifier.isInitialized) {
         final screenSize = MediaQuery.of(context).size;
         positionNotifier.initializePosition(screenSize);
       }
+      // 预加载完成后尝试订阅网络状态
+      _trySubscribeNetworkStatus(manager);
     });
 
     if (shouldHide || !settings.enabled) {
@@ -166,8 +214,61 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
                 ),
               ],
             ),
-            child: Center(
-              child: _buildBallContent(manager.ballState, manager),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // 主内容
+                Center(
+                  child: _buildBallContent(manager.ballState, manager),
+                ),
+                // LLM不可用时的指示器
+                if (!_isLLMAvailable && manager.ballState == FloatingBallState.idle)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade600,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.wifi_off,
+                        size: 10,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                // 检查LLM状态时的加载指示器
+                if (_isCheckingLLM)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -274,6 +375,12 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
       return;
     }
 
+    // 如果正在检查LLM状态，忽略点击
+    if (_isCheckingLLM) {
+      debugPrint('[GlobalFloatingBall] 正在检查LLM状态，忽略点击');
+      return;
+    }
+
     // 如果已经在连续对话模式中，单击停止整个对话
     if (manager.isContinuousMode) {
       debugPrint('[GlobalFloatingBall] 单击结束连续对话，当前状态: $currentState');
@@ -286,11 +393,26 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
     if (currentState == FloatingBallState.idle ||
         currentState == FloatingBallState.success ||
         currentState == FloatingBallState.error) {
-      // 先给用户反馈和启动录音，再做异步初始化
-      // 这样可以避免用户说话时录音还没开始的问题
+
+      // 主动检查LLM可用性
+      setState(() => _isCheckingLLM = true);
+      final llmAvailable = await manager.checkLLMAvailability();
+      if (!mounted) return;
+      setState(() {
+        _isCheckingLLM = false;
+        _isLLMAvailable = llmAvailable;
+      });
+
+      // 如果LLM不可用，显示提示并进入简洁模式
+      if (!llmAvailable) {
+        debugPrint('[GlobalFloatingBall] LLM不可用，显示提示');
+        _showLLMUnavailableHint();
+      }
+
+      // 无论LLM是否可用，都开始录音（规则模式仍然可用）
       HapticFeedback.mediumImpact();
       manager.setContinuousMode(true);
-      debugPrint('[GlobalFloatingBall] 开始连续对话');
+      debugPrint('[GlobalFloatingBall] 开始连续对话 (LLM可用: $llmAvailable)');
 
       // 立即开始录音，不等待其他初始化
       manager.startRecording();
@@ -307,6 +429,33 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
         coordinator.onVoiceButtonPressed();
       }
     }
+  }
+
+  /// 显示LLM不可用提示
+  void _showLLMUnavailableHint() {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.wifi_off, color: Colors.white, size: 20),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '网络不太稳定，已切换到简洁模式\n记账功能正常，闲聊功能暂时不可用',
+                style: TextStyle(fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.orange.shade700,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   /// 显示强制结束菜单

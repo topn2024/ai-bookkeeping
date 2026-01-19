@@ -16,8 +16,8 @@ import 'voice/barge_in_detector.dart';
 import 'voice/ai_intent_decomposer.dart';
 import 'voice/smart_intent_recognizer.dart';
 import 'voice/llm_response_generator.dart';
-import 'voice/agent/agent.dart';
 import 'voice/intelligence_engine/intelligence_engine.dart';
+import 'voice/agent/hybrid_intent_router.dart' show NetworkStatus;
 import 'voice/adapters/bookkeeping_operation_adapter.dart';
 import 'voice/adapters/bookkeeping_feedback_adapter.dart';
 import 'voice_recognition_engine.dart';
@@ -69,11 +69,11 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 智能意图识别器（多层递进架构）
   final SmartIntentRecognizer _smartRecognizer;
 
-  /// 对话式智能体（边聊边做模式）
-  ConversationalAgent? _conversationalAgent;
-
   /// 智能引擎（多操作识别、双通道处理、智能聚合）
   IntelligenceEngine? _intelligenceEngine;
+
+  /// 网络状态提供者（缓存用于传递给IntelligenceEngine）
+  NetworkStatus? Function()? _networkStatusProvider;
 
   /// 是否启用对话式智能体模式
   bool _agentModeEnabled = false;
@@ -138,11 +138,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     BargeInDetector? bargeInDetector,
     AIIntentDecomposer? aiDecomposer,
     SmartIntentRecognizer? smartRecognizer,
-    ConversationalAgent? conversationalAgent,
     bool enableStreamingTTS = true,
     bool enableAgentMode = false,
-  }) : _conversationalAgent = conversationalAgent,
-       _agentModeEnabled = enableAgentMode,
+  }) : _agentModeEnabled = enableAgentMode,
        _recognitionEngine = recognitionEngine ?? VoiceRecognitionEngine(),
        _ttsService = ttsService ?? TTSService.instanceWith(enableStreaming: enableStreamingTTS),
        _disambiguationService = disambiguationService ?? EntityDisambiguationService(),
@@ -215,79 +213,6 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 使用对话式智能体处理语音输入
-  ///
-  /// 将语音输入传递给 IntelligenceEngine 进行处理，
-  /// 支持多操作识别、双通道处理和智能聚合
-  Future<VoiceSessionResult> _processWithAgent(String voiceInput) async {
-    try {
-      // 优先使用智能引擎
-      if (_intelligenceEngine != null) {
-        return await _processWithIntelligenceEngine(voiceInput);
-      }
-
-      // 降级到旧Agent
-      final agent = _conversationalAgent!;
-
-      // 记录命令历史
-      final command = VoiceCommand(
-        input: voiceInput,
-        timestamp: DateTime.now(),
-      );
-      _addToHistory(command);
-
-      // 使用智能体处理
-      final userInput = UserInput.fromVoice(voiceInput);
-      final response = await agent.process(userInput);
-
-      debugPrint('[VoiceCoordinator] Agent响应: type=${response.type}, '
-          'text=${response.text.substring(0, response.text.length > 50 ? 50 : response.text.length)}...');
-
-      // 根据响应类型处理
-      switch (response.type) {
-        case AgentResponseType.action:
-        case AgentResponseType.chat:
-        case AgentResponseType.hybrid:
-          // 播放语音响应
-          if (response.shouldSpeak) {
-            await _speakWithSkipCheck(response.text);
-          }
-          _sessionState = VoiceSessionState.idle;
-          notifyListeners();
-          return VoiceSessionResult.success(response.text, {
-            'agentMode': true,
-            'responseType': response.type.name,
-            'emotion': response.emotion,
-          });
-
-        case AgentResponseType.unknown:
-          // unknown 表示无法识别具体意图，但 Agent 仍提供了友好的引导回复
-          // 应该作为成功处理，而非错误
-          await _speakWithSkipCheck(response.text);
-          _sessionState = VoiceSessionState.idle;
-          notifyListeners();
-          return VoiceSessionResult.success(response.text, {
-            'agentMode': true,
-            'responseType': 'unknown',
-          });
-
-        case AgentResponseType.error:
-          await _speakWithSkipCheck(response.text);
-          _sessionState = VoiceSessionState.idle;
-          notifyListeners();
-          return VoiceSessionResult.error(response.text);
-      }
-    } catch (e) {
-      debugPrint('[VoiceCoordinator] Agent处理失败: $e');
-      _sessionState = VoiceSessionState.error;
-      notifyListeners();
-
-      // 降级到传统模式处理
-      debugPrint('[VoiceCoordinator] 降级到传统模式处理');
-      _agentModeEnabled = false;
-      return await processVoiceCommand(voiceInput);
-    }
-  }
 
   /// 使用智能引擎处理语音输入
   Future<VoiceSessionResult> _processWithIntelligenceEngine(String voiceInput) async {
@@ -326,11 +251,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('[VoiceCoordinator] IntelligenceEngine处理失败: $e');
-      // 降级到旧Agent
-      if (_conversationalAgent != null) {
-        return await _processWithAgent(voiceInput);
-      }
-      rethrow;
+      return VoiceSessionResult.error('处理失败: $e');
     }
   }
 
@@ -356,25 +277,21 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 是否启用对话式智能体模式
   bool get isAgentModeEnabled => _agentModeEnabled;
 
-  /// 获取对话式智能体（可能为null）
-  ConversationalAgent? get conversationalAgent => _conversationalAgent;
-
   /// 启用对话式智能体模式
   ///
   /// 对话式智能体支持"边聊边做"的自然交互，
   /// LLM优先识别意图，支持上下文关联和指代消解
   Future<void> enableAgentMode() async {
-    if (_conversationalAgent == null) {
-      _conversationalAgent = ConversationalAgent();
-      await _conversationalAgent!.initialize();
-    }
-
     // 初始化智能引擎
     if (_intelligenceEngine == null) {
       _intelligenceEngine = IntelligenceEngine(
         operationAdapter: BookkeepingOperationAdapter(),
         feedbackAdapter: BookkeepingFeedbackAdapter(),
       );
+      // 传递已缓存的网络状态提供者
+      if (_networkStatusProvider != null) {
+        _intelligenceEngine!.setNetworkStatusProvider(_networkStatusProvider);
+      }
     }
 
     _agentModeEnabled = true;
@@ -402,6 +319,17 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     debugPrint('[VoiceCoordinator] TTS播放跳过设置: $skip');
   }
 
+  /// 设置网络状态提供者
+  ///
+  /// 用于SmartIntentRecognizer判断是否使用LLM
+  /// 返回null时表示网络状态未知，将允许LLM调用
+  void setNetworkStatusProvider(NetworkStatus? Function()? provider) {
+    _networkStatusProvider = provider;
+    _smartRecognizer.networkStatusProvider = provider;
+    _intelligenceEngine?.setNetworkStatusProvider(provider);
+    debugPrint('[VoiceCoordinator] 网络状态提供者已${provider != null ? "设置" : "清除"}');
+  }
+
   /// 播放TTS（考虑跳过标志）
   ///
   /// 如果 _skipTTSPlayback 为 true，则跳过实际播放
@@ -418,9 +346,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   ///
   /// 在用户按下语音按钮时调用，预热网络连接和LLM服务
   void onVoiceButtonPressed() {
-    if (_agentModeEnabled && _conversationalAgent != null) {
-      _conversationalAgent!.onVoiceButtonPressed();
-    }
+    // 预热逻辑已集成到IntelligenceEngine中
   }
 
   /// 获取意图路由器（用于外部访问多意图检测等功能）
@@ -502,9 +428,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         return VoiceSessionResult.error(invalidReason);
       }
 
-      // 对话式智能体模式：使用 ConversationalAgent 处理
-      if (_agentModeEnabled && _conversationalAgent != null) {
-        return await _processWithAgent(voiceInput);
+      // 对话式智能体模式：使用 IntelligenceEngine 处理
+      if (_agentModeEnabled && _intelligenceEngine != null) {
+        return await _processWithIntelligenceEngine(voiceInput);
       }
 
       // 检查是否处于闲聊模式
@@ -2934,10 +2860,6 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
     // 释放打断检测器
     _bargeInDetector.dispose();
-
-    // 释放对话式智能体
-    _conversationalAgent?.dispose();
-    _conversationalAgent = null;
 
     // 清空智能引擎引用
     _intelligenceEngine = null;

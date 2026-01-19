@@ -1,0 +1,35 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> GetLoc[/获取当前位置/]
+    GetLoc --> Fuse[多源位置融合]
+    Fuse --> Accuracy{精度是否足够?}
+
+    Accuracy -->|否| Enhance[增强定位]
+    Enhance --> Fuse
+
+    Accuracy -->|是| CheckFence{是否进入<br/>地理围栏?}
+
+    CheckFence -->|否| Monitor[继续监控]
+    Monitor --> GetLoc
+
+    CheckFence -->|是| Identify[识别POI/商户]
+    Identify --> Match{匹配到商户?}
+
+    Match -->|否| Learn[学习新位置]
+    Learn --> Context
+    Match -->|是| Context[推断消费上下文]
+
+    Context --> History[查询历史消费]
+    History --> Predict[预测消费类别和金额]
+
+    Predict --> Generate[生成记账建议]
+    Generate --> Notify[/推送通知给用户/]
+
+    Notify --> Response{用户响应}
+    Response -->|确认| Record[创建记账记录]
+    Response -->|修改| Edit[用户编辑]
+    Edit --> Record
+    Response -->|忽略| End
+
+    Record --> Update[更新位置-商户映射]
+    Update --> End([结束])

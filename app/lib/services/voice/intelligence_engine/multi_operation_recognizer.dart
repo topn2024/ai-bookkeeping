@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../smart_intent_recognizer.dart';
+import '../agent/hybrid_intent_router.dart' show NetworkStatus;
 
 /// 多操作识别器
 ///
@@ -14,6 +15,11 @@ class MultiOperationRecognizer {
   MultiOperationRecognizer({
     SmartIntentRecognizer? recognizer,
   }) : _recognizer = recognizer ?? SmartIntentRecognizer();
+
+  /// 设置网络状态提供者
+  void setNetworkStatusProvider(NetworkStatus? Function()? provider) {
+    _recognizer.networkStatusProvider = provider;
+  }
 
   /// 识别多操作
   Future<MultiOperationResult> recognize(
@@ -42,8 +48,10 @@ class MultiOperationRecognizer {
     debugPrint('[MultiOperationRecognizer] 识别成功: ${filteredOperations.length}个操作');
 
     return MultiOperationResult(
+      resultType: result.resultType,
       operations: filteredOperations,
       chatContent: cleanedChatContent,
+      clarifyQuestion: result.clarifyQuestion,
       confidence: result.confidence,
       source: result.source,
       originalInput: result.originalInput,

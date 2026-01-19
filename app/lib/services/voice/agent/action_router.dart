@@ -15,9 +15,19 @@ import '../../../models/transaction.dart';
 import '../../voice_navigation_service.dart';
 import '../../voice_navigation_executor.dart';
 import '../entity_disambiguation_service.dart';
+import '../unified_intent_type.dart';
 import 'action_registry.dart';
+import 'actions/config_actions.dart';
+import 'actions/vault_actions.dart';
+import 'actions/money_age_actions.dart';
+import 'actions/data_actions.dart';
+import 'actions/habit_actions.dart';
+import 'actions/share_actions.dart';
+import 'actions/system_actions.dart';
+import 'actions/automation_actions.dart';
 import 'hybrid_intent_router.dart';
 import 'safety_confirmation_service.dart';
+import 'action_auto_registry.dart';
 
 /// 行为路由器
 ///
@@ -44,21 +54,70 @@ class ActionRouter {
   /// 配置修改回调
   Future<void> Function(String key, dynamic value)? onConfigChange;
 
+  /// 是否使用自动注册
+  final bool _useAutoRegistry;
+
   ActionRouter({
     IDatabaseService? databaseService,
     VoiceNavigationService? navigationService,
     ActionRegistry? registry,
     EntityDisambiguationService? disambiguationService,
+    bool useAutoRegistry = false,
   })  : _databaseService = databaseService ?? sl<IDatabaseService>(),
         _navigationService = navigationService ?? VoiceNavigationService(),
         _registry = registry ?? ActionRegistry.instance,
-        _disambiguationService = disambiguationService ?? EntityDisambiguationService() {
+        _disambiguationService = disambiguationService ?? EntityDisambiguationService(),
+        _useAutoRegistry = useAutoRegistry {
     // 注册所有内置行为
     _registerBuiltInActions();
   }
 
+  /// 使用自动注册创建ActionRouter
+  ///
+  /// 这是推荐的创建方式，利用声明式的Action注册机制
+  factory ActionRouter.withAutoRegistry({
+    IDatabaseService? databaseService,
+    VoiceNavigationService? navigationService,
+    void Function(String route)? onNavigate,
+    Future<void> Function(String key, dynamic value)? onConfigChange,
+  }) {
+    final db = databaseService ?? sl<IDatabaseService>();
+    final nav = navigationService ?? VoiceNavigationService();
+
+    // 初始化ActionProvider
+    initializeActionProviders();
+
+    // 创建依赖容器
+    final deps = ActionDependencies(
+      databaseService: db,
+      navigationService: nav,
+      onNavigate: onNavigate,
+      onConfigChange: onConfigChange,
+    );
+
+    // 执行自动注册
+    ActionAutoRegistry.instance.registerAll(deps);
+
+    // 创建Router（跳过手动注册）
+    final router = ActionRouter(
+      databaseService: db,
+      navigationService: nav,
+      useAutoRegistry: true,
+    );
+    router.onNavigate = onNavigate;
+    router.onConfigChange = onConfigChange;
+
+    return router;
+  }
+
   /// 注册内置行为
   void _registerBuiltInActions() {
+    // 如果使用自动注册，跳过手动注册
+    if (_useAutoRegistry) {
+      debugPrint('[ActionRouter] 使用自动注册，跳过手动注册');
+      return;
+    }
+
     // 交易行为
     _registry.registerAll([
       _TransactionExpenseAction(_databaseService),
@@ -83,6 +142,57 @@ class ActionRouter {
       _AccountConfigAction(onConfigChange),
       _ReminderConfigAction(onConfigChange),
       _ThemeConfigAction(onConfigChange),
+      // 新增配置操作
+      CategoryConfigAction(_databaseService),
+      TagConfigAction(_databaseService),
+      LedgerConfigAction(_databaseService),
+      MemberConfigAction(_databaseService),
+      CreditCardConfigAction(_databaseService),
+      SavingsGoalConfigAction(_databaseService),
+      RecurringTransactionConfigAction(_databaseService),
+    ]);
+
+    // 高级功能行为
+    _registry.registerAll([
+      // 小金库操作
+      VaultQueryAction(_databaseService),
+      VaultCreateAction(_databaseService),
+      VaultTransferAction(_databaseService),
+      VaultBudgetAction(_databaseService),
+      // 钱龄操作
+      MoneyAgeQueryAction(_databaseService),
+      MoneyAgeReminderAction(_databaseService),
+      MoneyAgeReportAction(_databaseService),
+      // 数据操作
+      DataExportAction(_databaseService),
+      DataBackupAction(_databaseService),
+      DataStatisticsAction(_databaseService),
+      // 习惯操作
+      HabitQueryAction(_databaseService),
+      HabitAnalysisAction(_databaseService),
+      HabitReminderAction(_databaseService),
+      // 分享操作
+      ShareTransactionAction(_databaseService),
+      ShareReportAction(_databaseService),
+      ShareBudgetAction(_databaseService),
+    ]);
+
+    // 系统操作
+    _registry.registerAll([
+      SystemSettingsAction(_databaseService),
+      SystemAboutAction(),
+      SystemHelpAction(),
+      SystemFeedbackAction(),
+    ]);
+
+    // 自动化操作
+    _registry.registerAll([
+      ScreenRecognitionAction(_databaseService),
+      AlipayBillSyncAction(_databaseService),
+      WeChatBillSyncAction(_databaseService),
+      BankBillSyncAction(_databaseService),
+      EmailBillParseAction(_databaseService),
+      ScheduledBookkeepingAction(_databaseService),
     ]);
 
     debugPrint('[ActionRouter] 注册了 ${_registry.allActionIds.length} 个内置行为');
@@ -147,6 +257,69 @@ class ActionRouter {
         actionId: action.id,
       );
     }
+  }
+
+  /// 使用统一意图类型执行
+  ///
+  /// 提供基于 [UnifiedIntentType] 的执行入口，支持新的统一意图系统
+  Future<ActionResult> executeByIntentType(
+    UnifiedIntentType intentType, {
+    Map<String, dynamic> params = const {},
+    String? rawInput,
+  }) async {
+    debugPrint('[ActionRouter] 使用统一意图类型执行: ${intentType.id}');
+
+    // 通过意图ID查找对应的Action
+    final action = _registry.findById(intentType.id);
+
+    if (action == null) {
+      debugPrint('[ActionRouter] 未找到对应的Action: ${intentType.id}');
+      return ActionResult.unsupported(intentType.id);
+    }
+
+    // 合并参数
+    final entities = Map<String, dynamic>.from(params);
+    if (rawInput != null) {
+      entities['_rawInput'] = rawInput;
+    }
+
+    // 对于需要目标记录的操作，使用消歧服务解析指代
+    if (_needsDisambiguation(action.id, entities) && rawInput != null) {
+      debugPrint('[ActionRouter] 需要消歧: ${action.id}');
+      final disambiguationResult = await _disambiguateTargetWithResult(rawInput, entities);
+
+      if (disambiguationResult.success) {
+        return await action.execute(disambiguationResult.entities!);
+      } else {
+        return ActionResult.needParams(
+          missing: ['transactionId'],
+          prompt: disambiguationResult.prompt ?? '要操作哪笔记录？',
+          actionId: action.id,
+        );
+      }
+    }
+
+    // 执行行为
+    try {
+      return await action.execute(entities);
+    } catch (e) {
+      debugPrint('[ActionRouter] 执行失败: $e');
+      return ActionResult.failure(
+        '执行失败: ${e.toString()}',
+        actionId: action.id,
+      );
+    }
+  }
+
+  /// 根据统一意图结果执行
+  ///
+  /// 接收 [UnifiedIntentResult] 并执行对应的行为
+  Future<ActionResult> executeUnifiedIntent(UnifiedIntentResult intentResult) async {
+    return executeByIntentType(
+      intentResult.intentType,
+      params: intentResult.slots,
+      rawInput: intentResult.rawInput,
+    );
   }
 
   /// 检查是否需要消歧

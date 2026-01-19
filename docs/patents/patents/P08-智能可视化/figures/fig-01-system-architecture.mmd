@@ -1,0 +1,40 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 数据层
+        RAW[原始财务数据]
+        AGG[聚合数据]
+        CACHE[可视化缓存]
+    end
+
+    subgraph 分析层
+        CONTEXT[上下文分析]
+        PATTERN[模式识别]
+        PRIORITY[优先级计算]
+    end
+
+    subgraph 可视化引擎
+        ADAPT[自适应选择器]
+        CHART[图表生成器]
+        LAYOUT[布局优化器]
+    end
+
+    subgraph 交互层
+        PROG[渐进式披露]
+        DRILL[下钻导航]
+        FILTER[智能筛选]
+    end
+
+    RAW --> AGG
+    AGG --> CACHE
+
+    CACHE --> CONTEXT
+    CONTEXT --> PATTERN
+    PATTERN --> PRIORITY
+
+    PRIORITY --> ADAPT
+    ADAPT --> CHART
+    CHART --> LAYOUT
+
+    LAYOUT --> PROG
+    PROG --> DRILL
+    DRILL --> FILTER

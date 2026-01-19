@@ -1,0 +1,250 @@
+{
+  "patent_id": "P01",
+  "patent_name": "基于FIFO资源池的钱龄计算方法及系统",
+  "review_date": "2026-01-19",
+  "reviewer": "AI辅助审查系统 v2.0",
+  "scores": {
+    "legal_compliance": {
+      "total_score": 24,
+      "max_score": 30,
+      "weight": 0.30,
+      "weighted_score": 7.2,
+      "sub_scores": {
+        "novelty": {
+          "score": 8,
+          "max_score": 10,
+          "comments": "FIFO资源池在个人财务管理中的应用具有新颖性，'钱龄'概念创新"
+        },
+        "inventiveness": {
+          "score": 11,
+          "max_score": 15,
+          "comments": "双端队列+增量计算+缓存机制的组合具有创造性，技术效果显著"
+        },
+        "practicality": {
+          "score": 5,
+          "max_score": 5,
+          "comments": "技术方案可实施，实施例详细，可重现性强"
+        }
+      }
+    },
+    "technical_nature": {
+      "total_score": 22,
+      "max_score": 25,
+      "weight": 0.25,
+      "weighted_score": 5.5,
+      "sub_scores": {
+        "technical_problem": {
+          "score": 7,
+          "max_score": 8,
+          "comments": "技术问题识别清晰，量化充分，5个核心技术问题"
+        },
+        "technical_means": {
+          "score": 7,
+          "max_score": 8,
+          "comments": "技术手段与问题对应良好，算法描述清晰"
+        },
+        "technical_effect": {
+          "score": 8,
+          "max_score": 9,
+          "comments": "技术效果量化充分，提升幅度显著（99%、86.7%等）"
+        }
+      }
+    },
+    "document_quality": {
+      "total_score": 16,
+      "max_score": 20,
+      "weight": 0.20,
+      "weighted_score": 3.2,
+      "sub_scores": {
+        "specification": {
+          "score": 7,
+          "max_score": 8,
+          "comments": "结构完整，6个实施例，技术效果对比详细，但背景技术分析不足"
+        },
+        "claims": {
+          "score": 6,
+          "max_score": 8,
+          "comments": "独立权利要求缺少核心技术特征，保护范围可能过窄"
+        },
+        "drawings": {
+          "score": 3,
+          "max_score": 4,
+          "comments": "4幅附图覆盖全面，但格式需转换为PNG/JPG"
+        }
+      }
+    },
+    "prior_art_comparison": {
+      "total_score": 11,
+      "max_score": 15,
+      "weight": 0.15,
+      "weighted_score": 1.65,
+      "sub_scores": {
+        "novelty_search": {
+          "score": 6,
+          "max_score": 8,
+          "comments": "Web检索完成，发现FIFO会计方法和个人财务管理软件，但需补充CNIPA检索"
+        },
+        "inventiveness_search": {
+          "score": 5,
+          "max_score": 7,
+          "comments": "对比文件分析清晰，区别特征明确，但创造性论证需强化"
+        }
+      }
+    },
+    "business_value": {
+      "total_score": 8,
+      "max_score": 10,
+      "weight": 0.10,
+      "weighted_score": 0.8,
+      "sub_scores": {
+        "market_demand": {
+          "score": 4,
+          "max_score": 5,
+          "comments": "个人财务管理市场规模大，'钱龄'概念可作为差异化特征"
+        },
+        "implementation_feasibility": {
+          "score": 4,
+          "max_score": 5,
+          "comments": "技术方案清晰，算法复杂度低，适合移动端实现"
+        }
+      }
+    }
+  },
+  "overall_score": 81,
+  "overall_max_score": 100,
+  "risk_level": "low",
+  "estimated_success_rate": "85-95%",
+  "key_issues": [
+    {
+      "id": 1,
+      "type": "claims",
+      "severity": "high",
+      "title": "权利要求保护范围不足",
+      "description": "独立权利要求缺少核心技术特征（双端队列、增量计算、缓存机制）",
+      "impact": "可能导致保护范围过窄，容易被规避",
+      "recommendation": "在独立权利要求中增加核心技术特征，增加中间层次从属权利要求"
+    },
+    {
+      "id": 2,
+      "type": "prior_art",
+      "severity": "high",
+      "title": "现有技术检索不充分",
+      "description": "仅完成Web检索，未检索中国专利数据库（CNIPA）",
+      "impact": "可能遗漏相关现有技术，影响新颖性和创造性评估",
+      "recommendation": "在CNIPA检索相关专利，关键词：资金追踪、资金年龄、FIFO、个人财务管理"
+    },
+    {
+      "id": 3,
+      "type": "drawings",
+      "severity": "high",
+      "title": "附图格式问题",
+      "description": "仅有SVG格式，专利局要求PNG或JPG格式",
+      "impact": "不符合专利局形式要求，需要补正",
+      "recommendation": "转换图片格式为PNG（300dpi）或JPG"
+    },
+    {
+      "id": 4,
+      "type": "specification",
+      "severity": "medium",
+      "title": "背景技术分析不足",
+      "description": "缺少对现有个人财务管理软件的具体分析",
+      "impact": "可能影响创造性论证的说服力",
+      "recommendation": "列举2-3个现有产品，分析其技术缺陷，对比本发明优势"
+    },
+    {
+      "id": 5,
+      "type": "inventiveness",
+      "severity": "medium",
+      "title": "创造性论证不足",
+      "description": "需要强化组合方案的非显而易见性论证",
+      "impact": "可能在实质审查中被质疑创造性",
+      "recommendation": "论证为何本领域技术人员不会想到将FIFO应用于个人财务管理"
+    },
+    {
+      "id": 6,
+      "type": "claims",
+      "severity": "medium",
+      "title": "权利要求层次不足",
+      "description": "缺少中间层次的从属权利要求",
+      "impact": "保护层次单一，灵活性不足",
+      "recommendation": "增加双端队列实现、增量计算算法、缓存机制等从属权利要求"
+    },
+    {
+      "id": 7,
+      "type": "drawings",
+      "severity": "low",
+      "title": "附图说明简略",
+      "description": "附图说明不够详细，未详细说明各图的技术细节",
+      "impact": "可能影响审查员理解技术方案",
+      "recommendation": "补充附图说明，详细说明各图中的技术要素"
+    }
+  ],
+  "recommendations": [
+    {
+      "dimension": "权利要求",
+      "priority": "high",
+      "action": "修改独立权利要求1，增加核心技术特征（双端队列、增量计算、缓存机制）",
+      "expected_impact": "提升保护范围的稳定性和有效性"
+    },
+    {
+      "dimension": "现有技术检索",
+      "priority": "high",
+      "action": "在CNIPA检索相关专利，补充背景技术和现有技术对比",
+      "expected_impact": "充分评估新颖性和创造性风险"
+    },
+    {
+      "dimension": "附图",
+      "priority": "high",
+      "action": "转换图片格式为PNG（300dpi）或JPG",
+      "expected_impact": "符合专利局形式要求"
+    },
+    {
+      "dimension": "说明书",
+      "priority": "medium",
+      "action": "补充现有技术分析，列举2-3个现有产品，分析技术缺陷",
+      "expected_impact": "增强创造性论证的说服力"
+    },
+    {
+      "dimension": "创造性论证",
+      "priority": "medium",
+      "action": "强化组合方案的非显而易见性论证，说明协同效果",
+      "expected_impact": "降低实质审查中的创造性风险"
+    },
+    {
+      "dimension": "权利要求",
+      "priority": "medium",
+      "action": "增加中间层次从属权利要求（双端队列、增量计算、缓存机制）",
+      "expected_impact": "提升保护层次的灵活性"
+    }
+  ],
+  "strengths": [
+    "技术效果量化充分，对比明确（计算效率提升99%，准确率提升86.7%等）",
+    "'钱龄'概念新颖，具有创新性和实用价值",
+    "6个实施例覆盖主要应用场景，可实施性强",
+    "技术问题识别清晰，与解决方案对应良好",
+    "双端队列+增量计算+缓存机制的组合具有创造性"
+  ],
+  "weaknesses": [
+    "独立权利要求缺少核心技术特征，保护范围可能过窄",
+    "现有技术检索不充分，未检索CNIPA",
+    "附图格式不符合专利局要求",
+    "背景技术分析不足，缺少现有产品对比",
+    "创造性论证需要强化"
+  ],
+  "conclusion": {
+    "overall_assessment": "专利质量良好，具有较高的授权前景",
+    "success_rate": "85-95%",
+    "main_risks": [
+      "权利要求保护范围不足",
+      "现有技术检索不充分",
+      "创造性论证需要强化"
+    ],
+    "next_steps": [
+      "修改权利要求，增加核心技术特征",
+      "补充CNIPA检索",
+      "转换附图格式",
+      "强化创造性论证",
+      "咨询专业代理人进行最终审核"
+    ]
+  }
+}

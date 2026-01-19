@@ -1,0 +1,43 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant ASR as 语音识别
+    participant L1 as 精确规则层
+    participant L2 as 模糊规则层
+    participant L3 as LLM层
+    participant CACHE as 自学习缓存
+    participant EXEC as 执行引擎
+    participant TTS as 语音合成
+
+    U->>ASR: "帮我记一笔午餐花了35块"
+    ASR->>L1: 文本: 记一笔午餐花了35块
+
+    L1->>L1: 精确规则匹配
+    L1-->>L2: 未完全命中
+
+    L2->>L2: 模糊规则匹配
+    L2->>L2: 提取: 记账, 午餐, 35
+    L2-->>EXEC: 意图(记账, 餐饮, 35)
+
+    EXEC->>EXEC: 执行记账操作
+    EXEC-->>TTS: 已记录午餐支出35元
+
+    TTS-->>U: 播报确认
+
+    Note over U,TTS: 第二次交互 - LLM兜底
+
+    U->>ASR: "上周买菜总共花了多少"
+    ASR->>L1: 文本查询
+
+    L1-->>L2: 未命中
+    L2-->>L3: 未命中
+
+    L3->>L3: 调用LLM分析
+    L3->>L3: 解析: 查询, 上周, 买菜, 总额
+    L3->>CACHE: 添加新模式
+
+    L3-->>EXEC: 意图(查询, 时间范围, 类别)
+    EXEC->>EXEC: 执行查询
+    EXEC-->>TTS: 上周买菜共支出286元
+
+    TTS-->>U: 播报结果

@@ -1,0 +1,61 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 触发层
+        INPUT[消费意图输入]
+        AMOUNT[金额判定]
+        CATEGORY[分类判定]
+        URGENCY[紧急程度]
+    end
+
+    subgraph 冷静期引擎
+        TRIGGER[冷静期触发器]
+        PERIOD[时长计算器]
+        TIMER[倒计时器]
+        EXTEND[延长处理器]
+    end
+
+    subgraph 智能提醒
+        REMIND[提醒调度器]
+        CONTENT[内容生成器]
+        ASSIST[决策辅助]
+        NOTIFY[通知发送器]
+    end
+
+    subgraph 效果量化
+        STATS[统计引擎]
+        CANCEL[取消率计算]
+        SAVE[节省金额]
+        REPORT[效果报告]
+    end
+
+    subgraph 个性化调整
+        PROFILE[用户画像]
+        CONTROL[自控力评分]
+        ADAPTIVE[自适应调整]
+    end
+
+    INPUT --> AMOUNT
+    AMOUNT --> CATEGORY
+    CATEGORY --> URGENCY
+
+    URGENCY --> TRIGGER
+    TRIGGER --> PERIOD
+    PERIOD --> TIMER
+    TIMER --> EXTEND
+
+    TIMER --> REMIND
+    REMIND --> CONTENT
+    CONTENT --> ASSIST
+    ASSIST --> NOTIFY
+
+    NOTIFY --> STATS
+    STATS --> CANCEL
+    STATS --> SAVE
+    CANCEL --> REPORT
+    SAVE --> REPORT
+
+    STATS --> PROFILE
+    PROFILE --> CONTROL
+    CONTROL --> ADAPTIVE
+    ADAPTIVE --> PERIOD
+

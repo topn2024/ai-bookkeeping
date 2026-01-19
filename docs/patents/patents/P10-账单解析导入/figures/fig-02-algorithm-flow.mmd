@@ -1,0 +1,41 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Upload[/用户上传账单文件/]
+    Upload --> Size{文件大小判断}
+
+    Size -->|<1MB| Direct[直接处理]
+    Size -->|1-10MB| Split10[分10片处理]
+    Size -->|10-100MB| Split100[分100片处理]
+    Size -->|>100MB| Split1000[分1000片处理]
+
+    Direct --> Parse[解析交易记录]
+    Split10 --> Parallel[并行解析]
+    Split100 --> Parallel
+    Split1000 --> Parallel
+    Parallel --> Parse
+
+    Parse --> Amount[金额精度保护]
+    Amount --> DecimalConv[转换Decimal类型]
+    DecimalConv --> BankerRound[银行家舍入]
+    BankerRound --> RangeCheck[范围校验: 0~999,999,999.99]
+
+    RangeCheck --> Integrity[完整性校验]
+    Integrity --> Required{必填字段检查}
+    Required -->|缺失| Reject[标记异常]
+    Required -->|完整| Dedup[去重处理]
+
+    Dedup --> Hash[哈希快速预筛选]
+    Hash --> Bloom[布隆过滤器]
+    Bloom --> Similar{相似度>0.95?}
+    Similar -->|是| MarkDup[标记重复]
+    Similar -->|否| Keep[保留记录]
+
+    MarkDup --> Unify[统一数据模型]
+    Keep --> Unify
+    Reject --> Unify
+
+    Unify --> Compliance[合规检查]
+    Compliance --> Import[批量导入数据库]
+    Import --> Report[/生成导入报告/]
+    Report --> End([结束])
+
