@@ -447,7 +447,20 @@ class VoicePipelineController {
   /// 发送音频数据
   ///
   /// 将麦克风采集的音频数据发送到输入流水线
+  ///
+  /// 注意：listening 和 speaking 状态都需要传递音频
+  /// - listening: 正常识别用户输入
+  /// - speaking: 支持打断检测（BargeInDetector + EchoFilter 会过滤回声）
   int _feedDataCount = 0;
+
+  /// 高振幅打断阈值（平均振幅超过此值认为用户在大声说话）
+  static const int _bargeInAmplitudeThreshold = 5000;
+
+  /// 高振幅连续帧计数器（需要连续多帧高振幅才触发，避免误触发）
+  int _highAmplitudeFrameCount = 0;
+
+  /// 触发打断所需的连续高振幅帧数
+  static const int _bargeInFrameThreshold = 3;
 
   void feedAudioData(Uint8List audioData) {
     _feedDataCount++;
@@ -459,11 +472,62 @@ class VoicePipelineController {
       debugPrint('[VoicePipelineController] feedAudioData #$_feedDataCount, 状态=$_state, inputState=$inputState');
     }
 
-    if (_state == VoicePipelineState.listening) {
+    // listening 和 speaking 状态都传递音频
+    // speaking 状态下的音频用于打断检测
+    if (_state == VoicePipelineState.listening || _state == VoicePipelineState.speaking) {
       _inputPipeline.feedAudioData(audioData);
+
+      // speaking 状态下检测高振幅打断
+      if (_state == VoicePipelineState.speaking) {
+        _checkAmplitudeBargeIn(audioData);
+      }
     } else if (shouldLog) {
-      debugPrint('[VoicePipelineController] 状态=$_state，跳过feedAudioData（等待状态变为listening）');
+      debugPrint('[VoicePipelineController] 状态=$_state，跳过feedAudioData（等待状态变为listening或speaking）');
     }
+  }
+
+  /// 检测基于振幅的打断
+  /// 如果在TTS播放期间检测到连续的高振幅音频，说明用户在大声说话，触发打断
+  void _checkAmplitudeBargeIn(Uint8List audioData) {
+    // 计算平均振幅
+    int sumAmplitude = 0;
+    if (audioData.length >= 2) {
+      for (int i = 0; i < audioData.length - 1; i += 2) {
+        int sample = audioData[i] | (audioData[i + 1] << 8);
+        if (sample > 32767) sample -= 65536;
+        sumAmplitude += sample.abs();
+      }
+    }
+    final avgAmplitude = audioData.length > 2 ? sumAmplitude ~/ (audioData.length ~/ 2) : 0;
+
+    // 检查是否超过阈值
+    if (avgAmplitude > _bargeInAmplitudeThreshold) {
+      _highAmplitudeFrameCount++;
+      if (_highAmplitudeFrameCount >= _bargeInFrameThreshold) {
+        debugPrint('[VoicePipelineController] 检测到高振幅打断: 平均振幅=$avgAmplitude, 连续帧=$_highAmplitudeFrameCount');
+        _highAmplitudeFrameCount = 0; // 重置计数器
+        _handleAmplitudeBargeIn();
+      }
+    } else {
+      _highAmplitudeFrameCount = 0; // 重置计数器
+    }
+  }
+
+  /// 处理振幅触发的打断
+  void _handleAmplitudeBargeIn() {
+    if (_state != VoicePipelineState.speaking) return;
+
+    debugPrint('[VoicePipelineController] 执行振幅打断');
+
+    // 创建一个打断结果
+    final result = BargeInResult(
+      triggered: true,
+      layer: BargeInLayer.layer1VadAsr, // 使用layer1标记
+      text: '[振幅打断]',
+      similarity: 0.0,
+    );
+
+    _handleBargeIn(result);
   }
 
   /// 手动触发处理（用于测试或非语音输入）

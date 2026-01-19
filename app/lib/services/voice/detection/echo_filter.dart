@@ -36,6 +36,9 @@ class EchoFilter {
   /// TTS是否正在播放
   bool _isTTSPlaying = false;
 
+  /// TTS开始时间
+  DateTime? _ttsStartTime;
+
   /// TTS结束时间
   DateTime? _ttsEndTime;
 
@@ -58,6 +61,14 @@ class EchoFilter {
     if (_ttsEndTime == null) return false;
     final elapsed = DateTime.now().difference(_ttsEndTime!);
     return elapsed.inMilliseconds < _config.echoSilenceWindowMs;
+  }
+
+  /// 是否在TTS播放的早期阶段（前1秒）
+  /// 这个阶段最容易出现回声误识别，不应该允许打断
+  bool get isInTTSEarlyPhase {
+    if (!_isTTSPlaying || _ttsStartTime == null) return false;
+    final elapsed = DateTime.now().difference(_ttsStartTime!);
+    return elapsed.inMilliseconds < 1000; // TTS开始后1秒内
   }
 
   /// 是否在回声过滤冷却期内
@@ -97,6 +108,7 @@ class EchoFilter {
   void onTTSStarted(String text) {
     _currentTTSText = text;
     _isTTSPlaying = true;
+    _ttsStartTime = DateTime.now();
     _ttsEndTime = null;
     debugPrint('[EchoFilter] TTS开始: "${_truncate(text, 20)}"');
   }
@@ -133,21 +145,10 @@ class EchoFilter {
       return EchoFilterResult.pass;
     }
 
-    // VAD检测到语音时，用户很可能在说话，大幅放宽过滤
-    // 参考chat-companion-app: 只过滤非常短的文本
-    if (_vadSpeechDetected) {
-      // VAD检测到语音，只过滤1个字以下的噪音
-      if (cleanText.length < 2) {
-        _filteredCount++;
-        debugPrint('[EchoFilter] VAD模式-极短文本过滤: "$asrText"');
-        return EchoFilterResult.filtered;
-      }
-      // VAD模式下，几乎不做其他过滤，让用户输入通过
-      debugPrint('[EchoFilter] VAD检测到语音，放行: "$asrText"');
-      return EchoFilterResult.pass;
-    }
+    // TTS正在播放或在静默窗口内，需要仔细检查回声
+    // 注意：TTS回声会触发VAD，所以不能简单地因为VAD检测到语音就放行
 
-    // 没有VAD的情况，做基本的短文本过滤
+    // 首先做基本的短文本过滤
     if (cleanText.length < _config.echoMinTextLength) {
       _filteredCount++;
       _lastEchoFilterTime = DateTime.now();
@@ -155,18 +156,43 @@ class EchoFilter {
       return EchoFilterResult.filtered;
     }
 
-    // 简单的相似度检查（TTS正在播放或在静默窗口内）
+    // 相似度检查
     if (_currentTTSText.isNotEmpty) {
-      final similarity = _similarity.calculate(cleanText, _cleanText(_currentTTSText));
-      // 使用较高的阈值（0.7），宁可漏过回声也不误杀用户输入
-      final threshold = 0.7;
+      final cleanTTS = _cleanText(_currentTTSText);
+      final similarity = _similarity.calculate(cleanText, cleanTTS);
 
-      if (similarity > threshold) {
+      // 检查ASR结果是否是TTS文本的子串（回声特征）
+      final isSubstring = cleanTTS.contains(cleanText) && cleanText.length >= 2;
+      // 检查ASR结果是否以TTS文本开头（回声特征）
+      final isPrefix = cleanTTS.startsWith(cleanText) && cleanText.length >= 2;
+
+      if (isSubstring || isPrefix) {
         _filteredCount++;
         _lastEchoFilterTime = DateTime.now();
-        debugPrint('[EchoFilter] 相似度过滤: "$asrText" (sim=$similarity > $threshold)');
+        debugPrint('[EchoFilter] 子串/前缀匹配过滤: "$asrText" (isSubstring=$isSubstring, isPrefix=$isPrefix)');
         return EchoFilterResult.filtered;
       }
+
+      // 高相似度检查
+      if (similarity > 0.5) {
+        _filteredCount++;
+        _lastEchoFilterTime = DateTime.now();
+        debugPrint('[EchoFilter] 相似度过滤: "$asrText" (sim=$similarity > 0.5)');
+        return EchoFilterResult.filtered;
+      }
+    }
+
+    // VAD检测到语音时放行（但上面的子串/前缀/相似度检查已经过了）
+    if (_vadSpeechDetected) {
+      debugPrint('[EchoFilter] VAD检测到语音，通过其他检查后放行: "$asrText"');
+      return EchoFilterResult.pass;
+    }
+
+    // 在静默窗口内但没有VAD，标记为可疑
+    if (isInSilenceWindow && !_vadSpeechDetected) {
+      _suspiciousCount++;
+      debugPrint('[EchoFilter] 静默窗口内无VAD，标记可疑: "$asrText"');
+      return EchoFilterResult.suspicious;
     }
 
     return EchoFilterResult.pass;
@@ -194,6 +220,7 @@ class EchoFilter {
   void reset() {
     _currentTTSText = '';
     _isTTSPlaying = false;
+    _ttsStartTime = null;
     _ttsEndTime = null;
     _vadSpeechDetected = false;
     _lastEchoFilterTime = null;

@@ -138,6 +138,7 @@ class BargeInDetectorV2 {
   /// 简化版检测逻辑（参考chat-companion-app）：
   /// - VAD检测到语音 + 有足够内容 → 快速触发
   /// - 宁可多触发，不可漏掉用户打断
+  /// - 但需要防止TTS回声被误识别后触发误打断
   BargeInResult handlePartialResult(String text) {
     if (!_isTTSPlaying) return BargeInResult.notTriggered;
     if (!_canBargeIn()) return BargeInResult.notTriggered;
@@ -145,6 +146,24 @@ class BargeInDetectorV2 {
     _totalChecks++;
     final cleanText = _cleanText(text);
     if (cleanText.isEmpty) return BargeInResult.notTriggered;
+
+    // 新增：如果在TTS播放的早期阶段（前1秒），不允许打断
+    // 这个阶段回声误识别最严重，即使文本完全不匹配也可能是回声
+    if (_echoFilter.isInTTSEarlyPhase) {
+      debugPrint('[BargeInDetectorV2] 在TTS早期阶段，跳过打断检测: "$text"');
+      return BargeInResult.notTriggered;
+    }
+
+    // 新增：如果在静默窗口内且VAD没有检测到语音，跳过
+    // 静默窗口内的ASR结果很可能是残留的TTS回声
+    if (_echoFilter.isInSilenceWindow && !_vadSpeechDetected) {
+      debugPrint('[BargeInDetectorV2] 在静默窗口内且无VAD，跳过打断检测: "$text"');
+      return BargeInResult.notTriggered;
+    }
+
+    // 注意：不在这里使用回声过滤器拦截
+    // 因为当用户在TTS播放时说话，ASR会捕获混合内容
+    // 我们依赖VAD+ASR内容长度来判断，而不是文本相似度
 
     // 第1层：VAD + ASR联合检测（最快，最重要）
     // 如果VAD检测到语音且有一定内容，直接触发打断

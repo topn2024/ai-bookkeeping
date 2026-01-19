@@ -190,12 +190,69 @@ class InputPipeline {
 
   /// 处理ASR中间结果
   void _handlePartialResult(String text) {
+    bool isEcho = false;
+
+    // 如果 TTS 正在播放，检查是否是回声
+    if (_bargeInDetector.isEnabled) {
+      final ttsText = _bargeInDetector.currentTTSText;
+      if (ttsText.isNotEmpty && _isLikelyEcho(text, ttsText)) {
+        debugPrint('[InputPipeline] 检测到可能的TTS回声: "$text"');
+        isEcho = true;
+      }
+    }
+
+    // 即使是回声，也要传递给打断检测器（打断检测器会综合VAD状态判断）
+    // 但不要更新UI显示的文本
+    _bargeInDetector.handlePartialResult(text);
+
+    // 如果是回声，不更新显示和不传递给外部
+    if (isEcho) {
+      return;
+    }
+
     _currentPartialText = text;
     onPartialResult?.call(text);
+  }
 
-    // 更新打断检测器（检测器内部会通过 onBargeIn 回调触发打断）
-    // 注意：不要在这里再次调用 onBargeIn，避免重复触发
-    _bargeInDetector.handlePartialResult(text);
+  /// 检查 ASR 结果是否可能是 TTS 回声
+  bool _isLikelyEcho(String asrText, String ttsText) {
+    // 清理文本，移除标点、空白和特殊符号（包括波浪号~）
+    final punctuationRegex = RegExp(r'[。，！？；、：""''（）【】《》,.!?;:\s~～·]');
+    final cleanAsr = asrText.replaceAll(punctuationRegex, '').toLowerCase();
+    final cleanTts = ttsText.replaceAll(punctuationRegex, '').toLowerCase();
+
+    debugPrint('[InputPipeline] 回声检测: ASR="$cleanAsr", TTS="$cleanTts"');
+
+    if (cleanAsr.isEmpty || cleanTts.isEmpty) return false;
+
+    // 检查是否是 TTS 文本的子串（回声通常是 TTS 的一部分）
+    if (cleanTts.contains(cleanAsr) && cleanAsr.length >= 2) {
+      debugPrint('[InputPipeline] 回声检测: ASR是TTS的子串');
+      return true;
+    }
+
+    // 检查 ASR 是否是 TTS 的开头部分（回声通常从头开始匹配）
+    if (cleanTts.startsWith(cleanAsr) && cleanAsr.length >= 2) {
+      debugPrint('[InputPipeline] 回声检测: ASR是TTS的前缀');
+      return true;
+    }
+
+    // 计算简单的相似度（共同字符比例）
+    int commonChars = 0;
+    for (int i = 0; i < cleanAsr.length && i < cleanTts.length; i++) {
+      if (cleanAsr[i] == cleanTts[i]) {
+        commonChars++;
+      }
+    }
+    final similarity = commonChars / cleanAsr.length;
+
+    // 如果前缀相似度超过 50%，认为是回声
+    if (similarity > 0.5) {
+      debugPrint('[InputPipeline] 回声检测: 前缀相似度=${(similarity * 100).toStringAsFixed(0)}%');
+      return true;
+    }
+
+    return false;
   }
 
   /// 处理ASR最终结果
@@ -208,15 +265,20 @@ class InputPipeline {
       return;
     }
 
-    // 检查打断（用于触发打断回调）
-    // 注意：即使是打断，也不要丢弃用户输入！
-    // 用户在TTS播放期间说的话应该被处理，而不是被丢弃
+    // 如果 TTS 正在播放或刚停止，检查是否是回声
     if (_bargeInDetector.isEnabled) {
+      final ttsText = _bargeInDetector.currentTTSText;
+      if (ttsText.isNotEmpty && _isLikelyEcho(text, ttsText)) {
+        debugPrint('[InputPipeline] 检测到可能的TTS回声(最终结果)，丢弃: "$text"');
+        return; // 丢弃回声
+      }
+
+      // 检查打断（用于触发打断回调）
       final bargeInResult = _bargeInDetector.handleFinalResult(text);
       if (bargeInResult.triggered) {
-        debugPrint('[InputPipeline] 检测到打断，但仍然传递用户输入: "$text"');
+        debugPrint('[InputPipeline] 检测到打断，传递用户输入: "$text"');
         // 打断已经通过检测器内部的 _triggerBargeIn 触发
-        // 继续处理用户输入，不要丢弃！
+        // 继续处理用户输入
       }
     }
 

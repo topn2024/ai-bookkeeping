@@ -628,6 +628,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         break;
       case VoicePipelineState.listening:
         setBallState(FloatingBallState.recording);
+        // TTS播放完成后（speaking→listening）重启沉默超时检测
+        // 确保从TTS结束后开始新的30秒计时
+        _vadService?.startSilenceTimeoutDetection();
         break;
       case VoicePipelineState.processing:
         setBallState(FloatingBallState.processing);
@@ -702,6 +705,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _partialText = '';
     _isProcessingUtterance = false;
 
+    // 重置VAD服务，取消之前的静默超时计时器
+    _vadService?.reset();
+
     // 启动流水线控制器
     debugPrint('[GlobalVoiceAssistant] [1/5] 启动流水线控制器...');
     await _pipelineController!.start();
@@ -762,7 +768,10 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _recordingStartTime = DateTime.now();
     setBallState(FloatingBallState.recording);
 
-    debugPrint('[GlobalVoiceAssistant] 流水线模式录音已启动');
+    // 开始沉默超时检测（30秒无声音自动结束对话）
+    _vadService?.startSilenceTimeoutDetection();
+
+    debugPrint('[GlobalVoiceAssistant] 流水线模式录音已启动（沉默超时检测已开启）');
   }
 
   /// 音频数据计数器（流水线模式）
