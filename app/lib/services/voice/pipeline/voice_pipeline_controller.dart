@@ -7,6 +7,7 @@ import '../../voice_recognition_engine.dart';
 import '../realtime_vad_config.dart';
 import '../config/pipeline_config.dart';
 import '../detection/barge_in_detector_v2.dart';
+import '../dynamic_aggregation_window.dart';
 import '../tracking/response_tracker.dart';
 import 'input_pipeline.dart';
 import 'output_pipeline.dart';
@@ -46,16 +47,23 @@ class VoicePipelineController {
 
   VoicePipelineState _state = VoicePipelineState.idle;
 
+  /// 动态聚合窗口
+  late final DynamicAggregationWindow _dynamicWindow;
+
   /// 句子聚合缓冲区（用于连续对话）
   final List<String> _sentenceBuffer = [];
 
   /// 句子聚合计时器
   Timer? _sentenceAggregationTimer;
 
-  /// 句子聚合等待时间（毫秒）
-  /// 收到ASR句子结束后等待这么长时间，如果用户继续说话则合并
-  /// 1500ms适合多笔交易场景，给用户足够时间说完
-  static const int _sentenceAggregationDelayMs = 1500;
+  /// 最大等待计时器（5秒兜底）
+  Timer? _maxWaitTimer;
+
+  /// 累计等待时间（毫秒）- 用于最大等待时间兜底
+  int _cumulativeWaitMs = 0;
+
+  /// 上次语音结束时间 - 用于计算停顿时长
+  DateTime? _lastSpeechEndTime;
 
   /// 是否正在说话（基于VAD）
   bool _isUserSpeaking = false;
@@ -95,6 +103,7 @@ class VoicePipelineController {
         _ttsService = ttsService,
         _vadService = vadService,
         _config = config ?? PipelineConfig.defaultConfig {
+    _dynamicWindow = DynamicAggregationWindow();
     _responseTracker = ResponseTracker();
     _bargeInDetector = BargeInDetectorV2(config: _config);
 
@@ -152,17 +161,12 @@ class VoicePipelineController {
   /// 处理语音结束（VAD检测）
   void _handleSpeechEnd() {
     _isUserSpeaking = false;
+    _lastSpeechEndTime = DateTime.now();
     debugPrint('[VoicePipelineController] VAD: 用户停止说话');
 
-    // 如果有缓存的句子且用户已停止说话，快速处理
-    // 优化：从1000ms减少到300ms，参考chat-companion-app的即时响应模式
+    // 如果有缓存的句子且用户已停止说话，使用动态等待时间
     if (_sentenceBuffer.isNotEmpty) {
-      debugPrint('[VoicePipelineController] VAD检测到静音，缓冲区有${_sentenceBuffer.length}个句子，延迟300ms处理');
-      _sentenceAggregationTimer?.cancel();
-      _sentenceAggregationTimer = Timer(
-        const Duration(milliseconds: 300),
-        () => _processAggregatedSentences(),
-      );
+      _startDynamicAggregationTimer();
     }
   }
 
@@ -277,10 +281,14 @@ class VoicePipelineController {
     debugPrint('[VoicePipelineController] 状态已设置为stopping');
 
     try {
-      // 取消句子聚合计时器
+      // 取消所有计时器
       _sentenceAggregationTimer?.cancel();
       _sentenceAggregationTimer = null;
+      _maxWaitTimer?.cancel();
+      _maxWaitTimer = null;
       _sentenceBuffer.clear();
+      _cumulativeWaitMs = 0;
+      _lastSpeechEndTime = null;
       _isUserSpeaking = false;
       debugPrint('[VoicePipelineController] 聚合计时器已清理');
 
@@ -308,11 +316,11 @@ class VoicePipelineController {
 
   /// 处理ASR最终结果
   ///
-  /// 使用句子聚合机制 + VAD辅助判断：
+  /// 使用滑动窗口 + 动态等待时间：
   /// 1. 收到ASR句子结束时，先缓存句子
-  /// 2. 如果VAD显示用户仍在说话，只缓存不启动计时器
-  /// 3. 如果VAD显示用户停止说话，启动短延迟（500ms）后处理
-  /// 4. 保险机制：无论VAD状态，2秒后强制处理（防止VAD失灵）
+  /// 2. 取消旧计时器，启动新计时器（滑动窗口机制）
+  /// 3. 动态计算等待时间（根据语义分析）
+  /// 4. 最大等待时间兜底（5秒）
   Future<void> _handleFinalResult(String text) async {
     if (text.trim().isEmpty) return;
 
@@ -325,33 +333,83 @@ class VoicePipelineController {
     // 通知外部（用于UI显示当前识别的内容）
     onFinalResult?.call(text);
 
-    // 取消之前的计时器
+    // 滑动窗口机制：取消之前的计时器，启动新计时器
     _sentenceAggregationTimer?.cancel();
 
-    if (_isUserSpeaking) {
-      // VAD显示用户仍在说话，启动保险计时器
-      // 优化：从2000ms减少到500ms
-      debugPrint('[VoicePipelineController] 用户仍在说话，启动保险计时器 (${_sentenceAggregationDelayMs}ms)');
-      _sentenceAggregationTimer = Timer(
-        Duration(milliseconds: _sentenceAggregationDelayMs),
-        () {
-          debugPrint('[VoicePipelineController] 保险计时器触发，处理');
-          _processAggregatedSentences();
-        },
-      );
-    } else {
-      // VAD显示用户已停止说话，等待聚合
-      debugPrint('[VoicePipelineController] 用户已停止说话，启动聚合等待 (${_sentenceAggregationDelayMs}ms)');
-      _sentenceAggregationTimer = Timer(
-        Duration(milliseconds: _sentenceAggregationDelayMs),
-        () => _processAggregatedSentences(),
-      );
+    // 启动动态聚合计时器
+    _startDynamicAggregationTimer();
+
+    // 启动最大等待计时器（只在第一次启动）
+    _startMaxWaitTimerIfNeeded();
+  }
+
+  /// 启动动态聚合计时器
+  void _startDynamicAggregationTimer() {
+    // 计算自上次语音结束的时间
+    int? msSinceLastSpeechEnd;
+    if (_lastSpeechEndTime != null) {
+      msSinceLastSpeechEnd = DateTime.now().difference(_lastSpeechEndTime!).inMilliseconds;
     }
+
+    // 合并所有缓存的句子用于语义分析
+    final aggregatedText = _sentenceBuffer.join('');
+
+    // 创建聚合上下文
+    final context = AggregationContext(
+      text: aggregatedText,
+      isUserSpeaking: _isUserSpeaking,
+      msSinceLastSpeechEnd: msSinceLastSpeechEnd,
+      bufferedSentenceCount: _sentenceBuffer.length,
+      cumulativeWaitMs: _cumulativeWaitMs,
+    );
+
+    // 计算动态等待时间
+    final waitResult = _dynamicWindow.calculateWaitTime(context);
+    debugPrint('[VoicePipelineController] 动态等待: $waitResult');
+
+    // 如果强制处理，立即处理
+    if (waitResult.forceProcess) {
+      debugPrint('[VoicePipelineController] 强制处理（超过最大等待时间）');
+      _processAggregatedSentences();
+      return;
+    }
+
+    // 启动聚合计时器
+    _sentenceAggregationTimer = Timer(
+      Duration(milliseconds: waitResult.waitTimeMs),
+      () {
+        _cumulativeWaitMs += waitResult.waitTimeMs;
+        debugPrint('[VoicePipelineController] 聚合计时器触发 (累计${_cumulativeWaitMs}ms)');
+        _processAggregatedSentences();
+      },
+    );
+  }
+
+  /// 启动最大等待计时器（兜底机制）
+  void _startMaxWaitTimerIfNeeded() {
+    if (_maxWaitTimer != null) return; // 已经有计时器在运行
+
+    _maxWaitTimer = Timer(
+      Duration(milliseconds: AggregationTiming.maxWaitMs),
+      () {
+        debugPrint('[VoicePipelineController] 最大等待计时器触发（${AggregationTiming.maxWaitMs}ms兜底）');
+        _processAggregatedSentences();
+      },
+    );
   }
 
   /// 处理聚合后的句子
   Future<void> _processAggregatedSentences() async {
     if (_sentenceBuffer.isEmpty) return;
+
+    // 取消所有计时器
+    _sentenceAggregationTimer?.cancel();
+    _sentenceAggregationTimer = null;
+    _maxWaitTimer?.cancel();
+    _maxWaitTimer = null;
+
+    // 重置累计等待时间
+    _cumulativeWaitMs = 0;
 
     // 合并所有缓存的句子
     final aggregatedText = _sentenceBuffer.join('');
@@ -459,9 +517,11 @@ class VoicePipelineController {
   ///
   /// 将麦克风采集的音频数据发送到输入流水线
   ///
-  /// 注意：listening 和 speaking 状态都需要传递音频
-  /// - listening: 正常识别用户输入
-  /// - speaking: 支持打断检测（BargeInDetector + EchoFilter 会过滤回声）
+  /// 注意：
+  /// - listening: 发送给ASR+VAD，正常识别用户输入
+  /// - speaking: 只发送给VAD（不发给ASR），用于打断检测
+  ///   - 不发给ASR的原因：TTS播放时麦克风会录入TTS声音，即使有AEC也可能有残留
+  ///   - 打断后会重启InputPipeline，届时再发给ASR识别用户的真实输入
   int _feedDataCount = 0;
 
   /// 高振幅打断阈值（平均振幅超过此值认为用户在大声说话）
@@ -483,15 +543,17 @@ class VoicePipelineController {
       debugPrint('[VoicePipelineController] feedAudioData #$_feedDataCount, 状态=$_state, inputState=$inputState');
     }
 
-    // listening 和 speaking 状态都传递音频
-    // speaking 状态下的音频用于打断检测
-    if (_state == VoicePipelineState.listening || _state == VoicePipelineState.speaking) {
+    // listening 状态：发送给ASR+VAD进行识别
+    // speaking 状态：只发送给VAD用于打断检测（不发给ASR，避免TTS被识别为用户输入）
+    if (_state == VoicePipelineState.listening) {
       _inputPipeline.feedAudioData(audioData);
+    } else if (_state == VoicePipelineState.speaking) {
+      // speaking状态只发给VAD，用于打断检测
+      // 不发给ASR，因为TTS播放时会被麦克风录入，即使有AEC也可能有残留
+      _inputPipeline.feedAudioToVADOnly(audioData);
 
       // speaking 状态下检测高振幅打断
-      if (_state == VoicePipelineState.speaking) {
-        _checkAmplitudeBargeIn(audioData);
-      }
+      _checkAmplitudeBargeIn(audioData);
     } else if (shouldLog) {
       debugPrint('[VoicePipelineController] 状态=$_state，跳过feedAudioData（等待状态变为listening或speaking）');
     }
@@ -540,9 +602,9 @@ class VoicePipelineController {
     // 创建一个打断结果
     final result = BargeInResult(
       triggered: true,
-      layer: BargeInLayer.layer1VadAsr, // 使用layer1标记
+      layer: BargeInLayer.vadBased,
       text: '[振幅打断]',
-      similarity: 0.0,
+      reason: '持续高振幅检测',
     );
 
     _handleBargeIn(result);
@@ -555,10 +617,14 @@ class VoicePipelineController {
 
   /// 重置流水线
   void reset() {
-    // 取消句子聚合计时器
+    // 取消所有计时器
     _sentenceAggregationTimer?.cancel();
     _sentenceAggregationTimer = null;
+    _maxWaitTimer?.cancel();
+    _maxWaitTimer = null;
     _sentenceBuffer.clear();
+    _cumulativeWaitMs = 0;
+    _lastSpeechEndTime = null;
     _isUserSpeaking = false;
 
     _inputPipeline.reset();

@@ -175,6 +175,16 @@ class InputPipeline {
     _vadService?.processAudioFrame(audioData);
   }
 
+  /// 仅发送音频数据到VAD（不发送给ASR）
+  ///
+  /// 用于speaking状态下的打断检测：
+  /// - TTS播放时不需要ASR识别（避免回声被识别）
+  /// - 但仍需要VAD检测用户是否在说话（打断检测）
+  void feedAudioToVADOnly(Uint8List audioData) {
+    // 只发送给VAD处理，不发送给ASR
+    _vadService?.processAudioFrame(audioData);
+  }
+
   /// 处理ASR结果
   void _handleASRResult(ASRPartialResult result) {
     debugPrint('[InputPipeline] 收到ASR结果: "${result.text}" (isFinal=${result.isFinal})');
@@ -189,73 +199,19 @@ class InputPipeline {
   }
 
   /// 处理ASR中间结果
+  ///
+  /// 注意：回声消除由硬件级 AEC 在音频层处理，不再在文本层做回声过滤
   void _handlePartialResult(String text) {
-    bool isEcho = false;
-
-    // 如果 TTS 正在播放，检查是否是回声
-    if (_bargeInDetector.isEnabled) {
-      final ttsText = _bargeInDetector.currentTTSText;
-      if (ttsText.isNotEmpty && _isLikelyEcho(text, ttsText)) {
-        debugPrint('[InputPipeline] 检测到可能的TTS回声: "$text"');
-        isEcho = true;
-      }
-    }
-
-    // 即使是回声，也要传递给打断检测器（打断检测器会综合VAD状态判断）
-    // 但不要更新UI显示的文本
+    // 传递给打断检测器（打断检测器基于 VAD 判断是否打断）
     _bargeInDetector.handlePartialResult(text);
-
-    // 如果是回声，不更新显示和不传递给外部
-    if (isEcho) {
-      return;
-    }
 
     _currentPartialText = text;
     onPartialResult?.call(text);
   }
 
-  /// 检查 ASR 结果是否可能是 TTS 回声
-  bool _isLikelyEcho(String asrText, String ttsText) {
-    // 清理文本，移除标点、空白和特殊符号（包括波浪号~）
-    final punctuationRegex = RegExp(r'[。，！？；、：""''（）【】《》,.!?;:\s~～·]');
-    final cleanAsr = asrText.replaceAll(punctuationRegex, '').toLowerCase();
-    final cleanTts = ttsText.replaceAll(punctuationRegex, '').toLowerCase();
-
-    debugPrint('[InputPipeline] 回声检测: ASR="$cleanAsr", TTS="$cleanTts"');
-
-    if (cleanAsr.isEmpty || cleanTts.isEmpty) return false;
-
-    // 检查是否是 TTS 文本的子串（回声通常是 TTS 的一部分）
-    if (cleanTts.contains(cleanAsr) && cleanAsr.length >= 2) {
-      debugPrint('[InputPipeline] 回声检测: ASR是TTS的子串');
-      return true;
-    }
-
-    // 检查 ASR 是否是 TTS 的开头部分（回声通常从头开始匹配）
-    if (cleanTts.startsWith(cleanAsr) && cleanAsr.length >= 2) {
-      debugPrint('[InputPipeline] 回声检测: ASR是TTS的前缀');
-      return true;
-    }
-
-    // 计算简单的相似度（共同字符比例）
-    int commonChars = 0;
-    for (int i = 0; i < cleanAsr.length && i < cleanTts.length; i++) {
-      if (cleanAsr[i] == cleanTts[i]) {
-        commonChars++;
-      }
-    }
-    final similarity = commonChars / cleanAsr.length;
-
-    // 如果前缀相似度超过 50%，认为是回声
-    if (similarity > 0.5) {
-      debugPrint('[InputPipeline] 回声检测: 前缀相似度=${(similarity * 100).toStringAsFixed(0)}%');
-      return true;
-    }
-
-    return false;
-  }
-
   /// 处理ASR最终结果
+  ///
+  /// 注意：回声消除由硬件级 AEC 在音频层处理，不再在文本层做回声过滤
   void _handleFinalResult(String text) {
     _currentPartialText = '';
 
@@ -265,15 +221,8 @@ class InputPipeline {
       return;
     }
 
-    // 如果 TTS 正在播放或刚停止，检查是否是回声
+    // 如果 TTS 正在播放，检查打断（用于触发打断回调）
     if (_bargeInDetector.isEnabled) {
-      final ttsText = _bargeInDetector.currentTTSText;
-      if (ttsText.isNotEmpty && _isLikelyEcho(text, ttsText)) {
-        debugPrint('[InputPipeline] 检测到可能的TTS回声(最终结果)，丢弃: "$text"');
-        return; // 丢弃回声
-      }
-
-      // 检查打断（用于触发打断回调）
       final bargeInResult = _bargeInDetector.handleFinalResult(text);
       if (bargeInResult.triggered) {
         debugPrint('[InputPipeline] 检测到打断，传递用户输入: "$text"');
