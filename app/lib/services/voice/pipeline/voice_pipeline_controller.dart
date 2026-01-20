@@ -54,9 +54,8 @@ class VoicePipelineController {
 
   /// 句子聚合等待时间（毫秒）
   /// 收到ASR句子结束后等待这么长时间，如果用户继续说话则合并
-  /// 优化：从2000ms减少到500ms，参考chat-companion-app的即时处理模式
-  /// 过长的延迟会导致用户体验下降
-  static const int _sentenceAggregationDelayMs = 500;
+  /// 1500ms适合多笔交易场景，给用户足够时间说完
+  static const int _sentenceAggregationDelayMs = 1500;
 
   /// 是否正在说话（基于VAD）
   bool _isUserSpeaking = false;
@@ -268,9 +267,14 @@ class VoicePipelineController {
 
   /// 停止流水线
   Future<void> stop() async {
-    if (_state == VoicePipelineState.idle) return;
+    debugPrint('[VoicePipelineController] stop() 被调用, 当前状态=$_state');
+    if (_state == VoicePipelineState.idle) {
+      debugPrint('[VoicePipelineController] 状态已经是idle，直接返回');
+      return;
+    }
 
     _setState(VoicePipelineState.stopping);
+    debugPrint('[VoicePipelineController] 状态已设置为stopping');
 
     try {
       // 取消句子聚合计时器
@@ -278,14 +282,22 @@ class VoicePipelineController {
       _sentenceAggregationTimer = null;
       _sentenceBuffer.clear();
       _isUserSpeaking = false;
+      debugPrint('[VoicePipelineController] 聚合计时器已清理');
 
+      debugPrint('[VoicePipelineController] 开始停止InputPipeline...');
       await _inputPipeline.stop();
+      debugPrint('[VoicePipelineController] InputPipeline已停止');
+
+      debugPrint('[VoicePipelineController] 开始停止OutputPipeline...');
       await _outputPipeline.stop();
+      debugPrint('[VoicePipelineController] OutputPipeline已停止');
+
       _responseTracker.reset();
       _bargeInDetector.reset();
+      debugPrint('[VoicePipelineController] 追踪器和检测器已重置');
     } finally {
       _setState(VoicePipelineState.idle);
-      debugPrint('[VoicePipelineController] 已停止');
+      debugPrint('[VoicePipelineController] 已停止，状态设置为idle');
     }
   }
 
@@ -328,11 +340,10 @@ class VoicePipelineController {
         },
       );
     } else {
-      // VAD显示用户已停止说话，快速处理
-      // 优化：从1500ms减少到400ms，参考chat-companion-app的即时响应
-      debugPrint('[VoicePipelineController] 用户已停止说话，启动快速处理 (400ms)');
+      // VAD显示用户已停止说话，等待聚合
+      debugPrint('[VoicePipelineController] 用户已停止说话，启动聚合等待 (${_sentenceAggregationDelayMs}ms)');
       _sentenceAggregationTimer = Timer(
-        const Duration(milliseconds: 400),
+        Duration(milliseconds: _sentenceAggregationDelayMs),
         () => _processAggregatedSentences(),
       );
     }
@@ -489,6 +500,13 @@ class VoicePipelineController {
   /// 检测基于振幅的打断
   /// 如果在TTS播放期间检测到连续的高振幅音频，说明用户在大声说话，触发打断
   void _checkAmplitudeBargeIn(Uint8List audioData) {
+    // TTS正在播放时跳过振幅打断检测
+    // 因为麦克风可能录入TTS的声音，导致误触发打断
+    if (_outputPipeline.isSpeaking) {
+      _highAmplitudeFrameCount = 0; // 重置计数器
+      return;
+    }
+
     // 计算平均振幅
     int sumAmplitude = 0;
     if (audioData.length >= 2) {

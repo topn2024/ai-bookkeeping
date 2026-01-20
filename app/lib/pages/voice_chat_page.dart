@@ -19,14 +19,12 @@ class VoiceChatPage extends ConsumerStatefulWidget {
 class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
+  int _lastMessageCount = -1; // -1表示未初始化，首次进入时滚动到底部
+  bool _isFirstBuild = true;
 
   @override
   void initState() {
     super.initState();
-    // 滚动到底部
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
-    });
   }
 
   @override
@@ -44,10 +42,20 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
     final manager = ref.watch(globalVoiceAssistantProvider);
     final ballState = manager.ballState;
 
-    // 当消息变化时滚动到底部
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
-    });
+    // 首次进入时滚动到底部，之后只在有新消息时才滚动
+    if (_isFirstBuild) {
+      _isFirstBuild = false;
+      _lastMessageCount = messages.length;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    } else if (messages.length > _lastMessageCount) {
+      // 只在有新消息时才滚动到底部（允许用户向上查看历史）
+      _lastMessageCount = messages.length;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    }
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,

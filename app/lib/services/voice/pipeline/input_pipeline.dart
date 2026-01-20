@@ -327,22 +327,25 @@ class InputPipeline {
     // 标记正在主动停止（防止onDone触发错误回调）
     _isStopping = true;
 
-    // 关闭音频流
-    debugPrint('[InputPipeline] 关闭音频流控制器...');
-    await _audioStreamController?.close();
-    _audioStreamController = null;
+    // 先取消ASR识别（停止等待数据）
+    debugPrint('[InputPipeline] 取消ASR识别...');
+    await _asrEngine.cancelTranscription();
 
-    // 取消订阅
-    debugPrint('[InputPipeline] 取消ASR订阅...');
+    // 取消订阅（必须在关闭流之前，否则close()会等待onDone完成导致死锁）
+    debugPrint('[InputPipeline] 取消订阅...');
     await _asrSubscription?.cancel();
     await _vadSubscription?.cancel();
-
     _asrSubscription = null;
     _vadSubscription = null;
 
-    // 取消ASR识别
-    debugPrint('[InputPipeline] 取消ASR识别...');
-    await _asrEngine.cancelTranscription();
+    // 最后关闭音频流控制器（不等待，避免死锁）
+    debugPrint('[InputPipeline] 关闭音频流控制器...');
+    final controller = _audioStreamController;
+    _audioStreamController = null;
+    if (controller != null && !controller.isClosed) {
+      controller.close(); // 不await，避免死锁
+    }
+    debugPrint('[InputPipeline] 音频流控制器已关闭');
 
     _state = InputPipelineState.stopped;
     _stateController.add(_state);
