@@ -17,6 +17,8 @@ import 'voice/config/feature_flags.dart';
 import 'voice/config/pipeline_config.dart';
 import 'voice/pipeline/voice_pipeline_controller.dart';
 import 'voice/agent/hybrid_intent_router.dart' show ProactiveNetworkMonitor, NetworkStatus;
+import 'voice/audio_processor_service.dart';
+import 'voice/ambient_noise_calibrator.dart';
 import 'qwen_service.dart';
 
 /// 麦克风权限状态
@@ -350,10 +352,30 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   /// 调度预加载（延迟执行，避免影响应用启动）
   void _schedulePreload() {
+    // 立即开始环境噪声校准（3秒）
+    // 校准完成后会自动应用参数到 AudioProcessorService
+    debugPrint('[GlobalVoiceAssistant] 开始环境噪声校准...');
+    _startAmbientNoiseCalibration();
+
     // 延迟3秒后开始预加载，给应用启动留出时间
     Future.delayed(const Duration(seconds: 3), () async {
       debugPrint('[GlobalVoiceAssistant] 开始后台预加载...');
       await preload();
+    });
+  }
+
+  /// 开始环境噪声校准
+  void _startAmbientNoiseCalibration() {
+    AmbientNoiseCalibrator.instance.startCalibration().then((result) {
+      debugPrint('[GlobalVoiceAssistant] 噪声校准完成: $result');
+
+      // 如果环境非常嘈杂，通知用户
+      if (result.level == NoiseLevel.veryNoisy) {
+        _addSystemMessage('当前环境较嘈杂，建议移至安静处使用语音助手');
+        notifyListeners();
+      }
+    }).catchError((e) {
+      debugPrint('[GlobalVoiceAssistant] 噪声校准失败: $e，将使用默认值');
     });
   }
 
@@ -423,9 +445,33 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       debugPrint('[GlobalVoiceAssistant] [预加载] 3/5 流式TTS服务已初始化');
 
       // 4. 检查麦克风权限（不弹窗请求）
-      debugPrint('[GlobalVoiceAssistant] [预加载] 4/5 检查麦克风权限...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 4/7 检查麦克风权限...');
       final permissionStatus = await Permission.microphone.status;
-      debugPrint('[GlobalVoiceAssistant] [预加载] 4/5 麦克风权限状态: $permissionStatus');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 4/7 麦克风权限状态: $permissionStatus');
+
+      // 5. 预初始化 WebRTC APM 音频处理器
+      debugPrint('[GlobalVoiceAssistant] [预加载] 5/7 初始化 WebRTC APM...');
+      await AudioProcessorService.instance.initialize();
+      debugPrint('[GlobalVoiceAssistant] [预加载] 5/7 WebRTC APM 已初始化');
+
+      // 6. 预创建 AudioRecorder 实例
+      debugPrint('[GlobalVoiceAssistant] [预加载] 6/7 创建录音器实例...');
+      _audioRecorder ??= AudioRecorder();
+      debugPrint('[GlobalVoiceAssistant] [预加载] 6/7 录音器实例已创建');
+
+      // 7. 预初始化 VAD 和识别引擎（不需要权限）
+      debugPrint('[GlobalVoiceAssistant] [预加载] 7/7 初始化 VAD 和识别引擎...');
+      _recognitionEngine ??= VoiceRecognitionEngine();
+      if (_vadService == null) {
+        _vadService = RealtimeVADService(
+          config: RealtimeVADConfig.defaultConfig().copyWith(
+            speechEndThresholdMs: 1200,
+            silenceTimeoutMs: 30000,
+          ),
+        );
+        _vadSubscription = _vadService!.eventStream.listen(_handleVADEvent);
+      }
+      debugPrint('[GlobalVoiceAssistant] [预加载] 7/7 VAD 和识别引擎已初始化');
 
       final elapsed = DateTime.now().difference(_preloadStartTime!);
       _isPreloaded = true;
@@ -497,13 +543,19 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   /// 确保语音服务已初始化
   Future<void> _ensureVoiceServicesInitialized() async {
-    if (_audioRecorder != null) return;
+    // 检查核心服务是否已初始化（可能在预加载中完成）
+    final alreadyInitialized = _audioRecorder != null && _pipelineController != null;
+    if (alreadyInitialized) {
+      debugPrint('[GlobalVoiceAssistant] 语音服务已预加载完成，跳过初始化');
+      return;
+    }
 
     final startTime = DateTime.now();
     debugPrint('[GlobalVoiceAssistant] 开始初始化语音服务 (已预加载=$_isPreloaded)...');
 
-    _audioRecorder = AudioRecorder();
-    _recognitionEngine = VoiceRecognitionEngine();
+    // 录音器和识别引擎（如果预加载已创建则跳过）
+    _audioRecorder ??= AudioRecorder();
+    _recognitionEngine ??= VoiceRecognitionEngine();
 
     // TTS服务（如果预加载已初始化则跳过）
     if (_ttsService == null) {
@@ -515,18 +567,21 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       debugPrint('[GlobalVoiceAssistant] TTS服务已预加载，跳过初始化');
     }
 
-    // 初始化VAD服务
+    // 初始化VAD服务（如果预加载已创建则跳过）
     // speechEndThresholdMs权衡：太短会截断用户思考，太长会响应迟钝
     // 800ms: 反应快但易截断 | 1200ms: 折中 | 1500ms: 安全但迟钝
-    _vadService = RealtimeVADService(
-      config: RealtimeVADConfig.defaultConfig().copyWith(
-        speechEndThresholdMs: 1200,  // 静音1.2秒判定说完（折中方案）
-        silenceTimeoutMs: 30000,     // 30秒无声音自动结束对话
-      ),
-    );
-
-    // 订阅VAD事件
-    _vadSubscription = _vadService!.eventStream.listen(_handleVADEvent);
+    if (_vadService == null) {
+      _vadService = RealtimeVADService(
+        config: RealtimeVADConfig.defaultConfig().copyWith(
+          speechEndThresholdMs: 1200,  // 静音1.2秒判定说完（折中方案）
+          silenceTimeoutMs: 30000,     // 30秒无声音自动结束对话
+        ),
+      );
+      // 订阅VAD事件
+      _vadSubscription = _vadService!.eventStream.listen(_handleVADEvent);
+    } else {
+      debugPrint('[GlobalVoiceAssistant] VAD服务已预加载，跳过初始化');
+    }
 
     // 初始化打断检测器
     _bargeInDetector = BargeInDetector(
@@ -625,18 +680,24 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     switch (pipelineState) {
       case VoicePipelineState.idle:
         setBallState(FloatingBallState.idle);
+        // 通知 WebRTC APM TTS 停止
+        AudioProcessorService.instance.setTTSPlaying(false);
         break;
       case VoicePipelineState.listening:
         setBallState(FloatingBallState.recording);
         // TTS播放完成后（speaking→listening）重启沉默超时检测
         // 确保从TTS结束后开始新的30秒计时
         _vadService?.startSilenceTimeoutDetection();
+        // 通知 WebRTC APM TTS 停止
+        AudioProcessorService.instance.setTTSPlaying(false);
         break;
       case VoicePipelineState.processing:
         setBallState(FloatingBallState.processing);
         break;
       case VoicePipelineState.speaking:
         setBallState(FloatingBallState.recording);  // 播放时保持录音状态（支持打断）
+        // 通知 WebRTC APM TTS 开始播放，增强 AEC
+        AudioProcessorService.instance.setTTSPlaying(true);
         break;
       case VoicePipelineState.stopping:
         // 保持当前状态
@@ -708,47 +769,76 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 重置VAD服务，取消之前的静默超时计时器
     _vadService?.reset();
 
+    // 获取环境噪声校准结果
+    // 如果校准还没完成，取消并使用已有数据或默认值
+    final calibrationResult = AmbientNoiseCalibrator.instance.cancelAndGetResult();
+    debugPrint('[GlobalVoiceAssistant] [0/6] 环境噪声校准: $calibrationResult');
+
+    // 初始化 WebRTC APM 软件音频处理（AEC/NS/AGC）
+    // 如果已在预加载中初始化则跳过
+    if (!AudioProcessorService.instance.isInitialized) {
+      debugPrint('[GlobalVoiceAssistant] [1/6] 初始化 WebRTC APM...');
+      await AudioProcessorService.instance.initialize();
+    } else {
+      debugPrint('[GlobalVoiceAssistant] [1/6] WebRTC APM 已预加载，跳过初始化');
+    }
+
+    // 应用校准结果到音频处理器
+    await AudioProcessorService.instance.applyCalibration(calibrationResult);
+    debugPrint('[GlobalVoiceAssistant] [2/6] WebRTC APM 校准参数已应用');
+
     // 启动流水线控制器
-    debugPrint('[GlobalVoiceAssistant] [1/5] 启动流水线控制器...');
+    debugPrint('[GlobalVoiceAssistant] [3/6] 启动流水线控制器...');
     await _pipelineController!.start();
-    debugPrint('[GlobalVoiceAssistant] [2/5] 流水线控制器已启动');
+    debugPrint('[GlobalVoiceAssistant] [4/6] 流水线控制器已启动');
 
     // 创建音频流广播控制器
     _audioStreamController = StreamController<Uint8List>.broadcast();
-    debugPrint('[GlobalVoiceAssistant] [3/5] 音频流控制器已创建');
+    debugPrint('[GlobalVoiceAssistant] [5/6] 音频流控制器已创建');
 
-    // 录音配置 - 使用PCM格式
-    const config = RecordConfig(
+    // 录音配置 - 启用硬件级音频处理（AEC/AGC/NS）作为第一层
+    // WebRTC APM 软件处理作为第二层补充
+    final config = RecordConfig(
       encoder: AudioEncoder.pcm16bits,
       sampleRate: 16000,
       numChannels: 1,
+      echoCancel: true,
+      autoGain: true,
+      noiseSuppress: true,
+      androidConfig: AndroidRecordConfig(
+        audioSource: AndroidAudioSource.voiceCommunication,
+        audioManagerMode: AudioManagerMode.modeInCommunication,
+      ),
     );
 
     // 开始流式录音
-    debugPrint('[GlobalVoiceAssistant] [4/5] 开始调用startStream...');
+    debugPrint('[GlobalVoiceAssistant] [6/6] 开始调用startStream...');
     final audioStream = await _audioRecorder!.startStream(config);
-    debugPrint('[GlobalVoiceAssistant] [5/5] startStream返回成功');
+    debugPrint('[GlobalVoiceAssistant] startStream返回成功，开始处理音频流');
 
     // 音频数据计数器（使用实例变量以便在重启后重置）
     _pipelineAudioDataCount = 0;
 
-    // 订阅音频流，传输给流水线控制器
+    // 订阅音频流，通过 WebRTC APM 处理后传输给流水线控制器
     _audioStreamSubscription = audioStream.listen(
-      (data) {
-        final audioData = Uint8List.fromList(data);
+      (data) async {
+        final rawAudioData = Uint8List.fromList(data);
         _pipelineAudioDataCount++;
+
+        // 通过 WebRTC APM 软件处理（AEC/NS/AGC）
+        final processedAudioData = await AudioProcessorService.instance.processAudio(rawAudioData);
 
         // 前10次每次都打印，之后每100次打印一次（约3秒一次）
         if (_pipelineAudioDataCount <= 10 || _pipelineAudioDataCount % 100 == 0) {
           final pipelineState = _pipelineController?.state;
-          debugPrint('[GlobalVoiceAssistant] 音频数据 #$_pipelineAudioDataCount, ballState=$_ballState, pipelineState=$pipelineState, 大小=${audioData.length}');
+          debugPrint('[GlobalVoiceAssistant] 音频数据 #$_pipelineAudioDataCount, ballState=$_ballState, pipelineState=$pipelineState, 大小=${rawAudioData.length}→${processedAudioData.length}');
         }
 
-        // 发送到流水线控制器（即使在processing状态也发送，让控制器决定是否处理）
-        _pipelineController?.feedAudioData(audioData);
+        // 发送处理后的音频到流水线控制器
+        _pipelineController?.feedAudioData(processedAudioData);
 
-        // 计算振幅用于UI显示
-        _updateAmplitudeFromPCM(audioData);
+        // 计算振幅用于UI显示（使用处理后的数据）
+        _updateAmplitudeFromPCM(processedAudioData);
       },
       onError: (error) {
         debugPrint('[GlobalVoiceAssistant] 音频流错误: $error');
@@ -806,28 +896,38 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       // 等待音频设备完全释放（避免音频饱和问题）
       await Future.delayed(const Duration(milliseconds: 100));
 
-      // 重新开始录音
-      const config = RecordConfig(
+      // 重新开始录音 - 启用硬件级音频处理（AEC/AGC/NS）
+      final config = RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
+        echoCancel: true,
+        autoGain: true,
+        noiseSuppress: true,
+        androidConfig: AndroidRecordConfig(
+          audioSource: AndroidAudioSource.voiceCommunication,
+          audioManagerMode: AudioManagerMode.modeInCommunication,
+        ),
       );
 
       final audioStream = await _audioRecorder!.startStream(config);
       _pipelineAudioDataCount = 0;
 
       _audioStreamSubscription = audioStream.listen(
-        (data) {
-          final audioData = Uint8List.fromList(data);
+        (data) async {
+          final rawAudioData = Uint8List.fromList(data);
           _pipelineAudioDataCount++;
+
+          // 通过 WebRTC APM 软件处理
+          final processedAudioData = await AudioProcessorService.instance.processAudio(rawAudioData);
 
           if (_pipelineAudioDataCount <= 10 || _pipelineAudioDataCount % 100 == 0) {
             final pipelineState = _pipelineController?.state;
             debugPrint('[GlobalVoiceAssistant] 重启后音频数据 #$_pipelineAudioDataCount, ballState=$_ballState, pipelineState=$pipelineState');
           }
 
-          _pipelineController?.feedAudioData(audioData);
-          _updateAmplitudeFromPCM(audioData);
+          _pipelineController?.feedAudioData(processedAudioData);
+          _updateAmplitudeFromPCM(processedAudioData);
         },
         onError: (error) {
           debugPrint('[GlobalVoiceAssistant] 重启后音频流错误: $error');
@@ -837,7 +937,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         },
       );
 
-      debugPrint('[GlobalVoiceAssistant] 原生音频录制重启成功');
+      debugPrint('[GlobalVoiceAssistant] 原生音频录制重启成功 (硬件AEC + WebRTC APM)');
     } catch (e) {
       debugPrint('[GlobalVoiceAssistant] 重启原生音频录制失败: $e');
     }
@@ -852,28 +952,38 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       await _audioStreamSubscription?.cancel();
       _audioStreamSubscription = null;
 
-      // 重新开始录音
-      const config = RecordConfig(
+      // 重新开始录音 - 启用硬件级音频处理（AEC/AGC/NS）
+      final config = RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
+        echoCancel: true,
+        autoGain: true,
+        noiseSuppress: true,
+        androidConfig: AndroidRecordConfig(
+          audioSource: AndroidAudioSource.voiceCommunication,
+          audioManagerMode: AudioManagerMode.modeInCommunication,
+        ),
       );
 
       final audioStream = await _audioRecorder!.startStream(config);
       _pipelineAudioDataCount = 0;
 
       _audioStreamSubscription = audioStream.listen(
-        (data) {
-          final audioData = Uint8List.fromList(data);
+        (data) async {
+          final rawAudioData = Uint8List.fromList(data);
           _pipelineAudioDataCount++;
+
+          // 通过 WebRTC APM 软件处理
+          final processedAudioData = await AudioProcessorService.instance.processAudio(rawAudioData);
 
           if (_pipelineAudioDataCount <= 10 || _pipelineAudioDataCount % 100 == 0) {
             final pipelineState = _pipelineController?.state;
             debugPrint('[GlobalVoiceAssistant] 重启后音频数据 #$_pipelineAudioDataCount, ballState=$_ballState, pipelineState=$pipelineState');
           }
 
-          _pipelineController?.feedAudioData(audioData);
-          _updateAmplitudeFromPCM(audioData);
+          _pipelineController?.feedAudioData(processedAudioData);
+          _updateAmplitudeFromPCM(processedAudioData);
         },
         onError: (error) {
           debugPrint('[GlobalVoiceAssistant] 重启后音频流错误: $error');
@@ -883,7 +993,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         },
       );
 
-      debugPrint('[GlobalVoiceAssistant] 流水线录音重新启动成功');
+      debugPrint('[GlobalVoiceAssistant] 流水线录音重新启动成功 (硬件AEC + WebRTC APM)');
     } catch (e) {
       debugPrint('[GlobalVoiceAssistant] 重新启动流水线录音失败: $e');
       _handleError('无法重新启动录音');
@@ -1101,15 +1211,22 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       // 创建音频流广播控制器（用于传递给流式ASR）
       _audioStreamController = StreamController<Uint8List>.broadcast();
 
-      // 录音配置 - 使用PCM格式
-      const config = RecordConfig(
+      // 录音配置 - 启用硬件级音频处理（AEC/AGC/NS）
+      final config = RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
+        echoCancel: true,
+        autoGain: true,
+        noiseSuppress: true,
+        androidConfig: AndroidRecordConfig(
+          audioSource: AndroidAudioSource.voiceCommunication,
+          audioManagerMode: AudioManagerMode.modeInCommunication,
+        ),
       );
 
       // 开始流式录音
-      debugPrint('[GlobalVoiceAssistant] 开始流式录音+实时ASR');
+      debugPrint('[GlobalVoiceAssistant] 开始流式录音+实时ASR (AEC已启用)');
       final audioStream = await _audioRecorder!.startStream(config);
 
       // 订阅音频流，同时传输给VAD、ASR和打断检测器

@@ -91,6 +91,10 @@ dependencies:
   # Voice Activity Detection
   vad: ^0.0.7+1  # Silero VAD for accurate voice detection
 
+  # WebRTC Audio Processing (AEC/NS/AGC)
+  webrtc_apm:
+    path: packages/webrtc_apm
+
   # Multimodal wake-up
   sensors_plus: ^6.0.1  # Accelerometer for shake detection
   geolocator: ^13.0.2  # Location services for scene-aware wake-up
