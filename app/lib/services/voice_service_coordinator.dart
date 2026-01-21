@@ -84,6 +84,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 是否跳过TTS播放（流水线模式下由外部处理TTS）
   bool _skipTTSPlayback = false;
 
+  /// 延迟响应回调（流水线模式下通知外部处理延迟响应）
+  void Function(String response)? onDeferredResponse;
+
   /// 当前会话状态
   VoiceSessionState _sessionState = VoiceSessionState.idle;
 
@@ -307,7 +310,15 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   void _handleDeferredResponse(String response) {
     debugPrint('[VoiceCoordinator] 延迟响应: $response');
     _lastResponse = response;
-    _speakWithSkipCheck(response);
+
+    // 流水线模式下，通知外部处理延迟响应
+    if (_skipTTSPlayback && onDeferredResponse != null) {
+      debugPrint('[VoiceCoordinator] 流水线模式，通过回调传递延迟响应');
+      onDeferredResponse!(response);
+    } else {
+      // 非流水线模式，直接播放TTS
+      _speakWithSkipCheck(response);
+    }
   }
 
   /// 禁用对话式智能体模式

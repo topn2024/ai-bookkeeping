@@ -110,7 +110,9 @@ class BookkeepingOperationAdapter implements OperationAdapter {
       );
 
       // 调用 DatabaseService 添加交易
-      await _databaseService.insertTransaction(transaction);
+      debugPrint('[BookkeepingOperationAdapter] 准备调用insertTransaction: id=${transaction.id}');
+      final insertResult = await _databaseService.insertTransaction(transaction);
+      debugPrint('[BookkeepingOperationAdapter] insertTransaction返回: $insertResult');
 
       return ExecutionResult.success(data: {
         'id': transaction.id,
@@ -268,7 +270,7 @@ class BookkeepingOperationAdapter implements OperationAdapter {
       final updatedTransaction = Transaction(
         id: originalTransaction.id,
         type: originalTransaction.type,
-        amount: params['amount'] as double? ?? originalTransaction.amount,
+        amount: (params['amount'] as num?)?.toDouble() ?? originalTransaction.amount,
         category: params['category'] as String? ?? originalTransaction.category,
         note: params['note'] as String? ?? originalTransaction.note,
         date: originalTransaction.date,

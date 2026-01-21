@@ -82,12 +82,28 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
     });
   }
 
-  /// 检查麦克风权限
+  /// 检查并请求麦克风权限（应用启动时统一请求）
   Future<void> _checkMicrophonePermission() async {
     final status = await Permission.microphone.status;
+    if (status.isGranted) {
+      setState(() {
+        _hasPermission = true;
+      });
+      return;
+    }
+
+    // 如果没有授权，主动请求
+    debugPrint('[MainNavigation] 麦克风权限未授予，发起权限请求');
+    final requestStatus = await Permission.microphone.request();
     setState(() {
-      _hasPermission = status.isGranted;
+      _hasPermission = requestStatus.isGranted;
     });
+
+    if (!requestStatus.isGranted) {
+      debugPrint('[MainNavigation] 用户拒绝了麦克风权限');
+    } else {
+      debugPrint('[MainNavigation] 麦克风权限已授予');
+    }
   }
 
   /// 请求麦克风权限

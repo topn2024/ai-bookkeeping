@@ -215,6 +215,33 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     debugPrint('[GlobalVoiceAssistant] 命令处理器已${processor != null ? "设置" : "清除"}');
   }
 
+  /// 处理延迟响应（流水线模式）
+  ///
+  /// 当VoiceServiceCoordinator的延迟操作完成后，通过此方法将响应传递给流水线播放
+  void handleDeferredResponse(String response) {
+    debugPrint('[GlobalVoiceAssistant] 收到延迟响应: $response');
+
+    // 检查流水线是否可用且处于listening状态
+    if (_pipelineController == null) {
+      debugPrint('[GlobalVoiceAssistant] ⚠️ 流水线控制器未初始化，无法播放延迟响应');
+      return;
+    }
+
+    final pipelineState = _pipelineController!.state;
+    if (pipelineState != VoicePipelineState.listening) {
+      debugPrint('[GlobalVoiceAssistant] ⚠️ 流水线状态为$pipelineState，无法播放延迟响应');
+      return;
+    }
+
+    // 添加助手消息到对话历史
+    _addAssistantMessage(response);
+
+    // 通过流水线的主动消息机制播放响应
+    // isUserResponse=true表示这是对用户输入的延迟响应，不计入主动对话次数
+    debugPrint('[GlobalVoiceAssistant] 通过主动消息机制播放延迟响应');
+    _pipelineController!.triggerProactiveMessage(response, isUserResponse: true);
+  }
+
   // Getters
   FloatingBallState get ballState => _ballState;
   bool get isVisible => _isVisible;

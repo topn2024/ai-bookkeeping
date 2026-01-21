@@ -340,6 +340,15 @@ class VoicePipelineController {
     }
   }
 
+  /// 触发主动消息（用于延迟响应等场景）
+  ///
+  /// 外部调用此方法可以在流水线listening状态下播放消息
+  /// [isUserResponse] 为true时表示这是对用户输入的响应（延迟响应），不计入主动对话次数
+  void triggerProactiveMessage(String message, {bool isUserResponse = false}) {
+    debugPrint('[VoicePipelineController] 触发主动消息: $message (isUserResponse=$isUserResponse)');
+    _handleProactiveMessage(message, isUserResponse: isUserResponse);
+  }
+
   /// 处理ASR中间结果
   ///
   /// 中间结果表示用户仍在说话，需要重置聚合计时器
@@ -708,8 +717,8 @@ class VoicePipelineController {
   /// 处理主动对话消息
   ///
   /// 当用户30秒无操作时，系统主动发起对话
-  void _handleProactiveMessage(String message) {
-    debugPrint('[VoicePipelineController] 收到主动对话消息: $message');
+  void _handleProactiveMessage(String message, {bool isUserResponse = false}) {
+    debugPrint('[VoicePipelineController] 收到主动对话消息: $message (isUserResponse=$isUserResponse)');
 
     // 只在 listening 状态下处理主动消息
     if (_state != VoicePipelineState.listening) {

@@ -220,6 +220,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     // 由流水线的OutputPipeline负责TTS播放
     if (isPipelineMode) {
       coordinator.setSkipTTSPlayback(true);
+
+      // 设置延迟响应回调，将延迟响应传递给GlobalVoiceAssistant的流水线
+      coordinator.onDeferredResponse = (String response) {
+        debugPrint('[App] 收到延迟响应，传递给流水线: $response');
+        GlobalVoiceAssistantManager.instance.handleDeferredResponse(response);
+      };
     }
 
     // 连接网络状态提供者，让SmartIntentRecognizer能感知网络状态

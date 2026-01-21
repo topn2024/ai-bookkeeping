@@ -302,6 +302,12 @@ class SmartIntentRecognizer {
 输入："打车35，吃饭50"
 输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":35,"category":"交通"}},{"type":"add_transaction","priority":"deferred","params":{"amount":50,"category":"餐饮"}}],"chat_content":null,"clarify_question":null}
 
+输入："早餐七块"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":7,"category":"餐饮"}}],"chat_content":null,"clarify_question":null}
+
+输入："午餐十五，晚餐二十"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":15,"category":"餐饮"}},{"type":"add_transaction","priority":"deferred","params":{"amount":20,"category":"餐饮"}}],"chat_content":null,"clarify_question":null}
+
 输入："为什么要记账"
 输出：{"result_type":"chat","operations":[],"chat_content":"为什么要记账","clarify_question":null}
 

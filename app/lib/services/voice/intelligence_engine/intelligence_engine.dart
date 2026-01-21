@@ -388,7 +388,7 @@ class IntelligenceEngine {
         _resultBuffer.add(
           result: executionResult,
           description: description,
-          amount: operation.params['amount'] as double?,
+          amount: (operation.params['amount'] as num?)?.toDouble(),
           operationType: operation.type,
         );
 
@@ -409,7 +409,7 @@ class IntelligenceEngine {
   String _generateOperationDescription(Operation operation) {
     final params = operation.params;
     final category = params['category'] as String? ?? '';
-    final amount = params['amount'] as double?;
+    final amount = (params['amount'] as num?)?.toDouble();
 
     if (category.isNotEmpty && amount != null) {
       return '$category${amount.toStringAsFixed(0)}元';
@@ -489,7 +489,7 @@ class IntelligenceEngine {
         _resultBuffer.add(
           result: executionResult,
           description: description,
-          amount: pending.operation.params['amount'] as double?,
+          amount: (pending.operation.params['amount'] as num?)?.toDouble(),
           operationType: pending.operation.type,
         );
 
