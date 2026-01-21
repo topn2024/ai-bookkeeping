@@ -85,7 +85,9 @@ class AdaptiveConversationAgent {
     }
   }
 
-  /// 生成 chat 模式响应（简短2-3句）
+  /// 生成 chat 模式响应（降级模板，实际由ChatEngine处理）
+  ///
+  /// 日常闲聊默认1-2句，用户要求讲故事/详细解释时可展开3-5句
   String _generateChatResponse() {
     const templates = [
       '好的，有什么可以帮您的吗？',
@@ -130,10 +132,12 @@ class AdaptiveConversationAgent {
   }
 
   /// 获取响应长度限制
+  ///
+  /// 注意：chat模式上限较高，以支持用户要求讲故事等场景
   ResponseLengthLimit getLengthLimit(ConversationMode mode) {
     switch (mode) {
       case ConversationMode.chat:
-        return ResponseLengthLimit(min: 10, max: 30);
+        return ResponseLengthLimit(min: 10, max: 100);  // 支持展开回复
       case ConversationMode.chatWithIntent:
         return ResponseLengthLimit(min: 30, max: 100);
       case ConversationMode.quickBookkeeping:

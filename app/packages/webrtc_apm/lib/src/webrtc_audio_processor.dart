@@ -75,21 +75,21 @@ class WebrtcAudioProcessor {
         debugPrint('[WebrtcAudioProcessor] AEC 已启用 (high)');
       }
 
-      // 配置 NS
+      // 配置 NS - 自适应模式，初始使用 moderate，后续由校准结果调整
       if (enableNs) {
         await WebrtcApmPlatform.setNsEnabled(true);
         await WebrtcApmPlatform.setNsSuppressionLevel(
-          NsSuppressionLevel.high,
+          NsSuppressionLevel.moderate,  // 默认 moderate，校准后会调整
         );
-        debugPrint('[WebrtcAudioProcessor] NS 已启用 (high)');
+        debugPrint('[WebrtcAudioProcessor] NS 已启用 (moderate，待校准调整)');
       }
 
-      // 配置 AGC
+      // 配置 AGC - 豆包方案：目标音量 -12dBFS（阿里云 ASR 最优输入区间 -15~-10dBFS）
       if (enableAgc) {
         await WebrtcApmPlatform.setAgcEnabled(true);
         await WebrtcApmPlatform.setAgcMode(AgcMode.adaptiveDigital);
-        await WebrtcApmPlatform.setAgcTargetLevel(3);
-        debugPrint('[WebrtcAudioProcessor] AGC 已启用 (adaptiveDigital)');
+        await WebrtcApmPlatform.setAgcTargetLevel(12);  // -12dBFS
+        debugPrint('[WebrtcAudioProcessor] AGC 已启用 (adaptiveDigital, -12dBFS)');
       }
 
       _isInitialized = true;

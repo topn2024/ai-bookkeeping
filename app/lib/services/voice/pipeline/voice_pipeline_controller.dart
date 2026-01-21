@@ -8,6 +8,7 @@ import '../realtime_vad_config.dart';
 import '../config/pipeline_config.dart';
 import '../detection/barge_in_detector_v2.dart';
 import '../dynamic_aggregation_window.dart';
+import '../intelligence_engine/proactive_conversation_manager.dart';
 import '../tracking/response_tracker.dart';
 import 'input_pipeline.dart';
 import 'output_pipeline.dart';
@@ -68,6 +69,12 @@ class VoicePipelineController {
   /// 是否正在说话（基于VAD）
   bool _isUserSpeaking = false;
 
+  /// 主动对话管理器
+  late final ProactiveConversationManager _proactiveManager;
+
+  /// 主动话题生成器
+  late final SimpleTopicGenerator _topicGenerator;
+
   /// 回调
   /// 处理用户输入，返回LLM响应流
   Future<void> Function(String userInput, void Function(String chunk) onChunk, VoidCallback onComplete)? onProcessInput;
@@ -89,6 +96,12 @@ class VoicePipelineController {
 
   /// 需要重启音频录制回调（当ASR超时或流意外结束时触发）
   VoidCallback? onNeedRestartRecording;
+
+  /// 主动对话消息回调（当系统主动发起对话时触发）
+  void Function(String message)? onProactiveMessage;
+
+  /// 会话超时回调（连续3次无回应或30秒无响应时触发）
+  VoidCallback? onSessionTimeout;
 
   /// 事件流
   final _stateController = StreamController<VoicePipelineState>.broadcast();
@@ -118,6 +131,14 @@ class VoicePipelineController {
       responseTracker: _responseTracker,
       bargeInDetector: _bargeInDetector,
       config: _config,
+    );
+
+    // 初始化主动对话管理器
+    _topicGenerator = SimpleTopicGenerator();
+    _proactiveManager = ProactiveConversationManager(
+      topicGenerator: _topicGenerator,
+      onProactiveMessage: _handleProactiveMessage,
+      onSessionEnd: _handleSessionTimeout,
     );
 
     _setupCallbacks();
@@ -156,6 +177,9 @@ class VoicePipelineController {
   void _handleSpeechStart() {
     _isUserSpeaking = true;
     debugPrint('[VoicePipelineController] VAD: 用户开始说话');
+
+    // 用户开始说话时重置主动对话计时器
+    _proactiveManager.resetTimer();
   }
 
   /// 处理语音结束（VAD检测）
@@ -286,7 +310,14 @@ class VoicePipelineController {
       _sentenceAggregationTimer = null;
       _maxWaitTimer?.cancel();
       _maxWaitTimer = null;
-      _sentenceBuffer.clear();
+
+      // 重要：停止前先处理缓冲区中未处理的句子
+      // 这样用户说完话后即使流水线停止，内容也不会丢失
+      if (_sentenceBuffer.isNotEmpty) {
+        debugPrint('[VoicePipelineController] 停止前处理缓冲区: $_sentenceBuffer');
+        await _processAggregatedSentences();
+      }
+
       _cumulativeWaitMs = 0;
       _lastSpeechEndTime = null;
       _isUserSpeaking = false;
@@ -310,8 +341,18 @@ class VoicePipelineController {
   }
 
   /// 处理ASR中间结果
+  ///
+  /// 中间结果表示用户仍在说话，需要重置聚合计时器
   void _handlePartialResult(String text) {
     onPartialResult?.call(text);
+
+    // 如果有聚合计时器在运行且缓冲区有内容，收到中间结果说明用户还在说话
+    // 重置计时器，等待用户说完（滑动窗口机制的关键）
+    if (_sentenceAggregationTimer != null && _sentenceBuffer.isNotEmpty) {
+      debugPrint('[VoicePipelineController] 收到中间结果"$text"，重置聚合计时器');
+      _sentenceAggregationTimer?.cancel();
+      _startDynamicAggregationTimer();
+    }
   }
 
   /// 处理ASR最终结果
@@ -506,11 +547,34 @@ class VoicePipelineController {
   void _setState(VoicePipelineState newState) {
     if (_state == newState) return;
 
+    final oldState = _state;
     _state = newState;
     _stateController.add(_state);
     onStateChanged?.call(_state);
 
-    debugPrint('[VoicePipelineController] 状态变更: $newState');
+    debugPrint('[VoicePipelineController] 状态变更: $oldState → $newState');
+
+    // 主动对话状态管理
+    _updateProactiveMonitoring(oldState, newState);
+  }
+
+  /// 更新主动对话监听状态
+  void _updateProactiveMonitoring(VoicePipelineState oldState, VoicePipelineState newState) {
+    // 进入 listening 状态：启动静默监听
+    if (newState == VoicePipelineState.listening) {
+      debugPrint('[VoicePipelineController] 进入listening，启动主动对话监听');
+      _proactiveManager.startSilenceMonitoring();
+    }
+    // 离开 listening 状态（processing/speaking/stopping/idle）：停止监听
+    else if (oldState == VoicePipelineState.listening) {
+      debugPrint('[VoicePipelineController] 离开listening，暂停主动对话监听');
+      _proactiveManager.stopMonitoring();
+    }
+    // 进入 idle 状态：重置会话
+    if (newState == VoicePipelineState.idle) {
+      debugPrint('[VoicePipelineController] 进入idle，重置主动对话会话');
+      _proactiveManager.resetForNewSession();
+    }
   }
 
   /// 发送音频数据
@@ -637,9 +701,67 @@ class VoicePipelineController {
     }
   }
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 主动对话
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /// 处理主动对话消息
+  ///
+  /// 当用户30秒无操作时，系统主动发起对话
+  void _handleProactiveMessage(String message) {
+    debugPrint('[VoicePipelineController] 收到主动对话消息: $message');
+
+    // 只在 listening 状态下处理主动消息
+    if (_state != VoicePipelineState.listening) {
+      debugPrint('[VoicePipelineController] 非listening状态，忽略主动消息');
+      return;
+    }
+
+    // 通知外部回调
+    onProactiveMessage?.call(message);
+
+    // 启动新响应
+    final responseId = _responseTracker.startNewResponse();
+    _outputPipeline.start(responseId);
+
+    // 切换到 speaking 状态
+    _setState(VoicePipelineState.speaking);
+
+    // 通过输出流水线播放消息
+    _outputPipeline.addChunk(message);
+    _outputPipeline.complete();
+
+    debugPrint('[VoicePipelineController] 主动对话消息已发送到TTS');
+  }
+
+  /// 处理会话超时（连续3次无回应或30秒无响应）
+  void _handleSessionTimeout() {
+    debugPrint('[VoicePipelineController] 会话超时，自动结束');
+
+    // 通知外部
+    onSessionTimeout?.call();
+
+    // 停止流水线
+    stop();
+  }
+
+  /// 禁用主动对话
+  void disableProactiveConversation() {
+    _proactiveManager.disable();
+  }
+
+  /// 启用主动对话
+  void enableProactiveConversation() {
+    _proactiveManager.enable();
+  }
+
+  /// 主动对话是否已禁用
+  bool get isProactiveDisabled => _proactiveManager.isDisabled;
+
   /// 释放资源
   void dispose() {
     stop();
+    _proactiveManager.dispose();
     _inputPipeline.dispose();
     _outputPipeline.dispose();
     _stateController.close();

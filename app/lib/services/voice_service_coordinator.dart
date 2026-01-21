@@ -292,11 +292,22 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       if (_networkStatusProvider != null) {
         _intelligenceEngine!.setNetworkStatusProvider(_networkStatusProvider);
       }
+      // 设置延迟响应回调（deferred操作聚合后的响应）
+      _intelligenceEngine!.onDeferredResponse = _handleDeferredResponse;
     }
 
     _agentModeEnabled = true;
     notifyListeners();
     debugPrint('[VoiceCoordinator] 对话式智能体模式已启用');
+  }
+
+  /// 处理延迟响应
+  ///
+  /// 当 deferred 操作计时器到期时，播放统一响应
+  void _handleDeferredResponse(String response) {
+    debugPrint('[VoiceCoordinator] 延迟响应: $response');
+    _lastResponse = response;
+    _speakWithSkipCheck(response);
   }
 
   /// 禁用对话式智能体模式

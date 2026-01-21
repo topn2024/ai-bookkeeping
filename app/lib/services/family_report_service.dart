@@ -340,7 +340,7 @@ class FamilyReportService {
     // 数据充足性检查
     if (summary.transactionCount < 5) {
       insights.add(FinancialInsight(
-        type: InsightType.info,
+        type: InsightType.warning,
         title: '数据较少',
         description: '当前仅有${summary.transactionCount}笔交易记录，建议继续记账以获得更准确的财务分析',
         suggestion: '建议至少记录一周的完整交易数据（约20-30笔）后再查看报告',

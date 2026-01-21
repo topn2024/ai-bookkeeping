@@ -86,6 +86,7 @@ dependencies:
   connectivity_plus: ^7.0.0
   record: ^6.0.0  # Audio recording for Qwen Audio model
   just_audio: ^0.9.40  # Audio playback for source audio files
+  flutter_pcm_sound: ^3.3.3  # PCM audio playback for AEC reference signal
   http: ^1.2.2  # HTTP client for file sync
 
   # Voice Activity Detection

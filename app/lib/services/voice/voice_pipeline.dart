@@ -1,6 +1,7 @@
 /// 语音流水线模块
 ///
-/// 提供流式TTS流水线、三层打断检测、四层回声防护等能力。
+/// 提供流式TTS流水线、VAD打断检测等能力。
+/// 回声消除由硬件级 AEC 在音频层处理。
 ///
 /// 使用示例：
 /// ```dart
@@ -27,8 +28,6 @@ library voice_pipeline;
 export 'config/pipeline_config.dart';
 
 // 检测器
-export 'detection/similarity_calculator.dart';
-export 'detection/echo_filter.dart';
 export 'detection/barge_in_detector_v2.dart';
 
 // 追踪器

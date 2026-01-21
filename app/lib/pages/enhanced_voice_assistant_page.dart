@@ -40,7 +40,9 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   final ScrollController _scrollController = ScrollController();
   late AnimationController _pulseController;
   late AnimationController _waveController;
-  bool _hasPermission = false;
+
+  /// 权限状态：null = 检查中，true = 已授权，false = 未授权
+  bool? _hasPermission;
 
   // 交互模式：true = 点击开始/停止，false = 按住说话
   final bool _tapToToggleMode = true;
@@ -72,17 +74,14 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   }
 
   Future<void> _checkPermissions() async {
+    debugPrint('[VoiceAssistantPage] _checkPermissions 开始');
     final status = await Permission.microphone.status;
+    debugPrint('[VoiceAssistantPage] 麦克风权限状态: $status, isGranted=${status.isGranted}');
     setState(() {
       _hasPermission = status.isGranted;
     });
-
-    if (!_hasPermission) {
-      final result = await Permission.microphone.request();
-      setState(() {
-        _hasPermission = result.isGranted;
-      });
-    }
+    debugPrint('[VoiceAssistantPage] _hasPermission 设置为: $_hasPermission');
+    // 注意：不在这里请求权限，由 GlobalVoiceAssistantManager 在实际录音时统一处理
   }
 
   @override
@@ -653,8 +652,8 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
               ],
             ),
 
-            // 权限提示
-            if (!_hasPermission) ...[
+            // 权限提示（只在明确知道没有权限时显示，检查中不显示）
+            if (_hasPermission == false) ...[
               const SizedBox(height: 16),
               GestureDetector(
                 onTap: _requestPermission,
@@ -708,11 +707,12 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
     return GestureDetector(
       // 点击切换模式：点击开始/停止录音
-      onTap: _tapToToggleMode && _hasPermission ? () => _toggleRecording() : null,
+      // 权限检查中(null)或已授权(true)时允许操作
+      onTap: _tapToToggleMode && _hasPermission != false ? () => _toggleRecording() : null,
       // 按住说话模式：按下开始，松开停止
-      onTapDown: !_tapToToggleMode && _hasPermission && !isProcessing ? (_) => _startRecording() : null,
-      onTapUp: !_tapToToggleMode && _hasPermission ? (_) => _stopRecording() : null,
-      onTapCancel: !_tapToToggleMode && _hasPermission ? () => _stopRecording() : null,
+      onTapDown: !_tapToToggleMode && _hasPermission != false && !isProcessing ? (_) => _startRecording() : null,
+      onTapUp: !_tapToToggleMode && _hasPermission != false ? (_) => _stopRecording() : null,
+      onTapCancel: !_tapToToggleMode && _hasPermission != false ? () => _stopRecording() : null,
       child: AnimatedBuilder(
         animation: _pulseController,
         builder: (context, child) {
@@ -777,7 +777,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: _hasPermission
+                          colors: _hasPermission != false
                               ? (isListening
                                   ? [AppColors.expense, AppColors.expense.withValues(alpha: 0.85)]
                                   : [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.85)])
@@ -794,7 +794,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
                         ],
                       ),
                       child: Icon(
-                        _hasPermission
+                        _hasPermission != false
                             ? (isListening ? Icons.mic : Icons.mic_none)
                             : Icons.mic_off,
                         color: Colors.white,
@@ -924,11 +924,21 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
   /// 切换录音状态（点击模式）
   Future<void> _toggleRecording() async {
-    if (!_hasPermission) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先授予麦克风权限')),
-      );
-      return;
+    // 如果没有权限，先请求权限
+    if (_hasPermission == false) {
+      debugPrint('[VoiceAssistantPage] 没有麦克风权限，请求权限');
+      final granted = await _voiceManager.requestMicrophonePermission();
+      setState(() {
+        _hasPermission = granted;
+      });
+      if (!granted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('需要麦克风权限才能使用语音功能')),
+          );
+        }
+        return;
+      }
     }
 
     final voiceManager = ref.read(globalVoiceAssistantProvider);
@@ -956,11 +966,21 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   }
 
   Future<void> _startRecording() async {
-    if (!_hasPermission) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先授予麦克风权限')),
-      );
-      return;
+    // 如果没有权限，先请求权限
+    if (_hasPermission == false) {
+      debugPrint('[VoiceAssistantPage] 没有麦克风权限，请求权限');
+      final granted = await _voiceManager.requestMicrophonePermission();
+      setState(() {
+        _hasPermission = granted;
+      });
+      if (!granted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('需要麦克风权限才能使用语音功能')),
+          );
+        }
+        return;
+      }
     }
 
     final voiceManager = ref.read(globalVoiceAssistantProvider);
@@ -1033,7 +1053,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
       _hasPermission = result.isGranted;
     });
 
-    if (!_hasPermission) {
+    if (_hasPermission == false) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1288,7 +1308,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   }
 
   String _getActionText(VoiceSessionState sessionState) {
-    if (!_hasPermission) return '需要权限';
+    if (_hasPermission == false) return '需要权限';
     final voiceManager = ref.read(globalVoiceAssistantProvider);
     final isRecording = voiceManager.ballState == FloatingBallState.recording;
     final isProcessing = voiceManager.ballState == FloatingBallState.processing;
@@ -1299,7 +1319,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   }
 
   String _getActionHint(VoiceSessionState sessionState) {
-    if (!_hasPermission) return '点击申请麦克风权限';
+    if (_hasPermission == false) return '点击申请麦克风权限';
     final voiceManager = ref.read(globalVoiceAssistantProvider);
     final isRecording = voiceManager.ballState == FloatingBallState.recording;
     final isProcessing = voiceManager.ballState == FloatingBallState.processing;

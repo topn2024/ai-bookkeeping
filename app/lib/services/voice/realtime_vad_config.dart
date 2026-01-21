@@ -364,6 +364,14 @@ class RealtimeVADService {
     );
   }
 
+  /// 停止沉默超时检测（公开方法）
+  ///
+  /// TTS播放时调用，避免误触发
+  void stopSilenceTimeoutDetection() {
+    debugPrint('[RealtimeVAD] 停止沉默超时检测');
+    _cancelSilenceTimeoutTimer();
+  }
+
   /// 重置状态
   void reset() {
     _state = VADState.silence;

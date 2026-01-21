@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'voice_token_service.dart';
 import 'audio_stream_player.dart';
+import 'voice/pcm_audio_player.dart';
 
 /// 流式TTS服务
 ///
@@ -19,6 +21,7 @@ class StreamingTTSService {
   final VoiceTokenService _tokenService;
   final Dio _dio;
   final AudioStreamPlayer _streamPlayer;
+  final PCMAudioPlayer _pcmPlayer;
 
   /// TTS设置
   /// 使用 zhitian_emo（知甜情感女声）- 更自然动听的年轻女性声音
@@ -26,6 +29,9 @@ class StreamingTTSService {
   double _rate = 0;
   double _volume = 50;
   double _pitch = 0;
+
+  /// 是否使用PCM模式（用于AEC）
+  bool _usePCMMode = true;
 
   /// 状态
   bool _isInitialized = false;
@@ -41,10 +47,16 @@ class StreamingTTSService {
   Duration? _firstChunkLatency;
   Duration? get firstChunkLatency => _firstChunkLatency;
 
+  /// AEC参考信号回调
+  ///
+  /// 当播放PCM音频时，会调用此回调将音频数据传递给AEC
+  void Function(Uint8List pcmData)? onAudioPlayed;
+
   StreamingTTSService({VoiceTokenService? tokenService})
       : _tokenService = tokenService ?? VoiceTokenService(),
         _dio = Dio(),
-        _streamPlayer = AudioStreamPlayer() {
+        _streamPlayer = AudioStreamPlayer(),
+        _pcmPlayer = PCMAudioPlayer() {
     _dio.options.connectTimeout = const Duration(seconds: 5);
     _dio.options.receiveTimeout = const Duration(seconds: 10);
   }
@@ -57,8 +69,24 @@ class StreamingTTSService {
     if (_isInitialized) return;
 
     await _streamPlayer.initialize();
+
+    // 初始化PCM播放器
+    if (_usePCMMode) {
+      await _pcmPlayer.initialize(sampleRate: 16000, channelCount: 1);
+      // 设置AEC回调
+      _pcmPlayer.onAudioPlayed = (pcmData) {
+        onAudioPlayed?.call(pcmData);
+      };
+    }
+
     _isInitialized = true;
-    debugPrint('StreamingTTSService: initialized');
+    debugPrint('StreamingTTSService: initialized (PCM mode: $_usePCMMode)');
+  }
+
+  /// 设置是否使用PCM模式（用于AEC）
+  void setUsePCMMode(bool usePCM) {
+    _usePCMMode = usePCM;
+    debugPrint('StreamingTTSService: PCM mode = $usePCM');
   }
 
   /// 流式朗读文本
@@ -187,6 +215,83 @@ class StreamingTTSService {
     List<String> sentences,
     VoiceTokenInfo tokenInfo,
   ) async {
+    if (_usePCMMode) {
+      await _synthesizeAndPlayPCM(sentences, tokenInfo);
+    } else {
+      await _synthesizeAndPlayMP3(sentences, tokenInfo);
+    }
+  }
+
+  /// PCM模式：合成并播放（用于AEC）
+  Future<void> _synthesizeAndPlayPCM(
+    List<String> sentences,
+    VoiceTokenInfo tokenInfo,
+  ) async {
+    const prefetchCount = 2;
+    const maxQueueSize = 5;
+    const synthesisTimeout = Duration(seconds: 15);
+
+    final audioFutures = <int, Future<Uint8List?>>{};
+    int successCount = 0;
+
+    try {
+      // 启动预取
+      for (var i = 0; i < sentences.length && i < prefetchCount; i++) {
+        audioFutures[i] = _synthesizeToPCMWithTimeout(
+          sentences[i], tokenInfo, i, synthesisTimeout,
+        );
+      }
+
+      // 边合成边播放
+      for (var i = 0; i < sentences.length; i++) {
+        if (_isCancelled) break;
+
+        final future = audioFutures[i];
+        if (future == null) {
+          debugPrint('StreamingTTSService: missing future for sentence $i');
+          continue;
+        }
+
+        final pcmData = await future;
+        audioFutures.remove(i);
+
+        if (pcmData == null || _isCancelled) continue;
+
+        successCount++;
+
+        // 记录首字延迟
+        if (i == 0 && _synthesisStartTime != null) {
+          _firstChunkLatency = DateTime.now().difference(_synthesisStartTime!);
+          debugPrint('StreamingTTSService: first chunk latency = ${_firstChunkLatency!.inMilliseconds}ms (PCM)');
+          _stateController.add(StreamingTTSState.firstChunkReady);
+        }
+
+        // 预取下一个
+        final nextIndex = i + prefetchCount;
+        if (nextIndex < sentences.length && audioFutures.length < maxQueueSize) {
+          audioFutures[nextIndex] = _synthesizeToPCMWithTimeout(
+            sentences[nextIndex], tokenInfo, nextIndex, synthesisTimeout,
+          );
+        }
+
+        // 播放PCM（同时触发AEC回调）
+        await _pcmPlayer.playPCM(pcmData);
+      }
+
+      if (successCount == 0 && sentences.isNotEmpty && !_isCancelled) {
+        throw Exception('All sentences synthesis failed');
+      }
+    } catch (e) {
+      debugPrint('StreamingTTSService: PCM playback error - $e');
+      rethrow;
+    }
+  }
+
+  /// MP3模式：合成并播放（原有逻辑）
+  Future<void> _synthesizeAndPlayMP3(
+    List<String> sentences,
+    VoiceTokenInfo tokenInfo,
+  ) async {
     // 预取配置
     const prefetchCount = 2;
     const maxQueueSize = 5; // 最大队列长度，防止内存溢出
@@ -260,7 +365,7 @@ class StreamingTTSService {
     }
   }
 
-  /// 带超时保护的合成
+  /// 带超时保护的合成（MP3文件）
   Future<File?> _synthesizeToFileWithTimeout(
     String text,
     VoiceTokenInfo tokenInfo,
@@ -277,6 +382,79 @@ class StreamingTTSService {
       debugPrint('StreamingTTSService: synthesis failed for sentence $index - $e');
       return null;
     }
+  }
+
+  /// 带超时保护的合成（PCM数据）
+  Future<Uint8List?> _synthesizeToPCMWithTimeout(
+    String text,
+    VoiceTokenInfo tokenInfo,
+    int index,
+    Duration timeout,
+  ) async {
+    try {
+      return await _synthesizeToPCM(text, tokenInfo, index)
+          .timeout(timeout, onTimeout: () {
+        debugPrint('StreamingTTSService: PCM synthesis timeout for sentence $index');
+        return null;
+      });
+    } catch (e) {
+      debugPrint('StreamingTTSService: PCM synthesis failed for sentence $index - $e');
+      return null;
+    }
+  }
+
+  /// 合成单个句子到PCM数据
+  Future<Uint8List?> _synthesizeToPCM(
+    String text,
+    VoiceTokenInfo tokenInfo,
+    int index,
+  ) async {
+    try {
+      String ttsRestUrl = tokenInfo.ttsUrl;
+      if (ttsRestUrl.startsWith('wss://')) {
+        ttsRestUrl = ttsRestUrl
+            .replaceFirst('wss://', 'https://')
+            .replaceFirst('/ws/v1', '/stream/v1/tts');
+      } else if (ttsRestUrl.startsWith('ws://')) {
+        ttsRestUrl = ttsRestUrl
+            .replaceFirst('ws://', 'http://')
+            .replaceFirst('/ws/v1', '/stream/v1/tts');
+      }
+
+      final uri = Uri.parse(ttsRestUrl).replace(
+        queryParameters: {
+          'appkey': tokenInfo.appKey,
+          'text': text,
+          'format': 'pcm',  // 请求PCM格式
+          'sample_rate': '16000',  // 16kHz采样率
+          'voice': _voice,
+          'volume': _volume.round().toString(),
+          'speech_rate': _rate.round().toString(),
+          'pitch_rate': _pitch.round().toString(),
+        },
+      );
+
+      debugPrint('StreamingTTSService: requesting PCM for sentence $index');
+
+      final response = await _dio.getUri<List<int>>(
+        uri,
+        options: Options(
+          headers: {
+            'X-NLS-Token': tokenInfo.token,
+          },
+          responseType: ResponseType.bytes,
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final pcmData = Uint8List.fromList(response.data!);
+        debugPrint('StreamingTTSService: received ${pcmData.length} bytes PCM for sentence $index');
+        return pcmData;
+      }
+    } catch (e) {
+      debugPrint('StreamingTTSService: PCM synthesize error for sentence $index - $e');
+    }
+    return null;
   }
 
   /// 安全删除文件
@@ -362,6 +540,7 @@ class StreamingTTSService {
   Future<void> stop() async {
     _isCancelled = true;
     await _streamPlayer.stop();
+    await _pcmPlayer.stop();
     _isSpeaking = false;
     _stateController.add(StreamingTTSState.stopped);
     debugPrint('StreamingTTSService: stopped');
@@ -371,6 +550,7 @@ class StreamingTTSService {
   Future<void> fadeOutAndStop({Duration duration = const Duration(milliseconds: 100)}) async {
     _isCancelled = true;
     await _streamPlayer.fadeOutAndStop(duration: duration);
+    await _pcmPlayer.stop();  // PCM播放器不支持淡出，直接停止
     _isSpeaking = false;
     _stateController.add(StreamingTTSState.interrupted);
     debugPrint('StreamingTTSService: fade out stopped');
@@ -397,10 +577,11 @@ class StreamingTTSService {
   }
 
   /// 释放资源
-  void dispose() {
-    stop();
+  Future<void> dispose() async {
+    await stop();
     _stateController.close();
     _streamPlayer.dispose();
+    await _pcmPlayer.dispose();
     _dio.close();
   }
 }

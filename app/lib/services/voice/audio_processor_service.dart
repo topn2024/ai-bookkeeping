@@ -152,7 +152,7 @@ class AudioProcessorService {
 
   /// 应用环境噪声校准结果
   ///
-  /// 根据校准结果动态调整 NS 抑制级别
+  /// 根据校准结果动态调整 NS 抑制级别（自适应模式）
   Future<void> applyCalibration(CalibrationResult result) async {
     _calibrationResult = result;
 
@@ -163,14 +163,14 @@ class AudioProcessorService {
 
     debugPrint('[AudioProcessorService] 应用校准结果: $result');
 
-    // 根据校准结果设置 NS 抑制级别
+    // 根据校准结果设置 NS 抑制级别（自适应模式）
     final nsLevel = _mapNsSuppressionLevel(result.nsSuppressionLevel);
     await WebrtcApmPlatform.setNsSuppressionLevel(nsLevel);
 
     debugPrint('[AudioProcessorService] NS 抑制级别已设置为: $nsLevel');
   }
 
-  /// 映射 NS 抑制级别到枚举
+  /// 映射 NS 抑制级别到枚举（保留用于调试）
   NsSuppressionLevel _mapNsSuppressionLevel(int level) {
     switch (level) {
       case 0:

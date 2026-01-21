@@ -182,14 +182,12 @@ class CloudDirectService {
   }) async {
     // 创建新的LLM服务实例
     _llmService = ClientLLMService(
-      provider: provider,
-      model: model,
+      keyManager: _keyManager,
     );
 
     // 存储API key到SecureKeyManager
     // 使用不同的provider标识来区分
-    final llmKeyManager = SecureKeyManager();
-    await llmKeyManager.storeKey(
+    await _keyManager.storeKey(
       apiKey: apiKey,
       provider: provider.name,
     );

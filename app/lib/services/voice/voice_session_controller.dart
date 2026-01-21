@@ -203,10 +203,18 @@ class VoiceSessionController {
 
     _audioStreamController = StreamController<Uint8List>.broadcast();
 
-    const recordConfig = RecordConfig(
+    // 禁用硬件级 3A，只使用 WebRTC APM 软件处理
+    final recordConfig = RecordConfig(
       encoder: AudioEncoder.pcm16bits,
       sampleRate: 16000,
       numChannels: 1,
+      echoCancel: false,
+      autoGain: false,
+      noiseSuppress: false,
+      androidConfig: AndroidRecordConfig(
+        audioSource: AndroidAudioSource.voiceRecognition,  // 使用语音识别源，避免系统自动应用 NS
+        audioManagerMode: AudioManagerMode.modeInCommunication,
+      ),
     );
 
     final audioStream = await _audioRecorder.startStream(recordConfig);

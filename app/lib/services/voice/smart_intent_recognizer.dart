@@ -192,18 +192,29 @@ class SmartIntentRecognizer {
 
     if (singleResult.isSuccess) {
       debugPrint('[SmartIntent] 规则识别成功: ${singleResult.intentType}');
-      return MultiOperationResult.withOperations(
+      return MultiOperationResult(
+        resultType: RecognitionResultType.operation,
         operations: [_convertToOperation(singleResult)],
         chatContent: null,
         confidence: singleResult.confidence,
         source: singleResult.source,
         originalInput: originalInput,
+        isOfflineMode: true,  // 标识为离线模式
       );
     }
 
-    // 规则也无法识别，返回 failed 类型（离线且无法识别）
-    debugPrint('[SmartIntent] 规则无法识别，返回 failed 类型');
-    return MultiOperationResult.failed('离线模式下无法识别该指令');
+    // 规则也无法识别，返回 chat 类型并提示离线模式
+    // 避免返回 failed 导致用户看到错误信息
+    debugPrint('[SmartIntent] 规则无法识别，返回 chat 类型（离线模式）');
+    return MultiOperationResult(
+      resultType: RecognitionResultType.chat,
+      operations: [],
+      chatContent: originalInput,
+      confidence: 0.5,
+      source: RecognitionSource.error,
+      originalInput: originalInput,
+      isOfflineMode: true,  // 标识为离线模式
+    );
   }
 
   /// 带超时的多操作LLM调用
@@ -587,32 +598,10 @@ class SmartIntentRecognizer {
   }
 
   SmartIntentResult? _checkNavigationWithSynonyms(String input) {
-    // 使用 VoiceNavigationService 进行导航识别
-    // 它包含 237 个页面的丰富别名配置、模式匹配和模糊匹配
-    final navResult = _navigationService.parseNavigation(input);
-
-    if (navResult.success && navResult.config != null) {
-      final config = navResult.config!;
-
-      // 根据匹配置信度调整结果置信度
-      // VoiceNavigationService 返回的模糊匹配置信度为 0.7，精确匹配为 1.0
-      final confidence = navResult.confidence >= 0.9 ? 0.9 : 0.8;
-
-      return SmartIntentResult(
-        intentType: SmartIntentType.navigate,
-        confidence: confidence,
-        entities: {
-          'targetPage': config.name,
-          'route': config.route,
-          'module': config.module,
-        },
-        source: RecognitionSource.synonymExpansion,
-        originalInput: input,
-      );
-    }
-
-    // 如果 VoiceNavigationService 未匹配，回退到本地同义词检查
-    // 检查是否包含导航动词（或同义词）
+    // ═══════════════════════════════════════════════════════════════
+    // 先检查是否有导航意图（必须有导航动词才进行导航识别）
+    // 避免"你好"等闲聊被误识别为导航
+    // ═══════════════════════════════════════════════════════════════
     bool hasNavVerb = false;
     for (final synonyms in _navigationSynonyms.values) {
       if (synonyms.any((s) => input.contains(s))) {
@@ -637,7 +626,33 @@ class SmartIntentRecognizer {
       }
     }
 
+    // 没有导航动词，不进行导航识别
     if (!hasNavVerb) return null;
+
+    // ═══════════════════════════════════════════════════════════════
+    // 有导航意图，使用 VoiceNavigationService 进行页面匹配
+    // ═══════════════════════════════════════════════════════════════
+    final navResult = _navigationService.parseNavigation(input);
+
+    if (navResult.success && navResult.config != null) {
+      final config = navResult.config!;
+
+      // 根据匹配置信度调整结果置信度
+      // VoiceNavigationService 返回的模糊匹配置信度为 0.7，精确匹配为 1.0
+      final confidence = navResult.confidence >= 0.9 ? 0.9 : 0.8;
+
+      return SmartIntentResult(
+        intentType: SmartIntentType.navigate,
+        confidence: confidence,
+        entities: {
+          'targetPage': config.name,
+          'route': config.route,
+          'module': config.module,
+        },
+        source: RecognitionSource.synonymExpansion,
+        originalInput: input,
+      );
+    }
 
     // 检查目标页面（本地同义词作为兜底）
     for (final entry in _targetSynonyms.entries) {
@@ -1570,6 +1585,8 @@ class MultiOperationResult {
   final RecognitionSource source;
   final String originalInput;
   final String? errorMessage;
+  /// 是否处于离线模式（LLM不可用，使用规则兜底）
+  final bool isOfflineMode;
 
   const MultiOperationResult({
     required this.resultType,
@@ -1580,6 +1597,7 @@ class MultiOperationResult {
     required this.originalInput,
     this.clarifyQuestion,
     this.errorMessage,
+    this.isOfflineMode = false,
   });
 
   /// 有操作的结果
