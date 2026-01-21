@@ -34,6 +34,10 @@ class SagaState(Enum):
     FAILED = "failed"
 
 
+# 别名，保持向后兼容
+SagaStatus = SagaState
+
+
 class StepState(Enum):
     """Individual step states."""
     PENDING = "pending"

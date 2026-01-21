@@ -12,7 +12,7 @@ from datetime import datetime
 from celery import Task
 
 from app.tasks.celery_app import celery_app
-from app.database import get_db_context
+from app.core.database import get_db_context
 from app.services.data_quality_checker import DataQualityChecker
 from admin.models.data_quality_check import DataQualityCheck
 

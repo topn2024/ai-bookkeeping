@@ -127,3 +127,42 @@ def require_superadmin(
             detail="需要超级管理员权限",
         )
     return current_admin
+
+
+def require_permission(permission_code: str):
+    """
+    创建一个权限检查依赖项
+
+    Args:
+        permission_code: 权限代码，如 "monitor:data_quality:view"
+
+    Returns:
+        依赖函数，返回当前管理员（如果有权限）
+    """
+    async def check_permission(
+        current_admin: AdminUser = Depends(get_current_admin),
+    ) -> AdminUser:
+        # 超级管理员拥有所有权限
+        if current_admin.is_superadmin:
+            return current_admin
+
+        # 检查角色权限
+        if current_admin.role and current_admin.role.permissions:
+            for perm in current_admin.role.permissions:
+                # 支持通配符权限，如 "*" 或 "monitor:*"
+                if perm.code == "*":
+                    return current_admin
+                if perm.code == permission_code:
+                    return current_admin
+                # 检查前缀匹配，如 "monitor:*" 匹配 "monitor:data_quality:view"
+                if perm.code.endswith(":*"):
+                    prefix = perm.code[:-1]  # 去掉 "*"
+                    if permission_code.startswith(prefix):
+                        return current_admin
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"需要权限: {permission_code}",
+        )
+
+    return check_permission

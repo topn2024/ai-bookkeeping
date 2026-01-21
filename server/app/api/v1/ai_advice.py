@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
-from app.database import get_db
+from app.core.database import get_db
 from app.models.user import User
 from app.api.deps import get_current_user, get_llm_service
 from app.services.llm_service import LLMService

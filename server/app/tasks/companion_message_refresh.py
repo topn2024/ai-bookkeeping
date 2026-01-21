@@ -10,7 +10,7 @@ from sqlalchemy import select, func, and_
 from app.models.companion_message import CompanionMessageLibrary
 from app.services.companion_message_generator import CompanionMessageGenerator
 from app.services.llm_service import LLMService
-from app.database import get_db
+from app.core.database import get_db
 
 logger = logging.getLogger(__name__)
 

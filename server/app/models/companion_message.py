@@ -6,7 +6,7 @@ from sqlalchemy import Column, String, Text, Integer, Float, Boolean, DateTime, 
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base
+from app.core.database import Base
 
 
 class CompanionMessageLibrary(Base):

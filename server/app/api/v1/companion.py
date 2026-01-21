@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 from pydantic import BaseModel
 
-from app.database import get_db
+from app.core.database import get_db
 from app.models.companion_message import (
     CompanionMessageLibrary,
     CompanionMessageFeedback,

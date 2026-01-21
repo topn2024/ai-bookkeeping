@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # App
     APP_NAME: str = "AI Bookkeeping"
+    APP_BASE_URL: str = "http://localhost:8000"  # 应用基础URL，用于生成验证链接
     DEBUG: bool = False
     SECRET_KEY: str = ""  # Required: Set via environment variable
 

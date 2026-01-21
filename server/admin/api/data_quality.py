@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, and_, or_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.core.database import get_db
 from admin.api.deps import get_current_admin, require_permission
 from admin.models.admin_user import AdminUser
 from admin.models.data_quality_check import DataQualityCheck
