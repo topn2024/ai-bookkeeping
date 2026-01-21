@@ -467,6 +467,9 @@ class VoicePipelineController {
 
     debugPrint('[VoicePipelineController] 句子聚合完成，开始处理: "$aggregatedText"');
 
+    // 用户有输入，重置主动对话计时器和计数
+    _proactiveManager.resetTimer();
+
     // 开始处理
     _setState(VoicePipelineState.processing);
 
