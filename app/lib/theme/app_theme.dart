@@ -254,6 +254,7 @@ class AppTheme {
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
         brightness: Brightness.light,
+        primary: primaryColor,  // 明确指定主色，避免 Material 3 自动调整
       ),
       // 启用 iOS 风格的页面过渡动画，支持滑动返回手势
       pageTransitionsTheme: const PageTransitionsTheme(
@@ -322,6 +323,7 @@ class AppTheme {
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
         brightness: Brightness.dark,
+        primary: primaryColor,  // 明确指定主色，避免 Material 3 自动调整
       ),
       // 启用 iOS 风格的页面过渡动画，支持滑动返回手势
       pageTransitionsTheme: const PageTransitionsTheme(
