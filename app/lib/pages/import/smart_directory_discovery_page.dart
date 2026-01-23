@@ -128,26 +128,6 @@ class _SmartDirectoryDiscoveryPageState
       ),
     );
   }
-            ),
-          ),
-          GestureDetector(
-            onTap: _isScanning ? null : () => _browseDirectory(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.folder_open,
-                color: _isScanning
-                    ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// 扫描状态显示
   Widget _buildScanStatus(ThemeData theme) {
