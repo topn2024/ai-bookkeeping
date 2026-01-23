@@ -95,25 +95,39 @@ class PCMAudioPlayer {
     }
   }
 
+  /// 等待硬件播放完成的延迟（毫秒）
+  /// 音频硬件有自己的缓冲区，需要额外等待以确保完全播放
+  static const int _hardwareBufferDelayMs = 300;
+
   /// Feed回调 - 当缓冲区需要更多数据时调用
   void _onFeedCallback(int remainingFrames) {
     if (remainingFrames == 0) {
-      // 播放完成
-      _onPlaybackComplete();
+      // 缓冲区为空，但需要等待硬件播放完成
+      _onBufferDrained();
     } else if (_pendingData.isNotEmpty && !_isFeeding) {
       // 还有待播放数据，继续feed
       _feedNextChunk();
     }
   }
 
+  /// 缓冲区已排空，等待硬件播放完成
+  void _onBufferDrained() {
+    if (_pendingData.isEmpty && _isPlaying) {
+      // 添加延迟等待硬件缓冲区播放完成
+      Future.delayed(const Duration(milliseconds: _hardwareBufferDelayMs), () {
+        _onPlaybackComplete();
+      });
+    }
+  }
+
   /// 播放完成处理
   void _onPlaybackComplete() {
-    if (_pendingData.isEmpty) {
+    if (_pendingData.isEmpty && _isPlaying) {
       _isPlaying = false;
       _stateController.add(PCMPlayerState.completed);
       _playCompleter?.complete();
       _playCompleter = null;
-      debugPrint('[PCMAudioPlayer] 播放完成');
+      debugPrint('[PCMAudioPlayer] 播放完成（含硬件缓冲延迟）');
     }
   }
 
