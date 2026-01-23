@@ -96,6 +96,9 @@ class ResultBuffer {
   /// 结果过期时间（秒）
   static const int expirationSeconds = 30;
 
+  /// 过期清理间隔（秒）
+  static const int cleanupIntervalSeconds = 10;
+
   /// 缓冲区
   final List<BufferedResult> _buffer = [];
 
@@ -104,6 +107,9 @@ class ResultBuffer {
 
   /// ID计数器
   int _idCounter = 0;
+
+  /// 是否已释放（防止计时器回调在 dispose 后访问已清空的 buffer）
+  bool _isDisposed = false;
 
   ResultBuffer() {
     _startCleanupTimer();
@@ -134,6 +140,9 @@ class ResultBuffer {
     double? amount,
     OperationType? operationType,
   }) {
+    // 先清理过期结果，确保有空间
+    _cleanupExpired();
+
     // 计算优先级
     final priority = _calculatePriority(
       operationType: operationType,
@@ -210,6 +219,8 @@ class ResultBuffer {
 
   /// 释放资源
   void dispose() {
+    // 先标记为已释放，防止计时器回调继续访问 buffer
+    _isDisposed = true;
     _cleanupTimer?.cancel();
     _cleanupTimer = null;
     _buffer.clear();
@@ -242,19 +253,21 @@ class ResultBuffer {
   BufferedResult? _findById(String id) {
     try {
       return _buffer.firstWhere((r) => r.id == id);
-    } catch (_) {
+    } on StateError {
+      // firstWhere 在找不到元素时抛出 StateError
       return null;
     }
   }
 
   /// 移除最旧的已处理结果
   void _evictOldest() {
-    // 优先移除已通知/过期/压制的结果
-    final removable = _buffer.where((r) => r.status != ResultStatus.pending).toList();
+    // 优先移除已通知/过期/压制的结果，或者已经过期但状态还是pending的结果
+    final removable = _buffer.where((r) =>
+        r.status != ResultStatus.pending || r.isExpired).toList();
     if (removable.isNotEmpty) {
       final oldest = removable.first;
       _buffer.remove(oldest);
-      debugPrint('[ResultBuffer] 移除旧结果: ${oldest.id}');
+      debugPrint('[ResultBuffer] 移除旧结果: ${oldest.id} (status: ${oldest.status}, expired: ${oldest.isExpired})');
       return;
     }
 
@@ -270,23 +283,37 @@ class ResultBuffer {
   void _startCleanupTimer() {
     _cleanupTimer?.cancel();
     _cleanupTimer = Timer.periodic(
-      const Duration(seconds: 10),
+      const Duration(seconds: cleanupIntervalSeconds),
       (_) => _cleanupExpired(),
     );
   }
 
   /// 清理过期结果
+  ///
+  /// 原子操作：标记过期和移除在同一次遍历中完成，避免状态不一致窗口
   void _cleanupExpired() {
-    final expired = _buffer.where((r) => r.isExpired).toList();
-    for (final result in expired) {
-      result.status = ResultStatus.expired;
+    // 检查是否已释放（计时器回调可能在 dispose 后仍被触发）
+    if (_isDisposed) {
+      return;
     }
 
-    // 移除过期和已通知的结果
-    final toRemove = _buffer
-        .where((r) => r.status == ResultStatus.expired || r.status == ResultStatus.notified)
-        .toList();
+    final toRemove = <BufferedResult>[];
 
+    // 单次遍历：标记过期并收集需要移除的结果
+    for (final result in _buffer) {
+      // 检查是否过期，如果是则标记
+      if (result.isExpired && result.status == ResultStatus.pending) {
+        result.status = ResultStatus.expired;
+      }
+
+      // 收集需要移除的结果（过期或已通知）
+      if (result.status == ResultStatus.expired ||
+          result.status == ResultStatus.notified) {
+        toRemove.add(result);
+      }
+    }
+
+    // 批量移除
     if (toRemove.isNotEmpty) {
       for (final result in toRemove) {
         _buffer.remove(result);

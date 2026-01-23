@@ -197,6 +197,9 @@ class VoicePipelineController {
   /// 是否正在重启输入流水线（防止重复重启）
   bool _isRestartingInput = false;
 
+  /// 是否已释放（防止 dispose 后回调仍被触发）
+  bool _isDisposed = false;
+
   /// 处理输入流水线错误（ASR错误/流结束）
   Future<void> _handleInputError(Object error) async {
     debugPrint('[VoicePipelineController] 输入错误: $error');
@@ -256,7 +259,18 @@ class VoicePipelineController {
       debugPrint('[VoicePipelineController] 堆栈: $stack');
       onError?.call(e);
 
-      // 重启失败时，仍然尝试重置到listening状态
+      // 重启失败时，先清理 InputPipeline 状态，再重置控制器状态
+      // 这样确保 InputPipeline 不会处于不一致的中间状态
+      try {
+        debugPrint('[VoicePipelineController] 尝试清理失败的 InputPipeline...');
+        await _inputPipeline.stop();
+        _inputPipeline.reset();
+        debugPrint('[VoicePipelineController] InputPipeline 清理完成');
+      } catch (cleanupError) {
+        debugPrint('[VoicePipelineController] InputPipeline 清理也失败: $cleanupError');
+      }
+
+      // 然后重置控制器状态
       if (_state != VoicePipelineState.listening) {
         _setState(VoicePipelineState.listening);
       }
@@ -515,25 +529,51 @@ class VoicePipelineController {
   }
 
   /// 处理打断
+  ///
+  /// 使用 try-finally 确保状态始终恢复，即使过程中发生异常
   Future<void> _handleBargeIn(BargeInResult result) async {
     debugPrint('[VoicePipelineController] 处理打断: $result');
 
-    onBargeIn?.call(result);
+    // 检查是否已释放
+    if (_isDisposed) {
+      debugPrint('[VoicePipelineController] 已释放，忽略打断处理');
+      return;
+    }
 
-    // 停止输出
-    await _outputPipeline.fadeOutAndStop();
+    try {
+      // 通知外部回调（保护回调异常不影响后续流程）
+      try {
+        onBargeIn?.call(result);
+      } catch (e) {
+        debugPrint('[VoicePipelineController] 打断回调异常: $e');
+      }
 
-    // 取消当前响应
-    _responseTracker.cancelCurrentResponse();
+      // 停止输出
+      await _outputPipeline.fadeOutAndStop();
 
-    // 回到监听状态
-    _setState(VoicePipelineState.listening);
+      // 取消当前响应
+      _responseTracker.cancelCurrentResponse();
+    } finally {
+      // 无论成功还是失败，都要回到监听状态（除非已释放）
+      if (!_isDisposed && _state != VoicePipelineState.idle) {
+        _setState(VoicePipelineState.listening);
+      }
+    }
   }
 
   /// 处理输出完成
+  ///
+  /// 注意：使用 _isDisposed 检查防止竞态条件
+  /// 在 await _restartInputPipeline() 期间，stop() 可能被调用
   Future<void> _handleOutputCompleted() async {
     debugPrint('[VoicePipelineController] ========== 输出完成回调 ==========');
     debugPrint('[VoicePipelineController] 当前状态: $_state, feedDataCount=$_feedDataCount');
+
+    // 检查是否已释放
+    if (_isDisposed) {
+      debugPrint('[VoicePipelineController] 已释放，跳过输出完成处理');
+      return;
+    }
 
     // 输出完成后回到监听状态
     if (_state == VoicePipelineState.speaking ||
@@ -546,6 +586,12 @@ class VoicePipelineController {
       // 重置feedDataCount，以便重新开始日志计数
       _feedDataCount = 0;
       debugPrint('[VoicePipelineController] feedDataCount已重置');
+
+      // 再次检查 _isDisposed（状态切换期间可能被 dispose）
+      if (_isDisposed) {
+        debugPrint('[VoicePipelineController] 状态切换后发现已释放，跳过重启');
+        return;
+      }
 
       // 输出完成后重启输入流水线（确保ASR正常运行）
       await _restartInputPipeline();
@@ -561,12 +607,22 @@ class VoicePipelineController {
 
     final oldState = _state;
     _state = newState;
-    _stateController.add(_state);
-    onStateChanged?.call(_state);
+
+    // 检查 StreamController 是否已关闭，避免 dispose 后写入异常
+    if (!_stateController.isClosed) {
+      _stateController.add(_state);
+    }
+
+    // 通知外部状态变更（保护回调异常不影响内部状态管理）
+    try {
+      onStateChanged?.call(_state);
+    } catch (e) {
+      debugPrint('[VoicePipelineController] 状态变更回调异常: $e');
+    }
 
     debugPrint('[VoicePipelineController] 状态变更: $oldState → $newState');
 
-    // 主动对话状态管理
+    // 主动对话状态管理（必须执行，确保内部状态一致）
     _updateProactiveMonitoring(oldState, newState);
   }
 
@@ -723,14 +779,23 @@ class VoicePipelineController {
   void _handleProactiveMessage(String message, {bool isUserResponse = false}) {
     debugPrint('[VoicePipelineController] 收到主动对话消息: $message (isUserResponse=$isUserResponse)');
 
-    // 只在 listening 状态下处理主动消息
+    // 检查是否已释放或状态不对
+    if (_isDisposed) {
+      debugPrint('[VoicePipelineController] 已释放，忽略主动消息');
+      return;
+    }
+
     if (_state != VoicePipelineState.listening) {
       debugPrint('[VoicePipelineController] 非listening状态，忽略主动消息');
       return;
     }
 
-    // 通知外部回调
-    onProactiveMessage?.call(message);
+    // 通知外部回调（保护回调异常不影响后续流程）
+    try {
+      onProactiveMessage?.call(message);
+    } catch (e) {
+      debugPrint('[VoicePipelineController] 主动消息回调异常: $e');
+    }
 
     // 启动新响应
     final responseId = _responseTracker.startNewResponse();
@@ -747,14 +812,32 @@ class VoicePipelineController {
   }
 
   /// 处理会话超时（连续3次无回应或30秒无响应）
+  ///
+  /// 注意：先启动 stop() 再触发回调，确保：
+  /// 1. 状态同步更新为 stopping（stop() 开始时立即设置）
+  /// 2. 回调触发时外部可以正确读取状态
+  /// 3. 清理工作在后台继续进行
   void _handleSessionTimeout() {
     debugPrint('[VoicePipelineController] 会话超时，自动结束');
 
-    // 通知外部
-    onSessionTimeout?.call();
+    // 检查是否已释放
+    if (_isDisposed) {
+      debugPrint('[VoicePipelineController] 已释放，忽略会话超时');
+      return;
+    }
 
-    // 停止流水线
-    stop();
+    // 先启动停止流程（同步设置状态为 stopping）
+    // 使用 fire-and-forget 模式，清理在后台进行
+    stop().catchError((e, s) {
+      debugPrint('[VoicePipelineController] 超时停止时出错: $e');
+    });
+
+    // 状态已更新，通知外部（保护回调异常不影响内部流程）
+    try {
+      onSessionTimeout?.call();
+    } catch (e) {
+      debugPrint('[VoicePipelineController] 会话超时回调异常: $e');
+    }
   }
 
   /// 禁用主动对话
@@ -771,11 +854,22 @@ class VoicePipelineController {
   bool get isProactiveDisabled => _proactiveManager.isDisabled;
 
   /// 释放资源
-  void dispose() {
-    stop();
+  /// 释放资源
+  ///
+  /// 注意：异步方法，确保 stop() 完成后再释放资源
+  Future<void> dispose() async {
+    // 先标记为已释放，阻止新的回调
+    _isDisposed = true;
+
+    // 等待停止完成
+    await stop().catchError((e) {
+      debugPrint('[VoicePipelineController] dispose 中 stop 失败: $e');
+    });
+
     _proactiveManager.dispose();
-    _inputPipeline.dispose();
-    _outputPipeline.dispose();
-    _stateController.close();
+    // 等待子流水线释放完成
+    await _inputPipeline.dispose();
+    await _outputPipeline.dispose();
+    await _stateController.close();
   }
 }

@@ -545,3 +545,164 @@ class DataStatisticsAction extends Action {
     );
   }
 }
+
+/// 数据报告Action
+///
+/// 生成综合财务报告：
+/// - 月度报告
+/// - 年度报告
+/// - 自定义时间范围报告
+class DataReportAction extends Action {
+  final IDatabaseService databaseService;
+
+  DataReportAction(this.databaseService);
+
+  @override
+  String get id => 'data.report';
+
+  @override
+  String get name => '生成报告';
+
+  @override
+  String get description => '生成财务分析报告';
+
+  @override
+  List<String> get triggerPatterns => [
+    '生成报告', '财务报告', '月度报告', '年度报告',
+    '账单报告', '消费报告', '收支报告',
+    '报告', '分析报告',
+  ];
+
+  @override
+  List<ActionParam> get requiredParams => [];
+
+  @override
+  List<ActionParam> get optionalParams => [
+    const ActionParam(
+      name: 'reportType',
+      type: ActionParamType.string,
+      required: false,
+      defaultValue: 'monthly',
+      description: '报告类型: monthly/yearly/custom',
+    ),
+    const ActionParam(
+      name: 'startDate',
+      type: ActionParamType.dateTime,
+      required: false,
+      description: '开始日期',
+    ),
+    const ActionParam(
+      name: 'endDate',
+      type: ActionParamType.dateTime,
+      required: false,
+      description: '结束日期',
+    ),
+  ];
+
+  @override
+  Future<ActionResult> execute(Map<String, dynamic> params) async {
+    try {
+      final reportType = params['reportType'] as String? ?? 'monthly';
+      final now = DateTime.now();
+
+      DateTime startDate;
+      DateTime endDate = now;
+      String reportTitle;
+
+      switch (reportType) {
+        case 'yearly':
+          startDate = DateTime(now.year, 1, 1);
+          reportTitle = '${now.year}年度报告';
+          break;
+        case 'custom':
+          startDate = params['startDate'] as DateTime? ??
+              DateTime(now.year, now.month, 1);
+          endDate = params['endDate'] as DateTime? ?? now;
+          reportTitle = '自定义报告';
+          break;
+        case 'monthly':
+        default:
+          startDate = DateTime(now.year, now.month, 1);
+          reportTitle = '${now.month}月报告';
+          break;
+      }
+
+      final transactions = await databaseService.queryTransactions(
+        startDate: startDate,
+        endDate: endDate,
+      );
+
+      // 计算收支
+      double totalIncome = 0;
+      double totalExpense = 0;
+      final categoryExpenses = <String, double>{};
+      final categoryIncomes = <String, double>{};
+
+      for (final t in transactions) {
+        if (t.type == TransactionType.income) {
+          totalIncome += t.amount;
+          categoryIncomes[t.category] =
+              (categoryIncomes[t.category] ?? 0) + t.amount;
+        } else if (t.type == TransactionType.expense) {
+          totalExpense += t.amount;
+          categoryExpenses[t.category] =
+              (categoryExpenses[t.category] ?? 0) + t.amount;
+        }
+      }
+
+      final balance = totalIncome - totalExpense;
+      final savingsRate = totalIncome > 0
+          ? ((totalIncome - totalExpense) / totalIncome * 100)
+          : 0.0;
+
+      // 找出最大支出分类
+      String? topExpenseCategory;
+      double topExpenseAmount = 0;
+      categoryExpenses.forEach((category, amount) {
+        if (amount > topExpenseAmount) {
+          topExpenseAmount = amount;
+          topExpenseCategory = category;
+        }
+      });
+
+      // 生成报告摘要
+      final summary = StringBuffer();
+      summary.write('$reportTitle：');
+      summary.write('收入${totalIncome.toStringAsFixed(0)}元，');
+      summary.write('支出${totalExpense.toStringAsFixed(0)}元，');
+      if (balance >= 0) {
+        summary.write('结余${balance.toStringAsFixed(0)}元');
+      } else {
+        summary.write('超支${(-balance).toStringAsFixed(0)}元');
+      }
+      if (topExpenseCategory != null) {
+        summary.write('。$topExpenseCategory支出最多');
+      }
+
+      return ActionResult.success(
+        responseText: summary.toString(),
+        data: {
+          'reportTitle': reportTitle,
+          'period': {
+            'start': startDate.toIso8601String(),
+            'end': endDate.toIso8601String(),
+          },
+          'summary': {
+            'totalIncome': totalIncome,
+            'totalExpense': totalExpense,
+            'balance': balance,
+            'savingsRate': savingsRate,
+            'transactionCount': transactions.length,
+          },
+          'categoryExpenses': categoryExpenses,
+          'categoryIncomes': categoryIncomes,
+          'topExpenseCategory': topExpenseCategory,
+          'topExpenseAmount': topExpenseAmount,
+        },
+        actionId: id,
+      );
+    } catch (e) {
+      return ActionResult.failure('生成报告失败: $e', actionId: id);
+    }
+  }
+}

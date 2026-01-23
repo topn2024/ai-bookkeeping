@@ -18,13 +18,15 @@ import '../entity_disambiguation_service.dart';
 import '../unified_intent_type.dart';
 import 'action_registry.dart';
 import 'actions/config_actions.dart';
-import 'actions/vault_actions.dart';
-import 'actions/money_age_actions.dart';
+import 'actions/conversation_actions.dart';
 import 'actions/data_actions.dart';
 import 'actions/habit_actions.dart';
+import 'actions/money_age_actions.dart';
+import 'actions/navigation_actions.dart';
 import 'actions/share_actions.dart';
 import 'actions/system_actions.dart';
 import 'actions/automation_actions.dart';
+import 'actions/vault_actions.dart';
 import 'hybrid_intent_router.dart';
 import 'safety_confirmation_service.dart';
 import 'action_auto_registry.dart';
@@ -120,8 +122,7 @@ class ActionRouter {
 
     // 交易行为
     _registry.registerAll([
-      _TransactionExpenseAction(_databaseService),
-      _TransactionIncomeAction(_databaseService),
+      _TransactionAddAction(_databaseService),
       _TransactionModifyAction(_databaseService),
       _TransactionDeleteAction(_databaseService),
       _TransactionQueryAction(_databaseService),
@@ -130,11 +131,9 @@ class ActionRouter {
     // 导航行为
     _registry.register(_NavigationAction(_navigationService, onNavigate));
 
-    // 查询行为
-    _registry.registerAll([
-      _StatisticsQueryAction(_databaseService),
-      _BudgetQueryAction(),
-    ]);
+    // 查询行为已整合到 data_actions.dart 中
+    // - DataStatisticsAction (data.statistics)
+    // - 预算查询通过 config.budget 的 query 操作实现
 
     // 配置行为
     _registry.registerAll([
@@ -167,6 +166,7 @@ class ActionRouter {
       DataExportAction(_databaseService),
       DataBackupAction(_databaseService),
       DataStatisticsAction(_databaseService),
+      DataReportAction(_databaseService),
       // 习惯操作
       HabitQueryAction(_databaseService),
       HabitAnalysisAction(_databaseService),
@@ -177,11 +177,27 @@ class ActionRouter {
       ShareBudgetAction(_databaseService),
     ]);
 
+    // 导航行为
+    _registry.registerAll([
+      NavigationBackAction(),
+      NavigationHomeAction(),
+    ]);
+
+    // 会话控制行为
+    _registry.registerAll([
+      ConversationConfirmAction(),
+      ConversationCancelAction(),
+      ConversationClarifyAction(),
+      ConversationGreetingAction(),
+      ConversationHelpAction(),
+      UnknownIntentAction(),
+    ]);
+
     // 系统操作
+    // 注：system.help 改为 conversation.help，由 ConversationHelpAction 处理
     _registry.registerAll([
       SystemSettingsAction(_databaseService),
       SystemAboutAction(),
-      SystemHelpAction(),
       SystemFeedbackAction(),
     ]);
 
@@ -471,55 +487,86 @@ class ActionRouter {
 // 交易行为实现
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// 添加支出行为
-class _TransactionExpenseAction extends Action {
+/// 添加交易行为（统一支持支出/收入/转账）
+///
+/// 通过 transactionType 参数区分交易类型：
+/// - expense: 支出（默认）
+/// - income: 收入
+/// - transfer: 转账
+class _TransactionAddAction extends Action {
   final IDatabaseService _db;
 
-  _TransactionExpenseAction(this._db);
+  _TransactionAddAction(this._db);
 
   @override
-  String get id => 'transaction.expense';
+  String get id => 'transaction.add';
 
   @override
-  String get name => '添加支出';
+  String get name => '添加交易';
 
   @override
-  String get description => '记录一笔支出';
+  String get description => '记录一笔交易（支出/收入/转账）';
 
   @override
-  List<String> get triggerPatterns => ['花了', '买了', '付了', '消费', '支出'];
+  List<String> get triggerPatterns => [
+    // 支出关键词
+    '花了', '买了', '付了', '消费', '支出',
+    // 收入关键词
+    '收入', '赚了', '进账', '收到', '工资', '奖金', '红包', '退款', '返现',
+    // 通用关键词
+    '记账', '记录',
+  ];
 
   @override
   List<ActionParam> get requiredParams => [
-        const ActionParam(
-          name: 'amount',
-          type: ActionParamType.number,
-          description: '金额',
-        ),
-      ];
+    const ActionParam(
+      name: 'amount',
+      type: ActionParamType.number,
+      description: '金额',
+    ),
+  ];
 
   @override
   List<ActionParam> get optionalParams => [
-        const ActionParam(
-          name: 'category',
-          type: ActionParamType.string,
-          required: false,
-          defaultValue: '其他',
-          description: '分类',
-        ),
-        const ActionParam(
-          name: 'merchant',
-          type: ActionParamType.string,
-          required: false,
-          description: '商家',
-        ),
-        const ActionParam(
-          name: 'note',
-          type: ActionParamType.string,
-          required: false,
-          description: '备注',
-        ),
-      ];
+    const ActionParam(
+      name: 'transactionType',
+      type: ActionParamType.string,
+      required: false,
+      defaultValue: 'expense',
+      description: '交易类型: expense/income/transfer',
+    ),
+    const ActionParam(
+      name: 'category',
+      type: ActionParamType.string,
+      required: false,
+      description: '分类',
+    ),
+    const ActionParam(
+      name: 'merchant',
+      type: ActionParamType.string,
+      required: false,
+      description: '商家',
+    ),
+    const ActionParam(
+      name: 'note',
+      type: ActionParamType.string,
+      required: false,
+      description: '备注',
+    ),
+    const ActionParam(
+      name: 'accountId',
+      type: ActionParamType.string,
+      required: false,
+      defaultValue: 'default',
+      description: '账户ID',
+    ),
+    const ActionParam(
+      name: 'toAccountId',
+      type: ActionParamType.string,
+      required: false,
+      description: '目标账户ID（转账时使用）',
+    ),
+  ];
 
   @override
   Future<ActionResult> execute(Map<String, dynamic> params) async {
@@ -532,114 +579,73 @@ class _TransactionExpenseAction extends Action {
       );
     }
 
-    final category = params['category'] as String? ?? '其他';
+    // 解析交易类型
+    final typeStr = params['transactionType'] as String? ?? 'expense';
+    TransactionType transactionType;
+    String defaultCategory;
+
+    switch (typeStr.toLowerCase()) {
+      case 'income':
+        transactionType = TransactionType.income;
+        defaultCategory = '收入';
+        break;
+      case 'transfer':
+        transactionType = TransactionType.transfer;
+        defaultCategory = '转账';
+        break;
+      case 'expense':
+      default:
+        transactionType = TransactionType.expense;
+        defaultCategory = '其他';
+        break;
+    }
+
+    final category = params['category'] as String? ?? defaultCategory;
     final merchant = params['merchant'] as String?;
     final note = params['note'] as String?;
+    final accountId = params['accountId'] as String? ?? 'default';
+    final toAccountId = params['toAccountId'] as String?;
 
     try {
       final transaction = Transaction(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         amount: amount,
-        type: TransactionType.expense,
+        type: transactionType,
         category: category,
         rawMerchant: merchant,
         note: note,
         date: DateTime.now(),
-        accountId: 'default',
+        accountId: accountId,
+        toAccountId: toAccountId,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
 
       await _db.insertTransaction(transaction);
 
-      return ActionResult.success(
-        data: {
-          'transactionId': transaction.id,
-          'amount': amount,
-          'category': category,
-        },
-        responseText: '好的，已记录${category}${amount.toStringAsFixed(0)}元',
-        actionId: id,
-      );
-    } catch (e) {
-      return ActionResult.failure('记录失败: $e', actionId: id);
-    }
-  }
-}
-
-/// 添加收入行为
-class _TransactionIncomeAction extends Action {
-  final IDatabaseService _db;
-
-  _TransactionIncomeAction(this._db);
-
-  @override
-  String get id => 'transaction.income';
-
-  @override
-  String get name => '添加收入';
-
-  @override
-  String get description => '记录一笔收入';
-
-  @override
-  List<String> get triggerPatterns =>
-      ['收入', '赚了', '进账', '收到', '工资', '奖金', '红包', '退款', '返现'];
-
-  @override
-  List<ActionParam> get requiredParams => [
-        const ActionParam(
-          name: 'amount',
-          type: ActionParamType.number,
-          description: '金额',
-        ),
-      ];
-
-  @override
-  List<ActionParam> get optionalParams => [
-        const ActionParam(
-          name: 'category',
-          type: ActionParamType.string,
-          required: false,
-          defaultValue: '收入',
-          description: '分类',
-        ),
-      ];
-
-  @override
-  Future<ActionResult> execute(Map<String, dynamic> params) async {
-    final amount = (params['amount'] as num?)?.toDouble();
-    if (amount == null || amount <= 0) {
-      return ActionResult.needParams(
-        missing: ['amount'],
-        prompt: '请告诉我收入金额',
-        actionId: id,
-      );
-    }
-
-    final category = params['category'] as String? ?? '收入';
-
-    try {
-      final transaction = Transaction(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        amount: amount,
-        type: TransactionType.income,
-        category: category,
-        date: DateTime.now(),
-        accountId: 'default',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      await _db.insertTransaction(transaction);
+      // 根据类型生成响应文本
+      String responseText;
+      switch (transactionType) {
+        case TransactionType.income:
+          responseText = '好的，已记录收入${amount.toStringAsFixed(0)}元';
+          break;
+        case TransactionType.transfer:
+          responseText = '好的，已记录转账${amount.toStringAsFixed(0)}元';
+          break;
+        case TransactionType.expense:
+        default:
+          responseText = '好的，已记录$category${amount.toStringAsFixed(0)}元';
+          break;
+      }
 
       return ActionResult.success(
         data: {
           'transactionId': transaction.id,
           'amount': amount,
           'category': category,
+          'transactionType': typeStr,
         },
-        responseText: '好的，已记录收入${amount.toStringAsFixed(0)}元',
+        responseText: responseText,
         actionId: id,
       );
     } catch (e) {
@@ -1381,140 +1387,8 @@ class _NavigationAction extends Action {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 查询行为实现
-// ═══════════════════════════════════════════════════════════════════════════
-
-/// 统计查询行为
-class _StatisticsQueryAction extends Action {
-  final IDatabaseService _db;
-
-  _StatisticsQueryAction(this._db);
-
-  @override
-  String get id => 'query.statistics';
-
-  @override
-  String get name => '统计查询';
-
-  @override
-  String get description => '查询统计数据';
-
-  @override
-  List<String> get triggerPatterns => ['多少', '统计', '总共', '花了多少'];
-
-  @override
-  List<ActionParam> get requiredParams => [];
-
-  @override
-  List<ActionParam> get optionalParams => [
-        const ActionParam(
-          name: 'startDate',
-          type: ActionParamType.dateTime,
-          required: false,
-          description: '开始日期',
-        ),
-        const ActionParam(
-          name: 'endDate',
-          type: ActionParamType.dateTime,
-          required: false,
-          description: '结束日期',
-        ),
-      ];
-
-  @override
-  Future<ActionResult> execute(Map<String, dynamic> params) async {
-    final now = DateTime.now();
-    DateTime startDate;
-    DateTime endDate;
-
-    // 解析时间范围
-    if (params.containsKey('startDate')) {
-      startDate = params['startDate'] is DateTime
-          ? params['startDate']
-          : DateTime.parse(params['startDate'].toString());
-    } else {
-      // 默认本月
-      startDate = DateTime(now.year, now.month, 1);
-    }
-
-    if (params.containsKey('endDate')) {
-      endDate = params['endDate'] is DateTime
-          ? params['endDate']
-          : DateTime.parse(params['endDate'].toString());
-    } else {
-      endDate = now;
-    }
-
-    try {
-      final transactions = await _db.queryTransactions(
-        startDate: startDate,
-        endDate: endDate,
-      );
-
-      double totalExpense = 0;
-      double totalIncome = 0;
-      int count = 0;
-
-      for (final t in transactions) {
-        if (t.type == TransactionType.expense) {
-          totalExpense += t.amount;
-        } else if (t.type == TransactionType.income) {
-          totalIncome += t.amount;
-        }
-        count++;
-      }
-
-      return ActionResult.success(
-        data: {
-          'totalExpense': totalExpense,
-          'totalIncome': totalIncome,
-          'count': count,
-          'startDate': startDate.toIso8601String(),
-          'endDate': endDate.toIso8601String(),
-        },
-        responseText:
-            '这个月共支出${totalExpense.toStringAsFixed(0)}元，收入${totalIncome.toStringAsFixed(0)}元，共$count笔记录',
-        actionId: id,
-      );
-    } catch (e) {
-      return ActionResult.failure('统计失败: $e', actionId: id);
-    }
-  }
-}
-
-/// 预算查询行为
-class _BudgetQueryAction extends Action {
-  @override
-  String get id => 'query.budget';
-
-  @override
-  String get name => '预算查询';
-
-  @override
-  String get description => '查询预算使用情况';
-
-  @override
-  List<String> get triggerPatterns => ['预算', '剩余', '还能花'];
-
-  @override
-  List<ActionParam> get requiredParams => [];
-
-  @override
-  List<ActionParam> get optionalParams => [];
-
-  @override
-  Future<ActionResult> execute(Map<String, dynamic> params) async {
-    // TODO: 集成实际的预算服务
-    return ActionResult.success(
-      data: {'message': '预算查询功能待实现'},
-      responseText: '预算查询功能正在开发中',
-      actionId: id,
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // 配置行为实现
+// 注：查询行为已整合到 data_actions.dart (DataStatisticsAction, DataReportAction)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// 预算配置行为

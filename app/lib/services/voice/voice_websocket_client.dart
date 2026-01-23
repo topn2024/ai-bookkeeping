@@ -308,18 +308,20 @@ class VoiceWebSocketClient {
 
     debugPrint('[VoiceWebSocket] 断开连接');
 
-    // 发送会话结束消息
+    // 发送会话结束消息（在更新状态前发送）
     if (_state == WebSocketState.connected) {
       _sendMessage(VoiceMessageType.sessionEnd, {});
     }
 
+    // 先更新状态，防止在关闭过程中有新消息进来
+    _setState(WebSocketState.disconnected);
+
+    // 再关闭资源
     await _subscription?.cancel();
     _subscription = null;
 
     await _channel?.sink.close();
     _channel = null;
-
-    _setState(WebSocketState.disconnected);
   }
 
   /// 发送音频数据

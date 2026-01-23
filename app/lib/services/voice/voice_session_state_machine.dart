@@ -158,7 +158,7 @@ class VoiceSessionStateMachine {
   bool get isSpeaking => _state == VoiceSessionState.speaking;
 
   /// 释放资源
-  void dispose() {
-    _stateController.close();
+  Future<void> dispose() async {
+    await _stateController.close();
   }
 }

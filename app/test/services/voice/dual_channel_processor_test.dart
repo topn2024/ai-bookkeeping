@@ -100,6 +100,167 @@ void main() {
       expect(results.length, 1);
       expect(results[0].success, true);
     });
+
+    group('并发入队保护', () {
+      test('并发入队应该正确处理所有操作', () async {
+        final operations = List.generate(
+          5,
+          (i) => Operation(
+            type: OperationType.addTransaction,
+            priority: OperationPriority.normal,
+            params: {'index': i},
+            originalText: 'op-$i',
+          ),
+        );
+
+        // 并发入队
+        await Future.wait(operations.map((op) => channel.enqueue(op)));
+
+        // 所有操作都应该被执行
+        expect(adapter.executedOperations.length, equals(5));
+      });
+
+      test('并发入队不应该丢失操作', () async {
+        final executedTexts = <String>[];
+        final testAdapter = _TrackingAdapter(onExecute: (op) async {
+          executedTexts.add(op.originalText);
+        });
+        final testChannel = ExecutionChannel(adapter: testAdapter);
+
+        final operations = List.generate(
+          10,
+          (i) => Operation(
+            type: OperationType.addTransaction,
+            priority: OperationPriority.normal,
+            params: {},
+            originalText: 'concurrent-$i',
+          ),
+        );
+
+        // 并发入队
+        await Future.wait(operations.map((op) => testChannel.enqueue(op)));
+
+        // 验证所有操作都被执行
+        expect(executedTexts.length, equals(10));
+        for (var i = 0; i < 10; i++) {
+          expect(executedTexts, contains('concurrent-$i'));
+        }
+
+        testChannel.dispose();
+      });
+    });
+
+    group('执行锁保护', () {
+      test('执行锁应该防止并发执行', () async {
+        var concurrentExecutions = 0;
+        var maxConcurrentExecutions = 0;
+
+        final testAdapter = _TrackingAdapter(onExecute: (op) async {
+          concurrentExecutions++;
+          if (concurrentExecutions > maxConcurrentExecutions) {
+            maxConcurrentExecutions = concurrentExecutions;
+          }
+          // 模拟耗时操作
+          await Future.delayed(const Duration(milliseconds: 20));
+          concurrentExecutions--;
+        });
+        final testChannel = ExecutionChannel(adapter: testAdapter);
+
+        final operations = List.generate(
+          3,
+          (i) => Operation(
+            type: OperationType.addTransaction,
+            priority: OperationPriority.normal,
+            params: {},
+            originalText: 'lock-test-$i',
+          ),
+        );
+
+        // 并发入队
+        await Future.wait(operations.map((op) => testChannel.enqueue(op)));
+
+        // 由于有执行锁，最大并发执行数应该是 1
+        expect(maxConcurrentExecutions, equals(1));
+
+        testChannel.dispose();
+      });
+    });
+
+    group('回调错误处理', () {
+      test('回调异常不应该影响后续回调', () async {
+        var callback1Called = false;
+        var callback2Called = false;
+        var callback3Called = false;
+
+        channel.registerCallback((result) {
+          callback1Called = true;
+          throw Exception('Callback 1 error');
+        });
+
+        channel.registerCallback((result) {
+          callback2Called = true;
+        });
+
+        channel.registerCallback((result) {
+          callback3Called = true;
+        });
+
+        final operation = Operation(
+          type: OperationType.navigate,
+          priority: OperationPriority.immediate,
+          params: {},
+          originalText: 'callback-test',
+        );
+
+        await channel.enqueue(operation);
+
+        // 所有回调都应该被调用，即使第一个抛出异常
+        expect(callback1Called, isTrue);
+        expect(callback2Called, isTrue);
+        expect(callback3Called, isTrue);
+      });
+
+      test('应该调用错误回调', () async {
+        Object? capturedError;
+
+        channel.onCallbackError = (error, stackTrace, callback) {
+          capturedError = error;
+        };
+
+        channel.registerCallback((result) {
+          throw Exception('Test error');
+        });
+
+        final operation = Operation(
+          type: OperationType.navigate,
+          priority: OperationPriority.immediate,
+          params: {},
+          originalText: 'error-callback-test',
+        );
+
+        await channel.enqueue(operation);
+
+        expect(capturedError, isNotNull);
+        expect(capturedError.toString(), contains('Test error'));
+      });
+    });
+
+    group('flush', () {
+      test('flush 应该执行所有 deferred 操作', () async {
+        for (var i = 0; i < 3; i++) {
+          await channel.enqueue(Operation(
+            type: OperationType.addTransaction,
+            priority: OperationPriority.deferred,
+            params: {},
+            originalText: 'flush-$i',
+          ));
+        }
+
+        await channel.flush();
+
+        expect(adapter.executedOperations.length, greaterThanOrEqualTo(3));
+      });
+    });
   });
 
   group('ConversationChannel Tests', () {
@@ -164,6 +325,7 @@ void main() {
 
     test('应该正确处理多操作结果', () async {
       final result = MultiOperationResult(
+        resultType: RecognitionResultType.operation,
         operations: [
           Operation(
             type: OperationType.addTransaction,
@@ -184,4 +346,25 @@ void main() {
       // 验证对话内容被传递到对话通道
     });
   });
+}
+
+/// 用于测试的跟踪适配器
+class _TrackingAdapter implements OperationAdapter {
+  final Future<void> Function(Operation)? onExecute;
+  final List<Operation> executedOperations = [];
+
+  _TrackingAdapter({this.onExecute});
+
+  @override
+  String get adapterName => '_TrackingAdapter';
+
+  @override
+  bool canHandle(OperationType type) => true;
+
+  @override
+  Future<ExecutionResult> execute(Operation operation) async {
+    executedOperations.add(operation);
+    await onExecute?.call(operation);
+    return ExecutionResult.success(data: {'tracked': true});
+  }
 }

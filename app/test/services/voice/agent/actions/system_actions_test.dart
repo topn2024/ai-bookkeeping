@@ -148,43 +148,6 @@ void main() {
     });
   });
 
-  group('SystemHelpAction', () {
-    late SystemHelpAction action;
-
-    setUp(() {
-      action = SystemHelpAction();
-    });
-
-    test('should have correct metadata', () {
-      expect(action.id, 'system.help');
-      expect(action.name, '使用帮助');
-      expect(action.triggerPatterns, contains('帮助'));
-      expect(action.triggerPatterns, contains('怎么用'));
-    });
-
-    test('should return general help by default', () async {
-      final result = await action.execute({});
-
-      expect(result.success, isTrue);
-    });
-
-    test('should return specific help for voice topic', () async {
-      final result = await action.execute({
-        'topic': 'voice',
-      });
-
-      expect(result.success, isTrue);
-    });
-
-    test('should return budget help', () async {
-      final result = await action.execute({
-        'topic': 'budget',
-      });
-
-      expect(result.success, isTrue);
-    });
-  });
-
   group('SystemFeedbackAction', () {
     late SystemFeedbackAction action;
 

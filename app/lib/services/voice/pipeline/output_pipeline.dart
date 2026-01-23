@@ -88,10 +88,15 @@ class OutputPipeline {
   /// 当TTS播放PCM音频时，将数据传递给AudioProcessorService用于回声消除
   void _setupAECCallback() {
     _ttsService.onAudioPlayed = (pcmData) {
-      final audioProcessor = AudioProcessorService.instance;
-      if (audioProcessor.isInitialized) {
-        audioProcessor.feedTTSAudio(pcmData);
-        debugPrint('[OutputPipeline] AEC参考信号: ${pcmData.length}字节');
+      try {
+        final audioProcessor = AudioProcessorService.instance;
+        if (audioProcessor.isInitialized) {
+          audioProcessor.feedTTSAudio(pcmData);
+          debugPrint('[OutputPipeline] AEC参考信号: ${pcmData.length}字节');
+        }
+      } catch (e) {
+        // AEC 失败不应中断播放流程，仅记录日志
+        debugPrint('[OutputPipeline] AEC参考信号处理失败: $e');
       }
     };
     debugPrint('[OutputPipeline] AEC回调已设置');
@@ -314,9 +319,11 @@ class OutputPipeline {
   }
 
   /// 释放资源
-  void dispose() {
-    stop();
+  ///
+  /// 注意：异步方法，确保 stop() 完成后再释放其他资源
+  Future<void> dispose() async {
+    await stop();
     _ttsQueueWorker.dispose();
-    _stateController.close();
+    await _stateController.close();
   }
 }

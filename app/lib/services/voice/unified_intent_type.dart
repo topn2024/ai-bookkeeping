@@ -89,6 +89,15 @@ enum UnifiedIntentType {
   /// 预算设置
   configBudget('config.budget', IntentCategory.configuration, '预算设置'),
 
+  /// 账户设置
+  configAccount('config.account', IntentCategory.configuration, '账户设置'),
+
+  /// 提醒设置
+  configReminder('config.reminder', IntentCategory.configuration, '提醒设置'),
+
+  /// 主题设置
+  configTheme('config.theme', IntentCategory.configuration, '主题设置'),
+
   // ==================== 数据操作 ====================
   /// 数据导出
   dataExport('data.export', IntentCategory.data, '数据导出'),

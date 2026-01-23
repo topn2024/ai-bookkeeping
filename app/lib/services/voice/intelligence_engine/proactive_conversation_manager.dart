@@ -50,12 +50,25 @@ class ProactiveConversationManager {
     _state = ProactiveState.waiting;
 
     // 启动5秒静默计时器
+    // 注意：Timer 回调中的异步操作需要用 catchError 捕获错误
     _silenceTimer?.cancel();
     _silenceTimer = Timer(
       Duration(milliseconds: _silenceTimeoutMs),
-      () async {
+      () {
+        // 检查是否已禁用或状态已改变（计时器回调可能在状态变化后触发）
+        if (_proactiveDisabled) {
+          debugPrint('[ProactiveConversationManager] 计时器触发时已禁用，跳过');
+          return;
+        }
+        if (_state != ProactiveState.waiting) {
+          debugPrint('[ProactiveConversationManager] 计时器触发时状态非waiting($_state)，跳过');
+          return;
+        }
         debugPrint('[ProactiveConversationManager] 5秒静默超时，触发主动对话');
-        await _triggerProactiveMessage();
+        // 使用 catchError 确保异步错误被捕获
+        _triggerProactiveMessage().catchError((e, s) {
+          debugPrint('[ProactiveConversationManager] 触发主动对话失败: $e');
+        });
       },
     );
 
@@ -65,6 +78,11 @@ class ProactiveConversationManager {
       _totalSilenceTimer = Timer(
         Duration(milliseconds: _maxTotalSilenceMs),
         () {
+          // 检查是否已禁用（计时器回调可能在禁用后触发）
+          if (_proactiveDisabled) {
+            debugPrint('[ProactiveConversationManager] 30秒计时器触发时已禁用，跳过');
+            return;
+          }
           debugPrint('[ProactiveConversationManager] 30秒总计无响应，结束对话');
           _triggerSessionEnd();
         },
@@ -72,24 +90,40 @@ class ProactiveConversationManager {
     }
   }
 
-  /// 重置计时器（用户有输入时调用）
-  void resetTimer() {
-    debugPrint('[ProactiveConversationManager] 用户有输入，重置所有计时器');
+  /// 重置计时器
+  ///
+  /// [isUserInitiated] 是否由用户主动输入触发
+  /// - true: 用户真实输入，重置计数和30秒计时器
+  /// - false: 系统延迟响应（如deferred操作完成），重置30秒计时器和计数
+  ///
+  /// 关键设计决策：
+  /// - 无论是用户输入还是系统响应，都应该重置30秒总计时器
+  /// - 系统给出响应后，用户需要时间消化，不应该继续倒计时
+  /// - 系统响应（如延迟记账结果）也是新内容，用户需要时间回应
+  /// - 因此无论哪种情况都重置 _proactiveCount，给用户公平的回应机会
+  void resetTimer({bool isUserInitiated = true}) {
+    if (isUserInitiated) {
+      debugPrint('[ProactiveConversationManager] 用户主动输入，重置所有计时器和计数');
+    } else {
+      debugPrint('[ProactiveConversationManager] 系统响应，重置所有计时器和计数');
+    }
 
-    // 取消所有计时器
-    _silenceTimer?.cancel();
-    _totalSilenceTimer?.cancel();
-    _totalSilenceTimer = null;
-
-    _state = ProactiveState.idle;
-
-    // 用户响应后重置连续主动次数
+    // 无论是用户输入还是系统响应，都重置连续主动次数
+    // 因为系统响应也是新内容，用户需要时间回应
     if (_proactiveCount > 0) {
-      debugPrint('[ProactiveConversationManager] 用户响应，重置连续主动次数: $_proactiveCount → 0');
+      debugPrint('[ProactiveConversationManager] 重置连续主动次数: $_proactiveCount → 0');
       _proactiveCount = 0;
     }
 
-    // 重新启动监听（会重新启动5秒和30秒计时器）
+    // 无论哪种情况，都取消所有计时器并重新开始
+    // 这确保了系统响应后，用户有足够时间来回应
+    _silenceTimer?.cancel();
+    _totalSilenceTimer?.cancel();
+    _totalSilenceTimer = null; // 设为null，startSilenceMonitoring会重建
+
+    _state = ProactiveState.idle;
+
+    // 重新启动监听
     startSilenceMonitoring();
   }
 
@@ -103,6 +137,8 @@ class ProactiveConversationManager {
   }
 
   /// 触发主动对话
+  ///
+  /// 使用 try-finally 确保状态始终正确恢复到 idle
   Future<void> _triggerProactiveMessage() async {
     // 检查是否已经超过最大次数（5秒超时后触发）
     if (_proactiveCount >= _maxProactiveCount) {
@@ -117,25 +153,33 @@ class ProactiveConversationManager {
     debugPrint('[ProactiveConversationManager] 生成主动话题 ($_proactiveCount/$_maxProactiveCount)');
 
     try {
-      // 生成话题
-      final topic = await topicGenerator.generateTopic();
+      String? topic;
+      try {
+        // 生成话题
+        topic = await topicGenerator.generateTopic();
+      } catch (e) {
+        debugPrint('[ProactiveConversationManager] 生成话题失败: $e');
+      }
 
       if (topic != null) {
         _state = ProactiveState.speaking;
-        debugPrint('[ProactiveConversationManager] 主动话题: $topic');
+        debugPrint('[ProactiveConversationManager] 主动话题，长度: ${topic.length}');
 
-        // 回调通知
-        onProactiveMessage(topic);
+        // 回调通知（单独 try-catch 确保状态始终能恢复）
+        try {
+          onProactiveMessage(topic);
+        } catch (e) {
+          debugPrint('[ProactiveConversationManager] 主动消息回调失败: $e');
+        }
       }
-    } catch (e) {
-      debugPrint('[ProactiveConversationManager] 生成话题失败: $e');
+    } finally {
+      // 无论成功还是失败，都确保状态恢复到 idle
+      _state = ProactiveState.idle;
+
+      // 继续监听下一个5秒（即使已经3次，也给用户最后机会回应）
+      debugPrint('[ProactiveConversationManager] 继续监听，等待用户回应');
+      startSilenceMonitoring();
     }
-
-    _state = ProactiveState.idle;
-
-    // 继续监听下一个5秒（即使已经3次，也给用户最后机会回应）
-    debugPrint('[ProactiveConversationManager] 继续监听，等待用户回应');
-    startSilenceMonitoring();
   }
 
   /// 触发会话结束
@@ -206,6 +250,7 @@ class ProactiveConversationManager {
     _proactiveDisabled = false;
     _state = ProactiveState.idle;
     _silenceTimer?.cancel();
+    _silenceTimer = null;
     _totalSilenceTimer?.cancel();
     _totalSilenceTimer = null;
   }
@@ -213,7 +258,9 @@ class ProactiveConversationManager {
   /// 清理资源
   void dispose() {
     _silenceTimer?.cancel();
+    _silenceTimer = null;
     _totalSilenceTimer?.cancel();
+    _totalSilenceTimer = null;
   }
 }
 

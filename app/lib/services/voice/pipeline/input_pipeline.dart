@@ -187,7 +187,8 @@ class InputPipeline {
 
   /// 处理ASR结果
   void _handleASRResult(ASRPartialResult result) {
-    debugPrint('[InputPipeline] 收到ASR结果: "${result.text}" (isFinal=${result.isFinal})');
+    // 注意：不在日志中打印完整识别结果，避免泄露用户隐私
+    debugPrint('[InputPipeline] 收到ASR结果，长度: ${result.text.length} (isFinal=${result.isFinal})');
 
     if (result.isFinal) {
       // 最终结果
@@ -328,8 +329,10 @@ class InputPipeline {
   }
 
   /// 释放资源
-  void dispose() {
-    stop();
-    _stateController.close();
+  ///
+  /// 注意：异步方法，确保 stop() 完成后再关闭 StreamController
+  Future<void> dispose() async {
+    await stop();
+    await _stateController.close();
   }
 }
