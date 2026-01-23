@@ -103,20 +103,25 @@ class _AnalysisCenterPageState extends ConsumerState<AnalysisCenterPage>
     return Scaffold(
       body: Column(
         children: [
-          // 顶部区域 - 使用主题色背景
+          // 顶部标题栏 - 使用主题色背景
           Container(
             decoration: BoxDecoration(
               color: theme.colorScheme.primary,
             ),
             child: SafeArea(
               bottom: false,
-              child: Column(
-                children: [
-                  _buildHeader(context, theme),
-                  _buildPeriodSelector(context, theme),
-                  _buildTabBar(context, theme),
-                ],
-              ),
+              child: _buildHeader(context, theme),
+            ),
+          ),
+          // 期间选择器和标签栏 - 使用默认背景
+          SafeArea(
+            top: false,
+            bottom: false,
+            child: Column(
+              children: [
+                _buildPeriodSelector(context, theme),
+                _buildTabBar(context, theme),
+              ],
             ),
           ),
           Expanded(
@@ -178,11 +183,6 @@ class _AnalysisCenterPageState extends ConsumerState<AnalysisCenterPage>
                   setState(() => _selectedPeriod = index);
                 }
               },
-              backgroundColor: Colors.white.withOpacity(0.2),  // 半透明白色背景
-              selectedColor: Colors.white,  // 选中时白色背景
-              labelStyle: TextStyle(
-                color: isSelected ? theme.colorScheme.primary : Colors.white,  // 选中时主色，未选中时白色
-              ),
             ),
           );
         }),
@@ -195,9 +195,6 @@ class _AnalysisCenterPageState extends ConsumerState<AnalysisCenterPage>
       controller: _tabController,
       isScrollable: true,
       tabAlignment: TabAlignment.start,
-      labelColor: Colors.white,  // 选中标签白色
-      unselectedLabelColor: Colors.white.withOpacity(0.7),  // 未选中标签半透明白色
-      indicatorColor: Colors.white,  // 指示器白色
       tabs: _tabs.map((tab) => Tab(
         icon: Icon(tab.icon, size: 20),
         text: tab.label,
