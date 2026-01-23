@@ -131,30 +131,16 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
-        backgroundColor: AppTheme.surfaceColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          l10n.receiptDetail,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: Text(l10n.receiptDetail),
         actions: [
           IconButton(
-            icon: Icon(
-              _isEditing ? Icons.check : Icons.edit,
-              color: _isEditing ? AppTheme.primaryColor : AppTheme.textSecondaryColor,
-            ),
+            icon: Icon(_isEditing ? Icons.check : Icons.edit),
             onPressed: () {
               setState(() {
                 _isEditing = !_isEditing;
               });
             },
+            tooltip: _isEditing ? '完成' : '编辑',
           ),
         ],
       ),
