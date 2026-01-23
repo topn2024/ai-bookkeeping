@@ -270,7 +270,7 @@ const renderUsageChart = (data: any[]) => {
         smooth: true,
         areaStyle: { opacity: 0.3 },
         data: data.map(d => d.count),
-        itemStyle: { color: '#1890ff' },
+        itemStyle: { color: '#6495ED' },
       },
     ],
   }

@@ -43,8 +43,8 @@ class ColorThemeData {
 class AppColorThemes {
   static const Map<AppColorTheme, ColorThemeData> themes = {
     AppColorTheme.blue: ColorThemeData(
-      name: '天空蓝',
-      primaryColor: Color(0xFF2196F3),
+      name: '矢车菊蓝',
+      primaryColor: Color(0xFF6495ED),
       incomeColor: Color(0xFF4CAF50),
       expenseColor: Color(0xFFF44336),
       transferColor: Color(0xFFFF9800),

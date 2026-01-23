@@ -163,7 +163,7 @@ const renderResponseTimeChart = (data: any[]) => {
     xAxis: { type: 'category', data: data.map(d => d.time) },
     yAxis: { type: 'value', name: 'ms' },
     series: [
-      { name: 'API', type: 'line', smooth: true, data: data.map(d => d.api), itemStyle: { color: '#1890ff' } },
+      { name: 'API', type: 'line', smooth: true, data: data.map(d => d.api), itemStyle: { color: '#6495ED' } },
       { name: '数据库', type: 'line', smooth: true, data: data.map(d => d.database), itemStyle: { color: '#52c41a' } },
       { name: '缓存', type: 'line', smooth: true, data: data.map(d => d.cache), itemStyle: { color: '#fa8c16' } },
     ],

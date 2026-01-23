@@ -148,7 +148,7 @@ import * as statisticsApi from '@/api/statistics'
 
 // Quick reports config
 const quickReports = [
-  { type: 'daily', name: '日报', description: '今日数据汇总', icon: 'Calendar', color: '#1890ff' },
+  { type: 'daily', name: '日报', description: '今日数据汇总', icon: 'Calendar', color: '#6495ED' },
   { type: 'weekly', name: '周报', description: '本周数据汇总', icon: 'DataLine', color: '#52c41a' },
   { type: 'monthly', name: '月报', description: '本月数据汇总', icon: 'TrendCharts', color: '#fa8c16' },
   { type: 'annual', name: '年报', description: '本年数据汇总', icon: 'Document', color: '#722ed1' },

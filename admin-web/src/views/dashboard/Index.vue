@@ -194,7 +194,7 @@ let heatmapChartInstance: echarts.ECharts | null = null
 
 // Stats cards config - 匹配后端 DashboardStatsResponse 结构
 const statsCards = [
-  { key: 'today_new_users', label: '今日新增', icon: 'User', color: '#1890ff', isStatCard: true },
+  { key: 'today_new_users', label: '今日新增', icon: 'User', color: '#6495ED', isStatCard: true },
   { key: 'today_active_users', label: '今日活跃', icon: 'UserFilled', color: '#52c41a', isStatCard: true },
   { key: 'today_transactions', label: '今日交易', icon: 'Tickets', color: '#722ed1', isStatCard: true },
   { key: 'today_amount', label: '今日金额', icon: 'Timer', color: '#fa8c16', isStatCard: true },
@@ -381,7 +381,7 @@ const renderUserTrendChart = (data: any) => {
         smooth: true,
         areaStyle: { opacity: 0.3 },
         data: newUsersValues,
-        itemStyle: { color: '#1890ff' },
+        itemStyle: { color: '#6495ED' },
       },
       {
         name: '活跃用户',
@@ -443,7 +443,7 @@ const renderTransactionPieChart = () => {
         data: [
           { value: incomeCount, name: '收入', itemStyle: { color: '#52c41a' } },
           { value: expenseCount, name: '支出', itemStyle: { color: '#ff4d4f' } },
-          { value: transferCount, name: '转账', itemStyle: { color: '#1890ff' } },
+          { value: transferCount, name: '转账', itemStyle: { color: '#6495ED' } },
         ].filter(item => item.value > 0),
       },
     ],
@@ -571,7 +571,7 @@ onUnmounted(() => {
 
         &:hover {
           background-color: #e6f7ff;
-          color: #1890ff;
+          color: #6495ED;
         }
       }
 

@@ -256,16 +256,16 @@ const handleCommand = async (command: string) => {
     }
 
     &::-webkit-scrollbar-thumb {
-      background: #1890ff;
+      background: #6495ED;
       border-radius: 3px;
     }
 
     &::-webkit-scrollbar-thumb:hover {
-      background: #40a9ff;
+      background: #87CEFA;
     }
 
     :deep(.el-menu-item.is-active) {
-      background-color: #1890ff !important;
+      background-color: #6495ED !important;
     }
   }
 }
@@ -288,7 +288,7 @@ const handleCommand = async (command: string) => {
       margin-right: 20px;
 
       &:hover {
-        color: #1890ff;
+        color: #6495ED;
       }
     }
   }

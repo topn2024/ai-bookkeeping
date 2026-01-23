@@ -14,7 +14,7 @@
       <el-col :span="6">
         <el-card shadow="hover">
           <div class="metric-card">
-            <div class="metric-icon" style="background: #e6f7ff; color: #1890ff;">
+            <div class="metric-icon" style="background: #e6f7ff; color: #6495ED;">
               <el-icon :size="24"><User /></el-icon>
             </div>
             <div class="metric-info">
@@ -190,7 +190,7 @@ const renderGrowthChart = (data: any[]) => {
       { type: 'value', name: '累计', position: 'right' },
     ],
     series: [
-      { name: '新增用户', type: 'bar', data: data.map(d => d.new_users), itemStyle: { color: '#1890ff' } },
+      { name: '新增用户', type: 'bar', data: data.map(d => d.new_users), itemStyle: { color: '#6495ED' } },
       { name: '活跃用户', type: 'bar', data: data.map(d => d.active_users), itemStyle: { color: '#52c41a' } },
       { name: '累计用户', type: 'line', yAxisIndex: 1, smooth: true, data: data.map(d => d.total_users), itemStyle: { color: '#722ed1' } },
     ],
@@ -294,7 +294,7 @@ const getRetentionColor = (rate: number) => {
 const getActivityColor = (level: string) => {
   const colors: Record<string, string> = {
     '高活跃': '#52c41a',
-    '中活跃': '#1890ff',
+    '中活跃': '#6495ED',
     '低活跃': '#fa8c16',
     '沉默': '#ff4d4f',
   }

@@ -38,10 +38,10 @@ class AntigravityColors {
 }
 
 class AppColors {
-  // Primary colors (default blue theme)
-  static const Color primary = Color(0xFF2196F3);
-  static const Color primaryDark = Color(0xFF1976D2);
-  static const Color primaryLight = Color(0xFFBBDEFB);
+  // Primary colors (default blue theme - 矢车菊蓝)
+  static const Color primary = Color(0xFF6495ED);
+  static const Color primaryDark = Color(0xFF4169E1);
+  static const Color primaryLight = Color(0xFF87CEFA);
 
   // Accent colors
   static const Color accent = Color(0xFF03A9F4);

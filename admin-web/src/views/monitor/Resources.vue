@@ -255,7 +255,7 @@ const renderCpuMemoryChart = (data: any[]) => {
     xAxis: { type: 'category', data: data.map(d => formatTime(d.timestamp)) },
     yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
     series: [
-      { name: 'CPU', type: 'line', smooth: true, areaStyle: { opacity: 0.3 }, data: data.map(d => d.cpu_percent), itemStyle: { color: '#1890ff' } },
+      { name: 'CPU', type: 'line', smooth: true, areaStyle: { opacity: 0.3 }, data: data.map(d => d.cpu_percent), itemStyle: { color: '#6495ED' } },
       { name: '内存', type: 'line', smooth: true, areaStyle: { opacity: 0.3 }, data: data.map(d => d.memory_percent), itemStyle: { color: '#52c41a' } },
     ],
   }

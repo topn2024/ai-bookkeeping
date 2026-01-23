@@ -176,7 +176,7 @@ const renderTrendChart = (data: any[]) => {
     series: [
       { name: '收入', type: 'bar', stack: 'total', data: data.map(d => d.income), itemStyle: { color: '#52c41a' } },
       { name: '支出', type: 'bar', stack: 'total', data: data.map(d => -d.expense), itemStyle: { color: '#ff4d4f' } },
-      { name: '净额', type: 'line', smooth: true, data: data.map(d => d.net), itemStyle: { color: '#1890ff' } },
+      { name: '净额', type: 'line', smooth: true, data: data.map(d => d.net), itemStyle: { color: '#6495ED' } },
     ],
   }
 
@@ -272,7 +272,7 @@ const renderAmountDistChart = (data: any[]) => {
       data: data.map(d => d.count),
       itemStyle: {
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: '#1890ff' },
+          { offset: 0, color: '#6495ED' },
           { offset: 1, color: '#69c0ff' },
         ]),
       },
