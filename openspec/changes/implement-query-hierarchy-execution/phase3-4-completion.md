@@ -277,7 +277,7 @@ LineChartData(
 | 饼图 | ✅ 完成 |
 | 图表交互功能 | ✅ 完成 |
 | 数据采样 | ✅ 完成 |
-| 集成到语音助手界面 | ⏳ 待集成 |
+| 集成到语音助手界面 | ✅ 演示集成完成 |
 | Widget测试 | ⏳ 待编写 |
 
 ---
@@ -285,9 +285,11 @@ LineChartData(
 ## 待完成任务
 
 ### 1. 集成到语音助手界面
-- [ ] 在语音助手页面中添加卡片和图表的显示逻辑
-- [ ] 根据QueryResponse的level显示相应的UI组件
-- [ ] 处理卡片和图表的生命周期
+- [x] 在语音助手页面中添加卡片和图表的显示逻辑
+- [x] 根据QueryResponse的level显示相应的UI组件
+- [x] 处理卡片和图表的生命周期
+- [ ] 连接到真实的查询系统（当前使用演示数据）
+- [ ] 从VoiceServiceCoordinator传递cardData/chartData
 
 ### 2. Widget测试
 - [ ] 编写LightweightQueryCard的Widget测试

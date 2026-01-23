@@ -7,6 +7,14 @@ import '../providers/budget_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/voice/query/query_models.dart';
+import '../services/voice/query/query_executor.dart';
+import '../services/voice/query/query_result_router.dart';
+import '../services/voice/query/query_complexity_analyzer.dart';
+import '../widgets/voice/lightweight_query_card.dart';
+import '../widgets/voice/interactive_query_chart.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
 
 /// 6.20 语音智能客服页面
 /// 提供全方位的语音交互帮助，解答用户关于记账、预算、钱龄等问题
@@ -22,10 +30,23 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
   final List<Map<String, dynamic>> _messages = [];
   bool _isRecording = false;
 
+  // 查询系统组件
+  late final QueryExecutor _queryExecutor;
+  late final QueryResultRouter _queryRouter;
+
   @override
   void initState() {
     super.initState();
+    _initializeQuerySystem();
     _initializeChat();
+  }
+
+  void _initializeQuerySystem() {
+    final databaseService = sl<IDatabaseService>();
+    _queryExecutor = QueryExecutor(databaseService: databaseService);
+    _queryRouter = QueryResultRouter(
+      analyzer: QueryComplexityAnalyzer(),
+    );
   }
 
   void _initializeChat() {
@@ -373,9 +394,218 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
     _addUserMessage(text);
 
     // 模拟AI回复
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      _addAssistantMessage(_generateResponse(text));
+    Future.delayed(const Duration(milliseconds: 1000), () async {
+      // 检查是否是查询类型，需要显示卡片或图表
+      Widget? widget;
+      String response;
+
+      // 尝试执行真实查询
+      final queryResult = await _tryExecuteQuery(text);
+
+      if (queryResult != null) {
+        // 使用真实查询结果
+        response = queryResult['response'] as String;
+        widget = queryResult['widget'] as Widget?;
+      }
+      // Level 2: 轻量卡片（演示数据作为兜底）
+      else if (text.contains('占比') || text.contains('百分比')) {
+        response = '餐饮最多，占48.7%，总计2180元';
+        widget = LightweightQueryCard(
+          cardData: QueryCardData(
+            primaryValue: 2180.0,
+            percentage: 0.487,
+            cardType: CardType.percentage,
+          ),
+          onDismiss: () {},
+        );
+      } else if (text.contains('预算') && (text.contains('使用') || text.contains('进度'))) {
+        response = '本月预算已使用87.2%，还剩320元';
+        widget = LightweightQueryCard(
+          cardData: QueryCardData(
+            primaryValue: 2180.0,
+            secondaryValue: 2500.0,
+            progress: 0.872,
+            cardType: CardType.progress,
+          ),
+          onDismiss: () {},
+        );
+      } else if (text.contains('对比') || text.contains('比较')) {
+        response = '本月支出8400元，比上月减少14.3%';
+        widget = LightweightQueryCard(
+          cardData: QueryCardData(
+            primaryValue: 8400.0,
+            comparison: ComparisonData(
+              currentValue: 8400.0,
+              previousValue: 9800.0,
+              changePercentage: -14.3,
+              isIncrease: false,
+            ),
+            cardType: CardType.comparison,
+          ),
+          onDismiss: () {},
+        );
+      }
+      // Level 3: 交互图表（演示数据作为兜底）
+      else if (text.contains('趋势') || text.contains('变化')) {
+        response = '最近三个月消费趋势：整体比较平稳，2月最高9500元，3月最低7500元';
+        widget = InteractiveQueryChart(
+          chartData: QueryChartData(
+            chartType: ChartType.line,
+            title: '最近三个月消费趋势',
+            dataPoints: [
+              DataPoint(label: '1月', value: 8000.0),
+              DataPoint(label: '2月', value: 9500.0),
+              DataPoint(label: '3月', value: 7500.0),
+            ],
+            xLabels: ['1月', '2月', '3月'],
+            yLabel: '金额（元）',
+          ),
+          onDismiss: () {},
+        );
+      } else if (text.contains('分类') && text.contains('对比')) {
+        response = '各分类支出对比：餐饮2180元，交通800元，购物1500元';
+        widget = InteractiveQueryChart(
+          chartData: QueryChartData(
+            chartType: ChartType.bar,
+            title: '各分类支出对比',
+            dataPoints: [
+              DataPoint(label: '餐饮', value: 2180.0),
+              DataPoint(label: '交通', value: 800.0),
+              DataPoint(label: '购物', value: 1500.0),
+              DataPoint(label: '娱乐', value: 600.0),
+            ],
+            xLabels: ['餐饮', '交通', '购物', '娱乐'],
+            yLabel: '金额（元）',
+          ),
+          onDismiss: () {},
+        );
+      } else if (text.contains('分布')) {
+        response = '本月支出分布：餐饮占比最高43.6%，其次是购物30.0%';
+        widget = InteractiveQueryChart(
+          chartData: QueryChartData(
+            chartType: ChartType.pie,
+            title: '本月分类占比',
+            dataPoints: [
+              DataPoint(label: '餐饮', value: 2180.0),
+              DataPoint(label: '交通', value: 800.0),
+              DataPoint(label: '购物', value: 1500.0),
+              DataPoint(label: '娱乐', value: 600.0),
+            ],
+            xLabels: ['餐饮', '交通', '购物', '娱乐'],
+            yLabel: '金额（元）',
+          ),
+          onDismiss: () {},
+        );
+      } else {
+        response = _generateResponse(text);
+      }
+
+      _addAssistantMessage(response, widget: widget);
     });
+  }
+
+  /// 尝试执行真实查询
+  Future<Map<String, dynamic>?> _tryExecuteQuery(String input) async {
+    try {
+      // 简单的查询类型检测
+      QueryType? queryType;
+      TimeRange? timeRange;
+      String? category;
+      List<GroupByDimension>? groupBy;
+
+      // 检测查询类型
+      if (input.contains('今天') || input.contains('本日')) {
+        final now = DateTime.now();
+        timeRange = TimeRange(
+          start: DateTime(now.year, now.month, now.day),
+          end: DateTime(now.year, now.month, now.day, 23, 59, 59),
+        );
+        queryType = QueryType.summary;
+      } else if (input.contains('本月') || input.contains('这个月')) {
+        final now = DateTime.now();
+        timeRange = TimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: now,
+        );
+
+        if (input.contains('趋势') || input.contains('变化')) {
+          queryType = QueryType.trend;
+          groupBy = [GroupByDimension.date];
+        } else if (input.contains('分类') || input.contains('占比') || input.contains('分布')) {
+          queryType = QueryType.distribution;
+          groupBy = [GroupByDimension.category];
+        } else {
+          queryType = QueryType.summary;
+        }
+      } else if (input.contains('最近') && input.contains('月')) {
+        // 提取月份数
+        final monthMatch = RegExp(r'(\d+)个?月').firstMatch(input);
+        if (monthMatch != null) {
+          final months = int.tryParse(monthMatch.group(1)!) ?? 3;
+          final now = DateTime.now();
+          timeRange = TimeRange(
+            start: DateTime(now.year, now.month - months, now.day),
+            end: now,
+          );
+
+          if (input.contains('趋势') || input.contains('变化')) {
+            queryType = QueryType.trend;
+            groupBy = [GroupByDimension.month];
+          } else {
+            queryType = QueryType.summary;
+          }
+        }
+      }
+
+      // 检测分类
+      final categories = ['餐饮', '交通', '购物', '娱乐', '居住', '医疗', '其他'];
+      for (final cat in categories) {
+        if (input.contains(cat)) {
+          category = cat;
+          break;
+        }
+      }
+
+      // 如果检测到查询类型，执行查询
+      if (queryType != null && timeRange != null) {
+        final request = QueryRequest(
+          queryType: queryType,
+          timeRange: timeRange,
+          category: category,
+          groupBy: groupBy,
+        );
+
+        // 执行查询
+        final result = await _queryExecutor.execute(request);
+
+        // 生成响应
+        final queryResponse = await _queryRouter.route(request, result);
+
+        // 创建widget
+        Widget? widget;
+        if (queryResponse.level == QueryLevel.medium && queryResponse.cardData != null) {
+          widget = LightweightQueryCard(
+            cardData: queryResponse.cardData!,
+            onDismiss: () {},
+          );
+        } else if (queryResponse.level == QueryLevel.complex && queryResponse.chartData != null) {
+          widget = InteractiveQueryChart(
+            chartData: queryResponse.chartData!,
+            onDismiss: () {},
+          );
+        }
+
+        return {
+          'response': queryResponse.voiceText,
+          'widget': widget,
+        };
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('[VoiceAssistant] 查询执行失败: $e');
+      return null;
+    }
   }
 
   String _generateResponse(String input) {
