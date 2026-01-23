@@ -101,27 +101,38 @@ class _AnalysisCenterPageState extends ConsumerState<AnalysisCenterPage>
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context, theme),
-            _buildPeriodSelector(context, theme),
-            _buildTabBar(context, theme),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
+      body: Column(
+        children: [
+          // 顶部区域 - 使用主题色背景
+          Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary,
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Column(
                 children: [
-                  _TrendAnalysisTab(selectedPeriod: _selectedPeriod),
-                  _CategoryAnalysisTab(selectedPeriod: _selectedPeriod),
-                  _ComparisonTab(selectedPeriod: _selectedPeriod),
-                  _ReportCenterTab(),
-                  _InsightTab(),
-                  _SpecialAnalysisTab(),
+                  _buildHeader(context, theme),
+                  _buildPeriodSelector(context, theme),
+                  _buildTabBar(context, theme),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _TrendAnalysisTab(selectedPeriod: _selectedPeriod),
+                _CategoryAnalysisTab(selectedPeriod: _selectedPeriod),
+                _ComparisonTab(selectedPeriod: _selectedPeriod),
+                _ReportCenterTab(),
+                _InsightTab(),
+                _SpecialAnalysisTab(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -135,11 +146,12 @@ class _AnalysisCenterPageState extends ConsumerState<AnalysisCenterPage>
             '数据分析',
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
+              color: Colors.white,  // 白色文字
             ),
           ),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.filter_list, color: Colors.white),  // 白色图标
             onPressed: () {
               // TODO: 打开筛选页面
             },
@@ -166,6 +178,11 @@ class _AnalysisCenterPageState extends ConsumerState<AnalysisCenterPage>
                   setState(() => _selectedPeriod = index);
                 }
               },
+              backgroundColor: Colors.white.withOpacity(0.2),  // 半透明白色背景
+              selectedColor: Colors.white,  // 选中时白色背景
+              labelStyle: TextStyle(
+                color: isSelected ? theme.colorScheme.primary : Colors.white,  // 选中时主色，未选中时白色
+              ),
             ),
           );
         }),
@@ -178,6 +195,9 @@ class _AnalysisCenterPageState extends ConsumerState<AnalysisCenterPage>
       controller: _tabController,
       isScrollable: true,
       tabAlignment: TabAlignment.start,
+      labelColor: Colors.white,  // 选中标签白色
+      unselectedLabelColor: Colors.white.withOpacity(0.7),  // 未选中标签半透明白色
+      indicatorColor: Colors.white,  // 指示器白色
       tabs: _tabs.map((tab) => Tab(
         icon: Icon(tab.icon, size: 20),
         text: tab.label,
