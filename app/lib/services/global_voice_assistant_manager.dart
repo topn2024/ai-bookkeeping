@@ -16,6 +16,7 @@ import 'voice/barge_in_detector.dart';
 import 'voice/config/feature_flags.dart';
 import 'voice/config/pipeline_config.dart';
 import 'voice/pipeline/voice_pipeline_controller.dart';
+import 'voice/intelligence_engine/result_buffer.dart';
 import 'voice/agent/hybrid_intent_router.dart' show ProactiveNetworkMonitor, NetworkStatus;
 import 'voice/audio_processor_service.dart';
 import 'voice/ambient_noise_calibrator.dart';
@@ -214,6 +215,29 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _commandProcessor = processor;
     debugPrint('[GlobalVoiceAssistant] 命令处理器已${processor != null ? "设置" : "清除"}');
   }
+
+  // 结果缓冲区（用于查询结果通知）
+  ResultBuffer? _resultBuffer;
+
+  /// 设置结果缓冲区
+  ///
+  /// 当 VoiceServiceCoordinator 的 IntelligenceEngine 初始化后，
+  /// 通过此方法将 ResultBuffer 传递给流水线，使 SmartTopicGenerator
+  /// 能够在主动对话时检索待通知的查询结果。
+  void setResultBuffer(ResultBuffer? buffer) {
+    _resultBuffer = buffer;
+    debugPrint('[GlobalVoiceAssistant] ResultBuffer已${buffer != null ? "设置" : "清除"}');
+
+    // 如果流水线已初始化，需要重新创建以使用新的 ResultBuffer
+    // 这种情况发生在：先初始化流水线，后启用智能引擎模式
+    if (_pipelineController != null && buffer != null) {
+      debugPrint('[GlobalVoiceAssistant] 流水线已存在，标记需要重新初始化');
+      _needsReinitializePipeline = true;
+    }
+  }
+
+  // 是否需要重新初始化流水线（当 ResultBuffer 变化时）
+  bool _needsReinitializePipeline = false;
 
   /// 处理延迟响应（流水线模式）
   ///
@@ -662,17 +686,54 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     }
 
     // 创建流水线控制器
+    // 传入 ResultBuffer 使 SmartTopicGenerator 能够检索查询结果
     _pipelineController = VoicePipelineController(
       asrEngine: _recognitionEngine!,
       ttsService: _streamingTtsService!,
       vadService: _vadService,
       config: PipelineConfig.defaultConfig,
+      resultBuffer: _resultBuffer,
     );
+
+    // 重置重新初始化标记
+    _needsReinitializePipeline = false;
 
     // 设置流水线回调
     _setupPipelineCallbacks();
 
     debugPrint('[GlobalVoiceAssistant] 流水线控制器已创建');
+  }
+
+  /// 重新初始化流水线（当 ResultBuffer 变化时）
+  ///
+  /// 保留现有的 TTS 服务和 VAD 服务，只重建流水线控制器
+  Future<void> _reinitializePipeline() async {
+    debugPrint('[GlobalVoiceAssistant] 重新初始化流水线...');
+
+    // 先停止并释放旧的流水线控制器
+    if (_pipelineController != null) {
+      _pipelineStateSubscription?.cancel();
+      _pipelineStateSubscription = null;
+      await _pipelineController!.dispose();
+      _pipelineController = null;
+    }
+
+    // 重新创建流水线控制器（传入新的 ResultBuffer）
+    _pipelineController = VoicePipelineController(
+      asrEngine: _recognitionEngine!,
+      ttsService: _streamingTtsService!,
+      vadService: _vadService,
+      config: PipelineConfig.defaultConfig,
+      resultBuffer: _resultBuffer,
+    );
+
+    // 重新设置回调
+    _setupPipelineCallbacks();
+
+    // 重置标记
+    _needsReinitializePipeline = false;
+
+    debugPrint('[GlobalVoiceAssistant] 流水线重新初始化完成');
   }
 
   /// 设置流水线回调
@@ -718,6 +779,13 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _pipelineController!.onNeedRestartRecording = () {
       debugPrint('[GlobalVoiceAssistant] 收到重启音频录制请求');
       _restartNativeAudioRecording();
+    };
+
+    // 主动对话消息回调（添加到聊天历史）
+    _pipelineController!.onProactiveMessage = (message) {
+      debugPrint('[GlobalVoiceAssistant] 主动对话消息: $message');
+      _addAssistantMessage(message);
+      notifyListeners();
     };
   }
 
@@ -1263,6 +1331,11 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
       // 流水线模式（当前唯一的语音处理模式）
       if (_pipelineController != null) {
+        // 检查是否需要重新初始化流水线（ResultBuffer 变化时）
+        if (_needsReinitializePipeline && _resultBuffer != null) {
+          debugPrint('[GlobalVoiceAssistant] ResultBuffer已更新，重新初始化流水线');
+          await _reinitializePipeline();
+        }
         await _startRecordingWithPipeline();
         return;
       }

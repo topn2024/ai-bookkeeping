@@ -8,6 +8,7 @@ import '../services/voice_service_coordinator.dart';
 import '../services/global_voice_assistant_manager.dart';
 import '../widgets/multi_intent_confirm_widget.dart';
 import '../widgets/amount_supplement_widget.dart';
+import '../widgets/chat_message_list.dart';
 import '../theme/app_theme.dart';
 import '../theme/antigravity_shadows.dart';
 import '../l10n/app_localizations.dart';
@@ -36,7 +37,6 @@ class EnhancedVoiceAssistantPage extends ConsumerStatefulWidget {
 
 class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssistantPage>
     with TickerProviderStateMixin {
-  final ScrollController _scrollController = ScrollController();
   late AnimationController _pulseController;
   late AnimationController _waveController;
 
@@ -403,19 +403,12 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   }
 
   Widget _buildMessageList(BuildContext context, List<ChatMessage> messages) {
-    // 自动滚动到底部
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients && messages.isNotEmpty) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-
-    if (messages.isEmpty) {
-      return Center(
+    // 使用共享组件，统一滚动逻辑
+    return ChatMessageListWidget(
+      messages: messages,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      messageBuilder: (context, message) => _buildMessageBubbleFromGlobal(context, message),
+      emptyBuilder: (context) => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -427,17 +420,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
             ),
           ],
         ),
-      );
-    }
-
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: messages.length,
-      itemBuilder: (context, index) {
-        final message = messages[index];
-        return _buildMessageBubbleFromGlobal(context, message);
-      },
+      ),
     );
   }
 
@@ -1245,7 +1228,6 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   void dispose() {
     _pulseController.dispose();
     _waveController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 }

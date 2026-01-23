@@ -9,6 +9,7 @@ import '../config/pipeline_config.dart';
 import '../detection/barge_in_detector_v2.dart';
 import '../dynamic_aggregation_window.dart';
 import '../intelligence_engine/proactive_conversation_manager.dart';
+import '../intelligence_engine/result_buffer.dart';
 import '../tracking/response_tracker.dart';
 import 'input_pipeline.dart';
 import 'output_pipeline.dart';
@@ -73,7 +74,7 @@ class VoicePipelineController {
   late final ProactiveConversationManager _proactiveManager;
 
   /// 主动话题生成器
-  late final SimpleTopicGenerator _topicGenerator;
+  late final ProactiveTopicGenerator _topicGenerator;
 
   /// 回调
   /// 处理用户输入，返回LLM响应流
@@ -112,6 +113,7 @@ class VoicePipelineController {
     required StreamingTTSService ttsService,
     RealtimeVADService? vadService,
     PipelineConfig? config,
+    ResultBuffer? resultBuffer,
   })  : _asrEngine = asrEngine,
         _ttsService = ttsService,
         _vadService = vadService,
@@ -134,7 +136,11 @@ class VoicePipelineController {
     );
 
     // 初始化主动对话管理器
-    _topicGenerator = SimpleTopicGenerator();
+    // 如果提供了 ResultBuffer，使用 SmartTopicGenerator 以支持查询结果通知
+    // 否则降级使用 SimpleTopicGenerator
+    _topicGenerator = resultBuffer != null
+        ? SmartTopicGenerator(resultBuffer: resultBuffer)
+        : SimpleTopicGenerator();
     _proactiveManager = ProactiveConversationManager(
       topicGenerator: _topicGenerator,
       onProactiveMessage: _handleProactiveMessage,
@@ -176,21 +182,39 @@ class VoicePipelineController {
   /// 处理语音开始（VAD检测）
   void _handleSpeechStart() {
     _isUserSpeaking = true;
-    debugPrint('[VoicePipelineController] VAD: 用户开始说话');
+    debugPrint('[VoicePipelineController] VAD: 用户开始说话，停止主动对话监听');
 
-    // 用户开始说话时重置主动对话计时器
-    _proactiveManager.resetTimer();
+    // 用户开始说话，取消最大等待计时器
+    // 因为用户还在说，不应该强制处理
+    if (_maxWaitTimer != null) {
+      debugPrint('[VoicePipelineController] 用户继续说话，取消最大等待计时器');
+      _maxWaitTimer?.cancel();
+      _maxWaitTimer = null;
+    }
+
+    // 用户开始说话时停止主动对话监听（不是重置）
+    // 等用户说完后再根据情况决定是否重启
+    _proactiveManager.stopMonitoring();
   }
 
   /// 处理语音结束（VAD检测）
   void _handleSpeechEnd() {
     _isUserSpeaking = false;
     _lastSpeechEndTime = DateTime.now();
-    debugPrint('[VoicePipelineController] VAD: 用户停止说话');
+    debugPrint('[VoicePipelineController] VAD: 用户停止说话，缓冲区=${_sentenceBuffer.length}句');
 
-    // 如果有缓存的句子且用户已停止说话，使用动态等待时间
     if (_sentenceBuffer.isNotEmpty) {
+      // 有缓存句子，启动聚合计时器，不启动主动对话监听
+      // 等聚合完成、处理完成后，状态回到listening时才重启监听
       _startDynamicAggregationTimer();
+
+      // 用户停止说话后，启动最大等待计时器（基于语音结束时间）
+      // 这样确保只有在用户真正停顿后才开始计算最大等待时间
+      _startMaxWaitTimerFromSpeechEnd();
+    } else {
+      // 没有句子，用户可能只是噪音或短暂触发VAD，重启主动对话监听
+      debugPrint('[VoicePipelineController] 无缓存句子，重启主动对话监听');
+      _proactiveManager.startSilenceMonitoring();
     }
   }
 
@@ -365,9 +389,15 @@ class VoicePipelineController {
 
   /// 处理ASR中间结果
   ///
-  /// 中间结果表示用户仍在说话，需要重置聚合计时器
+  /// 中间结果表示用户仍在说话，需要：
+  /// 1. 暂停主动对话监听（防止用户说话时被打断）
+  /// 2. 重置聚合计时器（滑动窗口机制）
   void _handlePartialResult(String text) {
     onPartialResult?.call(text);
+
+    // 收到中间结果说明用户正在说话，暂停主动对话监听
+    // 这是 VAD speechStart 的补充机制，确保即使 VAD 没检测到也能正确暂停
+    _proactiveManager.stopMonitoring();
 
     // 如果有聚合计时器在运行且缓冲区有内容，收到中间结果说明用户还在说话
     // 重置计时器，等待用户说完（滑动窗口机制的关键）
@@ -390,6 +420,14 @@ class VoicePipelineController {
 
     debugPrint('[VoicePipelineController] 收到ASR句子: "$text", VAD说话中=$_isUserSpeaking');
 
+    // 关键：聚合等待开始时，停止主动对话监听
+    // 防止用户说多笔交易时被主动对话打断
+    // 主动对话监听会在聚合处理完成后（状态变为listening时）重新启动
+    if (_sentenceBuffer.isEmpty) {
+      debugPrint('[VoicePipelineController] 开始聚合等待，暂停主动对话监听');
+      _proactiveManager.stopMonitoring();
+    }
+
     // 将句子加入缓冲区
     _sentenceBuffer.add(text);
     debugPrint('[VoicePipelineController] 句子缓冲区: $_sentenceBuffer');
@@ -403,8 +441,9 @@ class VoicePipelineController {
     // 启动动态聚合计时器
     _startDynamicAggregationTimer();
 
-    // 启动最大等待计时器（只在第一次启动）
-    _startMaxWaitTimerIfNeeded();
+    // 注意：最大等待计时器改为在 _handleSpeechEnd() 中启动
+    // 这样确保只有在用户停止说话后才开始计算最大等待时间
+    // 避免用户说话中被强制打断
   }
 
   /// 启动动态聚合计时器
@@ -449,14 +488,27 @@ class VoicePipelineController {
     );
   }
 
-  /// 启动最大等待计时器（兜底机制）
-  void _startMaxWaitTimerIfNeeded() {
-    if (_maxWaitTimer != null) return; // 已经有计时器在运行
+  /// 启动最大等待计时器（基于语音结束时间）
+  ///
+  /// 设计说明：
+  /// - 只在用户停止说话（VAD speechEnd）后才启动
+  /// - 用户继续说话（VAD speechStart）时会取消此计时器
+  /// - 这样确保不会在用户说话中强制处理
+  void _startMaxWaitTimerFromSpeechEnd() {
+    // 取消之前的计时器，重新计时
+    _maxWaitTimer?.cancel();
+
+    debugPrint('[VoicePipelineController] 启动最大等待计时器（${AggregationTiming.maxWaitMs}ms，基于语音结束时间）');
 
     _maxWaitTimer = Timer(
       Duration(milliseconds: AggregationTiming.maxWaitMs),
       () {
-        debugPrint('[VoicePipelineController] 最大等待计时器触发（${AggregationTiming.maxWaitMs}ms兜底）');
+        // 再次检查用户是否在说话（双重保险）
+        if (_isUserSpeaking) {
+          debugPrint('[VoicePipelineController] 最大等待触发时用户正在说话，跳过');
+          return;
+        }
+        debugPrint('[VoicePipelineController] 最大等待计时器触发（${AggregationTiming.maxWaitMs}ms，基于语音结束）');
         _processAggregatedSentences();
       },
     );

@@ -47,6 +47,9 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
   late AnimationController _pulseController;
   OverlayEntry? _recordingOverlay;
 
+  // 双击退出相关
+  DateTime? _lastBackPressTime;
+
   // GlobalKey for feature guide
   static final GlobalKey _fabKey = GlobalKey();
   static final GlobalKey _xiaojiNavKey = GlobalKey();
@@ -213,14 +216,49 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
     // 小记页面（index=2）不显示底部导航栏
     final isVoiceAssistantPage = _currentIndex == 2;
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
+    return PopScope(
+      canPop: false,  // 始终拦截返回手势
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBackGesture();
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _pages,
+        ),
+        bottomNavigationBar: isVoiceAssistantPage ? null : _buildBottomNavBar(context),
+        floatingActionButton: isVoiceAssistantPage ? null : _buildCenterButton(context),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       ),
-      bottomNavigationBar: isVoiceAssistantPage ? null : _buildBottomNavBar(context),
-      floatingActionButton: isVoiceAssistantPage ? null : _buildCenterButton(context),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+    );
+  }
+
+  /// 处理返回手势
+  void _handleBackGesture() {
+    // 如果在非首页，返回首页
+    if (_currentIndex != 0) {
+      setState(() => _currentIndex = 0);
+      return;
+    }
+
+    // 在首页，双击退出
+    final now = DateTime.now();
+    if (_lastBackPressTime != null &&
+        now.difference(_lastBackPressTime!) < const Duration(seconds: 2)) {
+      // 两次返回间隔小于2秒，退出应用
+      Navigator.of(context).pop();
+      return;
+    }
+
+    // 第一次按返回，显示提示
+    _lastBackPressTime = now;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('再滑一次退出应用'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 

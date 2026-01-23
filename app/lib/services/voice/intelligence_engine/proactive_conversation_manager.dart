@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'result_buffer.dart';
 
 /// 主动对话管理器
 ///
@@ -332,6 +333,110 @@ class SimpleTopicGenerator implements ProactiveTopicGenerator {
     }
 
     // 轮换话题（确保不超出范围）
+    final topic = topics[_topicIndex % topics.length];
+    _topicIndex++;
+
+    return topic;
+  }
+
+  /// 重置话题索引
+  void reset() {
+    _topicIndex = 0;
+  }
+}
+
+/// 智能话题生成器
+///
+/// 核心功能：
+/// - 优先从 ResultBuffer 获取待通知的查询结果
+/// - 如果有查询结果，返回用户友好的结果文本
+/// - 如果没有查询结果，降级到时间相关的预设话题
+///
+/// 设计思想：
+/// 查询操作（如"今天花了多少"）是异步执行的，结果存入 ResultBuffer。
+/// 当用户静默时，系统通过主动对话机制检索这些结果并告知用户。
+class SmartTopicGenerator implements ProactiveTopicGenerator {
+  /// 结果缓冲区（用于获取待通知的查询结果）
+  final ResultBuffer? _resultBuffer;
+
+  /// 话题索引（用于轮换预设话题）
+  int _topicIndex = 0;
+
+  /// 预设话题（作为降级方案）
+  static const List<String> _defaultTopics = [
+    '需要我帮你记一笔账吗？',
+    '还有什么可以帮您的吗？',
+    '还在吗？',
+  ];
+
+  SmartTopicGenerator({ResultBuffer? resultBuffer})
+      : _resultBuffer = resultBuffer;
+
+  @override
+  Future<String?> generateTopic() async {
+    debugPrint('[SmartTopicGenerator] 生成话题，检查 ResultBuffer...');
+
+    // 1. 优先检查 ResultBuffer 中是否有待通知的查询结果
+    final resultBuffer = _resultBuffer;
+    if (resultBuffer != null && resultBuffer.hasPendingResults) {
+      final pendingResults = resultBuffer.pendingResults;
+      debugPrint('[SmartTopicGenerator] 有 ${pendingResults.length} 个待通知结果');
+
+      // 查找第一个查询结果（带有 responseText）
+      for (final bufferedResult in pendingResults) {
+        final data = bufferedResult.executionResult.data;
+        if (data != null) {
+          // 优先使用 responseText（由 BookkeepingOperationAdapter 生成）
+          final responseText = data['responseText'] as String?;
+          if (responseText != null && responseText.isNotEmpty) {
+            debugPrint('[SmartTopicGenerator] 找到查询结果: $responseText');
+
+            // 标记为已通知
+            resultBuffer.markNotified(bufferedResult.id);
+
+            return responseText;
+          }
+
+          // 如果没有 responseText，尝试用 description 构建简单反馈
+          if (bufferedResult.description.isNotEmpty) {
+            debugPrint('[SmartTopicGenerator] 使用 description: ${bufferedResult.description}');
+
+            // 标记为已通知
+            resultBuffer.markNotified(bufferedResult.id);
+
+            return bufferedResult.description + '已完成';
+          }
+        }
+      }
+    }
+
+    // 2. 没有待通知的查询结果，使用时间相关的预设话题
+    debugPrint('[SmartTopicGenerator] 无待通知结果，使用预设话题');
+    final hour = DateTime.now().hour;
+    List<String> topics;
+
+    if (hour >= 6 && hour < 10) {
+      topics = const [
+        '早上好！要记录一下早餐花销吗？',
+        '新的一天开始了，需要帮你记账吗？',
+        '还在吗？',
+      ];
+    } else if (hour >= 11 && hour < 14) {
+      topics = const [
+        '午餐吃了吗？要记一笔吗？',
+        '中午好！需要记录午餐消费吗？',
+        '还在吗？',
+      ];
+    } else if (hour >= 18 && hour < 22) {
+      topics = const [
+        '今天的账记完了吗？要查看今日消费吗？',
+        '晚上好！要回顾一下今天的支出吗？',
+        '还在吗？',
+      ];
+    } else {
+      topics = _defaultTopics;
+    }
+
     final topic = topics[_topicIndex % topics.length];
     _topicIndex++;
 

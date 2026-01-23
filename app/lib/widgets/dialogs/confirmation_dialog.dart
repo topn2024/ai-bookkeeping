@@ -128,7 +128,7 @@ class ConfirmationDialog extends StatelessWidget {
     String cancelText = '取消',
     IconData? icon,
     bool barrierDismissible = true,
-    bool enableSwipeDismiss = false,
+    bool enableSwipeDismiss = true, // 默认启用滑动关闭
     SwipeDismissDirection swipeDismissDirection = SwipeDismissDirection.horizontal,
   }) {
     final dialog = ConfirmationDialog(
@@ -173,7 +173,7 @@ class ConfirmationDialog extends StatelessWidget {
     String confirmText = '删除',
     String cancelText = '取消',
     IconData icon = Icons.warning_amber_rounded,
-    bool enableSwipeDismiss = false,
+    bool enableSwipeDismiss = true, // 默认启用滑动关闭
     SwipeDismissDirection swipeDismissDirection = SwipeDismissDirection.horizontal,
   }) {
     final dialog = ConfirmationDialog(
@@ -219,7 +219,7 @@ class ConfirmationDialog extends StatelessWidget {
     String cancelText = '取消',
     bool isDangerous = false,
     T? Function()? onConfirm,
-    bool enableSwipeDismiss = false,
+    bool enableSwipeDismiss = true, // 默认启用滑动关闭
     SwipeDismissDirection swipeDismissDirection = SwipeDismissDirection.horizontal,
   }) {
     final dialog = _ContentConfirmationDialog<T>(
