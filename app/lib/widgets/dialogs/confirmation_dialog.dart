@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'swipeable_dismiss_dialog.dart';
 
 /// 确认对话框配置
 class ConfirmationDialogConfig {
@@ -116,6 +117,9 @@ class ConfirmationDialog extends StatelessWidget {
   /// 显示基础确认对话框
   ///
   /// 返回 true 表示确认，false 或 null 表示取消
+  ///
+  /// [enableSwipeDismiss] 启用滑动手势关闭对话框
+  /// [swipeDismissDirection] 滑动关闭方向，默认水平
   static Future<bool?> show(
     BuildContext context, {
     required String title,
@@ -124,26 +128,44 @@ class ConfirmationDialog extends StatelessWidget {
     String cancelText = '取消',
     IconData? icon,
     bool barrierDismissible = true,
+    bool enableSwipeDismiss = false,
+    SwipeDismissDirection swipeDismissDirection = SwipeDismissDirection.horizontal,
   }) {
+    final dialog = ConfirmationDialog(
+      config: ConfirmationDialogConfig(
+        title: title,
+        message: message,
+        confirmText: confirmText,
+        cancelText: cancelText,
+        icon: icon,
+        barrierDismissible: barrierDismissible,
+      ),
+    );
+
+    if (enableSwipeDismiss) {
+      return showDialog<bool>(
+        context: context,
+        barrierDismissible: barrierDismissible,
+        builder: (context) => SwipeableDismissDialog(
+          direction: swipeDismissDirection,
+          child: dialog,
+        ),
+      );
+    }
+
     return showDialog<bool>(
       context: context,
       barrierDismissible: barrierDismissible,
-      builder: (context) => ConfirmationDialog(
-        config: ConfirmationDialogConfig(
-          title: title,
-          message: message,
-          confirmText: confirmText,
-          cancelText: cancelText,
-          icon: icon,
-          barrierDismissible: barrierDismissible,
-        ),
-      ),
+      builder: (context) => dialog,
     );
   }
 
   /// 显示危险操作对话框
   ///
   /// 确认按钮显示为红色，带警告图标
+  ///
+  /// [enableSwipeDismiss] 启用滑动手势关闭对话框
+  /// [swipeDismissDirection] 滑动关闭方向，默认水平
   static Future<bool?> showDangerous(
     BuildContext context, {
     required String title,
@@ -151,19 +173,34 @@ class ConfirmationDialog extends StatelessWidget {
     String confirmText = '删除',
     String cancelText = '取消',
     IconData icon = Icons.warning_amber_rounded,
+    bool enableSwipeDismiss = false,
+    SwipeDismissDirection swipeDismissDirection = SwipeDismissDirection.horizontal,
   }) {
+    final dialog = ConfirmationDialog(
+      config: ConfirmationDialogConfig.dangerous(
+        title: title,
+        message: message,
+        confirmText: confirmText,
+        cancelText: cancelText,
+        icon: icon,
+      ),
+    );
+
+    if (enableSwipeDismiss) {
+      return showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) => SwipeableDismissDialog(
+          direction: swipeDismissDirection,
+          child: dialog,
+        ),
+      );
+    }
+
     return showDialog<bool>(
       context: context,
       barrierDismissible: true,
-      builder: (context) => ConfirmationDialog(
-        config: ConfirmationDialogConfig.dangerous(
-          title: title,
-          message: message,
-          confirmText: confirmText,
-          cancelText: cancelText,
-          icon: icon,
-        ),
-      ),
+      builder: (context) => dialog,
     );
   }
 
@@ -171,6 +208,9 @@ class ConfirmationDialog extends StatelessWidget {
   ///
   /// 可以在对话框中央显示自定义 Widget，
   /// 确认后返回泛型结果
+  ///
+  /// [enableSwipeDismiss] 启用滑动手势关闭对话框
+  /// [swipeDismissDirection] 滑动关闭方向，默认水平
   static Future<T?> showWithContent<T>(
     BuildContext context, {
     required String title,
@@ -179,18 +219,33 @@ class ConfirmationDialog extends StatelessWidget {
     String cancelText = '取消',
     bool isDangerous = false,
     T? Function()? onConfirm,
+    bool enableSwipeDismiss = false,
+    SwipeDismissDirection swipeDismissDirection = SwipeDismissDirection.horizontal,
   }) {
+    final dialog = _ContentConfirmationDialog<T>(
+      title: title,
+      content: content,
+      confirmText: confirmText,
+      cancelText: cancelText,
+      isDangerous: isDangerous,
+      onConfirm: onConfirm,
+    );
+
+    if (enableSwipeDismiss) {
+      return showDialog<T>(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) => SwipeableDismissDialog(
+          direction: swipeDismissDirection,
+          child: dialog,
+        ),
+      );
+    }
+
     return showDialog<T>(
       context: context,
       barrierDismissible: true,
-      builder: (context) => _ContentConfirmationDialog<T>(
-        title: title,
-        content: content,
-        confirmText: confirmText,
-        cancelText: cancelText,
-        isDangerous: isDangerous,
-        onConfirm: onConfirm,
-      ),
+      builder: (context) => dialog,
     );
   }
 
