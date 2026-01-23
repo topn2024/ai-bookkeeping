@@ -257,8 +257,8 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       return;
     }
 
-    // 添加助手消息到对话历史
-    _addAssistantMessage(response);
+    // 注意：不在这里添加消息，triggerProactiveMessage 会通过 onProactiveMessage 回调添加
+    // 避免重复添加消息
 
     // 通过流水线的主动消息机制播放响应
     // isUserResponse=true表示这是对用户输入的延迟响应，不计入主动对话次数
