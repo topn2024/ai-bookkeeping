@@ -5,6 +5,9 @@ import '../../voice_navigation_service.dart';
 import '../intelligence_engine/intelligence_engine.dart';
 import '../intelligence_engine/models.dart';
 import '../../../models/transaction.dart';
+import '../query/query_executor.dart';
+import '../query/query_result_router.dart';
+import '../query/query_models.dart' as query;
 
 /// 记账操作适配器
 ///
@@ -17,12 +20,18 @@ import '../../../models/transaction.dart';
 class BookkeepingOperationAdapter implements OperationAdapter {
   final IDatabaseService _databaseService;
   final VoiceNavigationService _navigationService;
+  final QueryExecutor _queryExecutor;
+  final QueryResultRouter _queryRouter;
 
   BookkeepingOperationAdapter({
     IDatabaseService? databaseService,
     VoiceNavigationService? navigationService,
+    QueryExecutor? queryExecutor,
+    QueryResultRouter? queryRouter,
   })  : _databaseService = databaseService ?? DatabaseService(),
-        _navigationService = navigationService ?? VoiceNavigationService();
+        _navigationService = navigationService ?? VoiceNavigationService(),
+        _queryExecutor = queryExecutor ?? QueryExecutor(databaseService: databaseService),
+        _queryRouter = queryRouter ?? QueryResultRouter();
 
   @override
   String get adapterName => 'BookkeepingOperationAdapter';
@@ -132,91 +141,130 @@ class BookkeepingOperationAdapter implements OperationAdapter {
     final queryType = params['queryType'] as String? ?? 'summary';
     final time = params['time'] as String?;
     final period = params['period'] as String?;
+    final category = params['category'] as String?;
 
-    debugPrint('[BookkeepingOperationAdapter] 查询: queryType=$queryType, time=$time, period=$period');
+    debugPrint('[BookkeepingOperationAdapter] 查询: queryType=$queryType, time=$time, period=$period, category=$category');
 
     try {
-      // 解析时间范围
+      // 1. 解析时间范围
       final timeRange = _parseTimeRange(time, period);
       debugPrint('[BookkeepingOperationAdapter] 时间范围: ${timeRange.startDate} - ${timeRange.endDate}, 显示: ${timeRange.periodText}');
 
-      // 调用 DatabaseService 查询交易（带时间过滤）
-      final transactions = await _databaseService.queryTransactions(
-        startDate: timeRange.startDate,
-        endDate: timeRange.endDate,
+      // 2. 构建QueryRequest
+      final queryRequest = _buildQueryRequest(
+        queryType: queryType,
+        timeRange: timeRange,
+        category: category,
+        params: params,
       );
 
-      debugPrint('[BookkeepingOperationAdapter] 查询到 ${transactions.length} 条记录');
+      // 3. 执行查询
+      final queryResult = await _queryExecutor.execute(queryRequest);
+      debugPrint('[BookkeepingOperationAdapter] 查询结果: ${queryResult.transactionCount}笔, 支出${queryResult.totalExpense}, 收入${queryResult.totalIncome}');
 
-      // 根据查询类型返回不同的结果
-      switch (queryType) {
-        case 'summary':
-        case 'statistics':
-          final totalExpense = transactions
-              .where((t) => t.type == TransactionType.expense)
-              .fold(0.0, (sum, t) => sum + t.amount);
-          final totalIncome = transactions
-              .where((t) => t.type == TransactionType.income)
-              .fold(0.0, (sum, t) => sum + t.amount);
+      // 4. 路由到合适的响应层级
+      final queryResponse = await _queryRouter.route(queryRequest, queryResult);
+      debugPrint('[BookkeepingOperationAdapter] 响应层级: ${queryResponse.level}, 复杂度: ${queryResponse.complexityScore}');
 
-          // 生成用户友好的响应文本
-          String responseText;
-          if (totalExpense > 0 && totalIncome > 0) {
-            responseText = '${timeRange.periodText}您花费了${totalExpense.toStringAsFixed(0)}元，收入${totalIncome.toStringAsFixed(0)}元';
-          } else if (totalExpense > 0) {
-            responseText = '${timeRange.periodText}您一共花费了${totalExpense.toStringAsFixed(0)}元';
-          } else if (totalIncome > 0) {
-            responseText = '${timeRange.periodText}您收入了${totalIncome.toStringAsFixed(0)}元';
-          } else {
-            responseText = '${timeRange.periodText}暂无记账记录';
-          }
-
-          return ExecutionResult.success(
-            data: {
-              'queryType': queryType,
-              'totalExpense': totalExpense,
-              'totalIncome': totalIncome,
-              'balance': totalIncome - totalExpense,
-              'transactionCount': transactions.length,
-              'periodText': timeRange.periodText,
-              'responseText': responseText,
-            },
-          );
-
-        case 'recent':
-          final recentTransactions = transactions.take(10).toList();
-          final responseText = recentTransactions.isEmpty
-              ? '${timeRange.periodText}暂无记录'
-              : '${timeRange.periodText}有${recentTransactions.length}笔记录';
-          return ExecutionResult.success(
-            data: {
-              'queryType': queryType,
-              'transactions': recentTransactions.map((t) => {
-                'id': t.id,
-                'type': t.type.toString(),
-                'amount': t.amount,
-                'category': t.category,
-                'date': t.date.toIso8601String(),
-              }).toList(),
-              'periodText': timeRange.periodText,
-              'responseText': responseText,
-            },
-          );
-
-        default:
-          return ExecutionResult.success(
-            data: {
-              'queryType': queryType,
-              'transactionCount': transactions.length,
-              'periodText': timeRange.periodText,
-              'responseText': '${timeRange.periodText}有${transactions.length}笔记录',
-            },
-          );
-      }
+      // 5. 返回执行结果
+      return ExecutionResult.success(
+        data: {
+          'queryType': queryType,
+          'level': queryResponse.level.toString(),
+          'complexityScore': queryResponse.complexityScore,
+          'responseText': queryResponse.voiceText,
+          'totalExpense': queryResult.totalExpense,
+          'totalIncome': queryResult.totalIncome,
+          'balance': queryResult.balance,
+          'transactionCount': queryResult.transactionCount,
+          'periodText': queryResult.periodText,
+          // Level 2: 卡片数据
+          'cardData': queryResponse.cardData != null
+              ? {
+                  'type': queryResponse.cardData!.cardType.toString(),
+                  'primaryValue': queryResponse.cardData!.primaryValue,
+                  'secondaryValue': queryResponse.cardData!.secondaryValue,
+                  'percentage': queryResponse.cardData!.percentage,
+                  'progress': queryResponse.cardData!.progress,
+                }
+              : null,
+          // Level 3: 图表数据
+          'chartData': queryResponse.chartData != null
+              ? {
+                  'type': queryResponse.chartData!.chartType.toString(),
+                  'title': queryResponse.chartData!.title,
+                  'dataPoints': queryResponse.chartData!.dataPoints
+                      .map((p) => {'label': p.label, 'value': p.value})
+                      .toList(),
+                  'xLabels': queryResponse.chartData!.xLabels,
+                  'yLabel': queryResponse.chartData!.yLabel,
+                }
+              : null,
+        },
+      );
     } catch (e) {
       debugPrint('[BookkeepingOperationAdapter] 查询失败: $e');
       return ExecutionResult.failure('查询失败: $e');
     }
+  }
+
+  /// 构建QueryRequest
+  query.QueryRequest _buildQueryRequest({
+    required String queryType,
+    required _TimeRange timeRange,
+    String? category,
+    required Map<String, dynamic> params,
+  }) {
+    // 解析查询类型
+    query.QueryType type;
+    switch (queryType.toLowerCase()) {
+      case 'summary':
+      case 'statistics':
+        type = query.QueryType.summary;
+        break;
+      case 'recent':
+        type = query.QueryType.recent;
+        break;
+      case 'trend':
+        type = query.QueryType.trend;
+        break;
+      case 'distribution':
+        type = query.QueryType.distribution;
+        break;
+      case 'comparison':
+        type = query.QueryType.comparison;
+        break;
+      default:
+        type = query.QueryType.summary;
+    }
+
+    // 解析分组维度
+    List<query.GroupByDimension>? groupBy;
+    final groupByParam = params['groupBy'] as String?;
+    if (groupByParam != null) {
+      groupBy = [];
+      if (groupByParam.contains('date') || groupByParam.contains('日期')) {
+        groupBy.add(query.GroupByDimension.date);
+      }
+      if (groupByParam.contains('month') || groupByParam.contains('月')) {
+        groupBy.add(query.GroupByDimension.month);
+      }
+      if (groupByParam.contains('category') || groupByParam.contains('分类')) {
+        groupBy.add(query.GroupByDimension.category);
+      }
+    }
+
+    return query.QueryRequest(
+      queryType: type,
+      timeRange: query.TimeRange(
+        startDate: timeRange.startDate,
+        endDate: timeRange.endDate,
+        periodText: timeRange.periodText,
+      ),
+      category: category,
+      groupBy: groupBy,
+      limit: params['limit'] as int?,
+    );
   }
 
   /// 解析时间范围
