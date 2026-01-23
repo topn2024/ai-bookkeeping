@@ -54,53 +54,26 @@ class _ExportPageState extends ConsumerState<ExportPage> {
     final filteredTransactions = _getFilteredTransactions(transactions);
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildPageHeader(context, theme),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTimeRangeSection(context, theme),
-                    _buildTransactionTypeSection(context, theme),
-                    _buildExportFormatSection(context, theme),
-                    _buildIncludeOptionsSection(context, theme),
-                    _buildPreviewCard(context, theme, filteredTransactions.length),
-                  ],
-                ),
+      appBar: AppBar(
+        title: const Text('导出账单'),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTimeRangeSection(context, theme),
+                  _buildTransactionTypeSection(context, theme),
+                  _buildExportFormatSection(context, theme),
+                  _buildIncludeOptionsSection(context, theme),
+                  _buildPreviewCard(context, theme, filteredTransactions.length),
+                ],
               ),
             ),
-            _buildExportButton(context, theme),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPageHeader(BuildContext context, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: const Icon(Icons.arrow_back),
-            ),
           ),
-          const Expanded(
-            child: Text(
-              '导出账单',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-          ),
-          const SizedBox(width: 40),
+          _buildExportButton(context, theme),
         ],
       ),
     );
