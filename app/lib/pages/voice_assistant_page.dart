@@ -11,6 +11,7 @@ import '../services/voice/query/query_models.dart';
 import '../services/voice/query/query_executor.dart';
 import '../services/voice/query/query_result_router.dart';
 import '../services/voice/query/query_complexity_analyzer.dart';
+import '../services/voice/smart_intent_recognizer.dart';
 import '../widgets/voice/lightweight_query_card.dart';
 import '../widgets/voice/interactive_query_chart.dart';
 import '../core/di/service_locator.dart';
@@ -33,6 +34,7 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
   // 查询系统组件
   late final QueryExecutor _queryExecutor;
   late final QueryResultRouter _queryRouter;
+  late final SmartIntentRecognizer _intentRecognizer;
 
   @override
   void initState() {
@@ -47,6 +49,7 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
     _queryRouter = QueryResultRouter(
       analyzer: QueryComplexityAnalyzer(),
     );
+    _intentRecognizer = SmartIntentRecognizer();
   }
 
   void _initializeChat() {
@@ -504,107 +507,200 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
     });
   }
 
-  /// 尝试执行真实查询
+  /// 尝试执行真实查询（使用LLM意图识别）
   Future<Map<String, dynamic>?> _tryExecuteQuery(String input) async {
     try {
-      // 简单的查询类型检测
-      QueryType? queryType;
-      TimeRange? timeRange;
-      String? category;
-      List<GroupByDimension>? groupBy;
+      // 使用SmartIntentRecognizer进行意图识别
+      final recognitionResult = await _intentRecognizer.recognizeMultiOperation(
+        input,
+        pageContext: 'voice_assistant',
+      );
 
-      // 检测查询类型
-      if (input.contains('今天') || input.contains('本日')) {
-        final now = DateTime.now();
-        timeRange = TimeRange(
-          start: DateTime(now.year, now.month, now.day),
-          end: DateTime(now.year, now.month, now.day, 23, 59, 59),
-        );
-        queryType = QueryType.summary;
-      } else if (input.contains('本月') || input.contains('这个月')) {
-        final now = DateTime.now();
-        timeRange = TimeRange(
-          start: DateTime(now.year, now.month, 1),
-          end: now,
-        );
-
-        if (input.contains('趋势') || input.contains('变化')) {
-          queryType = QueryType.trend;
-          groupBy = [GroupByDimension.date];
-        } else if (input.contains('分类') || input.contains('占比') || input.contains('分布')) {
-          queryType = QueryType.distribution;
-          groupBy = [GroupByDimension.category];
-        } else {
-          queryType = QueryType.summary;
-        }
-      } else if (input.contains('最近') && input.contains('月')) {
-        // 提取月份数
-        final monthMatch = RegExp(r'(\d+)个?月').firstMatch(input);
-        if (monthMatch != null) {
-          final months = int.tryParse(monthMatch.group(1)!) ?? 3;
-          final now = DateTime.now();
-          timeRange = TimeRange(
-            start: DateTime(now.year, now.month - months, now.day),
-            end: now,
-          );
-
-          if (input.contains('趋势') || input.contains('变化')) {
-            queryType = QueryType.trend;
-            groupBy = [GroupByDimension.month];
-          } else {
-            queryType = QueryType.summary;
-          }
-        }
+      // 只处理查询操作
+      if (!recognitionResult.hasOperations) {
+        return null;
       }
 
-      // 检测分类
-      final categories = ['餐饮', '交通', '购物', '娱乐', '居住', '医疗', '其他'];
-      for (final cat in categories) {
-        if (input.contains(cat)) {
-          category = cat;
-          break;
-        }
+      // 查找第一个查询操作
+      final queryOperation = recognitionResult.operations.firstWhere(
+        (op) => op.type == OperationType.query,
+        orElse: () => recognitionResult.operations.first,
+      );
+
+      if (queryOperation.type != OperationType.query) {
+        return null;
       }
 
-      // 如果检测到查询类型，执行查询
-      if (queryType != null && timeRange != null) {
-        final request = QueryRequest(
-          queryType: queryType,
-          timeRange: timeRange,
-          category: category,
-          groupBy: groupBy,
+      // 从params中提取查询参数
+      final params = queryOperation.params;
+
+      // 解析查询类型
+      final queryTypeStr = params['queryType'] as String?;
+      if (queryTypeStr == null) return null;
+
+      final queryType = _parseQueryType(queryTypeStr);
+      if (queryType == null) return null;
+
+      // 解析时间范围
+      final timeStr = params['time'] as String?;
+      final timeRange = _parseTimeRange(timeStr);
+      if (timeRange == null) return null;
+
+      // 解析分类（可选）
+      final category = params['category'] as String?;
+
+      // 解析分组维度（可选）
+      final groupByStr = params['groupBy'] as String?;
+      final groupBy = groupByStr != null ? [_parseGroupByDimension(groupByStr)] : null;
+
+      // 构建查询请求
+      final request = QueryRequest(
+        queryType: queryType,
+        timeRange: timeRange,
+        category: category,
+        groupBy: groupBy?.whereType<GroupByDimension>().toList(),
+      );
+
+      // 执行查询
+      final result = await _queryExecutor.execute(request);
+
+      // 生成响应
+      final queryResponse = await _queryRouter.route(request, result);
+
+      // 创建widget
+      Widget? widget;
+      if (queryResponse.level == QueryLevel.medium && queryResponse.cardData != null) {
+        widget = LightweightQueryCard(
+          cardData: queryResponse.cardData!,
+          onDismiss: () {},
         );
-
-        // 执行查询
-        final result = await _queryExecutor.execute(request);
-
-        // 生成响应
-        final queryResponse = await _queryRouter.route(request, result);
-
-        // 创建widget
-        Widget? widget;
-        if (queryResponse.level == QueryLevel.medium && queryResponse.cardData != null) {
-          widget = LightweightQueryCard(
-            cardData: queryResponse.cardData!,
-            onDismiss: () {},
-          );
-        } else if (queryResponse.level == QueryLevel.complex && queryResponse.chartData != null) {
-          widget = InteractiveQueryChart(
-            chartData: queryResponse.chartData!,
-            onDismiss: () {},
-          );
-        }
-
-        return {
-          'response': queryResponse.voiceText,
-          'widget': widget,
-        };
+      } else if (queryResponse.level == QueryLevel.complex && queryResponse.chartData != null) {
+        widget = InteractiveQueryChart(
+          chartData: queryResponse.chartData!,
+          onDismiss: () {},
+        );
       }
 
-      return null;
+      return {
+        'response': queryResponse.voiceText,
+        'widget': widget,
+      };
     } catch (e) {
       debugPrint('[VoiceAssistant] 查询执行失败: $e');
       return null;
+    }
+  }
+
+  /// 解析查询类型字符串到枚举
+  QueryType? _parseQueryType(String typeStr) {
+    switch (typeStr.toLowerCase()) {
+      case 'summary':
+        return QueryType.summary;
+      case 'recent':
+        return QueryType.recent;
+      case 'trend':
+        return QueryType.trend;
+      case 'distribution':
+        return QueryType.distribution;
+      case 'comparison':
+        return QueryType.comparison;
+      default:
+        return null;
+    }
+  }
+
+  /// 解析时间范围字符串到TimeRange对象
+  TimeRange? _parseTimeRange(String? timeStr) {
+    if (timeStr == null) return null;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    switch (timeStr) {
+      case '今天':
+      case '本日':
+        return TimeRange(
+          startDate: today,
+          endDate: DateTime(now.year, now.month, now.day, 23, 59, 59),
+          periodText: '今天',
+        );
+
+      case '昨天':
+        final yesterday = today.subtract(const Duration(days: 1));
+        return TimeRange(
+          startDate: yesterday,
+          endDate: DateTime(yesterday.year, yesterday.month, yesterday.day, 23, 59, 59),
+          periodText: '昨天',
+        );
+
+      case '本周':
+        final weekStart = today.subtract(Duration(days: now.weekday - 1));
+        return TimeRange(
+          startDate: weekStart,
+          endDate: now,
+          periodText: '本周',
+        );
+
+      case '本月':
+      case '这个月':
+        return TimeRange(
+          startDate: DateTime(now.year, now.month, 1),
+          endDate: now,
+          periodText: '本月',
+        );
+
+      case '上月':
+      case '上个月':
+        final lastMonth = DateTime(now.year, now.month - 1, 1);
+        final lastMonthEnd = DateTime(now.year, now.month, 0, 23, 59, 59);
+        return TimeRange(
+          startDate: lastMonth,
+          endDate: lastMonthEnd,
+          periodText: '上月',
+        );
+
+      default:
+        // 尝试解析"最近N天"或"最近N个月"
+        final daysMatch = RegExp(r'最近(\d+)天').firstMatch(timeStr);
+        if (daysMatch != null) {
+          final days = int.tryParse(daysMatch.group(1)!) ?? 7;
+          return TimeRange(
+            startDate: today.subtract(Duration(days: days - 1)),
+            endDate: now,
+            periodText: '最近$days天',
+          );
+        }
+
+        final monthsMatch = RegExp(r'最近(\d+)个?月').firstMatch(timeStr);
+        if (monthsMatch != null) {
+          final months = int.tryParse(monthsMatch.group(1)!) ?? 3;
+          return TimeRange(
+            startDate: DateTime(now.year, now.month - months, now.day),
+            endDate: now,
+            periodText: '最近$months个月',
+          );
+        }
+
+        return null;
+    }
+  }
+
+  /// 解析分组维度字符串到枚举
+  GroupByDimension? _parseGroupByDimension(String dimensionStr) {
+    switch (dimensionStr.toLowerCase()) {
+      case 'date':
+      case 'day':
+        return GroupByDimension.date;
+      case 'month':
+        return GroupByDimension.month;
+      case 'category':
+        return GroupByDimension.category;
+      case 'source':
+        return GroupByDimension.source;
+      case 'account':
+        return GroupByDimension.account;
+      default:
+        return null;
     }
   }
 
