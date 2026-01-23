@@ -63,6 +63,7 @@ dependencies:
   csv: ^6.0.0
   excel: ^4.0.6
   archive: ^3.4.0
+  gbk_codec: ^0.4.0  # GBK encoding support for WeChat/Alipay bills
 
   # PDF generation
   pdf: ^3.11.1
