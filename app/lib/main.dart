@@ -220,7 +220,19 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     // 由流水线的OutputPipeline负责TTS播放
     if (isPipelineMode) {
       coordinator.setSkipTTSPlayback(true);
+
+      // 设置延迟响应回调，将延迟响应传递给GlobalVoiceAssistant的流水线
+      coordinator.onDeferredResponse = (String response) {
+        debugPrint('[App] 收到延迟响应，传递给流水线: $response');
+        GlobalVoiceAssistantManager.instance.handleDeferredResponse(response);
+      };
     }
+
+    // 连接网络状态提供者，让SmartIntentRecognizer能感知网络状态
+    // 返回null时表示网络状态未初始化，将允许LLM调用
+    coordinator.setNetworkStatusProvider(
+      () => GlobalVoiceAssistantManager.instance.networkStatus,
+    );
 
     GlobalVoiceAssistantManager.instance.setCommandProcessor((command) async {
       debugPrint('[App] 处理语音命令: $command');
@@ -298,8 +310,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         // 流水线模式：返回实际响应文本，由流水线处理TTS
         // 非流水线模式：返回空字符串，VoiceServiceCoordinator已播放TTS
         if (isPipelineMode) {
-          final responseText = result.message ?? '';
-          debugPrint('[App] 流水线模式，返回响应: ${responseText.length > 30 ? responseText.substring(0, 30) + "..." : responseText}');
+          // 错误时使用 errorMessage，成功时使用 message
+          final responseText = result.status == VoiceSessionStatus.error
+              ? (result.errorMessage ?? '处理时遇到了问题')
+              : (result.message ?? '');
+          debugPrint('[App] 流水线模式，返回响应: ${responseText.length > 30 ? "${responseText.substring(0, 30)}..." : responseText}');
           return responseText;
         }
       } catch (e) {

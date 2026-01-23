@@ -1,0 +1,13 @@
+# Build outputs
+.cxx/
+build/
+*.o
+*.so
+*.a
+
+# IDE
+.idea/
+*.iml
+
+# macOS
+.DS_Store

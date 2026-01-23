@@ -1,0 +1,41 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant APP as 应用
+    participant DETECT as 周期检测
+    participant EVAL as 使用评估
+    participant WASTE as 浪费检测
+
+    U->>APP: 导入交易记录
+    APP->>DETECT: 分析周期性消费
+
+    DETECT->>DETECT: 分组: 爱奇艺 25元
+    DETECT->>DETECT: 间隔: [31, 29, 31]天
+    DETECT->>DETECT: 平均: 30.3天, CV: 0.038
+    DETECT->>DETECT: 判定: 月订阅, 高度稳定
+
+    DETECT-->>APP: 发现订阅: 爱奇艺 25元/月
+
+    APP->>EVAL: 评估使用状态
+    EVAL->>EVAL: 检测: 3个月无观看记录
+    EVAL-->>APP: 状态: 完全未使用
+
+    APP->>WASTE: 浪费检测
+    WASTE->>WASTE: 完全未使用 → 浪费
+    WASTE->>WASTE: 年成本: 300元
+    WASTE->>WASTE: 潜在节省: 300元
+
+    WASTE-->>APP: 判定: 浪费订阅
+
+    Note over U,WASTE: 续费前7天
+
+    APP->>U: 续费提醒
+    Note right of U: 服务: 爱奇艺<br/>金额: 25元/月<br/>使用状态: 完全未使用<br/>建议: 强烈建议取消<br/>年度节省: 300元<br/>[继续] [取消] [稍后]
+
+    U->>APP: 选择: 取消订阅
+
+    APP->>APP: 记录决策
+    APP->>APP: 更新节省: +300元/年
+
+    APP-->>U: 已取消, 预计年节省300元
+

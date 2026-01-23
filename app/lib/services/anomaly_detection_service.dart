@@ -38,6 +38,14 @@ class AnomalyDetectionResult {
   }
 }
 
+/// 单个检测结果
+class _DetectionResult {
+  final AnomalyAlert? alert;
+  final AnomalyDataInsufficiency? insufficiency;
+
+  const _DetectionResult({this.alert, this.insufficiency});
+}
+
 /// 交易异常检测服务
 ///
 /// 功能：
@@ -122,14 +130,6 @@ class AnomalyDetectionService {
   }) async {
     final result = await detectAnomaliesWithInfo(newTx, userId: userId);
     return result.alerts;
-  }
-
-  /// 单个检测结果
-  class _DetectionResult {
-    final AnomalyAlert? alert;
-    final AnomalyDataInsufficiency? insufficiency;
-
-    const _DetectionResult({this.alert, this.insufficiency});
   }
 
   /// 金额异常检测（包含数据不足信息）

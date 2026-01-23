@@ -16,7 +16,7 @@ import '../services/voice_feedback_system.dart';
 /// Wraps the feature-rich VoiceServiceCoordinator with Riverpod's
 /// ChangeNotifierProvider for reactive state management.
 final voiceServiceCoordinatorProvider = ChangeNotifierProvider<VoiceServiceCoordinator>((ref) {
-  final ttsService = TTSService();
+  final ttsService = TTSService.instance;
   // 通过服务定位器获取数据库服务
   final databaseService = sl<IDatabaseService>();
 

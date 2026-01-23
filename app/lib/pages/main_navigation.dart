@@ -47,6 +47,9 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
   late AnimationController _pulseController;
   OverlayEntry? _recordingOverlay;
 
+  // 双击退出相关
+  DateTime? _lastBackPressTime;
+
   // GlobalKey for feature guide
   static final GlobalKey _fabKey = GlobalKey();
   static final GlobalKey _xiaojiNavKey = GlobalKey();
@@ -82,12 +85,28 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
     });
   }
 
-  /// 检查麦克风权限
+  /// 检查并请求麦克风权限（应用启动时统一请求）
   Future<void> _checkMicrophonePermission() async {
     final status = await Permission.microphone.status;
+    if (status.isGranted) {
+      setState(() {
+        _hasPermission = true;
+      });
+      return;
+    }
+
+    // 如果没有授权，主动请求
+    debugPrint('[MainNavigation] 麦克风权限未授予，发起权限请求');
+    final requestStatus = await Permission.microphone.request();
     setState(() {
-      _hasPermission = status.isGranted;
+      _hasPermission = requestStatus.isGranted;
     });
+
+    if (!requestStatus.isGranted) {
+      debugPrint('[MainNavigation] 用户拒绝了麦克风权限');
+    } else {
+      debugPrint('[MainNavigation] 麦克风权限已授予');
+    }
   }
 
   /// 请求麦克风权限
@@ -197,14 +216,49 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
     // 小记页面（index=2）不显示底部导航栏
     final isVoiceAssistantPage = _currentIndex == 2;
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
+    return PopScope(
+      canPop: false,  // 始终拦截返回手势
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBackGesture();
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _pages,
+        ),
+        bottomNavigationBar: isVoiceAssistantPage ? null : _buildBottomNavBar(context),
+        floatingActionButton: isVoiceAssistantPage ? null : _buildCenterButton(context),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       ),
-      bottomNavigationBar: isVoiceAssistantPage ? null : _buildBottomNavBar(context),
-      floatingActionButton: isVoiceAssistantPage ? null : _buildCenterButton(context),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+    );
+  }
+
+  /// 处理返回手势
+  void _handleBackGesture() {
+    // 如果在非首页，返回首页
+    if (_currentIndex != 0) {
+      setState(() => _currentIndex = 0);
+      return;
+    }
+
+    // 在首页，双击退出
+    final now = DateTime.now();
+    if (_lastBackPressTime != null &&
+        now.difference(_lastBackPressTime!) < const Duration(seconds: 2)) {
+      // 两次返回间隔小于2秒，退出应用
+      Navigator.of(context).pop();
+      return;
+    }
+
+    // 第一次按返回，显示提示
+    _lastBackPressTime = now;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('再滑一次退出应用'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 

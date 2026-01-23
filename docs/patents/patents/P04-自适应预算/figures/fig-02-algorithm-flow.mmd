@@ -1,0 +1,27 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> GetIncome[/获取本月收入/]
+    GetIncome --> SetBase[设置可支配基数]
+    SetBase --> Analyze[分析历史支出模式]
+
+    Analyze --> Zero[零基预算: 从零开始分配]
+    Zero --> Priority[按优先级排序支出类别]
+    Priority --> Allocate[逐类别分配预算]
+
+    Allocate --> Check{总分配 <= 收入?}
+    Check -->|否| Adjust[自适应调整<br/>削减低优先级]
+    Adjust --> Check
+
+    Check -->|是| Reserve[计算小金库额度]
+    Reserve --> Validate{预算合理性检查}
+
+    Validate -->|不通过| Optimize[优化调整]
+    Optimize --> Allocate
+
+    Validate -->|通过| Alert[设置预警阈值]
+    Alert --> Output[/输出: 预算方案/]
+    Output --> Monitor[持续监控执行]
+    Monitor --> Feedback{需要动态调整?}
+
+    Feedback -->|是| Analyze
+    Feedback -->|否| End([结束])

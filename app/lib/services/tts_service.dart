@@ -250,11 +250,25 @@ class TTSService {
         } on TimeoutException {
           _streamingFailCount++;
           debugPrint('TTS: streaming fail count = $_streamingFailCount');
+          // 重要：先停止流式TTS播放，避免两个声音同时播放
+          try {
+            await _streamingTTS!.stop();
+            debugPrint('TTS: streaming TTS stopped before fallback');
+          } catch (e) {
+            debugPrint('TTS: failed to stop streaming TTS: $e');
+          }
           // 降级到离线TTS
           await _speakWithOfflineEngine(processedText);
         } catch (e) {
           _streamingFailCount++;
           debugPrint('TTS: streaming error, fail count = $_streamingFailCount, error: $e');
+          // 重要：先停止流式TTS播放，避免两个声音同时播放
+          try {
+            await _streamingTTS!.stop();
+            debugPrint('TTS: streaming TTS stopped before fallback');
+          } catch (stopError) {
+            debugPrint('TTS: failed to stop streaming TTS: $stopError');
+          }
           // 降级到离线TTS
           await _speakWithOfflineEngine(processedText);
         }
@@ -840,7 +854,7 @@ class AlibabaCloudTTSEngine implements TTSEngine {
   final Dio _dio;
   final AudioPlayer _audioPlayer;
 
-  String _voice = 'xiaoyun'; // 默认音色
+  String _voice = 'zhitian_emo'; // 知甜情感女声 - 更自然动听
   double _rate = 0; // -500 to 500
   double _volume = 50; // 0-100
   double _pitch = 0; // -500 to 500
@@ -970,8 +984,26 @@ class AlibabaCloudTTSEngine implements TTSEngine {
 
   @override
   Future<List<TTSVoice>> getAvailableVoices() async {
-    // 阿里云支持的音色列表
+    // 阿里云支持的音色列表（情感语音放在前面）
     return [
+      const TTSVoice(
+        name: 'zhitian_emo',
+        language: 'zh-CN',
+        gender: TTSGender.female,
+        displayName: '知甜（情感女声）',
+      ),
+      const TTSVoice(
+        name: 'zhiyan_emo',
+        language: 'zh-CN',
+        gender: TTSGender.female,
+        displayName: '知燕（情感女声）',
+      ),
+      const TTSVoice(
+        name: 'zhimi_emo',
+        language: 'zh-CN',
+        gender: TTSGender.female,
+        displayName: '知蜜（情感女声）',
+      ),
       const TTSVoice(
         name: 'xiaoyun',
         language: 'zh-CN',

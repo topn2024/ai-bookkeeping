@@ -6,7 +6,7 @@ import 'user_profile_service.dart';
 ///
 /// 处理非记账场景的轻松对话，基于用户画像提供个性化回复
 class CasualChatService {
-  final UserProfileService _profileService;
+  final UserProfileService? _profileService;
   final Random _random = Random();
 
   // 安全边界：不回复的话题
@@ -22,7 +22,7 @@ class CasualChatService {
     '医疗建议',
   ];
 
-  CasualChatService({required UserProfileService profileService})
+  CasualChatService({UserProfileService? profileService})
       : _profileService = profileService;
 
   /// 处理闲聊输入
@@ -44,8 +44,11 @@ class CasualChatService {
       );
     }
 
-    // 3. 获取用户画像
-    final profile = await _profileService.getProfile(userId);
+    // 3. 获取用户画像（如果有profileService的话）
+    UserProfile? profile;
+    if (_profileService != null) {
+      profile = await _profileService!.getProfile(userId);
+    }
 
     // 4. 生成回复
     return _generateResponse(intent, input, profile, context);

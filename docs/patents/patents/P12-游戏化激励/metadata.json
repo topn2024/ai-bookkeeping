@@ -1,0 +1,32 @@
+{
+  "patent_id": "P12",
+  "patent_number": "",
+  "title": {
+    "zh": "游戏化激励系统",
+    "en": ""
+  },
+  "inventors": [
+    "李北华"
+  ],
+  "applicant": "李北华",
+  "filing_date": "",
+  "status": "drafting",
+  "category": "user-experience",
+  "tags": [],
+  "estimated_success_rate": "75-80%",
+  "related_patents": [],
+  "version": "1.0",
+  "changelog": [
+    {
+      "version": "2.0",
+      "date": "2026-01-18",
+      "changes": "迁移到标准化目录结构"
+    }
+  ],
+  "figures": [],
+  "files": {
+    "specification": "specification.md",
+    "claims": "claims.md",
+    "abstract": "abstract.md"
+  }
+}

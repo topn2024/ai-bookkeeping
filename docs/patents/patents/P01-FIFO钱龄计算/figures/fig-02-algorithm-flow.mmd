@@ -1,0 +1,26 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Input[/输入: 支出金额/]
+    Input --> Init[初始化: 剩余金额 = 支出金额]
+    Init --> Check{剩余金额 > 0?}
+
+    Check -->|是| GetFirst[获取最早入池的资源单元]
+    GetFirst --> Compare{资源余额 >= 剩余金额?}
+
+    Compare -->|是| Deduct1[从该资源扣除剩余金额]
+    Deduct1 --> CalcAge1[计算该资源的钱龄]
+    CalcAge1 --> Record1[记录消费明细]
+    Record1 --> SetZero[剩余金额 = 0]
+    SetZero --> Check
+
+    Compare -->|否| Deduct2[消费该资源全部余额]
+    Deduct2 --> CalcAge2[计算该资源的钱龄]
+    CalcAge2 --> Record2[记录消费明细]
+    Record2 --> Update[剩余金额 -= 资源余额]
+    Update --> Remove[移除空资源单元]
+    Remove --> Check
+
+    Check -->|否| Summary[汇总所有消费明细]
+    Summary --> CalcAvg[计算加权平均钱龄]
+    CalcAvg --> Output[/输出: 消费报告/]
+    Output --> End([结束])

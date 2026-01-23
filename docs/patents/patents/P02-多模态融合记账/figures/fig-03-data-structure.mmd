@@ -1,0 +1,41 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 多模态输入 {
+        +String 输入ID
+        +List~模态数据~ 模态列表
+        +DateTime 时间戳
+    }
+
+    class 模态数据 {
+        +String 模态类型
+        +Binary 原始数据
+        +Vector 特征向量
+        +Float 置信度
+    }
+
+    class 记账要素 {
+        +Decimal 金额
+        +Float 金额置信度
+        +String 类别
+        +Float 类别置信度
+        +DateTime 时间
+        +String 商户
+        +String 备注
+    }
+
+    class 融合结果 {
+        +String 结果ID
+        +记账要素 最终要素
+        +Float 整体置信度
+        +List~模态贡献~ 贡献详情
+    }
+
+    class 模态贡献 {
+        +String 模态类型
+        +Float 权重
+        +记账要素 原始要素
+    }
+
+    多模态输入 "1" *-- "n" 模态数据 : 包含
+    融合结果 "1" *-- "1" 记账要素 : 包含
+    融合结果 "1" *-- "n" 模态贡献 : 包含

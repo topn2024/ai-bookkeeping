@@ -51,6 +51,7 @@ dependencies:
   path: ^1.8.3
   path_provider: ^2.1.2
   uuid: ^4.5.2
+  web_socket_channel: ^2.4.0  # WebSocket for chat-companion backend
   package_info_plus: ^8.0.0
   device_info_plus: ^11.0.0
 
@@ -85,7 +86,15 @@ dependencies:
   connectivity_plus: ^7.0.0
   record: ^6.0.0  # Audio recording for Qwen Audio model
   just_audio: ^0.9.40  # Audio playback for source audio files
+  flutter_pcm_sound: ^3.3.3  # PCM audio playback for AEC reference signal
   http: ^1.2.2  # HTTP client for file sync
+
+  # Voice Activity Detection
+  vad: ^0.0.7+1  # Silero VAD for accurate voice detection
+
+  # WebRTC Audio Processing (AEC/NS/AGC)
+  webrtc_apm:
+    path: packages/webrtc_apm
 
   # Multimodal wake-up
   sensors_plus: ^6.0.1  # Accelerometer for shake detection

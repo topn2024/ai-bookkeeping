@@ -1,0 +1,60 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 标准交易模型 {
+        +UUID id
+        +String platform
+        +String platform_transaction_id
+        +DateTime transaction_time
+        +Decimal amount
+        +String original_currency
+        +String merchant
+        +String category
+        +String checksum
+        +转换金额() Decimal
+        +校验完整性() Boolean
+    }
+
+    class 金额精度保护 {
+        +String 原始字符串
+        +Decimal 精确金额
+        +Integer 小数位数
+        +String 舍入规则
+        +转换Decimal() Decimal
+        +银行家舍入() Decimal
+        +范围校验() Boolean
+    }
+
+    class 批量处理状态 {
+        +Integer 总记录数
+        +Integer 已处理数
+        +Integer 成功数
+        +Integer 失败数
+        +Float 进度百分比
+        +String 检查点ID
+        +更新进度() void
+        +断点续传() void
+    }
+
+    class 去重结果 {
+        +String 交易哈希
+        +Float 相似度分数
+        +Boolean 是否重复
+        +String 保留记录ID
+        +计算哈希() String
+        +计算相似度() Float
+    }
+
+    class 合规检查报告 {
+        +Boolean 税务合规
+        +Boolean 发票完整
+        +Boolean 报销合规
+        +List 异常项
+        +检查税务() Boolean
+        +检查发票() Boolean
+    }
+
+    标准交易模型 --> 金额精度保护 : 使用
+    标准交易模型 --> 去重结果 : 检测
+    批量处理状态 --> 标准交易模型 : 处理
+    标准交易模型 --> 合规检查报告 : 生成
+

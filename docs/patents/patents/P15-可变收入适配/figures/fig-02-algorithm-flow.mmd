@@ -1,0 +1,47 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Collect[/收集6个月收入数据/]
+    Collect --> CalcMean[计算平均收入]
+    CalcMean --> CalcStd[计算标准差]
+    CalcStd --> CalcCV[计算变异系数 CV=std/mean]
+
+    CalcCV --> StabilityLevel{稳定性等级判定}
+    StabilityLevel -->|CV<0.1| High[高度稳定: 90-100分]
+    StabilityLevel -->|0.1≤CV<0.2| Good[较稳定: 70-89分]
+    StabilityLevel -->|0.2≤CV<0.3| Medium[中等稳定: 50-69分]
+    StabilityLevel -->|0.3≤CV<0.5| Low[不稳定: 30-49分]
+    StabilityLevel -->|CV≥0.5| VeryLow[高度不稳定: 0-29分]
+
+    High --> Ratio90[使用90%收入]
+    Good --> Ratio80[使用80%收入]
+    Medium --> Ratio70[使用70%收入]
+    Low --> Ratio60[使用60%收入]
+    VeryLow --> Ratio50[使用50%收入]
+
+    Ratio90 --> BaseStrategy{基准收入策略}
+    Ratio80 --> BaseStrategy
+    Ratio70 --> BaseStrategy
+    Ratio60 --> BaseStrategy
+    Ratio50 --> BaseStrategy
+
+    BaseStrategy -->|高度不稳定| Conservative[保守: 取最小值]
+    BaseStrategy -->|不稳定| Prudent[稳健: 取25%分位]
+    BaseStrategy -->|中等稳定| Balanced[平衡: 取中位数]
+    BaseStrategy -->|较稳定/高度稳定| Optimistic[乐观: 取平均值]
+
+    Conservative --> CalcBudget[月度预算 = 基准×比例]
+    Prudent --> CalcBudget
+    Balanced --> CalcBudget
+    Optimistic --> CalcBudget
+
+    CalcBudget --> Emergency[计算应急资金月数]
+    Emergency --> EmergencyMonths["月数 = 3+（100-评分）/10"]
+    EmergencyMonths --> TargetFund["目标 = 支出×月数"]
+
+    TargetFund --> Smooth{收入平滑}
+    Smooth -->|实际>目标| SaveExcess[超额存入缓冲]
+    Smooth -->|实际<目标| UseBuffer[从缓冲补充]
+
+    SaveExcess --> End([结束])
+    UseBuffer --> End
+

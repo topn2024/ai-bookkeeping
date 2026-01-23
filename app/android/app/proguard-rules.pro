@@ -62,3 +62,39 @@
     java.lang.Object writeReplace();
     java.lang.Object readResolve();
 }
+
+# Flutter Secure Storage
+-keep class com.it_nomads.fluttersecurestorage.** { *; }
+-keep class androidx.security.crypto.** { *; }
+-keep class com.google.crypto.tink.** { *; }
+-dontwarn javax.annotation.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
+
+# Voice/Audio related
+-keep class com.dooboolab.audiorecorder.** { *; }
+-keep class com.konovalov.vad.** { *; }
+-dontwarn com.konovalov.vad.**
+
+# WebSocket
+-keep class org.java_websocket.** { *; }
+-dontwarn org.java_websocket.**
+
+# HTTP Client
+-keep class org.apache.http.** { *; }
+-dontwarn org.apache.http.**
+
+# Kotlin Coroutines
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-keepclassmembers class kotlinx.coroutines.** {
+    volatile <fields>;
+}
+-dontwarn kotlinx.coroutines.**
+
+# Keep R8 from removing the debug information
+-keepattributes SourceFile,LineNumberTable
+
+# Keep annotations
+-keepattributes RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations

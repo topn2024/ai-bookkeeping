@@ -16,7 +16,11 @@ import 'voice/barge_in_detector.dart';
 import 'voice/ai_intent_decomposer.dart';
 import 'voice/smart_intent_recognizer.dart';
 import 'voice/llm_response_generator.dart';
-import 'voice/agent/agent.dart';
+import 'voice/intelligence_engine/intelligence_engine.dart';
+import 'voice/intelligence_engine/result_buffer.dart';
+import 'voice/agent/hybrid_intent_router.dart' show NetworkStatus;
+import 'voice/adapters/bookkeeping_operation_adapter.dart';
+import 'voice/adapters/bookkeeping_feedback_adapter.dart';
 import 'voice_recognition_engine.dart';
 import 'tts_service.dart';
 import 'voice_navigation_service.dart';
@@ -66,14 +70,23 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 智能意图识别器（多层递进架构）
   final SmartIntentRecognizer _smartRecognizer;
 
-  /// 对话式智能体（边聊边做模式）
-  ConversationalAgent? _conversationalAgent;
+  /// 智能引擎（多操作识别、双通道处理、智能聚合）
+  IntelligenceEngine? _intelligenceEngine;
+
+  /// 网络状态提供者（缓存用于传递给IntelligenceEngine）
+  NetworkStatus? Function()? _networkStatusProvider;
 
   /// 是否启用对话式智能体模式
   bool _agentModeEnabled = false;
 
   /// 是否启用流式TTS模式
   bool _streamingTTSEnabled = true;
+
+  /// 是否跳过TTS播放（流水线模式下由外部处理TTS）
+  bool _skipTTSPlayback = false;
+
+  /// 延迟响应回调（流水线模式下通知外部处理延迟响应）
+  void Function(String response)? onDeferredResponse;
 
   /// 当前会话状态
   VoiceSessionState _sessionState = VoiceSessionState.idle;
@@ -129,11 +142,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     BargeInDetector? bargeInDetector,
     AIIntentDecomposer? aiDecomposer,
     SmartIntentRecognizer? smartRecognizer,
-    ConversationalAgent? conversationalAgent,
     bool enableStreamingTTS = true,
     bool enableAgentMode = false,
-  }) : _conversationalAgent = conversationalAgent,
-       _agentModeEnabled = enableAgentMode,
+  }) : _agentModeEnabled = enableAgentMode,
        _recognitionEngine = recognitionEngine ?? VoiceRecognitionEngine(),
        _ttsService = ttsService ?? TTSService.instanceWith(enableStreaming: enableStreamingTTS),
        _disambiguationService = disambiguationService ?? EntityDisambiguationService(),
@@ -206,71 +217,45 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 使用对话式智能体处理语音输入
-  ///
-  /// 将语音输入传递给 ConversationalAgent 进行处理，
-  /// 支持 LLM 优先的意图识别和自然对话
-  Future<VoiceSessionResult> _processWithAgent(String voiceInput) async {
+
+  /// 使用智能引擎处理语音输入
+  Future<VoiceSessionResult> _processWithIntelligenceEngine(String voiceInput) async {
+    final engine = _intelligenceEngine!;
+
+    // 记录命令历史
+    final command = VoiceCommand(
+      input: voiceInput,
+      timestamp: DateTime.now(),
+    );
+    _addToHistory(command);
+
     try {
-      final agent = _conversationalAgent!;
+      // 使用智能引擎处理
+      final result = await engine.process(voiceInput);
 
-      // 记录命令历史
-      final command = VoiceCommand(
-        input: voiceInput,
-        timestamp: DateTime.now(),
-      );
-      _addToHistory(command);
+      debugPrint('[VoiceCoordinator] IntelligenceEngine响应: success=${result.success}, message=${result.message}');
 
-      // 使用智能体处理
-      final userInput = UserInput.fromVoice(voiceInput);
-      final response = await agent.process(userInput);
+      // 构建响应文本
+      String responseText = result.message ?? '';
 
-      debugPrint('[VoiceCoordinator] Agent响应: type=${response.type}, '
-          'text=${response.text.substring(0, response.text.length > 50 ? 50 : response.text.length)}...');
-
-      // 根据响应类型处理
-      switch (response.type) {
-        case AgentResponseType.action:
-        case AgentResponseType.chat:
-        case AgentResponseType.hybrid:
-          // 播放语音响应
-          if (response.shouldSpeak) {
-            await _ttsService.speak(response.text);
-          }
-          _sessionState = VoiceSessionState.idle;
-          notifyListeners();
-          return VoiceSessionResult.success(response.text, {
-            'agentMode': true,
-            'responseType': response.type.name,
-            'emotion': response.emotion,
-          });
-
-        case AgentResponseType.unknown:
-          // unknown 表示无法识别具体意图，但 Agent 仍提供了友好的引导回复
-          // 应该作为成功处理，而非错误
-          await _ttsService.speak(response.text);
-          _sessionState = VoiceSessionState.idle;
-          notifyListeners();
-          return VoiceSessionResult.success(response.text, {
-            'agentMode': true,
-            'responseType': 'unknown',
-          });
-
-        case AgentResponseType.error:
-          await _ttsService.speak(response.text);
-          _sessionState = VoiceSessionState.idle;
-          notifyListeners();
-          return VoiceSessionResult.error(response.text);
+      // 播放语音响应
+      if (responseText.isNotEmpty) {
+        await _speakWithSkipCheck(responseText);
       }
-    } catch (e) {
-      debugPrint('[VoiceCoordinator] Agent处理失败: $e');
-      _sessionState = VoiceSessionState.error;
+
+      _sessionState = VoiceSessionState.idle;
       notifyListeners();
 
-      // 降级到传统模式处理
-      debugPrint('[VoiceCoordinator] 降级到传统模式处理');
-      _agentModeEnabled = false;
-      return await processVoiceCommand(voiceInput);
+      if (result.success) {
+        return VoiceSessionResult.success(responseText, {
+          'intelligenceEngine': true,
+        });
+      } else {
+        return VoiceSessionResult.error(responseText);
+      }
+    } catch (e) {
+      debugPrint('[VoiceCoordinator] IntelligenceEngine处理失败: $e');
+      return VoiceSessionResult.error('处理失败: $e');
     }
   }
 
@@ -296,21 +281,52 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 是否启用对话式智能体模式
   bool get isAgentModeEnabled => _agentModeEnabled;
 
-  /// 获取对话式智能体（可能为null）
-  ConversationalAgent? get conversationalAgent => _conversationalAgent;
+  /// 获取结果缓冲区（用于查询结果通知）
+  ///
+  /// 返回 IntelligenceEngine 的 ResultBuffer，供外部组件（如 SmartTopicGenerator）
+  /// 在主动对话时检索待通知的查询结果。
+  /// 如果智能引擎未初始化，返回 null。
+  ResultBuffer? get resultBuffer => _intelligenceEngine?.resultBuffer;
 
   /// 启用对话式智能体模式
   ///
   /// 对话式智能体支持"边聊边做"的自然交互，
   /// LLM优先识别意图，支持上下文关联和指代消解
   Future<void> enableAgentMode() async {
-    if (_conversationalAgent == null) {
-      _conversationalAgent = ConversationalAgent();
-      await _conversationalAgent!.initialize();
+    // 初始化智能引擎
+    if (_intelligenceEngine == null) {
+      _intelligenceEngine = IntelligenceEngine(
+        operationAdapter: BookkeepingOperationAdapter(),
+        feedbackAdapter: BookkeepingFeedbackAdapter(),
+      );
+      // 传递已缓存的网络状态提供者
+      if (_networkStatusProvider != null) {
+        _intelligenceEngine!.setNetworkStatusProvider(_networkStatusProvider);
+      }
+      // 设置延迟响应回调（deferred操作聚合后的响应）
+      _intelligenceEngine!.onDeferredResponse = _handleDeferredResponse;
     }
+
     _agentModeEnabled = true;
     notifyListeners();
     debugPrint('[VoiceCoordinator] 对话式智能体模式已启用');
+  }
+
+  /// 处理延迟响应
+  ///
+  /// 当 deferred 操作计时器到期时，播放统一响应
+  void _handleDeferredResponse(String response) {
+    debugPrint('[VoiceCoordinator] 延迟响应: $response');
+    _lastResponse = response;
+
+    // 流水线模式下，通知外部处理延迟响应
+    if (_skipTTSPlayback && onDeferredResponse != null) {
+      debugPrint('[VoiceCoordinator] 流水线模式，通过回调传递延迟响应');
+      onDeferredResponse!(response);
+    } else {
+      // 非流水线模式，直接播放TTS
+      _speakWithSkipCheck(response);
+    }
   }
 
   /// 禁用对话式智能体模式
@@ -322,13 +338,45 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     debugPrint('[VoiceCoordinator] 对话式智能体模式已禁用');
   }
 
+  /// 是否跳过TTS播放
+  bool get skipTTSPlayback => _skipTTSPlayback;
+
+  /// 设置是否跳过TTS播放
+  ///
+  /// 流水线模式下，TTS由外部处理，此时应跳过内部TTS播放
+  void setSkipTTSPlayback(bool skip) {
+    _skipTTSPlayback = skip;
+    debugPrint('[VoiceCoordinator] TTS播放跳过设置: $skip');
+  }
+
+  /// 设置网络状态提供者
+  ///
+  /// 用于SmartIntentRecognizer判断是否使用LLM
+  /// 返回null时表示网络状态未知，将允许LLM调用
+  void setNetworkStatusProvider(NetworkStatus? Function()? provider) {
+    _networkStatusProvider = provider;
+    _smartRecognizer.networkStatusProvider = provider;
+    _intelligenceEngine?.setNetworkStatusProvider(provider);
+    debugPrint('[VoiceCoordinator] 网络状态提供者已${provider != null ? "设置" : "清除"}');
+  }
+
+  /// 播放TTS（考虑跳过标志）
+  ///
+  /// 如果 _skipTTSPlayback 为 true，则跳过实际播放
+  /// 用于流水线模式下由外部处理TTS的场景
+  Future<void> _speakWithSkipCheck(String text) async {
+    if (_skipTTSPlayback) {
+      debugPrint('[VoiceCoordinator] TTS跳过（流水线模式）: ${text.length > 30 ? text.substring(0, 30) + "..." : text}');
+      return;
+    }
+    await _ttsService.speak(text);
+  }
+
   /// 语音按钮按下时的预热
   ///
   /// 在用户按下语音按钮时调用，预热网络连接和LLM服务
   void onVoiceButtonPressed() {
-    if (_agentModeEnabled && _conversationalAgent != null) {
-      _conversationalAgent!.onVoiceButtonPressed();
-    }
+    // 预热逻辑已集成到IntelligenceEngine中
   }
 
   /// 获取意图路由器（用于外部访问多意图检测等功能）
@@ -410,9 +458,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         return VoiceSessionResult.error(invalidReason);
       }
 
-      // 对话式智能体模式：使用 ConversationalAgent 处理
-      if (_agentModeEnabled && _conversationalAgent != null) {
-        return await _processWithAgent(voiceInput);
+      // 对话式智能体模式：使用 IntelligenceEngine 处理
+      if (_agentModeEnabled && _intelligenceEngine != null) {
+        return await _processWithIntelligenceEngine(voiceInput);
       }
 
       // 检查是否处于闲聊模式
@@ -586,7 +634,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       // 生成确认提示
       final prompt = multiResult.generatePrompt();
-      await _ttsService.speak(prompt);
+      await _speakWithSkipCheck(prompt);
 
       notifyListeners();
 
@@ -623,7 +671,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         notifyListeners();
 
         final supplementPrompt = _generateAmountSupplementPrompt(result.incompleteIntents);
-        await _ttsService.speak(supplementPrompt);
+        await _speakWithSkipCheck(supplementPrompt);
 
         return VoiceSessionResult.success(supplementPrompt, {
           'executedCount': executedCount,
@@ -651,7 +699,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         userInput: null,
       );
       final finalMessage = navigationMessage != null ? '$message，$navigationMessage' : message;
-      await _ttsService.speak(finalMessage);
+      await _speakWithSkipCheck(finalMessage);
 
       return VoiceSessionResult.success(message, {
         'executedCount': executedCount,
@@ -671,7 +719,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     notifyListeners();
 
     const message = '已取消所有待处理的记录';
-    await _ttsService.speak(message);
+    await _speakWithSkipCheck(message);
 
     return VoiceSessionResult.success(message);
   }
@@ -719,7 +767,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     notifyListeners();
 
     final message = '已移除第${index + 1}项，还有${_pendingMultiIntent!.totalIntentCount}项待处理';
-    await _ttsService.speak(message);
+    await _speakWithSkipCheck(message);
 
     return VoiceSessionResult.success(message);
   }
@@ -760,11 +808,11 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     if (newIncomplete.isEmpty) {
       // 所有金额已补充，可以确认执行
       final message = '金额已补充完成，共${newComplete.length}笔记录待确认';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.success(message);
     } else {
       final message = '已补充第${index + 1}项金额${amount.toStringAsFixed(2)}元，还有${newIncomplete.length}项需要补充金额';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.success(message);
     }
   }
@@ -915,7 +963,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     );
 
     final feedbackText = result.generateFeedbackText();
-    await _ttsService.speak(feedbackText);
+    await _speakWithSkipCheck(feedbackText);
 
     if (result.needsClarification) {
       _currentSession = VoiceSessionContext(
@@ -948,7 +996,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   ) async {
     if (_currentSession == null) {
       const message = '没有待确认的操作';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
 
@@ -987,7 +1035,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           ],
           userInput: '确认记录',
         );
-        await _ttsService.speak(message);
+        await _speakWithSkipCheck(message);
         result = VoiceSessionResult.success(message);
         break;
 
@@ -998,7 +1046,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       default:
         const message = '无法确认此类型的操作';
-        await _ttsService.speak(message);
+        await _speakWithSkipCheck(message);
         result = VoiceSessionResult.error(message);
     }
 
@@ -1017,7 +1065,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   ) async {
     if (_currentSession == null) {
       const message = '没有可取消的操作';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
 
@@ -1056,7 +1104,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     _clearSession();
 
     const message = '操作已取消';
-    await _ttsService.speak(message);
+    await _speakWithSkipCheck(message);
 
     notifyListeners();
     return VoiceSessionResult.success(message);
@@ -1069,7 +1117,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   ) async {
     if (_currentSession == null) {
       const message = '没有需要澄清的操作';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
 
@@ -1094,7 +1142,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       default:
         const message = '无法澄清此类型的操作';
-        await _ttsService.speak(message);
+        await _speakWithSkipCheck(message);
         result = VoiceSessionResult.error(message);
     }
 
@@ -1128,7 +1176,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       if (amount == null || amount <= 0) {
         debugPrint('[VoiceCoordinator] 金额无效，返回错误');
         const message = '请告诉我金额是多少';
-        await _ttsService.speak(message);
+        await _speakWithSkipCheck(message);
         return VoiceSessionResult.error(message);
       }
 
@@ -1191,7 +1239,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
         // 播放简洁的语音提示
         debugPrint('VoiceCoordinator: 开始播放TTS: $voiceMessage');
-        await _ttsService.speak(voiceMessage);
+        await _speakWithSkipCheck(voiceMessage);
         debugPrint('VoiceCoordinator: TTS播放完成');
 
         // 保存待确认的交易到会话
@@ -1247,7 +1295,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       await _feedbackSystem.provideOperationFeedback(
         result: OperationResult.success('add', {'amount': amount}),
       );
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
 
       _clearSession();
       notifyListeners();
@@ -1291,11 +1339,11 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       debugPrint('[VoiceCoordinator] 预算查询结果: ${result.intent}, 成功: ${result.success}');
 
       if (!result.success) {
-        await _ttsService.speak(result.spokenResponse);
+        await _speakWithSkipCheck(result.spokenResponse);
         return VoiceSessionResult.error(result.spokenResponse);
       }
 
-      await _ttsService.speak(result.spokenResponse);
+      await _speakWithSkipCheck(result.spokenResponse);
       _clearSession();
       notifyListeners();
 
@@ -1306,7 +1354,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     } catch (e) {
       debugPrint('[VoiceCoordinator] 预算查询失败: $e');
       const message = '查询预算时遇到问题，请稍后重试';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
   }
@@ -1415,7 +1463,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           break;
       }
 
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       _clearSession();
       notifyListeners();
       return VoiceSessionResult.success(message, resultData);
@@ -1445,7 +1493,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       final message = executed
           ? '正在打开${result.pageName}'
           : '抱歉，暂时无法打开${result.pageName}';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.success(
         message,
         {'route': result.route, 'pageName': result.pageName, 'executed': executed},
@@ -1454,7 +1502,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
     final message = result.errorMessage ?? '抱歉，我不知道您想去哪个页面';
     debugPrint('[VoiceServiceCoordinator] 导航解析失败: $message');
-    await _ttsService.speak(message);
+    await _speakWithSkipCheck(message);
     return VoiceSessionResult.success(message, null);
   }
 
@@ -1473,7 +1521,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     final feedback = result.hasMultipleBills
         ? result.getDetailedVoiceFeedback()
         : result.getVoiceFeedback();
-    await _ttsService.speak(feedback);
+    await _speakWithSkipCheck(feedback);
 
     // 根据结果状态处理
     if (result.isSuccess || result.status == VoiceScreenRecognitionStatus.lowConfidence) {
@@ -1588,7 +1636,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         transactions: txInfos,
         userInput: '屏幕识别记账',
       );
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
 
       return VoiceSessionResult.success(message, {
         'recorded': true,
@@ -1599,7 +1647,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     } catch (e) {
       _clearSession();
       final message = '记录失败：$e';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
   }
@@ -1619,7 +1667,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     final appName = isAlipay ? '支付宝' : '微信';
 
     // 播放开始提示
-    await _ttsService.speak('好的，正在打开$appName读取账单...');
+    await _speakWithSkipCheck('好的，正在打开$appName读取账单...');
 
     // 设置自动化运行状态
     _sessionState = VoiceSessionState.automationRunning;
@@ -1644,7 +1692,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       // 播放结果反馈
       final feedback = result.getVoiceFeedback();
-      await _ttsService.speak(feedback);
+      await _speakWithSkipCheck(feedback);
 
       _clearSession();
 
@@ -1672,7 +1720,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     } catch (e) {
       _clearSession();
       final message = '自动化同步失败：$e';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
   }
@@ -1709,14 +1757,14 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       if (configId == null) {
         const message = '请告诉我要修改哪个配置';
-        await _ttsService.speak(message);
+        await _speakWithSkipCheck(message);
         return VoiceSessionResult.error(message);
       }
 
       // 通过VoiceConfigService处理配置
       // TODO: 集成VoiceConfigService执行配置修改
       final message = '已更新配置：$configId';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
 
       return VoiceSessionResult.success(message, {
         'config': configId,
@@ -1724,7 +1772,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       });
     } catch (e) {
       final message = '配置修改失败: $e';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
   }
@@ -1772,11 +1820,11 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           message = '钱龄操作已完成';
       }
 
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.success(message, data);
     } catch (e) {
       final message = '钱龄操作失败: $e';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
   }
@@ -1830,11 +1878,11 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           message = '习惯操作已完成';
       }
 
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.success(message, data);
     } catch (e) {
       final message = '习惯操作失败: $e';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
   }
@@ -1865,7 +1913,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           // 分配资金
           if (amount == null || vaultName == null) {
             message = '请告诉我要分配多少钱到哪个小金库';
-            await _ttsService.speak(message);
+            await _speakWithSkipCheck(message);
             return VoiceSessionResult.error(message);
           }
           // TODO: 集成VaultRepository执行分配
@@ -1889,7 +1937,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           final targetVault = entities['targetVault'] as String?;
           if (amount == null || vaultName == null || targetVault == null) {
             message = '请告诉我从哪个小金库调多少钱到哪个小金库';
-            await _ttsService.speak(message);
+            await _speakWithSkipCheck(message);
             return VoiceSessionResult.error(message);
           }
           message = '已从$vaultName调拨${amount.toStringAsFixed(0)}元到$targetVault';
@@ -1900,7 +1948,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           // 取出资金
           if (amount == null || vaultName == null) {
             message = '请告诉我从哪个小金库取多少钱';
-            await _ttsService.speak(message);
+            await _speakWithSkipCheck(message);
             return VoiceSessionResult.error(message);
           }
           message = '已从$vaultName取出${amount.toStringAsFixed(0)}元';
@@ -1911,11 +1959,11 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           message = '小金库操作已完成';
       }
 
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.success(message, data);
     } catch (e) {
       final message = '小金库操作失败: $e';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
   }
@@ -1970,11 +2018,11 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           message = '数据操作已完成';
       }
 
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.success(message, data);
     } catch (e) {
       final message = '数据操作失败: $e';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
   }
@@ -2022,11 +2070,11 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           message = '分享操作已完成';
       }
 
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.success(message, data);
     } catch (e) {
       final message = '分享操作失败: $e';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
   }
@@ -2091,11 +2139,11 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           message = '系统操作已完成';
       }
 
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.success(message, data);
     } catch (e) {
       final message = '系统操作失败: $e';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
   }
@@ -2132,7 +2180,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
               final message = executed
                   ? '正在打开${navResult.pageName}'
                   : '抱歉，暂时无法打开${navResult.pageName}';
-              await _ttsService.speak(message);
+              await _speakWithSkipCheck(message);
               return VoiceSessionResult.success(message, {
                 'navigation': navResult.route,
                 'aiAssisted': true,
@@ -2155,7 +2203,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
                 success: true,
                 userInput: originalInput,
               );
-              await _ttsService.speak(message);
+              await _speakWithSkipCheck(message);
               return VoiceSessionResult.success(message, {
                 'executedCount': executedCount,
                 'aiAssisted': true,
@@ -2190,7 +2238,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       );
 
       debugPrint('[VoiceCoordinator] LLM闲聊响应: $message');
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
 
       // 记录到闲聊历史（用于多轮对话）
       _conversationContext.addChatTurn(
@@ -2216,7 +2264,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       debugPrint('[VoiceCoordinator] 闲聊处理失败: $e');
       _conversationContext.exitChatMode();
       const message = '嗯？没太听清，你是想记账还是查询呢？';
-      await _ttsService.speak(message);
+      await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
     }
   }
@@ -2276,7 +2324,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     );
 
     debugPrint('[VoiceCoordinator] LLM闲聊回复: $message');
-    await _ttsService.speak(message);
+    await _speakWithSkipCheck(message);
 
     // 记录到闲聊历史
     _conversationContext.addChatTurn(
@@ -2374,14 +2422,21 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 删除交易记录的回调方法
   Future<bool> _deleteTransactions(List<TransactionRecord> records) async {
+    debugPrint('[VoiceCoordinator] _deleteTransactions 开始, 记录数: ${records.length}');
     try {
       for (final record in records) {
+        debugPrint('[VoiceCoordinator] 软删除记录: id=${record.id}, ${record.category} ¥${record.amount}');
         final rowsAffected = await _databaseService.softDeleteTransaction(record.id);
-        if (rowsAffected <= 0) return false;
+        debugPrint('[VoiceCoordinator] softDeleteTransaction 返回: $rowsAffected');
+        if (rowsAffected <= 0) {
+          debugPrint('[VoiceCoordinator] 删除失败: rowsAffected=$rowsAffected');
+          return false;
+        }
       }
+      debugPrint('[VoiceCoordinator] 所有记录删除成功');
       return true;
     } catch (e) {
-      debugPrint('删除交易记录失败: $e');
+      debugPrint('[VoiceCoordinator] 删除交易记录异常: $e');
       return false;
     }
   }
@@ -2463,13 +2518,15 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   bool _hasExcessiveRepetition(String text) {
     if (text.length < 4) return false;
 
-    // 检查连续重复字符
+    // 检查连续重复字符（排除数字，因为金额可能有重复数字如1111、2222）
     var maxRepeat = 1;
     var currentRepeat = 1;
     for (var i = 1; i < text.length; i++) {
       if (text[i] == text[i - 1]) {
         currentRepeat++;
-        if (currentRepeat > maxRepeat) {
+        // 只对非数字字符计算重复
+        final isDigit = text[i].codeUnitAt(0) >= 48 && text[i].codeUnitAt(0) <= 57;
+        if (!isDigit && currentRepeat > maxRepeat) {
           maxRepeat = currentRepeat;
         }
       } else {
@@ -2477,7 +2534,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       }
     }
 
-    // 超过3个连续重复字符认为是噪音
+    // 超过3个连续重复非数字字符认为是噪音
     return maxRepeat > 3;
   }
 
@@ -2836,9 +2893,8 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     // 释放打断检测器
     _bargeInDetector.dispose();
 
-    // 释放对话式智能体
-    _conversationalAgent?.dispose();
-    _conversationalAgent = null;
+    // 清空智能引擎引用
+    _intelligenceEngine = null;
 
     // 清理命令历史防止内存泄漏
     _commandHistory.clear();

@@ -1,0 +1,95 @@
+{
+  "patent_id": "P14",
+  "patent_dir": "docs/patents/patents/P14-冷静期控制",
+  "disclaimer": "⚠️ 以下为AI辅助分析意见,非最终法律结论",
+  "analysis": {
+    "technical_features": {
+      "name": "技术特征提取",
+      "type": "AI分析",
+      "features": [
+        {
+          "type": "算法",
+          "name": "冷静期触发判定",
+          "description": "冷静期触发判定\n输入:消费意图 Intent\n输出:是否触发冷静期 Boolean\n\n判定规则:\n1. 金额判定:\n   - amount < 100元 → 不触发(小额消费)\n   - 100元 ≤ amount < 500元 → 24小时冷静期\n   - 500元 ≤ amount < 1000元 → 48小时冷静期\n   - amount ≥ 1000元 → 72小时冷静期\n\n2. 分类判定..."
+        },
+        {
+          "type": "算法",
+          "name": "到期提醒触发",
+          "description": "到期提醒触发\n输入:冷静期列表 Items\n输出:提醒通知 Notifications\n\n提醒策略:\n1. 提前提醒:\n   - 到期前1小时发送提醒\n   - 提醒内容:商品名称、金额、到期时间\n\n2. 决策辅助:\n   - 展示购买理由\n   - 展示预算剩余情况\n   - 展示同类商品历史取消率\n\n3. 操作选项:\n   - 立即购买:结束冷静期,执行消费\n   - 延长冷静期:再等待24小..."
+        },
+        {
+          "type": "算法",
+          "name": "效果量化计算",
+          "description": "效果量化计算\n输入:用户历史数据 History\n输出:效果报告 Report\n\n统计维度:\n1. 取消率:\n   - cancel_rate = 已取消数量 / 总数量\n   - 行业基准:40-60%\n\n2. 节省金额:\n   - saved_amount = Σ(已取消商品金额)\n   - 月度节省、年度节省\n\n3. 平均冷静期:\n   - avg_period = Σ(实际等待时长) /..."
+        },
+        {
+          "type": "算法",
+          "name": "个性化冷静期调整",
+          "description": "个性化冷静期调整\n输入:用户行为特征 Profile\n输出:调整后冷静期 AdjustedPeriod\n\n调整因子:\n1. 用户自控力评分:\n   - 基于历史取消率计算\n   - self_control_score = cancel_rate × 100\n   - 高自控力(>60分) → 缩短20%冷静期\n   - 低自控力(<40分) → 延长20%冷静期\n\n2. 收入稳定性:\n   -..."
+        }
+      ]
+    },
+    "technical_problem": {
+      "name": "技术问题识别",
+      "type": "AI判断",
+      "technical_problems": [
+        {
+          "keyword": "延迟",
+          "context": "...无法量化冲动消费的抑制效果。\n\n[0005] **现有技术三(心理学研究)**:行为经济学领域提出\"延迟满足\"(Delayed Gratification)理论,即推迟即时满足以获得更大长期收益。著名的\"..."
+        }
+      ],
+      "business_problems": [],
+      "risk_level": "low"
+    },
+    "technical_effects": {
+      "name": "技术效果分析",
+      "type": "AI判断",
+      "technical_effects": [
+        {
+          "keyword": "延迟",
+          "context": "...视化效果展示\n\n5. **心理学支撑**:\n   - 传统方案:缺乏理论基础\n   - 本发明:基于延迟满足理论,科学性强",
+          "quantified": false
+        }
+      ],
+      "business_effects": [],
+      "quantified": false,
+      "risk_level": "low"
+    },
+    "technical_means": {
+      "name": "技术手段分析",
+      "type": "AI分析",
+      "algorithms": {
+        "count": 4,
+        "found": true
+      },
+      "data_structures": [
+        "struct",
+        "数据结构"
+      ],
+      "system_architecture": [
+        "架构",
+        "模块",
+        "组件"
+      ]
+    }
+  },
+  "ai_opinions": [
+    {
+      "type": "effect_not_quantified",
+      "severity": "medium",
+      "message": "AI判断:技术效果未量化",
+      "legal_basis": "《专利审查指南》第二部分第二章第2.2.3节",
+      "recommendation": "建议量化技术效果,如'响应时间<80ms'、'准确率>95%'"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "medium",
+      "type": "建议优化",
+      "message": "发现1个中风险问题,建议优化",
+      "items": [
+        "建议量化技术效果,如'响应时间<80ms'、'准确率>95%'"
+      ]
+    }
+  ]
+}

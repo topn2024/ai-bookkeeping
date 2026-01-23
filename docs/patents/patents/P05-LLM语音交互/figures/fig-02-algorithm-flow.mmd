@@ -1,0 +1,36 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Input[/接收语音输入/]
+    Input --> ASR[语音转文字]
+    ASR --> Preprocess[文本预处理]
+
+    Preprocess --> L1{第一层:<br/>精确规则匹配}
+    L1 -->|命中| Extract1[提取参数]
+    Extract1 --> Execute
+
+    L1 -->|未命中| L2{第二层:<br/>模糊规则匹配}
+    L2 -->|命中| Extract2[模糊提取参数]
+    Extract2 --> Confirm{需要确认?}
+    Confirm -->|是| AskUser[询问用户确认]
+    AskUser --> Execute
+    Confirm -->|否| Execute
+
+    L2 -->|未命中| L3{第三层:<br/>LLM兜底识别}
+    L3 --> LLMCall[调用大语言模型]
+    LLMCall --> Parse[解析LLM响应]
+    Parse --> Learn[自学习: 更新缓存]
+    Learn --> Execute
+
+    Execute --> Dimension{识别交互维度}
+    Dimension -->|记账| Bookkeep[执行记账]
+    Dimension -->|查询| Query[执行查询]
+    Dimension -->|配置| Config[执行配置]
+    Dimension -->|导航| Navigate[执行导航]
+
+    Bookkeep --> Response
+    Query --> Response
+    Config --> Response
+    Navigate --> Response
+
+    Response[生成响应] --> TTS[语音合成播报]
+    TTS --> End([结束])

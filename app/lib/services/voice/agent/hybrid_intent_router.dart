@@ -171,6 +171,10 @@ class ProactiveNetworkMonitor {
   /// 缓存的网络状态
   NetworkStatus _cachedStatus = NetworkStatus.unknown();
 
+  /// 状态变化通知流
+  final StreamController<NetworkStatus> _statusController =
+      StreamController<NetworkStatus>.broadcast();
+
   /// 延迟阈值（毫秒）
   static const int _latencyThresholdMs = 2000;
 
@@ -203,6 +207,9 @@ class ProactiveNetworkMonitor {
 
   /// 获取缓存的网络状态
   NetworkStatus get cachedStatus => _cachedStatus;
+
+  /// 获取状态变化流
+  Stream<NetworkStatus> get statusStream => _statusController.stream;
 
   /// 配置回调函数
   void configure({
@@ -256,10 +263,13 @@ class ProactiveNetworkMonitor {
     debugPrint(
         '[NetworkMonitor] 初始化完成: online=$isOnline, llm=$llmAvailable, latency=${latency}ms, mode=${_cachedStatus.recommendedMode.name}');
 
-    // 5. 启动定时刷新
+    // 5. 广播初始状态（让订阅者获取初始值）
+    _statusController.add(_cachedStatus);
+
+    // 6. 启动定时刷新
     _startPeriodicRefresh();
 
-    // 6. 监听网络变化
+    // 7. 监听网络变化
     _listenToNetworkChanges();
   }
 
@@ -322,6 +332,7 @@ class ProactiveNetworkMonitor {
       llmAvailable = false;
     }
 
+    final oldLlmAvailable = _cachedStatus.llmAvailable;
     _cachedStatus = NetworkStatus(
       isOnline: isOnline,
       llmAvailable: llmAvailable,
@@ -329,6 +340,12 @@ class ProactiveNetworkMonitor {
       recommendedMode: _determineMode(isOnline, llmAvailable, latency),
       lastCheckTime: DateTime.now(),
     );
+
+    // 如果LLM可用性发生变化，通知监听者
+    if (oldLlmAvailable != llmAvailable) {
+      debugPrint('[NetworkMonitor] LLM状态变化: $oldLlmAvailable -> $llmAvailable');
+      _statusController.add(_cachedStatus);
+    }
   }
 
   /// 预热连接（异步，不阻塞）
@@ -391,6 +408,54 @@ class ProactiveNetworkMonitor {
   void dispose() {
     _refreshTimer?.cancel();
     _connectivitySubscription?.cancel();
+    _statusController.close();
+  }
+
+  /// 主动检查LLM连接状态（用户点击悬浮球时调用）
+  ///
+  /// 返回检查结果，如果LLM不可用会返回 false
+  Future<bool> checkLLMAvailability() async {
+    debugPrint('[NetworkMonitor] 主动检查LLM连接...');
+
+    final isOnline = await _checkConnectivity();
+    if (!isOnline) {
+      debugPrint('[NetworkMonitor] 网络不可用');
+      _updateStatus(isOnline: false, llmAvailable: false);
+      return false;
+    }
+
+    if (_llmAvailabilityChecker == null) {
+      debugPrint('[NetworkMonitor] 未配置LLM检测器');
+      return _cachedStatus.llmAvailable;
+    }
+
+    try {
+      final llmAvailable = await _llmAvailabilityChecker!()
+          .timeout(const Duration(seconds: 3));
+      debugPrint('[NetworkMonitor] LLM检查结果: $llmAvailable');
+      _updateStatus(isOnline: true, llmAvailable: llmAvailable);
+      return llmAvailable;
+    } catch (e) {
+      debugPrint('[NetworkMonitor] LLM检查失败: $e');
+      _updateStatus(isOnline: true, llmAvailable: false);
+      return false;
+    }
+  }
+
+  /// 更新状态并通知
+  void _updateStatus({required bool isOnline, required bool llmAvailable}) {
+    final oldLlmAvailable = _cachedStatus.llmAvailable;
+    _cachedStatus = NetworkStatus(
+      isOnline: isOnline,
+      llmAvailable: llmAvailable,
+      estimatedLatency: _cachedStatus.estimatedLatency,
+      recommendedMode: _determineMode(isOnline, llmAvailable, _cachedStatus.estimatedLatency),
+      lastCheckTime: DateTime.now(),
+    );
+
+    if (oldLlmAvailable != llmAvailable) {
+      _statusController.add(_cachedStatus);
+    }
   }
 }
 

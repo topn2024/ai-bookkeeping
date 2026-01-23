@@ -23,6 +23,9 @@
 #   ADMIN_PASSWORD: 管理员密码 (必需)
 #   API_BASE_URL: API 地址 (默认: https://160.202.238.29)
 #
+# API Keys (从 app/.env.local 自动加载):
+#   QWEN_API_KEY: 通义千问 API Key (用于 LLM 功能)
+#
 # 注意: 构建时会自动添加 --no-tree-shake-icons 参数以避免图标问题
 #
 
@@ -274,6 +277,22 @@ if [ "$DO_BUILD" = "true" ]; then
     echo "使用 --no-tree-shake-icons 参数避免图标问题"
     echo ""
 
+    # 加载 .env.local 中的环境变量
+    ENV_FILE="$APP_DIR/.env.local"
+    if [ -f "$ENV_FILE" ]; then
+        echo "加载环境变量: $ENV_FILE"
+        # 读取 QWEN_API_KEY
+        QWEN_API_KEY=$(grep -E "^QWEN_API_KEY=" "$ENV_FILE" | cut -d'=' -f2-)
+        if [ -n "$QWEN_API_KEY" ]; then
+            echo -e "${GREEN}✓ 已加载 QWEN_API_KEY${NC}"
+        else
+            echo -e "${YELLOW}⚠ 警告: QWEN_API_KEY 未设置，LLM 功能将不可用${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ 警告: 未找到 $ENV_FILE，跳过环境变量加载${NC}"
+    fi
+    echo ""
+
     # 更新 build_info.dart (同步版本号和构建时间)
     echo "更新 build_info.dart..."
     BUILD_TIME=$(date +"%Y-%m-%dT%H:%M:%S.000000")
@@ -314,7 +333,13 @@ BUILDINFO
     # 清理并构建
     "$FLUTTER_CMD" clean
     "$FLUTTER_CMD" pub get
-    "$FLUTTER_CMD" build apk --release --no-tree-shake-icons
+
+    # 构建命令（带 API key）
+    BUILD_ARGS="--release --no-tree-shake-icons"
+    if [ -n "$QWEN_API_KEY" ]; then
+        BUILD_ARGS="$BUILD_ARGS --dart-define=QWEN_API_KEY=$QWEN_API_KEY"
+    fi
+    "$FLUTTER_CMD" build apk $BUILD_ARGS
 
     popd > /dev/null
 
@@ -385,18 +410,19 @@ STEP=$((STEP + 1))
 echo -e "${YELLOW}[$STEP/$TOTAL_STEPS] 创建版本记录...${NC}"
 
 # 使用 Node.js 构建 JSON，确保中文字符正确编码
+# 通过命令行参数传递，避免特殊字符和换行符问题
 CREATE_DATA=$(node -e "
 const data = {
-    version_name: '$VERSION_NAME',
-    version_code: $VERSION_CODE,
-    platform: '$PLATFORM',
-    release_notes: '$RELEASE_NOTES',
-    is_force_update: $IS_FORCE_UPDATE
+    version_name: process.argv[1],
+    version_code: parseInt(process.argv[2]),
+    platform: process.argv[3],
+    release_notes: process.argv[4],
+    is_force_update: process.argv[5] === 'true'
 };
-if ('$RELEASE_NOTES_EN') data.release_notes_en = '$RELEASE_NOTES_EN';
-if ('$MIN_SUPPORTED_VERSION') data.min_supported_version = '$MIN_SUPPORTED_VERSION';
+if (process.argv[6]) data.release_notes_en = process.argv[6];
+if (process.argv[7]) data.min_supported_version = process.argv[7];
 console.log(JSON.stringify(data));
-")
+" "$VERSION_NAME" "$VERSION_CODE" "$PLATFORM" "$RELEASE_NOTES" "$IS_FORCE_UPDATE" "$RELEASE_NOTES_EN" "$MIN_SUPPORTED_VERSION")
 
 CREATE_RESPONSE=$(curl -s -k -X POST "${API_BASE_URL}/admin/app-versions" \
     -H "Authorization: Bearer $TOKEN" \

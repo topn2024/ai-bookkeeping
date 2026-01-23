@@ -57,6 +57,13 @@ class PipelineConfig {
   /// TTS结束后的静默窗口（毫秒）
   final int echoSilenceWindowMs;
 
+  /// VAD检测到语音时的回声阈值（更高，因为用户可能真的在说话）
+  final double echoThresholdWithVAD;
+
+  /// 回声过滤后的冷却时间（毫秒）
+  /// 防止回声过滤后的短时间内重复触发打断
+  final int echoFilterCooldownMs;
+
   // ==================== 性能优化配置 ====================
 
   /// 相似度计算节流间隔（毫秒）
@@ -74,54 +81,62 @@ class PipelineConfig {
     this.maxTTSQueueSize = 5,
     this.ttsPrefetchCount = 2,
     this.ttsSynthesisTimeoutMs = 15000,
-    // 打断检测
+    // 打断检测（优化：更快响应，参考chat-companion-app）
     this.bargeInLayer1MinChars = 4,
-    this.bargeInLayer1Threshold = 0.4,
+    this.bargeInLayer1Threshold = 0.5,  // 从0.4提高到0.5，更宽松
     this.bargeInLayer2MinChars = 8,
-    this.bargeInLayer2Threshold = 0.3,
-    this.bargeInCooldownMs = 1500,
-    // 回声过滤
-    this.echoSimilarityThreshold = 0.5,
-    this.echoMinTextLength = 3,
-    this.echoSilenceWindowMs = 500,
+    this.bargeInLayer2Threshold = 0.4,  // 从0.3提高到0.4，更宽松
+    this.bargeInCooldownMs = 1000,  // 从2000减少到1000，更快响应
+    // 回声过滤（优化：更宽松，避免误杀用户输入）
+    this.echoSimilarityThreshold = 0.7,  // 从0.6提高到0.7，更宽松
+    this.echoMinTextLength = 2,  // 从3减少到2
+    this.echoSilenceWindowMs = 800,  // 从1500减少到800，更短的静默窗口
+    // 回声过滤动态阈值
+    this.echoThresholdWithVAD = 0.9,  // 从0.8提高到0.9，VAD模式下几乎不过滤
+    this.echoFilterCooldownMs = 200,  // 从500减少到200
     // 性能优化
-    this.similarityThrottleMs = 100,
+    this.similarityThrottleMs = 50,  // 从100减少到50，更快检测
     this.enableComputeIsolate = false,
   });
 
   /// 默认配置
   static const defaultConfig = PipelineConfig();
 
-  /// 低延迟配置（牺牲一些准确性换取更快响应）
+  /// 低延迟配置（最快响应，适合网络好的场景）
   static const lowLatencyConfig = PipelineConfig(
-    minSentenceLength: 3,
+    minSentenceLength: 2,
     bargeInLayer1MinChars: 3,
-    bargeInLayer1Threshold: 0.5,
-    bargeInCooldownMs: 1000,
-    echoSilenceWindowMs: 300,
-    similarityThrottleMs: 50,
+    bargeInLayer1Threshold: 0.6,
+    bargeInCooldownMs: 500,
+    echoSilenceWindowMs: 500,
+    echoFilterCooldownMs: 100,
+    similarityThrottleMs: 30,
   );
 
-  /// 高准确性配置（更严格的阈值，减少误触发）
+  /// 高准确性配置（减少误触发，适合嘈杂环境）
   static const highAccuracyConfig = PipelineConfig(
     minSentenceLength: 5,
     bargeInLayer1MinChars: 5,
-    bargeInLayer1Threshold: 0.3,
+    bargeInLayer1Threshold: 0.4,
     bargeInLayer2MinChars: 10,
-    bargeInLayer2Threshold: 0.2,
-    bargeInCooldownMs: 2000,
-    echoSimilarityThreshold: 0.4,
-    echoMinTextLength: 4,
-    echoSilenceWindowMs: 800,
+    bargeInLayer2Threshold: 0.3,
+    bargeInCooldownMs: 1500,
+    echoSimilarityThreshold: 0.6,
+    echoThresholdWithVAD: 0.8,
+    echoMinTextLength: 3,
+    echoSilenceWindowMs: 1200,
+    echoFilterCooldownMs: 400,
   );
 
-  /// 调试配置（更宽松的阈值，便于测试）
+  /// 调试配置（最宽松，几乎不过滤）
   static const debugConfig = PipelineConfig(
     bargeInLayer1MinChars: 2,
-    bargeInLayer1Threshold: 0.6,
-    bargeInCooldownMs: 500,
-    echoSimilarityThreshold: 0.7,
-    echoMinTextLength: 2,
+    bargeInLayer1Threshold: 0.7,
+    bargeInCooldownMs: 300,
+    echoSimilarityThreshold: 0.8,
+    echoThresholdWithVAD: 0.95,
+    echoMinTextLength: 1,
+    echoFilterCooldownMs: 100,
   );
 
   /// 复制并修改配置
@@ -140,6 +155,8 @@ class PipelineConfig {
     double? echoSimilarityThreshold,
     int? echoMinTextLength,
     int? echoSilenceWindowMs,
+    double? echoThresholdWithVAD,
+    int? echoFilterCooldownMs,
     int? similarityThrottleMs,
     bool? enableComputeIsolate,
   }) {
@@ -158,6 +175,8 @@ class PipelineConfig {
       echoSimilarityThreshold: echoSimilarityThreshold ?? this.echoSimilarityThreshold,
       echoMinTextLength: echoMinTextLength ?? this.echoMinTextLength,
       echoSilenceWindowMs: echoSilenceWindowMs ?? this.echoSilenceWindowMs,
+      echoThresholdWithVAD: echoThresholdWithVAD ?? this.echoThresholdWithVAD,
+      echoFilterCooldownMs: echoFilterCooldownMs ?? this.echoFilterCooldownMs,
       similarityThrottleMs: similarityThrottleMs ?? this.similarityThrottleMs,
       enableComputeIsolate: enableComputeIsolate ?? this.enableComputeIsolate,
     );

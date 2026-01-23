@@ -743,20 +743,20 @@ class AliCloudASRService {
       }
 
       // 构建WebSocket URL
+      // 注意：Android 平台的 WebSocket 不支持自定义 headers，
+      // 因此将 token 作为查询参数传递
       final wsUri = Uri.parse(tokenInfo.asrUrl).replace(
         queryParameters: {
           'appkey': tokenInfo.appKey,
+          'token': tokenInfo.token,
         },
       );
-      debugPrint('[AliCloudASR] WebSocket URL: $wsUri');
+      debugPrint('[AliCloudASR] WebSocket URL: ${wsUri.toString().replaceAll(tokenInfo.token, '***')}');
 
       // 连接WebSocket（带超时）
       debugPrint('[AliCloudASR] 正在连接WebSocket...');
       _webSocket = await WebSocket.connect(
         wsUri.toString(),
-        headers: {
-          'X-NLS-Token': tokenInfo.token,
-        },
       ).timeout(
         Duration(seconds: ASRErrorHandlingConfig.defaultTimeoutSeconds),
         onTimeout: () {

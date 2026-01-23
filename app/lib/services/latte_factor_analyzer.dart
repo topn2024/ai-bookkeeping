@@ -113,11 +113,11 @@ class LatteFactorAnalyzer {
 
     final transactions = await _getSmallExpenses(threshold, period, ledgerId);
     if (transactions.isEmpty) {
-      return const LatteFactorReport(
+      return LatteFactorReport(
         factors: [],
         totalMonthlyImpact: 0,
         totalYearlyImpact: 0,
-        topSuggestion: '暂无小额高频消费数据。继续记账${period}个月后，可分析您的消费习惯并提供节省建议。',
+        topSuggestion: '暂无小额高频消费数据。继续记账$period个月后，可分析您的消费习惯并提供节省建议。',
         potentialYearlySavings: 0,
       );
     }

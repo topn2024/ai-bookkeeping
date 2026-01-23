@@ -1,0 +1,46 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 可视化配置 {
+        +String 视图ID
+        +Integer 当前层级
+        +String 图表类型
+        +Dict 筛选条件
+        +List 数据维度
+        +自适应选择() String
+    }
+
+    class 渐进披露层级 {
+        +Integer 层级编号
+        +String 层级名称
+        +List~数据项~ 可见数据
+        +Integer 复杂度阈值
+        +获取下一层() 层级
+        +获取上一层() 层级
+    }
+
+    class 图表选择器 {
+        +Dict 规则库
+        +选择图表(数据特征) String
+        +评估适配度(图表, 数据) Float
+    }
+
+    class 布局优化器 {
+        +Integer 屏幕宽度
+        +Integer 屏幕高度
+        +优化布局(图表列表) 布局
+        +计算优先级(图表) Integer
+    }
+
+    class 交互状态 {
+        +Stack 导航历史
+        +Dict 当前筛选
+        +String 焦点元素
+        +下钻(目标)
+        +返回()
+        +应用筛选(条件)
+    }
+
+    可视化配置 --> 渐进披露层级 : 使用
+    可视化配置 --> 图表选择器 : 调用
+    布局优化器 --> 可视化配置 : 优化
+    交互状态 --> 可视化配置 : 更新

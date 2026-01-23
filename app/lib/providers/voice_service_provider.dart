@@ -38,7 +38,7 @@ final voiceRecognitionEngineProvider = Provider<VoiceRecognitionEngine>((ref) {
 
 /// TTS服务Provider
 final ttsServiceProvider = Provider<TTSService>((ref) {
-  return TTSService();
+  return TTSService.instance;
 });
 
 /// 数据库服务Provider（通过服务定位器获取）

@@ -1,0 +1,53 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 健康评分 {
+        +String 用户ID
+        +Float 综合评分
+        +String 健康等级
+        +DateTime 评估时间
+        +计算综合评分() Float
+        +获取等级() String
+    }
+
+    class 六维度分数 {
+        +Float 收支平衡分
+        +Float 预算执行分
+        +Float 储蓄能力分
+        +Float 债务健康分
+        +Float 消费结构分
+        +Float 目标达成分
+        +计算维度得分() Float
+    }
+
+    class 预警状态 {
+        +String 预警级别
+        +Float 消费进度
+        +Float 时间进度
+        +Date 预计耗尽日
+        +Integer 提醒频率
+        +判定预警级别() String
+    }
+
+    class 个性化建议 {
+        +String 问题类型
+        +String 建议内容
+        +String 优先级
+        +String 期限类型
+        +生成建议() List
+    }
+
+    class 目标追踪 {
+        +String 目标ID
+        +Float 目标金额
+        +Float 已完成金额
+        +Float 完成度
+        +分解目标() List
+        +计算进度() Float
+        +触发激励() String
+    }
+
+    健康评分 --> 六维度分数 : 包含
+    健康评分 --> 预警状态 : 触发
+    健康评分 --> 个性化建议 : 生成
+    目标追踪 --> 六维度分数 : 影响
+

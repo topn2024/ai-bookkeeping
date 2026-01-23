@@ -1,0 +1,202 @@
+{
+  "portfolio": {
+    "name": "AI记账应用专利组合",
+    "total_patents": 18,
+    "last_updated": "2026-01-19",
+    "version": "1.0"
+  },
+  "categories": {
+    "core-technology": {
+      "name": "核心技术专利",
+      "count": 7,
+      "patents": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P07",
+        "P10",
+        "P11"
+      ]
+    },
+    "financial-management": {
+      "name": "财务管理专利",
+      "count": 8,
+      "patents": [
+        "P04",
+        "P05",
+        "P09",
+        "P14",
+        "P15",
+        "P16",
+        "P17",
+        "P18"
+      ]
+    },
+    "user-experience": {
+      "name": "用户体验专利",
+      "count": 3,
+      "patents": [
+        "P08",
+        "P12",
+        "P13"
+      ]
+    }
+  },
+  "patents": [
+    {
+      "id": "P01",
+      "title": "FIFO资源池钱龄计算",
+      "status": "drafting",
+      "category": "core-technology",
+      "success_rate": "85-90%",
+      "directory": "patents/P01-FIFO钱龄计算/"
+    },
+    {
+      "id": "P02",
+      "title": "多模态融合智能记账",
+      "status": "drafting",
+      "category": "core-technology",
+      "success_rate": "80-85%",
+      "directory": "patents/P02-多模态融合记账/"
+    },
+    {
+      "id": "P03",
+      "title": "基于差分隐私的财务智能自学习系统",
+      "status": "drafting",
+      "category": "core-technology",
+      "success_rate": "80-85%",
+      "directory": "patents/P03-差分隐私学习/"
+    },
+    {
+      "id": "P04",
+      "title": "自适应零基预算智能管理系统",
+      "status": "drafting",
+      "category": "financial-management",
+      "success_rate": "80-85%",
+      "directory": "patents/P04-自适应预算/"
+    },
+    {
+      "id": "P05",
+      "title": "LLM增强的四维语音交互系统",
+      "status": "drafting",
+      "category": "financial-management",
+      "success_rate": "85-90%",
+      "directory": "patents/P05-LLM语音交互/"
+    },
+    {
+      "id": "P06",
+      "title": "位置增强财务管理",
+      "status": "drafting",
+      "category": "core-technology",
+      "success_rate": "75-80%",
+      "directory": "patents/P06-位置增强管理/"
+    },
+    {
+      "id": "P07",
+      "title": "多因子交易去重",
+      "status": "drafting",
+      "category": "core-technology",
+      "success_rate": "75-80%",
+      "directory": "patents/P07-交易去重/"
+    },
+    {
+      "id": "P08",
+      "title": "智能自适应财务数据可视化系统",
+      "status": "drafting",
+      "category": "user-experience",
+      "success_rate": "75-80%",
+      "directory": "patents/P08-智能可视化/"
+    },
+    {
+      "id": "P09",
+      "title": "智能财务健康评分与管理系统",
+      "status": "drafting",
+      "category": "financial-management",
+      "success_rate": "75-80%",
+      "directory": "patents/P09-财务健康评分/"
+    },
+    {
+      "id": "P10",
+      "title": "智能账单解析导入",
+      "status": "drafting",
+      "category": "core-technology",
+      "success_rate": "75-80%",
+      "directory": "patents/P10-账单解析导入/"
+    },
+    {
+      "id": "P11",
+      "title": "离线优先增量同步",
+      "status": "drafting",
+      "category": "core-technology",
+      "success_rate": "75-80%",
+      "directory": "patents/P11-离线增量同步/"
+    },
+    {
+      "id": "P12",
+      "title": "游戏化激励系统",
+      "status": "drafting",
+      "category": "user-experience",
+      "success_rate": "75-80%",
+      "directory": "patents/P12-游戏化激励/"
+    },
+    {
+      "id": "P13",
+      "title": "家庭协作记账",
+      "status": "drafting",
+      "category": "user-experience",
+      "success_rate": "75-80%",
+      "directory": "patents/P13-家庭协作记账/"
+    },
+    {
+      "id": "P14",
+      "title": "冷静期消费控制",
+      "status": "drafting",
+      "category": "financial-management",
+      "success_rate": "80-85%",
+      "directory": "patents/P14-冷静期控制/"
+    },
+    {
+      "id": "P15",
+      "title": "可变收入适配器",
+      "status": "drafting",
+      "category": "financial-management",
+      "success_rate": "80-85%",
+      "directory": "patents/P15-可变收入适配/"
+    },
+    {
+      "id": "P16",
+      "title": "订阅追踪与浪费检测",
+      "status": "drafting",
+      "category": "financial-management",
+      "success_rate": "80-85%",
+      "directory": "patents/P16-订阅追踪检测/"
+    },
+    {
+      "id": "P17",
+      "title": "债务健康管理",
+      "status": "drafting",
+      "category": "financial-management",
+      "success_rate": "75-80%",
+      "directory": "patents/P17-债务健康管理/"
+    },
+    {
+      "id": "P18",
+      "title": "消费趋势预测",
+      "status": "drafting",
+      "category": "financial-management",
+      "success_rate": "75-80%",
+      "directory": "patents/P18-消费趋势预测/"
+    }
+  ],
+  "statistics": {
+    "by_status": {
+      "drafting": 18
+    },
+    "by_success_rate": {
+      "high": 8,
+      "medium": 10,
+      "low": 0
+    }
+  }
+}

@@ -1,0 +1,66 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 权限控制层
+        OWNER[所有者]
+        ADMIN[管理员]
+        MEMBER[成员]
+        VIEWER[只读]
+        PERM[权限检查器]
+    end
+
+    subgraph 协作引擎
+        SYNC[同步引擎]
+        CONFLICT[冲突检测]
+        RESOLVE[冲突解决]
+        MERGE[数据合并]
+    end
+
+    subgraph 数据隔离层
+        PERSONAL[个人账本]
+        FAMILY[家庭账本]
+        SHARE[共享记录]
+        ISOLATE[数据隔离器]
+    end
+
+    subgraph 智能分摊
+        EQUAL[平均分摊]
+        RATIO[按比例分摊]
+        CUSTOM[自定义分摊]
+        DEBT[债务计算]
+    end
+
+    subgraph 成员管理
+        INVITE[邀请管理]
+        REMOVE[成员移除]
+        EXIT[退出处理]
+        LOG[操作日志]
+    end
+
+    OWNER --> PERM
+    ADMIN --> PERM
+    MEMBER --> PERM
+    VIEWER --> PERM
+
+    PERM --> SYNC
+    SYNC --> CONFLICT
+    CONFLICT --> RESOLVE
+    RESOLVE --> MERGE
+
+    MERGE --> PERSONAL
+    MERGE --> FAMILY
+    PERSONAL --> SHARE
+    SHARE --> FAMILY
+    FAMILY --> ISOLATE
+
+    FAMILY --> EQUAL
+    FAMILY --> RATIO
+    FAMILY --> CUSTOM
+    EQUAL --> DEBT
+    RATIO --> DEBT
+    CUSTOM --> DEBT
+
+    PERM --> INVITE
+    INVITE --> REMOVE
+    REMOVE --> EXIT
+    EXIT --> LOG
+

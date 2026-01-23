@@ -255,6 +255,13 @@ class AppTheme {
         seedColor: primaryColor,
         brightness: Brightness.light,
       ),
+      // 启用 iOS 风格的页面过渡动画，支持滑动返回手势
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
       scaffoldBackgroundColor: AntigravityColors.surface,
       appBarTheme: AppBarTheme(
         backgroundColor: primaryColor,
@@ -315,6 +322,13 @@ class AppTheme {
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
         brightness: Brightness.dark,
+      ),
+      // 启用 iOS 风格的页面过渡动画，支持滑动返回手势
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
       ),
       scaffoldBackgroundColor: const Color(0xFF121212),
       appBarTheme: const AppBarTheme(

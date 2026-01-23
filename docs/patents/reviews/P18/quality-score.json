@@ -1,0 +1,44 @@
+{
+  "patent_id": "P18",
+  "patent_dir": "docs/patents/patents/P18-消费趋势预测",
+  "disclaimer": "⚠️ 以下评分为AI辅助评估,非最终法律结论",
+  "scores": {
+    "legal_compliance": {
+      "score": 95,
+      "max": 100,
+      "weight": 0.3
+    },
+    "technical_nature": {
+      "score": 85,
+      "max": 100,
+      "weight": 0.25
+    },
+    "document_quality": {
+      "score": 100,
+      "max": 100,
+      "weight": 0.2
+    },
+    "prior_art_risk": {
+      "score": 60,
+      "max": 100,
+      "weight": 0.15
+    },
+    "business_value": {
+      "score": 95,
+      "max": 100,
+      "weight": 0.1
+    }
+  },
+  "overall_score": 88.2,
+  "risk_level": "low",
+  "estimated_success_rate": "75-85%(AI估计)",
+  "key_issues": [],
+  "recommendations": [
+    {
+      "dimension": "现有技术",
+      "priority": "medium",
+      "message": "需要进行现有技术检索",
+      "action": "使用prior-art-search.json中的检索策略进行检索"
+    }
+  ]
+}

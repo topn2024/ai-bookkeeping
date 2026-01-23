@@ -1,0 +1,60 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Collect[/收集交易历史/]
+    Collect --> Group[按商户+金额分组]
+    Group --> CalcInterval[计算时间间隔]
+
+    CalcInterval --> Periodic{周期性判定}
+    Periodic -->|间隔≈7天| Week[周订阅]
+    Periodic -->|间隔≈30天| Month[月订阅]
+    Periodic -->|间隔≈90天| Quarter[季订阅]
+    Periodic -->|间隔≈365天| Year[年订阅]
+    Periodic -->|无规律| NotSub[非订阅]
+
+    Week --> Confirm{确认条件}
+    Month --> Confirm
+    Quarter --> Confirm
+    Year --> Confirm
+
+    Confirm -->|交易≥3次且CV<0.2| CreateSub[创建订阅记录]
+    Confirm -->|不满足| NotSub
+
+    CreateSub --> CalcStability[计算稳定性评分]
+    CalcStability --> AmountScore[金额稳定性: 40分]
+    AmountScore --> TimeScore[时间稳定性: 40分]
+    TimeScore --> DurationScore[持续性: 20分]
+    DurationScore --> TotalScore[综合评分]
+
+    TotalScore --> EvalUsage[评估使用状态]
+    EvalUsage --> UsageLevel{使用频率}
+    UsageLevel -->|每周≥2次| Frequent[经常使用]
+    UsageLevel -->|每月1-4次| Occasional[偶尔使用]
+    UsageLevel -->|每季1-2次| Rare[很少使用]
+    UsageLevel -->|3月无使用| Unused[完全未使用]
+
+    Frequent --> CheckWaste{浪费检测}
+    Occasional --> CheckWaste
+    Rare --> CheckWaste
+    Unused --> CheckWaste
+
+    CheckWaste -->|完全未使用| Waste1[浪费: 年成本×100%]
+    CheckWaste -->|单次成本>2倍| Waste2[浪费: 建议按需购买]
+    CheckWaste -->|重复订阅| Waste3[浪费: 保留1个]
+    CheckWaste -->|正常使用| NoWaste[继续订阅]
+
+    Waste1 --> Remind[发送续费提醒]
+    Waste2 --> Remind
+    Waste3 --> Remind
+    NoWaste --> Remind
+
+    Remind --> Decision{用户决策}
+    Decision -->|继续| Keep[保留订阅]
+    Decision -->|取消| Cancel[取消订阅]
+    Decision -->|稍后| Defer[延迟提醒]
+
+    Keep --> Learn[学习用户偏好]
+    Cancel --> Learn
+    Defer --> Learn
+    NotSub --> End([结束])
+    Learn --> End
+

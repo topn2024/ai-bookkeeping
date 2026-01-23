@@ -1,0 +1,40 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 位置采集层
+        GPS[GPS定位]
+        WIFI[WiFi定位]
+        CELL[基站定位]
+    end
+
+    subgraph 位置处理层
+        FUSE[位置融合]
+        GEO[地理围栏引擎]
+        POI[POI识别]
+    end
+
+    subgraph 业务逻辑层
+        TRIGGER[触发器管理]
+        MERCHANT[商户识别]
+        CONTEXT[上下文推断]
+    end
+
+    subgraph 记账增强层
+        AUTO[自动记账建议]
+        CAT[类别推荐]
+        NOTE[备注生成]
+    end
+
+    GPS --> FUSE
+    WIFI --> FUSE
+    CELL --> FUSE
+
+    FUSE --> GEO
+    FUSE --> POI
+
+    GEO --> TRIGGER
+    POI --> MERCHANT
+    MERCHANT --> CONTEXT
+
+    TRIGGER --> AUTO
+    CONTEXT --> CAT
+    CONTEXT --> NOTE

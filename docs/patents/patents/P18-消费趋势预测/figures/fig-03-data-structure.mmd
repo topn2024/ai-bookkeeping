@@ -1,0 +1,72 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 预测结果 {
+        +Date target_month
+        +Decimal predicted_amount
+        +Float confidence_level
+        +Decimal lower_bound
+        +Decimal upper_bound
+        +Enum trend
+        +Float seasonality_factor
+        +Map algorithm_weights
+        +获取预测() Decimal
+    }
+
+    class 算法权重 {
+        +Float sma_weight
+        +Float wma_weight
+        +Float ema_weight
+        +Float lr_weight
+        +计算SMA() Decimal
+        +计算WMA() Decimal
+        +计算EMA() Decimal
+        +计算趋势() Decimal
+        +融合预测() Decimal
+    }
+
+    class 季节性因子 {
+        +Map monthly_factors
+        +Float yearly_avg
+        +计算月度因子() Float
+        +中国市场调整() Float
+        +平滑处理() Float
+    }
+
+    class 置信区间 {
+        +List historical_errors
+        +Float std_error
+        +Float z_score
+        +Float margin
+        +计算误差() List
+        +计算标准差() Float
+        +计算区间() Tuple
+    }
+
+    class 消费洞察 {
+        +Float small_ratio
+        +Float weekend_ratio
+        +Integer large_count
+        +Float trend_rate
+        +List top_categories
+        +检测拿铁因子() String
+        +分析周末消费() String
+        +识别大额消费() String
+        +分析趋势() String
+    }
+
+    class 预警配置 {
+        +Float spending_progress
+        +Float time_progress
+        +Decimal projected_spending
+        +String alert_level
+        +判定预警() String
+        +生成建议() String
+        +发送通知() void
+    }
+
+    预测结果 --> 算法权重 : 使用
+    预测结果 --> 季节性因子 : 调整
+    预测结果 --> 置信区间 : 包含
+    预测结果 --> 消费洞察 : 生成
+    预测结果 --> 预警配置 : 触发
+

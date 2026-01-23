@@ -1,211 +1,173 @@
-# 语音智能助手完善 - 任务清单
+# 实时对话系统升级任务清单
 
-## 1. 基础设施 - Token管理和密钥安全
+## 第一批：P0 核心对话体验
 
-- [x] 1.1 创建后端Token代理服务
-  - 文件：`server/app/api/v1/voice_token.py`
-  - 实现阿里云临时Token获取
-  - 实现Token缓存和刷新逻辑
-  - 添加请求限流保护
+### 1. 实时对话会话控制器
+- [x] 创建 `lib/services/voice/realtime_conversation_session.dart`
+- [x] 实现 RealtimeSessionState 状态枚举
+- [x] 实现状态流转逻辑
+- [x] 集成VAD语音活动检测
+- [x] 实现轮次结束停顿机制（1.5秒）
+- [x] 实现等待超时逻辑（5秒）
 
-- [x] 1.2 创建客户端Token管理服务
-  - 文件：`app/lib/services/voice_token_service.dart`
-  - 使用flutter_secure_storage存储Token
-  - 实现Token自动刷新机制
-  - 添加Token过期检测
+### 2. 对话与执行桥接器
+- [x] 创建 `lib/services/voice/conversation_action_bridge.dart`
+- [x] 实现异步操作提交接口
+- [x] 实现执行结果流
+- [x] 实现结果注入对话上下文
 
-- [x] 1.3 更新依赖配置
-  - 确认flutter_secure_storage已添加到pubspec.yaml
-  - 添加必要的iOS/Android权限配置
+### 3. 后台操作执行器
+- [x] 创建 `lib/services/voice/background_operation_executor.dart`
+- [x] 实现操作队列管理
+- [x] 复用ActionRouter进行操作分发
+- [x] 实现异步执行不阻塞调用方
+- [x] 实现执行结果通知机制
 
-## 2. ASR语音识别实现
+### 4. VAD参数优化
+- [x] 创建 `lib/services/voice/realtime_vad_config.dart`
+- [x] 调整语音开始阈值为200ms
+- [x] 调整语音结束阈值为500ms
+- [x] 实现背景噪音自适应
 
-- [x] 2.1 实现阿里云一句话识别API
-  - 文件：`app/lib/services/voice_recognition_engine.dart`
-  - 替换AliCloudASRService.transcribe()中的模拟代码
-  - 实现真实的HTTP POST请求
-  - 添加音频格式转换（PCM → WAV）
-  - 处理API响应和错误
+### 5. 层次化状态机
+- [x] 创建 `lib/services/voice/voice_state_machine.dart`
+- [x] 实现SessionState (active, paused, ended)
+- [x] 实现SpeakingState (idle, speaking, fading)
+- [x] 实现ListeningState (idle, listening, processing)
+- [x] 支持并发状态（speaking + listening）
 
-- [x] 2.2 实现阿里云WebSocket流式识别
-  - 文件：`app/lib/services/voice_recognition_engine.dart`
-  - 实现WebSocket连接管理
-  - 实现音频流实时发送
-  - 处理部分识别结果和最终结果
-  - 实现连接断开重连机制
+### 6. 流式TTS服务
+- [x] 创建 `lib/services/streaming_tts_service.dart`
+- [x] 实现WebSocket长连接（或分句策略）
+- [x] 实现分块接收音频数据
+- [x] 实现边接收边播放
+- [x] 实现中途取消支持
+- [x] 创建 `lib/services/audio_stream_player.dart`
+- [x] 实现音频分块缓冲
+- [x] 实现智能预缓冲策略
+- [x] 实现即时停止功能
+- [x] 实现音频淡出效果
 
-- [x] 2.3 完善离线ASR降级逻辑
-  - 文件：`app/lib/services/voice_recognition_engine.dart`
-  - 实现网络状态检测
-  - 实现自动切换到Sherpa-ONNX
-  - 添加用户提示
+### 7. 集成到悬浮球
+- [x] 创建 `lib/services/voice/realtime_voice_integration.dart` （集成服务）
+- [x] 创建 `lib/providers/realtime_voice_provider.dart` （Riverpod状态管理）
+- [x] 创建 `lib/widgets/realtime_floating_ball.dart` （新悬浮球组件）
+- [x] 实现RealtimeVoiceController控制器
+- [x] 实现状态到UI颜色的映射
 
-- [x] 2.4 实现ASR热词表集成
-  - 文件：`app/lib/services/voice_recognition_engine.dart`
-  - 获取用户常用分类和商家名称
-  - 构建动态热词表
-  - 在API调用中传递热词参数
+## 第二批：P1 个性化体验
 
-## 3. TTS语音合成实现
+### 8. 会话级短期记忆
+- [x] 创建 `lib/services/voice/memory/conversation_memory.dart`
+- [x] 实现对话历史管理（3-5轮）
+- [x] 实现操作指代解析（"改成50"、"删掉它"）
+- [x] 实现上下文摘要生成（供LLM使用）
 
-- [x] 3.1 实现Flutter TTS引擎
-  - 文件：`app/lib/services/tts_service.dart`
-  - 取消FlutterTTSEngine中的注释代码
-  - 实现真实的flutter_tts包调用
-  - 添加语速、音量、音调配置
-  - 处理播放完成回调
+### 9. 扩展操作指代
+- [x] 在ConversationMemory中实现操作指代解析
+- [x] 实现ActionReferenceType枚举（modifyAmount, modifyCategory, delete, cancel）
+- [x] 实现"改成50"→修改金额
+- [x] 实现"删掉它"→删除最近操作
+- [x] 记录最近操作上下文（_lastAction）
 
-- [x] 3.2 实现阿里云TTS引擎
-  - 文件：`app/lib/services/tts_service.dart`
-  - 取消AlibabaCloudTTSEngine中的注释代码
-  - 实现真实的HTTP请求获取音频
-  - 实现音频流播放
-  - 支持多种音色切换
+### 10. 扩展用户画像
+- [x] 修改 `lib/services/user_profile_service.dart`
+- [x] 新增ConversationPreferences类
+- [x] 记录是否喜欢主动发起对话（likesProactiveChat）
+- [x] 记录沉默容忍度（silenceToleranceSeconds）
+- [x] 记录感兴趣话题（favoriteTopics）
+- [x] 新增VoiceDialogStyle枚举和对话风格
 
-- [x] 3.3 实现TTS引擎自动选择
-  - 文件：`app/lib/services/tts_service.dart`
-  - 根据网络状态选择引擎
-  - 根据用户偏好选择引擎
-  - 实现优雅降级
+### 11. 集成画像驱动对话
+- [x] 集成ProfileDrivenDialogService到RealtimeConversationSession
+- [x] 在会话初始化时加载用户画像（_loadUserProfile）
+- [x] 在生成响应时使用画像+记忆（ConversationMemory集成）
 
-## 4. 唤醒词检测实现
+## 第三批：P1 完整交互
 
-- [x] 4.1 集成Porcupine SDK
-  - 添加porcupine_flutter依赖（框架代码已就绪，需要添加实际依赖）
-  - 配置iOS/Android权限
-  - 获取API Key（需要从Picovoice Console获取）
+### 12. 打断检测
+- [x] 创建 `lib/services/voice/barge_in_detector.dart`
+- [x] 实现能量阈值检测
+- [x] 实现VAD双通道
+- [x] 实现关键词检测（"停"、"等等"）
+- [x] 实现打断响应流程（淡出+切换）
 
-- [x] 4.2 实现唤醒词检测服务
-  - 文件：`app/lib/services/voice_wake_word_service.dart`
-  - 替换TODO注释为真实实现
-  - 实现后台音频监听
-  - 实现唤醒词检测回调
-  - 添加灵敏度调节
+### 13. 主动话题生成
+- [x] 创建 `lib/services/voice/proactive_topic_generator.dart`
+- [x] 实现基于画像的话题生成
+- [x] 实现执行结果反馈话题
+- [x] 实现提醒类话题
+- [x] 实现引导类话题
 
-- [x] 4.3 实现唤醒词配置UI
-  - 文件：`app/lib/pages/voice_config_page.dart`（需要创建）
-  - 添加唤醒词开关
-  - 添加灵敏度滑块
-  - 添加测试按钮
+### 14. 对话结束检测
+- [x] 创建 `lib/services/voice/conversation_end_detector.dart`
+- [x] 实现显式结束检测（"好了"、"谢谢"）
+- [x] 实现隐式结束检测（连续两轮无响应）
+- [x] 实现优雅结束流程
 
-## 5. 确认流程和UI完善
+### 15. 异常处理机制
+- [x] 创建 `lib/services/voice/exception_handler.dart`
+- [x] 实现ASR异常处理
+- [x] 实现NLU异常处理
+- [x] 实现操作层异常处理
+- [x] 创建 `lib/services/voice/frequency_limiter.dart`
+- [x] 实现重复输入检测（3秒内）
+- [x] 实现高频请求限制（1分钟20次）
+- [x] 实现重复修改检测
+- [x] 创建 `lib/services/voice/interrupt_recovery_manager.dart`
+- [x] 实现对话放弃恢复
+- [x] 实现应用切换恢复
+- [x] 实现意图变更恢复
+- [x] 创建 `lib/services/voice/input_preprocessor.dart`
+- [x] 实现噪声检测与过滤
+- [x] 实现输入长度限制
+- [x] 实现安全检查（注入攻击检测）
+- [x] 实现特殊字符过滤与规范化
 
-- [x] 5.1 实现确认流程UI反馈
-  - 文件：`app/lib/services/voice_service_provider.dart:308`
-  - 实现TODO中提到的确认流程
-  - 添加确认对话框
-  - 实现语音确认（"是"/"否"）
-  - 实现超时自动取消
+### 16. 集成服务
+- [x] 创建 `lib/services/voice/realtime_voice_integration.dart`
+- [x] 整合所有实时语音组件
+- [x] 提供统一API供悬浮球使用
+- [x] 实现生命周期事件处理
 
-- [x] 5.2 实现命令历史显示
-  - 文件：`app/lib/pages/enhanced_voice_assistant_page.dart:810`
-  - 实现TODO中提到的命令历史显示
-  - 添加历史记录列表UI
-  - 支持历史命令重放
-  - 支持历史记录清空
+## 第四批：P2 增强体验
 
-- [x] 5.3 完善权限检查逻辑
-  - 文件：`app/lib/pages/voice_recognition_page.dart`
-  - 实现麦克风权限检查
-  - 实现权限拒绝处理
-  - 添加权限说明对话框
-  - 支持跳转系统设置
+### 16. 语音自然度
+- [x] 实现情感化TTS参数
+- [x] 实现拟声词和语气词
+- [x] 实现响应变化（3-5种变体）
 
-## 6. 错误处理和稳定性
+### 17. 画像学习优化
+- [x] 从对话中学习用户偏好
+- [x] 优化主动话题推荐
 
-- [x] 6.1 实现网络错误处理
-  - 添加网络超时处理（默认10秒）
-  - 添加重试机制（最多3次）
-  - 添加离线检测和提示
+### 18. 高频输入优化
+- [x] 优化批量记账处理
+- [x] 优化频率限制策略
 
-- [x] 6.2 实现API限流处理
-  - 检测429响应
-  - 实现指数退避重试
-  - 添加用户友好提示
+### 19. 中断恢复增强
+- [x] 集成应用生命周期监听
+- [x] 优化恢复策略
 
-- [x] 6.3 实现音频流缓冲优化
-  - 实现环形缓冲区 (AudioCircularBuffer)
-  - 优化内存使用
-  - 防止音频丢失
+## 验证任务
 
-- [x] 6.4 添加识别超时机制
-  - 设置最大识别时间（默认60秒）
-  - 实现静音检测自动停止（3秒）
-  - 添加超时提示
+### 对话体验验证
+- [ ] 延迟测试：用户说话结束到听到回复 < 1.5秒
+- [ ] 打断测试：TTS播放时说话，停止延迟 < 200ms
+- [ ] 并发测试：说话时监听功能正常
+- [ ] 自动结束测试：说"好了"后对话自动关闭
+- [ ] 后台操作测试：记账期间继续说话不中断
+- [ ] 主动发起测试：沉默5秒后智能体主动说话
 
-## 7. 测试和文档
+### 个性化验证
+- [ ] 短期记忆测试："记一笔100块"后说"改成50"
+- [ ] 长期记忆测试：退出会话后重新开始能记住偏好
+- [ ] 用户画像测试：多次交互后画像更新
+- [ ] 个性化人设测试：不同画像用户问候语不同
 
-- [ ] 7.1 编写ASR服务单元测试
-  - 测试Token获取
-  - 测试API调用
-  - 测试错误处理
-  - 测试离线降级
-
-- [ ] 7.2 编写TTS服务单元测试
-  - 测试引擎选择
-  - 测试播放控制
-  - 测试错误处理
-
-- [ ] 7.3 编写集成测试
-  - 测试完整语音记账流程
-  - 测试唤醒词到执行完成
-  - 测试网络切换场景
-
-- [ ] 7.4 完善API文档
-  - 记录ASR服务接口
-  - 记录TTS服务接口
-  - 记录唤醒词服务接口
-  - 添加使用示例
-
-## 依赖关系
-
-```
-1.1 → 1.2 → 2.1 → 2.2
-              ↓
-           2.3, 2.4
-
-1.2 → 3.1 → 3.2 → 3.3
-
-4.1 → 4.2 → 4.3
-
-5.1, 5.2, 5.3 可并行
-
-6.x 依赖 2.x 和 3.x 完成
-
-7.x 依赖所有功能完成
-```
-
-## 可并行工作
-
-- 1.1（后端）和 4.1（SDK集成）可并行
-- 2.x（ASR）和 3.x（TTS）可并行（在1.2完成后）
-- 5.1、5.2、5.3 可并行
-- 6.1、6.2、6.3、6.4 可并行
-
-## 验证检查点
-
-- [x] Token代理服务可正常获取临时Token
-- [x] 语音识别可在真实设备上工作
-- [x] TTS播报可正常发声
-- [x] 唤醒词可触发语音助手
-- [x] 确认流程UI正常显示
-- [x] 命令历史可正常查看
-- [x] 离线模式可正常工作
-- [x] 所有原有TODO已处理
-
-## 实现说明
-
-### 已完成的核心功能
-
-1. **Token管理** - 实现了服务端Token代理和客户端Token缓存
-2. **ASR语音识别** - 阿里云REST和WebSocket API集成
-3. **TTS语音合成** - Flutter TTS和阿里云TTS双引擎支持
-4. **唤醒词检测** - Porcupine框架集成（需要添加实际SDK依赖）
-5. **UI完善** - 命令历史、权限检查、确认流程
-6. **错误处理** - 重试机制、限流处理、超时控制、音频缓冲
-
-### 待完成的工作
-
-1. **测试** - 单元测试和集成测试
-2. **文档** - API文档和使用说明
-3. **Porcupine SDK** - 需要获取API Key并添加实际依赖
+### 异常处理验证
+- [ ] 语音识别异常测试：静音/噪音、发音不清、数字歧义
+- [ ] 语义理解异常测试：无关话题、模糊意图、矛盾指令
+- [ ] 操作异常测试：越权操作、数据溢出、频率异常
+- [ ] 高频重复输入测试：快速重复、大量请求、来回修改
+- [ ] 中断恢复测试：对话放弃、应用切换、意图变更

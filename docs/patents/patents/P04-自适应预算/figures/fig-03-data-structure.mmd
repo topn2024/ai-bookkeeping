@@ -1,0 +1,45 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 预算方案 {
+        +String 方案ID
+        +Integer 年月
+        +Decimal 总收入
+        +Decimal 总预算
+        +Decimal 小金库额度
+        +List~类别预算~ 分类列表
+        +生成方案()
+        +动态调整()
+    }
+
+    class 类别预算 {
+        +String 类别ID
+        +String 类别名称
+        +Integer 优先级
+        +Decimal 预算金额
+        +Decimal 已使用
+        +Decimal 剩余
+        +Float 预警阈值
+        +检查预警() Boolean
+    }
+
+    class 支出分析 {
+        +String 类别ID
+        +Decimal 历史平均
+        +Decimal 历史最大
+        +Float 波动系数
+        +Integer 必要性评分
+        +计算建议预算() Decimal
+    }
+
+    class 小金库 {
+        +Decimal 目标金额
+        +Decimal 当前余额
+        +String 用途说明
+        +List~存入记录~ 记录
+        +存入(金额)
+        +支取(金额)
+    }
+
+    预算方案 "1" *-- "n" 类别预算 : 包含
+    预算方案 "1" *-- "1" 小金库 : 关联
+    类别预算 --> 支出分析 : 参考

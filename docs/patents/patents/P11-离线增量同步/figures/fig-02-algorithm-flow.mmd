@@ -1,0 +1,41 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Offline{设备是否离线?}
+
+    Offline -->|是| LocalOp[本地操作]
+    LocalOp --> WAL[写入写前日志]
+    WAL --> OpLog[记录操作日志]
+    OpLog --> Checkpoint{达到检查点?}
+    Checkpoint -->|是| SaveCP[保存检查点]
+    Checkpoint -->|否| LocalOp
+
+    Offline -->|否| Online[在线状态]
+    SaveCP --> Online
+
+    Online --> Sync[触发同步]
+    Sync --> Push[推送本地变更]
+    Push --> Pull[拉取远程变更]
+
+    Pull --> Merge[CRDT合并]
+    Merge --> Conflict{存在冲突?}
+
+    Conflict -->|金额冲突| MVR[多值保留-用户选择]
+    Conflict -->|时间冲突| EarlyWin[保留最早时间]
+    Conflict -->|分类冲突| Primary[优先主设备]
+    Conflict -->|备注冲突| OT[操作变换合并]
+    Conflict -->|无冲突| Apply[直接应用]
+
+    MVR --> Resolve[冲突解决]
+    EarlyWin --> Resolve
+    Primary --> Resolve
+    OT --> Resolve
+    Apply --> Verify[一致性验证]
+    Resolve --> Verify
+
+    Verify --> BalanceCheck{余额一致?}
+    BalanceCheck -->|否| Repair[自动修复]
+    BalanceCheck -->|是| Complete[同步完成]
+    Repair --> Complete
+
+    Complete --> End([结束])
+

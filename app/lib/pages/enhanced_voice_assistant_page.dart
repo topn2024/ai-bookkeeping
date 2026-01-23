@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../providers/voice_coordinator_provider.dart';
 import '../providers/global_voice_assistant_provider.dart';
@@ -9,6 +8,7 @@ import '../services/voice_service_coordinator.dart';
 import '../services/global_voice_assistant_manager.dart';
 import '../widgets/multi_intent_confirm_widget.dart';
 import '../widgets/amount_supplement_widget.dart';
+import '../widgets/chat_message_list.dart';
 import '../theme/app_theme.dart';
 import '../theme/antigravity_shadows.dart';
 import '../l10n/app_localizations.dart';
@@ -37,20 +37,19 @@ class EnhancedVoiceAssistantPage extends ConsumerStatefulWidget {
 
 class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssistantPage>
     with TickerProviderStateMixin {
-  final ScrollController _scrollController = ScrollController();
   late AnimationController _pulseController;
   late AnimationController _waveController;
-  bool _hasPermission = false;
+
+  // 交互模式：true = 点击开始/停止，false = 按住说话
+  final bool _tapToToggleMode = true;
 
   // 使用 GlobalVoiceAssistantManager 进行录音和聊天记录管理
   GlobalVoiceAssistantManager get _voiceManager => ref.read(globalVoiceAssistantProvider);
-  bool get _isRecording => _voiceManager.ballState == FloatingBallState.recording;
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
-    _checkPermissions();
   }
 
   void _initializeAnimations() {
@@ -67,20 +66,6 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   /// 清除所有聊天记录
   Future<void> _clearChatHistory() async {
     _voiceManager.clearHistory();
-  }
-
-  Future<void> _checkPermissions() async {
-    final status = await Permission.microphone.status;
-    setState(() {
-      _hasPermission = status.isGranted;
-    });
-
-    if (!_hasPermission) {
-      final result = await Permission.microphone.request();
-      setState(() {
-        _hasPermission = result.isGranted;
-      });
-    }
   }
 
   @override
@@ -167,24 +152,28 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
             ),
           ),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '智能语音助手',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '智能语音助手',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Text(
-                _getStatusText(sessionState),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _getStatusColor(sessionState),
+                Text(
+                  _getStatusText(sessionState),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _getStatusColor(sessionState),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -414,19 +403,12 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   }
 
   Widget _buildMessageList(BuildContext context, List<ChatMessage> messages) {
-    // 自动滚动到底部
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients && messages.isNotEmpty) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-
-    if (messages.isEmpty) {
-      return Center(
+    // 使用共享组件，统一滚动逻辑
+    return ChatMessageListWidget(
+      messages: messages,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      messageBuilder: (context, message) => _buildMessageBubbleFromGlobal(context, message),
+      emptyBuilder: (context) => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -438,17 +420,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
             ),
           ],
         ),
-      );
-    }
-
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: messages.length,
-      itemBuilder: (context, index) {
-        final message = messages[index];
-        return _buildMessageBubbleFromGlobal(context, message);
-      },
+      ),
     );
   }
 
@@ -584,6 +556,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     bool isRecording,
     bool isProcessing,
   ) {
+    final voiceManager = ref.watch(globalVoiceAssistantProvider);
     final isListening = isRecording || sessionState == VoiceSessionState.listening;
 
     return Container(
@@ -646,37 +619,11 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
               ],
             ),
 
-            // 权限提示
-            if (!_hasPermission) ...[
-              const SizedBox(height: 16),
-              GestureDetector(
-                onTap: _requestPermission,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.mic_off, color: AppColors.warning, size: 16),
-                      const SizedBox(width: 6),
-                      Text(
-                        '点击申请麦克风权限',
-                        style: TextStyle(
-                          color: AppColors.warning,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-
-            // 快捷操作按钮（会话进行中时显示）
-            if (sessionState != VoiceSessionState.idle) ...[
+            // 快捷操作按钮（会话进行中或连续模式时显示）
+            if (sessionState != VoiceSessionState.idle ||
+                voiceManager.isContinuousMode ||
+                isRecording ||
+                isProcessing) ...[
               const SizedBox(height: 12),
               _buildQuickActionButtons(context, sessionState, coordinator),
             ],
@@ -693,12 +640,16 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   ) {
     final voiceManager = ref.watch(globalVoiceAssistantProvider);
     final isRecording = voiceManager.ballState == FloatingBallState.recording;
+    final isProcessing = voiceManager.ballState == FloatingBallState.processing;
     final isListening = isRecording || sessionState == VoiceSessionState.listening;
 
     return GestureDetector(
-      onTapDown: _hasPermission ? (_) => _startRecording() : null,
-      onTapUp: _hasPermission ? (_) => _stopRecording() : null,
-      onTapCancel: _hasPermission ? () => _stopRecording() : null,
+      // 点击切换模式：点击开始/停止录音
+      onTap: _tapToToggleMode ? () => _toggleRecording() : null,
+      // 按住说话模式：按下开始，松开停止
+      onTapDown: !_tapToToggleMode && !isProcessing ? (_) => _startRecording() : null,
+      onTapUp: !_tapToToggleMode ? (_) => _stopRecording() : null,
+      onTapCancel: !_tapToToggleMode ? () => _stopRecording() : null,
       child: AnimatedBuilder(
         animation: _pulseController,
         builder: (context, child) {
@@ -763,11 +714,9 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: _hasPermission
-                              ? (isListening
-                                  ? [AppColors.expense, AppColors.expense.withValues(alpha: 0.85)]
-                                  : [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.85)])
-                              : [Colors.grey, Colors.grey.shade400],
+                          colors: isListening
+                              ? [AppColors.expense, AppColors.expense.withValues(alpha: 0.85)]
+                              : [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.85)],
                         ),
                         shape: BoxShape.circle,
                         boxShadow: [
@@ -780,9 +729,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
                         ],
                       ),
                       child: Icon(
-                        _hasPermission
-                            ? (isListening ? Icons.mic : Icons.mic_none)
-                            : Icons.mic_off,
+                        isListening ? Icons.mic : Icons.mic_none,
                         color: Colors.white,
                         size: 40,
                       ),
@@ -867,6 +814,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     VoiceServiceCoordinator coordinator,
   ) {
     final voiceManager = ref.read(globalVoiceAssistantProvider);
+    final isContinuous = voiceManager.isContinuousMode;
 
     return Row(
       children: [
@@ -891,19 +839,49 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
           color: AppColors.expense,
           tooltip: '取消操作',
         ),
+
+        // 结束对话按钮（连续模式时显示）
+        if (isContinuous)
+          IconButton(
+            onPressed: _endConversation,
+            icon: const Icon(Icons.stop_circle_outlined),
+            iconSize: 20,
+            color: Colors.grey[600],
+            tooltip: '结束对话',
+          ),
       ],
     );
   }
 
   // 事件处理方法 - 使用 GlobalVoiceAssistantManager 进行录音
-  Future<void> _startRecording() async {
-    if (!_hasPermission) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先授予麦克风权限')),
-      );
-      return;
-    }
 
+  /// 切换录音状态（点击模式）
+  Future<void> _toggleRecording() async {
+    final voiceManager = ref.read(globalVoiceAssistantProvider);
+    final currentState = voiceManager.ballState;
+
+    if (currentState == FloatingBallState.recording) {
+      // 正在录音，停止当前录音（但保持连续模式，处理完后会自动继续）
+      await voiceManager.stopRecording();
+      debugPrint('[VoiceAssistantPage] 停止录音，等待处理后自动继续');
+    } else if (currentState == FloatingBallState.idle ||
+        currentState == FloatingBallState.success ||
+        currentState == FloatingBallState.error) {
+      // 空闲状态，开始录音（启用连续对话模式）
+      voiceManager.setContinuousMode(true);
+      await _startRecording();
+    }
+    // 如果正在处理中，不做任何操作
+  }
+
+  /// 完全结束对话（停止连续模式）
+  void _endConversation() {
+    final voiceManager = ref.read(globalVoiceAssistantProvider);
+    voiceManager.stopContinuousMode();
+    debugPrint('[VoiceAssistantPage] 对话已结束');
+  }
+
+  Future<void> _startRecording() async {
     final voiceManager = ref.read(globalVoiceAssistantProvider);
     if (voiceManager.ballState == FloatingBallState.recording) return;
 
@@ -929,6 +907,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
 
     try {
       // 使用 GlobalVoiceAssistantManager 停止录音并处理
+      // 注意：不要停止连续模式，让处理完后自动继续
       await voiceManager.stopRecording();
       debugPrint('[VoiceAssistantPage] 停止录音');
     } catch (e) {
@@ -965,23 +944,6 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => targetPage),
     );
-  }
-
-  Future<void> _requestPermission() async {
-    final result = await Permission.microphone.request();
-    setState(() {
-      _hasPermission = result.isGranted;
-    });
-
-    if (!_hasPermission) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('需要麦克风权限才能使用语音功能，请在设置中手动开启'),
-          ),
-        );
-      }
-    }
   }
 
   void _showCommandHistory() {
@@ -1228,19 +1190,28 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   }
 
   String _getActionText(VoiceSessionState sessionState) {
-    if (!_hasPermission) return '需要权限';
-    if (sessionState == VoiceSessionState.listening) return '正在聆听...';
-    if (sessionState == VoiceSessionState.processing) return '正在处理';
+    final voiceManager = ref.read(globalVoiceAssistantProvider);
+    final isRecording = voiceManager.ballState == FloatingBallState.recording;
+    final isProcessing = voiceManager.ballState == FloatingBallState.processing;
+    if (isRecording) return '正在聆听...';
+    if (isProcessing || sessionState == VoiceSessionState.processing) return '正在处理';
     if (sessionState != VoiceSessionState.idle) return '等待回应';
-    return '按住说话';
+    return _tapToToggleMode ? '点击开始' : '按住说话';
   }
 
   String _getActionHint(VoiceSessionState sessionState) {
-    if (!_hasPermission) return '点击申请麦克风权限';
-    if (sessionState == VoiceSessionState.listening) return '松开即结束';
-    if (sessionState == VoiceSessionState.processing) return '正在理解您的指令...';
+    final voiceManager = ref.read(globalVoiceAssistantProvider);
+    final isRecording = voiceManager.ballState == FloatingBallState.recording;
+    final isProcessing = voiceManager.ballState == FloatingBallState.processing;
+    final isContinuous = voiceManager.isContinuousMode;
+    if (isRecording) {
+      return _tapToToggleMode ? '再次点击结束，说完会自动继续' : '松开即结束';
+    }
+    if (isProcessing || sessionState == VoiceSessionState.processing) {
+      return isContinuous ? '处理完成后会自动开始下一轮...' : '正在理解您的指令...';
+    }
     if (sessionState != VoiceSessionState.idle) return '请说"确认"或"取消"';
-    return '按住麦克风直接说话';
+    return _tapToToggleMode ? '点击麦克风开始连续对话' : '按住麦克风直接说话';
   }
 
   String _formatTime(DateTime dateTime) {
@@ -1257,7 +1228,6 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
   void dispose() {
     _pulseController.dispose();
     _waveController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 }

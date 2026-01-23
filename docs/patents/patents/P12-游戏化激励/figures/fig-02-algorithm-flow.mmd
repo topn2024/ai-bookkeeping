@@ -1,0 +1,47 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Behavior[/用户完成记账行为/]
+    Behavior --> Analyze[八维度行为分析]
+
+    Analyze --> D1[记账频率: 每日=15分]
+    D1 --> D2[金额准确度: 精确到分=15分]
+    D2 --> D3[分类完整度: 完整=15分]
+    D3 --> D4[备注详细度: 详细=10分]
+    D4 --> D5[照片凭证: 有=10分]
+    D5 --> D6[标签使用: 有=10分]
+    D6 --> D7[预算遵守: 预算内=15分]
+    D7 --> D8[数据修正: 主动=10分]
+
+    D8 --> Quality[质量评分 = Σ维度分/100]
+    Quality --> Contribution[贡献值 = 质量 × 难度 × 时间衰减]
+
+    Contribution --> Level{用户等级判定}
+    Level -->|0-30天| Newbie[新手: 奖励×1.5]
+    Level -->|31-90天| Advanced[进阶: 奖励×1.0]
+    Level -->|>90天| Expert[专家: 奖励×0.8]
+
+    Newbie --> Streak[连续奖励加成]
+    Advanced --> Streak
+    Expert --> Streak
+
+    Streak --> StreakCalc[streak_bonus = min连续天数×0.1, 2.0]
+    StreakCalc --> Fatigue{防疲劳检查}
+
+    Fatigue -->|贡献>10000| F1[fatigue = 0.9]
+    Fatigue -->|贡献>50000| F2[fatigue = 0.8]
+    Fatigue -->|正常| F3[fatigue = 1.0]
+
+    F1 --> Final[最终奖励计算]
+    F2 --> Final
+    F3 --> Final
+
+    Final --> Achievement[成就检查与解锁]
+    Achievement --> AntiCheat[防刷检测]
+
+    AntiCheat --> Anomaly{异常评分≥60?}
+    Anomaly -->|是| Punish[扣除50%积分, 暂停7天]
+    Anomaly -->|否| Grant[发放奖励]
+
+    Punish --> End([结束])
+    Grant --> End
+

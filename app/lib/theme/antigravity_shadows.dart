@@ -13,6 +13,23 @@ class AntigravityShadows {
   /// L0 - 无阴影（平铺内容）
   static const List<BoxShadow> l0 = [];
 
+  /// L2的零影版本（用于动画过渡，避免负blur radius问题）
+  /// 与L2结构相同但完全透明，用于AnimatedContainer动画
+  static List<BoxShadow> get l2Zero => [
+    const BoxShadow(
+      color: Colors.transparent,
+      blurRadius: 0,
+      spreadRadius: 0,
+      offset: Offset.zero,
+    ),
+    const BoxShadow(
+      color: Colors.transparent,
+      blurRadius: 0,
+      spreadRadius: 0,
+      offset: Offset.zero,
+    ),
+  ];
+
   /// L1 - 轻微阴影（分割线卡片）
   /// elevation: 1-2dp, blur: 3
   static List<BoxShadow> get l1 => [

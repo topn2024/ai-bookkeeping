@@ -1,0 +1,32 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant UI as 用户界面
+    participant RM as 资源管理器
+    participant Pool as 资源池
+    participant DB as 数据库
+
+    Note over U,DB: 收入入池流程
+    U->>UI: 记录收入(金额, 来源)
+    UI->>RM: 创建入池请求
+    RM->>Pool: 创建资源单元
+    Pool->>DB: 持久化资源
+    DB-->>Pool: 确认保存
+    Pool-->>RM: 返回资源ID
+    RM-->>UI: 入池成功
+    UI-->>U: 显示确认
+
+    Note over U,DB: 支出消费流程
+    U->>UI: 记录支出(金额)
+    UI->>RM: 创建消费请求
+    RM->>Pool: FIFO消费(金额)
+    loop 直到金额消费完毕
+        Pool->>Pool: 获取最早资源
+        Pool->>Pool: 扣除金额
+        Pool->>Pool: 计算钱龄
+    end
+    Pool->>DB: 更新资源状态
+    DB-->>Pool: 确认更新
+    Pool-->>RM: 返回消费报告
+    RM-->>UI: 消费成功
+    UI-->>U: 显示钱龄报告

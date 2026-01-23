@@ -1,0 +1,28 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 用户接口层
+        UI[用户界面]
+    end
+
+    subgraph 业务逻辑层
+        RI[资源入池模块]
+        RM[资源管理模块]
+        RC[资源消费模块]
+        AC[钱龄计算模块]
+    end
+
+    subgraph 数据持久层
+        DB[(资源池数据库)]
+        LOG[(交易日志)]
+    end
+
+    UI -->|收入事件| RI
+    UI -->|支出事件| RC
+    UI -->|查询请求| AC
+
+    RI -->|创建资源单元| RM
+    RC -->|FIFO消费| RM
+    AC -->|统计计算| RM
+
+    RM -->|持久化| DB
+    RM -->|记录| LOG

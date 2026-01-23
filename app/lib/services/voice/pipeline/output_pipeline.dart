@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../streaming_tts_service.dart';
+import '../audio_processor_service.dart';
 import '../config/pipeline_config.dart';
 import '../detection/barge_in_detector_v2.dart';
-import '../detection/echo_filter.dart';
 import '../tracking/response_tracker.dart';
 import 'sentence_buffer.dart';
 import 'tts_queue_worker.dart';
@@ -25,7 +25,9 @@ enum OutputPipelineState {
 /// - 接收LLM流式输出
 /// - 通过SentenceBuffer分割句子
 /// - 通过TTSQueueWorker合成和播放
-/// - 与EchoFilter和BargeInDetector协作
+/// - 与BargeInDetector协作进行打断检测
+///
+/// 注意：回声消除由硬件级 AEC 在音频层处理，不再在此处做文本层过滤
 class OutputPipeline {
   final StreamingTTSService _ttsService;
   final ResponseTracker _responseTracker;
@@ -34,7 +36,6 @@ class OutputPipeline {
 
   late final SentenceBuffer _sentenceBuffer;
   late final TTSQueueWorker _ttsQueueWorker;
-  late final EchoFilter _echoFilter;
 
   OutputPipelineState _state = OutputPipelineState.idle;
   int _currentResponseId = 0;
@@ -66,7 +67,6 @@ class OutputPipeline {
         _bargeInDetector = bargeInDetector,
         _config = config ?? PipelineConfig.defaultConfig {
     _sentenceBuffer = SentenceBuffer(config: _config);
-    _echoFilter = EchoFilter(config: _config);
     _ttsQueueWorker = TTSQueueWorker(
       ttsService: _ttsService,
       responseTracker: _responseTracker,
@@ -78,6 +78,28 @@ class OutputPipeline {
     _ttsQueueWorker.onCompleted = _onTTSCompleted;
     _ttsQueueWorker.onSentenceStarted = _onSentenceStarted;
     _ttsQueueWorker.onSentenceCompleted = _onSentenceCompleted;
+
+    // 设置AEC参考信号回调
+    _setupAECCallback();
+  }
+
+  /// 设置AEC参考信号回调
+  ///
+  /// 当TTS播放PCM音频时，将数据传递给AudioProcessorService用于回声消除
+  void _setupAECCallback() {
+    _ttsService.onAudioPlayed = (pcmData) {
+      try {
+        final audioProcessor = AudioProcessorService.instance;
+        if (audioProcessor.isInitialized) {
+          audioProcessor.feedTTSAudio(pcmData);
+          debugPrint('[OutputPipeline] AEC参考信号: ${pcmData.length}字节');
+        }
+      } catch (e) {
+        // AEC 失败不应中断播放流程，仅记录日志
+        debugPrint('[OutputPipeline] AEC参考信号处理失败: $e');
+      }
+    };
+    debugPrint('[OutputPipeline] AEC回调已设置');
   }
 
   /// 当前状态
@@ -108,7 +130,6 @@ class OutputPipeline {
 
     _sentenceBuffer.clear();
     _ttsQueueWorker.reset();
-    _echoFilter.reset();
 
     _totalChunks = 0;
     _totalSentences = 0;
@@ -184,8 +205,14 @@ class OutputPipeline {
     _state = OutputPipelineState.stopped;
     _stateController.add(_state);
 
+    // 标记响应被打断（参考chat-companion-app的playback confirmation机制）
+    _responseTracker.markInterrupted(_currentResponseId);
+
     await _ttsQueueWorker.stop();
     _sentenceBuffer.clear();
+
+    // 通知AEC停止播放TTS
+    AudioProcessorService.instance.setTTSPlaying(false);
 
     // 更新打断检测器
     _bargeInDetector.updateTTSState(isPlaying: false, currentText: '');
@@ -199,11 +226,18 @@ class OutputPipeline {
     _state = OutputPipelineState.fading;
     _stateController.add(_state);
 
+    // 标记响应被打断（参考chat-companion-app的playback confirmation机制）
+    // 这样后续的playback_complete事件会被忽略
+    _responseTracker.markInterrupted(_currentResponseId);
+
     await _ttsQueueWorker.fadeOutAndStop();
     _sentenceBuffer.clear();
 
     _state = OutputPipelineState.stopped;
     _stateController.add(_state);
+
+    // 通知AEC停止播放TTS
+    AudioProcessorService.instance.setTTSPlaying(false);
 
     // 更新打断检测器
     _bargeInDetector.updateTTSState(isPlaying: false, currentText: '');
@@ -223,6 +257,12 @@ class OutputPipeline {
     _state = OutputPipelineState.speaking;
     _stateController.add(_state);
 
+    // 标记开始播放（参考chat-companion-app的playback confirmation机制）
+    _responseTracker.markPlaybackStarted(_currentResponseId);
+
+    // 通知AEC开始播放TTS
+    AudioProcessorService.instance.setTTSPlaying(true);
+
     // 更新打断检测器
     _bargeInDetector.updateTTSState(
       isPlaying: true,
@@ -232,8 +272,19 @@ class OutputPipeline {
 
   /// TTS播放完成回调
   void _onTTSCompleted() {
+    // 确认播放完成（参考chat-companion-app的playback confirmation机制）
+    // 只有当响应ID匹配且未被打断时才接受完成事件
+    final accepted = _responseTracker.confirmPlaybackComplete(_currentResponseId);
+    if (!accepted) {
+      debugPrint('[OutputPipeline] 播放完成事件被拒绝（响应已过期或已被打断）');
+      return;
+    }
+
     _state = OutputPipelineState.idle;
     _stateController.add(_state);
+
+    // 通知AEC停止播放TTS
+    AudioProcessorService.instance.setTTSPlaying(false);
 
     // 更新打断检测器
     _bargeInDetector.updateTTSState(isPlaying: false, currentText: '');
@@ -244,9 +295,6 @@ class OutputPipeline {
 
   /// 句子开始播放回调
   void _onSentenceStarted(String sentence) {
-    // 更新回声过滤器
-    _echoFilter.onTTSStarted(sentence);
-
     // 更新打断检测器的TTS文本
     _bargeInDetector.appendTTSText(sentence);
 
@@ -262,7 +310,6 @@ class OutputPipeline {
   void reset() {
     _sentenceBuffer.clear();
     _ttsQueueWorker.reset();
-    _echoFilter.reset();
     _currentResponseId = 0;
 
     if (_state != OutputPipelineState.idle) {
@@ -272,9 +319,11 @@ class OutputPipeline {
   }
 
   /// 释放资源
-  void dispose() {
-    stop();
+  ///
+  /// 注意：异步方法，确保 stop() 完成后再释放其他资源
+  Future<void> dispose() async {
+    await stop();
     _ttsQueueWorker.dispose();
-    _stateController.close();
+    await _stateController.close();
   }
 }

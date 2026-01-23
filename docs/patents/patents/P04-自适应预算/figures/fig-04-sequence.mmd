@@ -1,0 +1,42 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant UI as 界面
+    participant ZBA as 零基预算引擎
+    participant ADA as 自适应调整器
+    participant DB as 数据库
+
+    U->>UI: 请求生成预算
+    UI->>DB: 查询本月收入
+    DB-->>UI: 返回收入数据
+
+    UI->>ZBA: 启动零基预算
+    ZBA->>DB: 查询历史支出
+    DB-->>ZBA: 返回历史数据
+
+    ZBA->>ZBA: 分析支出模式
+    ZBA->>ZBA: 计算类别优先级
+    ZBA->>ZBA: 从零分配预算
+
+    ZBA->>ADA: 提交初始方案
+    ADA->>ADA: 检查合理性
+    ADA->>ADA: 自适应调整
+
+    alt 需要调整
+        ADA-->>ZBA: 返回调整建议
+        ZBA->>ZBA: 重新分配
+    end
+
+    ADA->>DB: 保存预算方案
+    DB-->>ADA: 确认保存
+
+    ADA-->>UI: 返回预算方案
+    UI-->>U: 展示预算详情
+
+    Note over U,DB: 执行期间监控
+    loop 每日检查
+        UI->>DB: 查询执行情况
+        DB-->>UI: 返回实际支出
+        UI->>ADA: 检查是否需要调整
+        ADA-->>UI: 返回调整建议
+    end

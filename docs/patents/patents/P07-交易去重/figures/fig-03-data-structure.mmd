@@ -1,0 +1,52 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 交易特征向量 {
+        +Decimal 金额
+        +DateTime 时间
+        +String 商户名
+        +String 类别
+        +String 描述
+        +String 来源渠道
+        +计算相似度(另一向量) Float
+    }
+
+    class 六因子评分模型 {
+        +Float 金额权重
+        +Float 时间权重
+        +Float 商户权重
+        +Float 类别权重
+        +Float 描述权重
+        +Float 来源权重
+        +Float 阈值
+        +评分(向量A, 向量B) Float
+        +调整权重(反馈)
+    }
+
+    class 候选索引 {
+        +Dict 时间索引
+        +Dict 金额索引
+        +Integer 窗口大小
+        +添加交易(交易)
+        +查询候选(交易) List
+        +清理过期()
+    }
+
+    class 去重结果 {
+        +String 结果ID
+        +String 状态
+        +交易特征向量 原交易
+        +交易特征向量 匹配交易
+        +Float 相似度得分
+        +String 处理方式
+    }
+
+    class 合并策略 {
+        +String 策略名
+        +合并(交易A, 交易B) 交易
+        +选择金额() Decimal
+        +合并备注() String
+    }
+
+    六因子评分模型 --> 交易特征向量 : 评估
+    候选索引 --> 交易特征向量 : 索引
+    去重结果 --> 合并策略 : 使用

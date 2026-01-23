@@ -390,7 +390,7 @@ class _MultimodalInputPageState extends ConsumerState<MultimodalInputPage> {
                         ? theme.colorScheme.primary
                         : theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: isSelected ? AntigravityShadows.l2 : null,
+                    boxShadow: isSelected ? AntigravityShadows.l2 : AntigravityShadows.l2Zero,
                   ),
                   child: Icon(
                     _getModeIcon(mode),

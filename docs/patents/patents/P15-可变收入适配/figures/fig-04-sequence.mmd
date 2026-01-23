@@ -1,0 +1,45 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 自由职业者
+    participant APP as 应用
+    participant EVAL as 稳定性评估
+    participant BUDGET as 预算引擎
+    participant BUFFER as 缓冲账户
+
+    U->>APP: 记录6个月收入数据
+    Note right of U: 8000, 12000, 6000,<br/>15000, 9000, 11000
+
+    APP->>EVAL: 评估收入稳定性
+
+    EVAL->>EVAL: 计算平均值: 10,167元
+    EVAL->>EVAL: 计算标准差: 3,189元
+    EVAL->>EVAL: 计算CV: 0.314
+    EVAL->>EVAL: 稳定性等级: 不稳定(35分)
+
+    EVAL-->>BUDGET: 稳定性评分: 35分
+
+    BUDGET->>BUDGET: 可用比例: 60%(不稳定)
+    BUDGET->>BUDGET: 基准策略: 稳健(25%分位)
+    BUDGET->>BUDGET: 基准收入: 7,500元
+    BUDGET->>BUDGET: 月度预算: 7500×0.6=4,500元
+    BUDGET->>BUDGET: 储蓄目标: 7500×0.4=3,000元
+
+    BUDGET-->>APP: 预算建议
+
+    APP->>APP: 应急资金计算
+    APP->>APP: 月数: 3+(100-35)/10=9.5≈10个月
+    APP->>APP: 目标: 4500×10=45,000元
+
+    APP-->>U: 建议: 预算4500元/月, 储蓄3000元/月
+
+    Note over U,BUFFER: 7月实际收入15,000元
+
+    U->>APP: 记录收入: 15,000元
+    APP->>BUFFER: 收入平滑处理
+
+    BUFFER->>BUFFER: 目标固定收入: 8,000元
+    BUFFER->>BUFFER: 超额: 15000-8000=7,000元
+    BUFFER->>BUFFER: 存入缓冲账户: +7,000元
+
+    BUFFER-->>U: 本月可用: 8,000元, 缓冲余额: 7,000元
+

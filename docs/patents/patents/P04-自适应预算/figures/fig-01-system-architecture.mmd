@@ -1,0 +1,38 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 数据采集层
+        INC[收入数据]
+        EXP[支出数据]
+        HIS[历史数据]
+    end
+
+    subgraph 分析引擎
+        ZBA[零基预算分析器]
+        ADA[自适应调整器]
+        OPT[优化器]
+    end
+
+    subgraph 预算管理
+        CAT[分类预算]
+        RES[小金库]
+        ALT[预警系统]
+    end
+
+    subgraph 输出层
+        REP[预算报告]
+        REC[建议推荐]
+    end
+
+    INC --> ZBA
+    EXP --> ZBA
+    HIS --> ADA
+
+    ZBA --> CAT
+    ADA --> OPT
+    OPT --> CAT
+    OPT --> RES
+
+    CAT --> ALT
+    RES --> ALT
+    ALT --> REP
+    ALT --> REC

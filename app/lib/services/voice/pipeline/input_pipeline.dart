@@ -175,9 +175,20 @@ class InputPipeline {
     _vadService?.processAudioFrame(audioData);
   }
 
+  /// 仅发送音频数据到VAD（不发送给ASR）
+  ///
+  /// 用于speaking状态下的打断检测：
+  /// - TTS播放时不需要ASR识别（避免回声被识别）
+  /// - 但仍需要VAD检测用户是否在说话（打断检测）
+  void feedAudioToVADOnly(Uint8List audioData) {
+    // 只发送给VAD处理，不发送给ASR
+    _vadService?.processAudioFrame(audioData);
+  }
+
   /// 处理ASR结果
   void _handleASRResult(ASRPartialResult result) {
-    debugPrint('[InputPipeline] 收到ASR结果: "${result.text}" (isFinal=${result.isFinal})');
+    // 注意：不在日志中打印完整识别结果，避免泄露用户隐私
+    debugPrint('[InputPipeline] 收到ASR结果，长度: ${result.text.length} (isFinal=${result.isFinal})');
 
     if (result.isFinal) {
       // 最终结果
@@ -189,18 +200,19 @@ class InputPipeline {
   }
 
   /// 处理ASR中间结果
+  ///
+  /// 注意：回声消除由硬件级 AEC 在音频层处理，不再在文本层做回声过滤
   void _handlePartialResult(String text) {
+    // 传递给打断检测器（打断检测器基于 VAD 判断是否打断）
+    _bargeInDetector.handlePartialResult(text);
+
     _currentPartialText = text;
     onPartialResult?.call(text);
-
-    // 更新打断检测器
-    final bargeInResult = _bargeInDetector.handlePartialResult(text);
-    if (bargeInResult.triggered) {
-      onBargeIn?.call(bargeInResult);
-    }
   }
 
   /// 处理ASR最终结果
+  ///
+  /// 注意：回声消除由硬件级 AEC 在音频层处理，不再在文本层做回声过滤
   void _handleFinalResult(String text) {
     _currentPartialText = '';
 
@@ -210,12 +222,13 @@ class InputPipeline {
       return;
     }
 
-    // 先检查打断
+    // 如果 TTS 正在播放，检查打断（用于触发打断回调）
     if (_bargeInDetector.isEnabled) {
       final bargeInResult = _bargeInDetector.handleFinalResult(text);
       if (bargeInResult.triggered) {
-        onBargeIn?.call(bargeInResult);
-        return;
+        debugPrint('[InputPipeline] 检测到打断，传递用户输入: "$text"');
+        // 打断已经通过检测器内部的 _triggerBargeIn 触发
+        // 继续处理用户输入
       }
     }
 
@@ -264,22 +277,25 @@ class InputPipeline {
     // 标记正在主动停止（防止onDone触发错误回调）
     _isStopping = true;
 
-    // 关闭音频流
-    debugPrint('[InputPipeline] 关闭音频流控制器...');
-    await _audioStreamController?.close();
-    _audioStreamController = null;
+    // 先取消ASR识别（停止等待数据）
+    debugPrint('[InputPipeline] 取消ASR识别...');
+    await _asrEngine.cancelTranscription();
 
-    // 取消订阅
-    debugPrint('[InputPipeline] 取消ASR订阅...');
+    // 取消订阅（必须在关闭流之前，否则close()会等待onDone完成导致死锁）
+    debugPrint('[InputPipeline] 取消订阅...');
     await _asrSubscription?.cancel();
     await _vadSubscription?.cancel();
-
     _asrSubscription = null;
     _vadSubscription = null;
 
-    // 取消ASR识别
-    debugPrint('[InputPipeline] 取消ASR识别...');
-    await _asrEngine.cancelTranscription();
+    // 最后关闭音频流控制器（不等待，避免死锁）
+    debugPrint('[InputPipeline] 关闭音频流控制器...');
+    final controller = _audioStreamController;
+    _audioStreamController = null;
+    if (controller != null && !controller.isClosed) {
+      controller.close(); // 不await，避免死锁
+    }
+    debugPrint('[InputPipeline] 音频流控制器已关闭');
 
     _state = InputPipelineState.stopped;
     _stateController.add(_state);
@@ -313,8 +329,10 @@ class InputPipeline {
   }
 
   /// 释放资源
-  void dispose() {
-    stop();
-    _stateController.close();
+  ///
+  /// 注意：异步方法，确保 stop() 完成后再关闭 StreamController
+  Future<void> dispose() async {
+    await stop();
+    await _stateController.close();
   }
 }

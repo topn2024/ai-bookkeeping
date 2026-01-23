@@ -1,0 +1,39 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant UI as 界面
+    participant SCORE as 评分引擎
+    participant ALERT as 预警系统
+    participant ADVICE as 建议引擎
+    participant GOAL as 目标追踪
+
+    U->>UI: 打开财务健康页面
+    UI->>SCORE: 请求健康评分
+
+    SCORE->>SCORE: 计算收支平衡: 25%结余 → 20分
+    SCORE->>SCORE: 计算预算执行: 93.75% → 20分
+    SCORE->>SCORE: 计算储蓄能力: 15% → 8分
+    SCORE->>SCORE: 计算债务健康: 无债务 → 15分
+    SCORE->>SCORE: 计算消费结构: 55%必需 → 15分
+    SCORE->>SCORE: 计算目标达成: 70% → 12分
+
+    SCORE->>SCORE: 综合评分: 90分
+    SCORE-->>UI: 返回评分: 90分, 等级: 优秀
+
+    UI->>ALERT: 检查预警状态
+    ALERT->>ALERT: 餐饮预算消费进度: 80%
+    ALERT->>ALERT: 时间进度: 50%
+    ALERT->>ALERT: 判定: 警告级别(橙色)
+    ALERT-->>UI: 预警: 餐饮预算4天后耗尽
+
+    UI->>ADVICE: 请求改善建议
+    ADVICE->>ADVICE: 诊断: 储蓄率偏低(15%)
+    ADVICE-->>UI: 建议: 设置自动储蓄计划
+
+    UI->>GOAL: 查询目标进度
+    GOAL->>GOAL: 3个月储蓄6000元
+    GOAL->>GOAL: 当前进度: 4200元(70%)
+    GOAL-->>UI: 激励: 胜利在望!
+
+    UI-->>U: 展示健康报告
+

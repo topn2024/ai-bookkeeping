@@ -5,6 +5,9 @@ import '../qwen_service.dart';
 import '../voice_service_coordinator.dart' show VoiceIntentType;
 import '../voice_navigation_service.dart';
 import 'voice_intent_router.dart';
+import 'agent/hybrid_intent_router.dart' show NetworkStatus, RoutingMode;
+import 'unified_intent_type.dart' as unified;
+import 'intelligence_engine/models.dart' show RecognitionResultType;
 
 /// 智能意图识别器
 ///
@@ -33,16 +36,25 @@ class SmartIntentRecognizer {
   /// 是否已加载缓存
   bool _cacheLoaded = false;
 
+  /// 网络状态提供者（可选）
+  /// 返回null时表示网络状态未知，将允许LLM调用
+  NetworkStatus? Function()? networkStatusProvider;
+
+  /// 渐进式反馈回调（可选）
+  void Function(String message)? onProgressiveFeedback;
+
   SmartIntentRecognizer({
     VoiceIntentRouter? ruleRouter,
     QwenService? qwenService,
     VoiceNavigationService? navigationService,
+    this.networkStatusProvider,
+    this.onProgressiveFeedback,
   })  : _ruleRouter = ruleRouter ?? VoiceIntentRouter(),
         _qwenService = qwenService ?? QwenService(),
         _navigationService = navigationService ?? VoiceNavigationService();
 
   /// LLM调用超时时间（毫秒）
-  static const int _llmTimeoutMs = 5000;
+  static const int _llmTimeoutMs = 5000; // 5秒超时，平衡响应速度和成功率
 
   /// 识别意图（LLM优先，规则兜底）
   Future<SmartIntentResult> recognize(
@@ -57,10 +69,28 @@ class SmartIntentRecognizer {
     debugPrint('[SmartIntent] 开始识别: $input');
 
     // ═══════════════════════════════════════════════════════════════
+    // 检查网络状态，决定是否使用LLM
+    // ═══════════════════════════════════════════════════════════════
+    final networkStatus = networkStatusProvider?.call();
+    final shouldUseLLM = networkStatus == null ||
+                         networkStatus.recommendedMode != RoutingMode.ruleOnly;
+
+    if (!shouldUseLLM) {
+      debugPrint('[SmartIntent] 网络状态: 离线模式，跳过LLM直接使用规则');
+      return _fallbackToRules(normalizedInput, input, pageContext);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // 主路径: LLM识别（优先）
     // ═══════════════════════════════════════════════════════════════
     if (_qwenService.isAvailable) {
       debugPrint('[SmartIntent] 尝试LLM识别...');
+
+      // 2秒后显示渐进式反馈
+      Future.delayed(const Duration(milliseconds: 2000), () {
+        onProgressiveFeedback?.call('正在思考...');
+      });
+
       final llmResult = await _tryLLMWithTimeout(input, pageContext);
       if (llmResult != null && llmResult.isSuccess && llmResult.confidence >= 0.7) {
         debugPrint('[SmartIntent] LLM识别成功: ${llmResult.intentType}, 置信度: ${llmResult.confidence}');
@@ -71,6 +101,7 @@ class SmartIntentRecognizer {
         return llmResult;
       }
       debugPrint('[SmartIntent] LLM识别失败或置信度不足，使用规则兜底');
+      onProgressiveFeedback?.call('切换到快速模式');
     } else {
       debugPrint('[SmartIntent] LLM不可用（未配置API Key），使用规则兜底');
     }
@@ -92,6 +123,392 @@ class SmartIntentRecognizer {
     } catch (e) {
       debugPrint('[SmartIntent] LLM调用超时或失败: $e');
       return null;
+    }
+  }
+
+  /// 识别多操作意图（支持一次输入包含多个操作）
+  Future<MultiOperationResult> recognizeMultiOperation(
+    String input, {
+    String? pageContext,
+  }) async {
+    if (input.trim().isEmpty) {
+      return MultiOperationResult.error('输入为空');
+    }
+
+    final normalizedInput = _normalize(input);
+    debugPrint('[SmartIntent] 开始多操作识别: $input');
+
+    // ═══════════════════════════════════════════════════════════════
+    // 检查网络状态，决定是否使用LLM
+    // ═══════════════════════════════════════════════════════════════
+    final networkStatus = networkStatusProvider?.call();
+    debugPrint('[SmartIntent] 网络状态检查: provider=${networkStatusProvider != null}, '
+        'status=${networkStatus != null ? "有" : "null"}, '
+        'mode=${networkStatus?.recommendedMode}, '
+        'qwenAvailable=${_qwenService.isAvailable}');
+
+    final shouldUseLLM = _qwenService.isAvailable &&
+        (networkStatus == null || networkStatus.recommendedMode != RoutingMode.ruleOnly);
+
+    if (!shouldUseLLM) {
+      final reason = !_qwenService.isAvailable
+          ? '未配置API Key'
+          : '网络状态: ${networkStatus?.recommendedMode}';
+      debugPrint('[SmartIntent] 跳过LLM，直接使用规则兜底 ($reason)');
+      return _multiOperationFallbackToRules(normalizedInput, input, pageContext);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 主路径: LLM识别（优先）
+    // ═══════════════════════════════════════════════════════════════
+    debugPrint('[SmartIntent] 尝试LLM多操作识别...');
+    final llmResult = await _tryMultiOperationLLMWithTimeout(input, pageContext);
+    if (llmResult != null && llmResult.isSuccess) {
+      // LLM成功识别（包括 operation、chat、clarify 三种情况）
+      debugPrint('[SmartIntent] LLM识别成功: resultType=${llmResult.resultType}, '
+          'operations=${llmResult.operations.length}, '
+          'isChat=${llmResult.isChat}, '
+          'needsClarify=${llmResult.needsClarify}');
+      return llmResult;
+    }
+    debugPrint('[SmartIntent] LLM识别失败或超时，使用规则兜底');
+
+    // ═══════════════════════════════════════════════════════════════
+    // 兜底路径: 使用现有单操作识别
+    // ═══════════════════════════════════════════════════════════════
+    return _multiOperationFallbackToRules(normalizedInput, input, pageContext);
+  }
+
+  /// 多操作规则兜底识别
+  ///
+  /// 仅在离线模式下使用，当 LLM 不可用时作为兜底
+  Future<MultiOperationResult> _multiOperationFallbackToRules(
+    String normalizedInput,
+    String originalInput,
+    String? pageContext,
+  ) async {
+    debugPrint('[SmartIntent] 使用规则兜底识别（离线模式）...');
+    final singleResult = await _fallbackToRules(normalizedInput, originalInput, pageContext);
+
+    if (singleResult.isSuccess) {
+      debugPrint('[SmartIntent] 规则识别成功: ${singleResult.intentType}');
+      return MultiOperationResult(
+        resultType: RecognitionResultType.operation,
+        operations: [_convertToOperation(singleResult)],
+        chatContent: null,
+        confidence: singleResult.confidence,
+        source: singleResult.source,
+        originalInput: originalInput,
+        isOfflineMode: true,  // 标识为离线模式
+      );
+    }
+
+    // 规则也无法识别，返回 chat 类型并提示离线模式
+    // 避免返回 failed 导致用户看到错误信息
+    debugPrint('[SmartIntent] 规则无法识别，返回 chat 类型（离线模式）');
+    return MultiOperationResult(
+      resultType: RecognitionResultType.chat,
+      operations: [],
+      chatContent: originalInput,
+      confidence: 0.5,
+      source: RecognitionSource.error,
+      originalInput: originalInput,
+      isOfflineMode: true,  // 标识为离线模式
+    );
+  }
+
+  /// 带超时的多操作LLM调用
+  Future<MultiOperationResult?> _tryMultiOperationLLMWithTimeout(
+    String input,
+    String? pageContext,
+  ) async {
+    try {
+      return await _multiOperationLLMRecognition(input, pageContext)
+          .timeout(Duration(milliseconds: _llmTimeoutMs));
+    } catch (e) {
+      debugPrint('[SmartIntent] 多操作LLM调用超时或失败: $e');
+      return null;
+    }
+  }
+
+  /// 多操作LLM识别
+  Future<MultiOperationResult?> _multiOperationLLMRecognition(
+    String input,
+    String? pageContext,
+  ) async {
+    try {
+      final prompt = _buildMultiOperationLLMPrompt(input, pageContext);
+      final response = await _qwenService.chat(prompt);
+
+      if (response == null || response.isEmpty) {
+        return null;
+      }
+
+      return _parseMultiOperationLLMResponse(response, input);
+    } catch (e) {
+      debugPrint('[SmartIntent] 多操作LLM调用失败: $e');
+      return null;
+    }
+  }
+
+  /// 构建多操作LLM Prompt
+  String _buildMultiOperationLLMPrompt(String input, String? pageContext) {
+    final highAdaptPages = _navigationService.highAdaptationPages;
+    final pageList = highAdaptPages
+        .take(30)
+        .map((p) => '${p.name}(${p.route})')
+        .join('、');
+
+    return '''
+你是一个记账助手，请理解用户输入并返回JSON。
+
+【核心规则 - 必须严格遵守】
+1. 记账(add_transaction)必须有明确的数字金额（如"35"、"五十"），没有金额绝对不要生成add_transaction
+2. 闲聊、提问、询问功能等不包含操作意图的内容，result_type为"chat"
+3. 包含"记账"二字但没有金额的，如果用户意图是想记账但信息不完整，result_type为"clarify"并生成澄清问题
+4. 用户表达模糊、信息不足时，主动反问澄清而不是猜测
+5. 【重要】疑问句优先判断为查询：
+   - "花了多少钱"、"多少钱"、"花了多少"等疑问句 → query（查询统计）
+   - "花了35块"等陈述句+金额 → add_transaction（记账）
+   - 区分方法：有"？"或"多少"且无具体金额 = 查询；有具体金额 = 记账
+
+【用户输入】$input
+【页面上下文】${pageContext ?? '首页'}
+
+【结果类型 result_type】
+- operation: 有明确操作意图，可以执行
+- chat: 闲聊/提问/无需操作
+- clarify: 意图模糊，需要反问用户获取更多信息
+
+【操作类型】
+- add_transaction: 记账（必须有明确数字金额）
+- navigate: 导航（打开某页面）
+- query: 查询统计（用户明确要查数据）
+- modify: 修改记录
+- delete: 删除记录
+
+【优先级】
+- immediate: 导航
+- normal: 查询
+- deferred: 记账
+
+【返回格式】
+{"result_type":"operation|chat|clarify","operations":[],"chat_content":"对话内容或null","clarify_question":"澄清问题或null"}
+
+【记账参数说明】
+- amount: 金额（必填）
+- category: 分类（必填）
+- note: 物品/用途说明（可选，用户说了具体物品时必须提取）
+
+【分类】餐饮、交通、购物、娱乐、居住、医疗、其他
+【常用页面】$pageList
+
+【示例】
+输入："打车35，吃饭50"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":35,"category":"交通","note":"打车"}},{"type":"add_transaction","priority":"deferred","params":{"amount":50,"category":"餐饮","note":"吃饭"}}],"chat_content":null,"clarify_question":null}
+
+输入："早餐七块"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":7,"category":"餐饮","note":"早餐"}}],"chat_content":null,"clarify_question":null}
+
+输入："午餐十五，晚餐二十"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":15,"category":"餐饮","note":"午餐"}},{"type":"add_transaction","priority":"deferred","params":{"amount":20,"category":"餐饮","note":"晚餐"}}],"chat_content":null,"clarify_question":null}
+
+输入："买了个闹钟11块，柜子200，桌子300"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":11,"category":"购物","note":"闹钟"}},{"type":"add_transaction","priority":"deferred","params":{"amount":200,"category":"购物","note":"柜子"}},{"type":"add_transaction","priority":"deferred","params":{"amount":300,"category":"购物","note":"桌子"}}],"chat_content":null,"clarify_question":null}
+
+输入："淘宝买了件衣服199"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":199,"category":"购物","note":"淘宝买衣服"}}],"chat_content":null,"clarify_question":null}
+
+输入："为什么要记账"
+输出：{"result_type":"chat","operations":[],"chat_content":"为什么要记账","clarify_question":null}
+
+输入："你会记账吗"
+输出：{"result_type":"chat","operations":[],"chat_content":"你会记账吗","clarify_question":null}
+
+输入："帮我记笔账"
+输出：{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"好的，请告诉我金额和用途，比如：午餐花了35块"}
+
+输入："记一下"
+输出：{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"请问要记录什么呢？可以说具体金额和用途"}
+
+输入："买了个东西"
+输出：{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"请问花了多少钱呢？"}
+
+输入："查一下昨天花了多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"statistics","time":"昨天"}}],"chat_content":null,"clarify_question":null}
+
+输入："今天花了多少钱"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"statistics","time":"今天"}}],"chat_content":null,"clarify_question":null}
+
+输入："我这个月花了多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"statistics","time":"本月"}}],"chat_content":null,"clarify_question":null}
+
+输入："最近一周花了多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"statistics","time":"本周"}}],"chat_content":null,"clarify_question":null}
+
+输入："你好"
+输出：{"result_type":"chat","operations":[],"chat_content":"你好","clarify_question":null}
+
+只返回JSON：''';
+  }
+
+  /// 解析多操作LLM响应
+  ///
+  /// 根据 result_type 返回不同类型的 MultiOperationResult：
+  /// - operation: 有操作意图，使用 withOperations
+  /// - chat: 闲聊/提问，使用 chat
+  /// - clarify: 需要澄清，使用 clarify
+  MultiOperationResult? _parseMultiOperationLLMResponse(String response, String originalInput) {
+    try {
+      final jsonStr = _extractJson(response);
+      if (jsonStr == null) return null;
+
+      final json = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final resultType = json['result_type'] as String? ?? 'operation';
+      final operationsJson = json['operations'] as List<dynamic>? ?? [];
+      final chatContent = json['chat_content'] as String?;
+      final clarifyQuestion = json['clarify_question'] as String?;
+
+      debugPrint('[SmartIntent] LLM返回: result_type=$resultType, '
+          'operations=${operationsJson.length}, '
+          'chatContent=${chatContent != null ? "有" : "无"}, '
+          'clarifyQuestion=${clarifyQuestion != null ? "有" : "无"}');
+
+      // 根据 result_type 返回不同类型的结果
+      switch (resultType) {
+        case 'chat':
+          // 闲聊模式：无需操作，返回 chat 类型结果
+          return MultiOperationResult.chat(
+            chatContent: chatContent ?? originalInput,
+            source: RecognitionSource.llmFallback,
+            originalInput: originalInput,
+          );
+
+        case 'clarify':
+          // 澄清模式：需要反问用户
+          return MultiOperationResult.clarify(
+            clarifyQuestion: clarifyQuestion ?? '请问您具体想要做什么呢？',
+            source: RecognitionSource.llmFallback,
+            originalInput: originalInput,
+          );
+
+        case 'operation':
+        default:
+          // 操作模式：解析操作列表
+          final operations = <Operation>[];
+          for (final opJson in operationsJson) {
+            final opMap = opJson as Map<String, dynamic>;
+            final type = opMap['type'] as String? ?? 'unknown';
+            final priority = opMap['priority'] as String? ?? 'normal';
+            final params = opMap['params'] as Map<String, dynamic>? ?? {};
+
+            operations.add(Operation(
+              type: _parseOperationType(type),
+              priority: _parseOperationPriority(priority),
+              params: params,
+              originalText: originalInput,
+            ));
+          }
+
+          // 如果 result_type 是 operation 但没有操作，降级为 chat
+          if (operations.isEmpty) {
+            debugPrint('[SmartIntent] result_type=operation 但无操作，降级为 chat');
+            return MultiOperationResult.chat(
+              chatContent: chatContent ?? originalInput,
+              source: RecognitionSource.llmFallback,
+              originalInput: originalInput,
+            );
+          }
+
+          return MultiOperationResult.withOperations(
+            operations: operations,
+            chatContent: chatContent,
+            confidence: 0.9,
+            source: RecognitionSource.llmFallback,
+            originalInput: originalInput,
+          );
+      }
+    } catch (e) {
+      debugPrint('[SmartIntent] 解析多操作LLM响应失败: $e');
+      return null;
+    }
+  }
+
+  /// 将SmartIntentResult转换为Operation
+  Operation _convertToOperation(SmartIntentResult result) {
+    return Operation(
+      type: _mapSmartIntentToOperationType(result.intentType),
+      priority: _inferOperationPriority(result.intentType),
+      params: result.entities,
+      originalText: result.originalInput,
+    );
+  }
+
+  /// 映射SmartIntentType到OperationType
+  OperationType _mapSmartIntentToOperationType(SmartIntentType type) {
+    switch (type) {
+      case SmartIntentType.addTransaction:
+        return OperationType.addTransaction;
+      case SmartIntentType.navigate:
+        return OperationType.navigate;
+      case SmartIntentType.query:
+        return OperationType.query;
+      case SmartIntentType.modify:
+        return OperationType.modify;
+      case SmartIntentType.delete:
+        return OperationType.delete;
+      default:
+        return OperationType.unknown;
+    }
+  }
+
+  /// 推断操作优先级
+  OperationPriority _inferOperationPriority(SmartIntentType type) {
+    switch (type) {
+      case SmartIntentType.navigate:
+        return OperationPriority.immediate;
+      case SmartIntentType.query:
+        return OperationPriority.normal;
+      case SmartIntentType.addTransaction:
+      case SmartIntentType.modify:
+      case SmartIntentType.delete:
+        return OperationPriority.deferred;
+      default:
+        return OperationPriority.normal;
+    }
+  }
+
+  /// 解析操作类型字符串
+  OperationType _parseOperationType(String type) {
+    switch (type.toLowerCase()) {
+      case 'add_transaction':
+        return OperationType.addTransaction;
+      case 'navigate':
+        return OperationType.navigate;
+      case 'query':
+        return OperationType.query;
+      case 'modify':
+        return OperationType.modify;
+      case 'delete':
+        return OperationType.delete;
+      default:
+        return OperationType.unknown;
+    }
+  }
+
+  /// 解析操作优先级字符串
+  OperationPriority _parseOperationPriority(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'immediate':
+        return OperationPriority.immediate;
+      case 'normal':
+        return OperationPriority.normal;
+      case 'deferred':
+        return OperationPriority.deferred;
+      case 'background':
+        return OperationPriority.background;
+      default:
+        return OperationPriority.normal;
     }
   }
 
@@ -201,32 +618,10 @@ class SmartIntentRecognizer {
   }
 
   SmartIntentResult? _checkNavigationWithSynonyms(String input) {
-    // 使用 VoiceNavigationService 进行导航识别
-    // 它包含 237 个页面的丰富别名配置、模式匹配和模糊匹配
-    final navResult = _navigationService.parseNavigation(input);
-
-    if (navResult.success && navResult.config != null) {
-      final config = navResult.config!;
-
-      // 根据匹配置信度调整结果置信度
-      // VoiceNavigationService 返回的模糊匹配置信度为 0.7，精确匹配为 1.0
-      final confidence = navResult.confidence >= 0.9 ? 0.9 : 0.8;
-
-      return SmartIntentResult(
-        intentType: SmartIntentType.navigate,
-        confidence: confidence,
-        entities: {
-          'targetPage': config.name,
-          'route': config.route,
-          'module': config.module,
-        },
-        source: RecognitionSource.synonymExpansion,
-        originalInput: input,
-      );
-    }
-
-    // 如果 VoiceNavigationService 未匹配，回退到本地同义词检查
-    // 检查是否包含导航动词（或同义词）
+    // ═══════════════════════════════════════════════════════════════
+    // 先检查是否有导航意图（必须有导航动词才进行导航识别）
+    // 避免"你好"等闲聊被误识别为导航
+    // ═══════════════════════════════════════════════════════════════
     bool hasNavVerb = false;
     for (final synonyms in _navigationSynonyms.values) {
       if (synonyms.any((s) => input.contains(s))) {
@@ -251,7 +646,33 @@ class SmartIntentRecognizer {
       }
     }
 
+    // 没有导航动词，不进行导航识别
     if (!hasNavVerb) return null;
+
+    // ═══════════════════════════════════════════════════════════════
+    // 有导航意图，使用 VoiceNavigationService 进行页面匹配
+    // ═══════════════════════════════════════════════════════════════
+    final navResult = _navigationService.parseNavigation(input);
+
+    if (navResult.success && navResult.config != null) {
+      final config = navResult.config!;
+
+      // 根据匹配置信度调整结果置信度
+      // VoiceNavigationService 返回的模糊匹配置信度为 0.7，精确匹配为 1.0
+      final confidence = navResult.confidence >= 0.9 ? 0.9 : 0.8;
+
+      return SmartIntentResult(
+        intentType: SmartIntentType.navigate,
+        confidence: confidence,
+        entities: {
+          'targetPage': config.name,
+          'route': config.route,
+          'module': config.module,
+        },
+        source: RecognitionSource.synonymExpansion,
+        originalInput: input,
+      );
+    }
 
     // 检查目标页面（本地同义词作为兜底）
     for (final entry in _targetSynonyms.entries) {
@@ -314,6 +735,9 @@ class SmartIntentRecognizer {
     // 推断分类
     final category = _inferCategory(input);
 
+    // 提取物品/用途说明
+    final note = _extractItemNote(input, category);
+
     return SmartIntentResult(
       intentType: SmartIntentType.addTransaction,
       confidence: 0.8,
@@ -321,6 +745,7 @@ class SmartIntentRecognizer {
         'amount': amount,
         'category': category,
         'type': isIncome ? 'income' : 'expense',
+        if (note != null) 'note': note,
       },
       source: RecognitionSource.synonymExpansion,
       originalInput: input,
@@ -477,8 +902,14 @@ class SmartIntentRecognizer {
     if (template.contains('{amount}')) {
       final amount = _extractAmount(input);
       if (amount != null) {
+        final category = _inferCategory(input);
         entities['amount'] = amount;
-        entities['category'] = _inferCategory(input);
+        entities['category'] = category;
+        // 提取物品/用途说明
+        final note = _extractItemNote(input, category);
+        if (note != null) {
+          entities['note'] = note;
+        }
         confidence = 0.75;
         return {'confidence': confidence, 'entities': entities};
       }
@@ -780,7 +1211,12 @@ class SmartIntentRecognizer {
 - system: 系统操作（检查更新、清理缓存）
 
 【返回格式】
-{"intent":"意图类型","confidence":0.9,"entities":{"amount":金额,"category":"分类","targetPage":"页面名","route":"路由","operation":"操作类型","configId":"配置项ID","vaultName":"小金库名称"}}
+{"intent":"意图类型","confidence":0.9,"entities":{"amount":金额,"category":"分类","note":"具体物品或用途","targetPage":"页面名","route":"路由","operation":"操作类型","configId":"配置项ID","vaultName":"小金库名称"}}
+
+【记账参数说明】
+- amount: 金额（必填）
+- category: 分类（必填）
+- note: 物品/用途说明（可选，用户说了具体物品时必须提取，如"闹钟"、"衣服"、"打车"等）
 
 【分类】餐饮、交通、购物、娱乐、居住、医疗、其他
 【常用页面】$pageList
@@ -969,6 +1405,41 @@ class SmartIntentRecognizer {
     }
 
     return '其他';
+  }
+
+  /// 提取物品/用途说明
+  ///
+  /// 从输入中提取具体的物品名称或用途，作为交易备注
+  /// 例如："买了个闹钟11块" → "闹钟"
+  /// 例如："淘宝买衣服199" → "淘宝买衣服"
+  String? _extractItemNote(String input, String category) {
+    // 移除金额相关的部分
+    String text = input
+        .replaceAll(RegExp(r'\d+(\.\d+)?(元|块|毛|角|分|块钱|元钱)?'), '')
+        .replaceAll(RegExp(r'[零一二两三四五六七八九十百千万]+(\s*(元|块|毛|角|分|块钱|元钱))?'), '');
+
+    // 移除常见的动词和助词
+    final removePatterns = [
+      '花了', '花', '消费', '支出', '付了', '付', '买了', '买', '用了', '支付',
+      '收入', '赚了', '进账', '收到', '入账',
+      '一个', '一件', '一份', '一瓶', '一杯', '一碗', '一盒',
+      '了', '的', '个', '只', '件', '把', '张', '台', '部',
+    ];
+    for (final pattern in removePatterns) {
+      text = text.replaceAll(pattern, '');
+    }
+
+    // 清理空白和标点
+    text = text
+        .replaceAll(RegExp(r'[，。！？、；：,.!?;:\s]+'), '')
+        .trim();
+
+    // 如果提取的内容太短或太长，或者与分类相同，返回null
+    if (text.isEmpty || text.length < 2 || text.length > 20 || text == category) {
+      return null;
+    }
+
+    return text;
   }
 
   SmartIntentType _mapIntentType(VoiceIntentType type) {
@@ -1166,4 +1637,206 @@ class LearnedPattern {
       'isUserCorrection': isUserCorrection,
     };
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 多操作识别数据模型
+// ═══════════════════════════════════════════════════════════════
+
+/// 多操作识别结果
+class MultiOperationResult {
+  /// 结果类型：operation/chat/clarify/failed
+  final RecognitionResultType resultType;
+  final List<Operation> operations;
+  final String? chatContent;
+  /// 澄清问题（当resultType为clarify时使用）
+  final String? clarifyQuestion;
+  final double confidence;
+  final RecognitionSource source;
+  final String originalInput;
+  final String? errorMessage;
+  /// 是否处于离线模式（LLM不可用，使用规则兜底）
+  final bool isOfflineMode;
+
+  const MultiOperationResult({
+    required this.resultType,
+    required this.operations,
+    required this.chatContent,
+    required this.confidence,
+    required this.source,
+    required this.originalInput,
+    this.clarifyQuestion,
+    this.errorMessage,
+    this.isOfflineMode = false,
+  });
+
+  /// 有操作的结果
+  factory MultiOperationResult.withOperations({
+    required List<Operation> operations,
+    String? chatContent,
+    required double confidence,
+    required RecognitionSource source,
+    required String originalInput,
+  }) {
+    return MultiOperationResult(
+      resultType: RecognitionResultType.operation,
+      operations: operations,
+      chatContent: chatContent,
+      confidence: confidence,
+      source: source,
+      originalInput: originalInput,
+    );
+  }
+
+  /// 闲聊结果（无需操作）
+  factory MultiOperationResult.chat({
+    required String chatContent,
+    required RecognitionSource source,
+    required String originalInput,
+  }) {
+    return MultiOperationResult(
+      resultType: RecognitionResultType.chat,
+      operations: [],
+      chatContent: chatContent,
+      confidence: 0.9,
+      source: source,
+      originalInput: originalInput,
+    );
+  }
+
+  /// 需要澄清的结果
+  factory MultiOperationResult.clarify({
+    required String clarifyQuestion,
+    required RecognitionSource source,
+    required String originalInput,
+  }) {
+    return MultiOperationResult(
+      resultType: RecognitionResultType.clarify,
+      operations: [],
+      chatContent: null,
+      clarifyQuestion: clarifyQuestion,
+      confidence: 0.9,
+      source: source,
+      originalInput: originalInput,
+    );
+  }
+
+  /// LLM不可用时的失败结果
+  factory MultiOperationResult.failed(String message) {
+    return MultiOperationResult(
+      resultType: RecognitionResultType.failed,
+      operations: [],
+      chatContent: null,
+      confidence: 0,
+      source: RecognitionSource.error,
+      originalInput: '',
+      errorMessage: message,
+    );
+  }
+
+  /// 兼容旧的 error 工厂方法
+  factory MultiOperationResult.error(String message) {
+    return MultiOperationResult.failed(message);
+  }
+
+  /// 是否成功识别（包括operation、chat、clarify都算成功）
+  bool get isSuccess => resultType != RecognitionResultType.failed;
+
+  /// 是否有操作需要执行
+  bool get hasOperations => resultType == RecognitionResultType.operation && operations.isNotEmpty;
+
+  /// 是否是闲聊
+  bool get isChat => resultType == RecognitionResultType.chat;
+
+  /// 是否需要澄清
+  bool get needsClarify => resultType == RecognitionResultType.clarify;
+
+  @override
+  String toString() {
+    return 'MultiOperationResult(type: $resultType, operations: ${operations.length}, confidence: $confidence, source: $source)';
+  }
+}
+
+/// 操作
+class Operation {
+  final OperationType type;
+  final OperationPriority priority;
+  final Map<String, dynamic> params;
+  final String originalText;
+
+  const Operation({
+    required this.type,
+    required this.priority,
+    required this.params,
+    required this.originalText,
+  });
+
+  @override
+  String toString() {
+    return 'Operation(type: $type, priority: $priority, params: $params)';
+  }
+}
+
+/// 操作类型
+///
+/// @deprecated 请使用 [unified.UnifiedIntentType] 代替
+/// 此枚举保留用于向后兼容，新代码应使用统一意图类型
+enum OperationType {
+  addTransaction,
+  navigate,
+  query,
+  modify,
+  delete,
+  unknown,
+}
+
+/// OperationType 到 UnifiedIntentType 的转换扩展
+extension OperationTypeConversion on OperationType {
+  /// 转换为统一意图类型
+  unified.UnifiedIntentType toUnified() {
+    switch (this) {
+      case OperationType.addTransaction:
+        return unified.UnifiedIntentType.transactionAdd;
+      case OperationType.navigate:
+        return unified.UnifiedIntentType.navigationPage;
+      case OperationType.query:
+        return unified.UnifiedIntentType.transactionQuery;
+      case OperationType.modify:
+        return unified.UnifiedIntentType.transactionModify;
+      case OperationType.delete:
+        return unified.UnifiedIntentType.transactionDelete;
+      case OperationType.unknown:
+        return unified.UnifiedIntentType.unknown;
+    }
+  }
+
+  /// 从统一意图类型创建
+  static OperationType fromUnified(unified.UnifiedIntentType type) {
+    switch (type) {
+      case unified.UnifiedIntentType.transactionAdd:
+        return OperationType.addTransaction;
+      case unified.UnifiedIntentType.navigationPage:
+      case unified.UnifiedIntentType.navigationBack:
+      case unified.UnifiedIntentType.navigationHome:
+        return OperationType.navigate;
+      case unified.UnifiedIntentType.transactionQuery:
+        return OperationType.query;
+      case unified.UnifiedIntentType.transactionModify:
+        return OperationType.modify;
+      case unified.UnifiedIntentType.transactionDelete:
+        return OperationType.delete;
+      default:
+        return OperationType.unknown;
+    }
+  }
+}
+
+/// 操作优先级
+///
+/// @deprecated 请使用 [unified.OperationPriority] 代替
+enum OperationPriority {
+  immediate,   // 立即执行（导航）
+  normal,      // 快速执行（查询）
+  deferred,    // 延迟执行（记账，可聚合）
+  background,  // 后台执行（批量操作）
 }

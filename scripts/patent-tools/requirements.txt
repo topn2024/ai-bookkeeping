@@ -1,0 +1,16 @@
+# 专利文档工具依赖
+
+# JSON 处理
+pyyaml>=6.0
+
+# 命令行参数
+click>=8.0
+
+# 文件操作
+pathlib2>=2.3; python_version < "3.4"
+
+# Markdown 处理
+markdown>=3.0
+
+# 日期处理
+python-dateutil>=2.8

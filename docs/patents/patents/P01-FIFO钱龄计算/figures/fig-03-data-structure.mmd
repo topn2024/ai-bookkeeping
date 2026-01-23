@@ -1,0 +1,39 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 资源池 {
+        +String 池ID
+        +List~资源单元~ 资源列表
+        +Decimal 总余额
+        +入池(资源单元)
+        +消费(金额) 消费记录
+        +查询钱龄() 钱龄报告
+    }
+
+    class 资源单元 {
+        +String 资源ID
+        +DateTime 入池时间
+        +String 来源类型
+        +String 来源描述
+        +Decimal 原始金额
+        +Decimal 剩余金额
+        +计算钱龄() Integer
+        +消费(金额) Boolean
+    }
+
+    class 消费记录 {
+        +String 记录ID
+        +DateTime 消费时间
+        +Decimal 消费金额
+        +List~消费明细~ 明细列表
+        +Integer 平均钱龄
+    }
+
+    class 消费明细 {
+        +String 资源ID
+        +Decimal 消费金额
+        +Integer 钱龄天数
+    }
+
+    资源池 "1" *-- "n" 资源单元 : 包含
+    消费记录 "1" *-- "n" 消费明细 : 包含
+    消费明细 --> 资源单元 : 引用

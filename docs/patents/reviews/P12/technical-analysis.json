@@ -1,0 +1,129 @@
+{
+  "patent_id": "P12",
+  "patent_dir": "docs/patents/patents/P12-游戏化激励",
+  "disclaimer": "⚠️ 以下为AI辅助分析意见,非最终法律结论",
+  "analysis": {
+    "technical_features": {
+      "name": "技术特征提取",
+      "type": "AI分析",
+      "features": [
+        {
+          "type": "算法",
+          "name": "行为质量评估",
+          "description": "行为质量评估\n输入:用户行为 Behavior\n输出:质量评分 QualityScore, 贡献值 Contribution\n\n评估维度(8维):\n1. 记账频率(15分):\n   - 每日记账:15分\n   - 每周3-6次:10分\n   - 每周1-2次:5分\n   - 低于每周1次:0分\n\n2. 金额准确度(15分):\n   - 精确到分:15分\n   - 精确到角:10分\n   - 整数金..."
+        },
+        {
+          "type": "算法",
+          "name": "自适应奖励计算",
+          "description": "自适应奖励计算\n输入:用户行为 Behavior, 用户画像 Profile\n输出:奖励积分 Points, 奖励类型 RewardType\n\n用户分级:\n1. 新手用户(0-30天):\n   - 基础奖励 × 1.5\n   - 降低难度,增加正反馈\n   - 每日任务奖励翻倍\n\n2. 进阶用户(31-90天):\n   - 基础奖励 × 1.0\n   - 正常难度\n   - 引入周任务和月任务..."
+        },
+        {
+          "type": "算法",
+          "name": "成就解锁与进度追踪",
+          "description": "成就解锁与进度追踪\n输入:用户画像 Profile, 行为历史 History\n输出:解锁成就 Achievements, 进度更新 Progress\n\n成就分类:\n1. 基础成就(青铜):\n   - 首次记账\n   - 连续记账3天\n   - 记账10笔\n   - 设置预算\n   - 添加照片\n\n2. 进阶成就(白银):\n   - 连续记账7天\n   - 记账50笔\n   - 预算达成率>90%..."
+        },
+        {
+          "type": "算法",
+          "name": "社交激励与排行榜",
+          "description": "社交激励与排行榜\n输入:用户列表 Users\n输出:排行榜 Leaderboard, 社交奖励 SocialRewards\n\n分层排行榜:\n1. 新手榜(0-30天用户):\n   - 按贡献值排名\n   - 仅显示同期新手\n   - 避免与老用户竞争\n\n2. 进阶榜(31-90天用户):\n   - 按月度贡献排名\n   - 显示同级别用户\n\n3. 专家榜(>90天用户):\n   - 按年度贡献排名..."
+        },
+        {
+          "type": "算法",
+          "name": "异常行为检测与防刷",
+          "description": "异常行为检测与防刷\n输入:用户行为序列 Behaviors\n输出:异常评分 AnomalyScore, 是否作弊 IsCheating\n\n异常检测规则:\n1. 频率异常:\n   - 1分钟内记账>5笔 → 可疑\n   - 1小时内记账>20笔 → 高度可疑\n   - 1天内记账>100笔 → 作弊\n\n2. 模式异常:\n   - 金额完全相同(连续10笔) → 可疑\n   - 时间间隔完全相同 →..."
+        }
+      ]
+    },
+    "technical_problem": {
+      "name": "技术问题识别",
+      "type": "AI判断",
+      "technical_problems": [],
+      "business_problems": [
+        {
+          "keyword": "用户留存",
+          "context": "[0002] 记账应用的用户留存率普遍较低。根据行业数据,记账应用的7日留存率仅为15-25%,30日留存率低于10%。用户放弃记账..."
+        }
+      ],
+      "risk_level": "high"
+    },
+    "technical_effects": {
+      "name": "技术效果分析",
+      "type": "AI判断",
+      "technical_effects": [],
+      "business_effects": [
+        {
+          "keyword": "用户满意度",
+          "context": "...*数据质量**:\n   - 传统方案:质量评分较低\n   - 本发明:质量评分显著提升\n\n4. **用户满意度**:\n   - 传统方案:用户满意度一般\n   - 本发明:用户满意度较高\n\n5. **防刷效果*..."
+        },
+        {
+          "keyword": "留存率",
+          "context": "[0016] 与现有技术相比,本发明具有以下有益效果:\n\n1. **用户留存率**:\n   - 传统方案:7日留存率较低\n   - 本发明:7日留存率显著提升,30日留存率明显改..."
+        },
+        {
+          "keyword": "活跃度",
+          "context": "...统方案:7日留存率较低\n   - 本发明:7日留存率显著提升,30日留存率明显改善\n\n2. **用户活跃度**:\n   - 传统方案:平均每周记账2-3次\n   - 本发明:平均每周记账5-6次\n\n3. *..."
+        }
+      ],
+      "quantified": false,
+      "risk_level": "medium"
+    },
+    "technical_means": {
+      "name": "技术手段分析",
+      "type": "AI分析",
+      "algorithms": {
+        "count": 5,
+        "found": true
+      },
+      "data_structures": [
+        "struct",
+        "数据结构"
+      ],
+      "system_architecture": [
+        "架构",
+        "模块"
+      ]
+    }
+  },
+  "ai_opinions": [
+    {
+      "type": "technical_problem_risk",
+      "severity": "high",
+      "message": "AI判断:背景技术中商业问题描述多于技术问题,存在被认定为商业方法的风险",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节",
+      "recommendation": "建议重点强调技术问题,如计算效率、系统性能、算法创新等"
+    },
+    {
+      "type": "business_effect_risk",
+      "severity": "medium",
+      "message": "AI判断:技术效果中包含3个商业指标",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节",
+      "recommendation": "建议删除商业指标,仅保留技术指标"
+    },
+    {
+      "type": "effect_not_quantified",
+      "severity": "medium",
+      "message": "AI判断:技术效果未量化",
+      "legal_basis": "《专利审查指南》第二部分第二章第2.2.3节",
+      "recommendation": "建议量化技术效果,如'响应时间<80ms'、'准确率>95%'"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "high",
+      "type": "必须改进",
+      "message": "发现1个高风险问题,必须解决",
+      "items": [
+        "建议重点强调技术问题,如计算效率、系统性能、算法创新等"
+      ]
+    },
+    {
+      "priority": "medium",
+      "type": "建议优化",
+      "message": "发现2个中风险问题,建议优化",
+      "items": [
+        "建议删除商业指标,仅保留技术指标",
+        "建议量化技术效果,如'响应时间<80ms'、'准确率>95%'"
+      ]
+    }
+  ]
+}

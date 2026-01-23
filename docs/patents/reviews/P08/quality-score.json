@@ -1,0 +1,57 @@
+{
+  "patent_id": "P08",
+  "patent_dir": "docs/patents/patents/P08-智能可视化",
+  "disclaimer": "⚠️ 以下评分为AI辅助评估,非最终法律结论",
+  "scores": {
+    "legal_compliance": {
+      "score": 95,
+      "max": 100,
+      "weight": 0.3
+    },
+    "technical_nature": {
+      "score": 50,
+      "max": 100,
+      "weight": 0.25
+    },
+    "document_quality": {
+      "score": 85,
+      "max": 100,
+      "weight": 0.2
+    },
+    "prior_art_risk": {
+      "score": 60,
+      "max": 100,
+      "weight": 0.15
+    },
+    "business_value": {
+      "score": 60,
+      "max": 100,
+      "weight": 0.1
+    }
+  },
+  "overall_score": 73.0,
+  "risk_level": "medium",
+  "estimated_success_rate": "55-70%(AI估计)",
+  "key_issues": [
+    {
+      "type": "technical",
+      "severity": "high",
+      "message": "AI判断:未明确识别到技术问题",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节"
+    }
+  ],
+  "recommendations": [
+    {
+      "dimension": "技术性",
+      "priority": "high",
+      "message": "技术性不足,存在被认定为商业方法的风险",
+      "action": "强化技术问题、技术手段、技术效果的描述"
+    },
+    {
+      "dimension": "现有技术",
+      "priority": "medium",
+      "message": "需要进行现有技术检索",
+      "action": "使用prior-art-search.json中的检索策略进行检索"
+    }
+  ]
+}

@@ -1465,6 +1465,7 @@ class DatabaseService implements IDatabaseService {
   // Transaction CRUD
   @override
   Future<int> insertTransaction(model.Transaction transaction) async {
+    debugPrint('[DatabaseService] 开始插入交易: id=${transaction.id}, amount=${transaction.amount}, category=${transaction.category}');
     final db = await database;
     final result = await db.insert('transactions', {
       'id': transaction.id,
@@ -1510,6 +1511,7 @@ class DatabaseService implements IDatabaseService {
       }
     }
 
+    debugPrint('[DatabaseService] 交易插入成功: result=$result');
     return result;
   }
 
@@ -3805,6 +3807,9 @@ class DatabaseService implements IDatabaseService {
 
     final whereConditions = <String>[];
     final whereArgs = <dynamic>[];
+
+    // 排除已删除的记录
+    whereConditions.add('isDeleted = 0');
 
     // 时间范围过滤
     if (startDate != null) {

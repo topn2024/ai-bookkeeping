@@ -1,0 +1,69 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 收入记录 {
+        +UUID id
+        +Decimal amount
+        +Date date
+        +String source
+        +Enum type
+        +Boolean is_recurring
+        +Float confidence
+        +分类收入() void
+    }
+
+    class 稳定性评估 {
+        +Float cv_score
+        +Float fixed_ratio_score
+        +Float diversity_score
+        +Float regularity_score
+        +Float total_score
+        +计算变异系数() Float
+        +评估稳定性() Integer
+    }
+
+    class 自适应预算 {
+        +Float usage_ratio
+        +Enum strategy
+        +Decimal base_income
+        +Decimal monthly_budget
+        +Decimal saving_target
+        +选择策略() Enum
+        +计算预算() Decimal
+    }
+
+    class 缓冲账户 {
+        +Decimal balance
+        +Decimal target_amount
+        +Float health_ratio
+        +存入超额() void
+        +补充不足() void
+        +检查健康度() Float
+    }
+
+    class 应急资金规划 {
+        +Integer emergency_months
+        +Decimal target_fund
+        +Decimal current_fund
+        +Decimal gap
+        +Integer target_months
+        +计算月数() Integer
+        +生成储蓄计划() Plan
+    }
+
+    class 收入预测 {
+        +Float trend
+        +Map seasonal_factors
+        +Decimal predicted_income
+        +Decimal lower_bound
+        +Decimal upper_bound
+        +趋势分析() Float
+        +季节性分析() Map
+        +预测收入() Decimal
+    }
+
+    收入记录 --> 稳定性评估 : 输入
+    稳定性评估 --> 自适应预算 : 影响
+    自适应预算 --> 缓冲账户 : 管理
+    稳定性评估 --> 应急资金规划 : 影响
+    收入记录 --> 收入预测 : 输入
+

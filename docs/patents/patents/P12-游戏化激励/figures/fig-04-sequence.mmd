@@ -1,0 +1,44 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant U as 用户
+    participant APP as 应用
+    participant ANALYZE as 行为分析
+    participant REWARD as 奖励引擎
+    participant ACHIEVE as 成就系统
+    participant ANTI as 防刷检测
+
+    U->>APP: 完成一笔记账
+    APP->>ANALYZE: 分析行为质量
+
+    ANALYZE->>ANALYZE: 记账频率: 每日 → 15分
+    ANALYZE->>ANALYZE: 金额准确度: 精确 → 15分
+    ANALYZE->>ANALYZE: 分类完整: 是 → 15分
+    ANALYZE->>ANALYZE: 备注详细: 是 → 10分
+    ANALYZE->>ANALYZE: 有照片: 是 → 10分
+    ANALYZE->>ANALYZE: 使用标签: 是 → 10分
+    ANALYZE->>ANALYZE: 预算内: 是 → 15分
+    ANALYZE->>ANALYZE: 主动修正: 否 → 0分
+
+    ANALYZE-->>REWARD: 质量评分: 90分
+
+    REWARD->>REWARD: 用户等级: 进阶(60天)
+    REWARD->>REWARD: 基础奖励: 90分
+    REWARD->>REWARD: 等级系数: ×1.0
+    REWARD->>REWARD: 连续15天: +15%
+    REWARD->>REWARD: 防疲劳: ×1.0
+    REWARD->>REWARD: 最终奖励: 103.5分
+
+    REWARD->>ANTI: 异常检测
+    ANTI->>ANTI: 频率正常: 0分
+    ANTI->>ANTI: 模式正常: 0分
+    ANTI->>ANTI: 异常评分: 0分 < 60
+    ANTI-->>REWARD: 通过检测
+
+    REWARD->>ACHIEVE: 检查成就
+    ACHIEVE->>ACHIEVE: 连续15天 → 未解锁(需30天)
+    ACHIEVE->>ACHIEVE: 记账150笔 → 未解锁(需200笔)
+    ACHIEVE-->>REWARD: 无新成就
+
+    REWARD-->>APP: 奖励: +103.5分
+    APP-->>U: 恭喜获得103.5积分!
+

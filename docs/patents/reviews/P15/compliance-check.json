@@ -1,0 +1,113 @@
+{
+  "patent_id": "P15",
+  "patent_dir": "docs/patents/patents/P15-可变收入适配",
+  "checks": {
+    "file_structure": {
+      "name": "文件结构检查",
+      "passed": true,
+      "details": {
+        "specification.md": {
+          "description": "说明书",
+          "exists": true,
+          "path": "docs/patents/patents/P15-可变收入适配/specification.md"
+        },
+        "claims.md": {
+          "description": "权利要求书",
+          "exists": true,
+          "path": "docs/patents/patents/P15-可变收入适配/claims.md"
+        },
+        "abstract.md": {
+          "description": "摘要",
+          "exists": true,
+          "path": "docs/patents/patents/P15-可变收入适配/abstract.md"
+        },
+        "metadata.json": {
+          "description": "元数据",
+          "exists": true,
+          "path": "docs/patents/patents/P15-可变收入适配/metadata.json"
+        }
+      }
+    },
+    "specification": {
+      "name": "说明书结构检查",
+      "passed": true,
+      "details": {
+        "技术领域": {
+          "found": true,
+          "required": true
+        },
+        "背景技术": {
+          "found": true,
+          "required": true
+        },
+        "发明内容": {
+          "found": true,
+          "required": true
+        },
+        "附图说明": {
+          "found": true,
+          "required": true
+        },
+        "具体实施方式": {
+          "found": true,
+          "required": true
+        }
+      }
+    },
+    "claims": {
+      "name": "权利要求书结构检查",
+      "passed": true,
+      "details": {
+        "independent_claims": {
+          "count": 2,
+          "found": true
+        },
+        "total_claims": 9
+      }
+    },
+    "abstract": {
+      "name": "摘要检查",
+      "passed": true,
+      "details": {
+        "length": {
+          "characters": 267,
+          "recommended_range": "150-300字"
+        }
+      }
+    },
+    "figures": {
+      "name": "附图检查",
+      "passed": true,
+      "details": {
+        "figures_dir_exists": true,
+        "image_files": {
+          "png_jpg_count": 0,
+          "svg_count": 4,
+          "files": [
+            "fig-02-algorithm-flow.svg",
+            "fig-03-data-structure.svg",
+            "fig-04-sequence.svg",
+            "fig-01-system-architecture.svg"
+          ]
+        }
+      }
+    }
+  },
+  "issues": [],
+  "warnings": [
+    {
+      "type": "svg_only",
+      "severity": "warning",
+      "message": "仅有SVG格式图片,专利局要求提交PNG或JPG格式",
+      "legal_basis": "《专利审查指南》第一部分第一章第4.2节"
+    }
+  ],
+  "passed": true,
+  "summary": {
+    "total_checks": 5,
+    "passed_checks": 5,
+    "total_issues": 0,
+    "total_warnings": 1,
+    "overall_passed": true
+  }
+}

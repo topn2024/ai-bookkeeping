@@ -1,0 +1,33 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant C1 as 客户端1
+    participant C2 as 客户端2
+    participant DP as 差分隐私层
+    participant S as 聚合服务器
+    participant GM as 全局模型
+
+    Note over C1,GM: 联邦学习一轮迭代
+
+    C1->>C1: 本地数据训练
+    C2->>C2: 本地数据训练
+
+    C1->>DP: 提交本地梯度
+    DP->>DP: 梯度裁剪(阈值C)
+    DP->>DP: 添加高斯噪声(σ)
+    DP->>DP: 检查隐私预算
+    DP-->>C1: 返回加密梯度
+
+    C2->>DP: 提交本地梯度
+    DP->>DP: 梯度裁剪
+    DP->>DP: 添加噪声
+    DP-->>C2: 返回加密梯度
+
+    C1->>S: 上传加密梯度
+    C2->>S: 上传加密梯度
+
+    S->>S: 安全聚合
+    S->>S: 恶意检测
+    S->>GM: 更新全局模型
+
+    GM-->>C1: 分发新模型
+    GM-->>C2: 分发新模型

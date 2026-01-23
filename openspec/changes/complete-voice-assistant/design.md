@@ -1,229 +1,191 @@
-# 语音智能助手技术设计文档
+# 实时对话系统架构设计
 
-## 上下文
+## 分层架构
 
-当前语音智能助手已具备完整的架构设计，包括：
-- 多引擎ASR支持（阿里云在线 + Sherpa-ONNX离线）
-- 多引擎TTS支持（系统TTS + 阿里云TTS）
-- 完整的NLU引擎和意图路由
-- 记账业务流程（添加/查询/修改/删除）
-
-但核心API调用为模拟实现，需要实装真实服务。
-
-### 约束
-- 必须支持离线使用（记账核心功能）
-- API密钥不能硬编码或暴露
-- 需要兼容iOS和Android双平台
-- 遵循现有的Riverpod状态管理模式
-
-### 利益相关者
-- 终端用户：需要流畅的语音交互体验
-- 开发团队：需要清晰的API抽象和错误处理
-
----
-
-## 目标 / 非目标
-
-### 目标
-- 实现生产级的语音识别和合成功能
-- 提供无缝的在线/离线切换体验
-- 实现安全的API密钥管理
-- 完成所有已知的TODO项
-
-### 非目标
-- 不涉及NLU引擎的改进（当前实现已足够）
-- 不涉及记账业务逻辑的修改
-- 不实现多语言支持（当前仅支持中文）
-- 不实现自定义唤醒词训练
-
----
-
-## 决策
-
-### 决策1：ASR实现方案
-
-**选择：阿里云一句话识别API + WebSocket流式识别**
-
-**理由：**
-- 阿里云提供高准确率的中文识别（>95%）
-- 支持金融领域热词定制
-- 流式识别可提供实时反馈
-- 已有账号和配置基础
-
-**考虑的替代方案：**
-| 方案 | 优点 | 缺点 | 结论 |
-|------|------|------|------|
-| 科大讯飞 | 准确率高 | SDK体积大，集成复杂 | 排除 |
-| 百度语音 | 免费额度多 | 中文准确率略低 | 备选 |
-| Google Speech | 国际标准 | 国内访问不稳定 | 排除 |
-| 纯离线方案 | 无网络依赖 | 准确率和模型大小受限 | 作为降级方案 |
-
-**API调用流程：**
 ```
-用户说话 → 录音(record包) → 音频数据
-    ↓
-网络检测 → 在线? → 阿里云ASR (REST/WebSocket)
-    ↓           ↓
-    否          是
-    ↓           ↓
-Sherpa-ONNX ← 识别结果 → NLU处理
+┌═══════════════════════════════════════════════════════════════════════════┐
+║                        对话层 (Conversation Layer)                          ║
+║  ┌────────────────────────────────────────────────────────────────────┐   ║
+║  │                  RealtimeConversationSession                        │   ║
+║  │  状态机: idle → listening → userSpeaking → thinking                 │   ║
+║  │         → agentSpeaking → turnEndPause → waitingForInput → proactive│   ║
+║  └────────────────────────────────────────────────────────────────────┘   ║
+║  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ║
+║  │   语音输入    │  │   意图识别    │  │   语音输出    │  │   个性化     │  ║
+║  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘  ║
+║  ┌─────────────────────────────────────────────────────────────────────┐  ║
+║  │                    异常处理层 (Exception Handling)                   │  ║
+║  │  ASR异常处理器 | NLU异常处理器 | 操作层异常处理器 | 频率限制控制器    │  ║
+║  │  中断恢复管理器: 对话放弃恢复 | 应用切换恢复 | 意图变更恢复          │  ║
+║  └─────────────────────────────────────────────────────────────────────┘  ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║                        记忆层 (Memory Layer)                               ║
+║  短期记忆(会话级): 对话历史3-5轮, 操作上下文, 指代解析                      ║
+║  长期记忆(持久化): 用户偏好, 历史摘要, 交互模式                            ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║                        执行层 (Execution Layer)                            ║
+║  操作队列(优先级) → 后台执行器(ActionExec) → 结果反馈(注入上下文)          ║
+║  复用: ActionRouter | ActionRegistry | ActionExecutor                     ║
+╚═══════════════════════════════════════════════════════════════════════════╝
 ```
 
----
+## 核心组件设计
 
-### 决策2：TTS实现方案
+### 1. RealtimeConversationSession
 
-**选择：双引擎架构 - Flutter TTS（默认） + 阿里云TTS（高质量）**
+**职责**: 管理实时对话会话的状态流转
 
-**理由：**
-- Flutter TTS利用系统TTS，无额外成本，低延迟
-- 阿里云TTS提供更自然的语音，适合重要播报
-- 用户可在设置中切换
-
-**引擎选择策略：**
+**状态枚举**:
 ```dart
-TTSEngine selectEngine(TTSContext context) {
-  if (context.requireHighQuality) {
-    return AlibabaCloudTTSEngine();
-  }
-  if (context.isOffline) {
-    return FlutterTTSEngine();
-  }
-  return userPreference ?? FlutterTTSEngine();
+enum RealtimeSessionState {
+  idle,              // 空闲
+  listening,         // 监听用户说话
+  userSpeaking,      // 用户正在说话
+  thinkingAfterUser, // 用户说完，智能体思考中
+  agentSpeaking,     // 智能体说话中
+  turnEndPause,      // 轮次结束停顿
+  waitingForInput,   // 等待用户输入
+  proactive,         // 主动发起话题
+  ending,            // 对话结束中
+  ended,             // 已结束
 }
 ```
 
----
+**核心流程**:
+1. 用户点击悬浮球 → `listening`
+2. VAD检测到语音 → `userSpeaking`
+3. 500ms静音 → `thinkingAfterUser`
+4. LLM响应就绪 → `agentSpeaking`
+5. 说完一句 → `turnEndPause` (1.5秒)
+6. 停顿期间用户说话 → 回到 `userSpeaking`
+7. 停顿超时 → `waitingForInput`
+8. 等待超时(5秒) → `proactive`
+9. 检测到结束意图 → `ending` → `ended`
 
-### 决策3：唤醒词检测方案
+### 2. ConversationActionBridge
 
-**选择：Picovoice Porcupine**
+**职责**: 对话层与执行层的异步桥接
 
-**理由：**
-- 支持离线运行，无网络依赖
-- 提供Flutter SDK
-- 支持自定义唤醒词
-- 低功耗，适合后台运行
-
-**考虑的替代方案：**
-| 方案 | 优点 | 缺点 | 结论 |
-|------|------|------|------|
-| Snowboy | 开源免费 | 已停止维护 | 排除 |
-| 阿里云唤醒 | 与ASR集成 | 需要网络 | 排除 |
-| 自研方案 | 完全可控 | 开发成本高 | 未来考虑 |
-
-**唤醒词：** "小白管家" 或 "记一笔"
-
----
-
-### 决策4：API密钥管理方案
-
-**选择：flutter_secure_storage + 服务端Token代理**
-
-**架构：**
-```
-App启动 → 检查本地Token → 有效? → 直接使用
-                           ↓
-                          否
-                           ↓
-               请求后端Token代理服务
-                           ↓
-               后端使用AK/SK获取临时Token
-                           ↓
-               返回临时Token（有效期1小时）
-                           ↓
-               存储到flutter_secure_storage
+```dart
+class ConversationActionBridge {
+  /// 发送操作到执行层（非阻塞）
+  void submitAction(VoiceAction action);
+  
+  /// 监听执行结果流
+  Stream<OperationResult> get executionResults;
+  
+  /// 将结果注入对话上下文
+  void injectResultToContext(OperationResult result);
+}
 ```
 
-**安全措施：**
-- API密钥仅存储在服务端
-- 客户端使用临时Token
-- Token自动刷新机制
-- 支持Token撤销
+### 3. BackgroundOperationExecutor
 
----
+**职责**: 后台异步执行操作
 
-### 决策5：错误处理和降级策略
+**复用已有组件**:
+- ActionRouter (路由分发)
+- ActionRegistry (操作注册)
+- ActionExecutor (操作执行)
 
-**错误分类和处理：**
+**新增能力**:
+- 操作队列管理（优先级排序）
+- 异步执行（不阻塞调用方）
+- 执行结果流（供对话层订阅）
 
-| 错误类型 | 处理策略 | 用户提示 |
-|----------|----------|----------|
-| 网络不可用 | 切换离线ASR | "已切换到离线模式" |
-| API限流 | 等待重试 + 离线降级 | "请稍后再试" |
-| Token过期 | 自动刷新 | 无感知 |
-| 识别失败 | 重试3次后提示 | "没听清，请再说一遍" |
-| TTS失败 | 显示文字替代 | 静默降级 |
+### 4. VoiceExceptionHandler
 
----
+**职责**: 四层异常处理
 
-## 风险 / 权衡
+| 层级 | 异常类型 | 处理方向 |
+|-----|---------|---------|
+| 语音识别层 | 静音/噪音、发音不清、数字歧义 | 智能补全、确认 |
+| 语义理解层 | 无关话题、模糊意图、矛盾指令 | 友好边界、追问澄清 |
+| 操作层 | 越权操作、数据溢出、频率异常 | 阻止+教育、合理性提醒 |
+| 恶意/极端 | 注入攻击、超长输入、格式攻击 | 静默过滤、安全拦截 |
 
-### 风险1：阿里云服务不可用
-- **影响：** 在线语音识别完全失效
-- **概率：** 低（阿里云SLA 99.9%）
-- **缓解：** 离线Sherpa-ONNX自动降级
+### 5. FrequencyLimiter
 
-### 风险2：唤醒词误触发
-- **影响：** 用户体验受损
-- **概率：** 中
-- **缓解：** 可调灵敏度，默认设为中等
+**职责**: 高频重复输入处理
 
-### 风险3：音频权限被拒
-- **影响：** 语音功能完全不可用
-- **概率：** 低
-- **缓解：** 清晰的权限说明，优雅降级到文字输入
+**三种场景**:
+1. 快速重复相同指令（3秒内）→ 只执行一次
+2. 短时间大量不同请求（1分钟超过20次）→ 批量处理或冷却期
+3. 来回修改同一笔记录（超过3次）→ 建议UI编辑
 
-### 风险4：离线模型下载失败
-- **影响：** 离线功能不可用
-- **概率：** 中（网络环境复杂）
-- **缓解：** 支持断点续传，提供模型预置选项
+### 6. InterruptRecoveryManager
 
----
+**职责**: 中断恢复管理
 
-## 迁移计划
+**三种场景**:
+1. 多轮对话中途放弃 → 5秒后提示，保存上下文
+2. 来电/通知打断 → 根据时长决定恢复策略
+   - < 2分钟: "刚才被打断了，继续吗？"
+   - < 30分钟: "可以继续刚才的操作"
+   - > 30分钟: 直接重置
+3. 用户突然改变意图 → 暂存未完成上下文，处理完新意图后询问
 
-### 阶段1：基础设施（优先级1）
-1. 实现Token代理服务（后端）
-2. 实现flutter_secure_storage密钥管理
-3. 替换ASR模拟实现为真实API调用
-4. 替换TTS模拟实现为真实API调用
+### 7. ConversationMemory
 
-### 阶段2：功能完善（优先级2）
-1. 集成Porcupine唤醒词检测
-2. 实现确认流程UI
-3. 完成命令历史显示
-4. 完善错误处理
+**职责**: 会话级短期记忆
 
-### 阶段3：优化测试（优先级3）
-1. 性能优化（流缓冲、超时）
-2. 单元测试和集成测试
-3. 文档完善
+**复用EntityDisambiguationService**处理指代解析:
+- 时间指代: "昨天"、"刚才"
+- 顺序指代: "那笔"、"上一笔"
+- 描述指代: "午餐"、"打车"
+- **新增**操作指代: "改成50"、"删掉它"
 
-### 回滚方案
-- 每个阶段独立可回滚
-- 保留模拟实现代码（通过配置开关）
-- 灰度发布，逐步放量
+## 文件变更清单
 
----
+### 新建文件
+| 文件 | 优先级 | 说明 |
+|------|--------|------|
+| `lib/services/voice/realtime_conversation_session.dart` | P0 | 实时对话会话控制 |
+| `lib/services/voice/conversation_action_bridge.dart` | P0 | 对话→执行桥接器 |
+| `lib/services/voice/background_operation_executor.dart` | P0 | 后台异步执行器 |
+| `lib/services/voice/memory/conversation_memory.dart` | P1 | 会话级对话历史 |
+| `lib/services/voice/exception_handler.dart` | P1 | 异常分类与处理策略 |
+| `lib/services/voice/frequency_limiter.dart` | P1 | 频率限制与重复检测 |
+| `lib/services/voice/interrupt_recovery_manager.dart` | P1 | 中断恢复管理 |
+| `lib/services/voice/proactive_topic_generator.dart` | P1 | 主动话题生成 |
+| `lib/services/voice/conversation_end_detector.dart` | P1 | 对话结束检测 |
+| `lib/services/streaming_tts_service.dart` | P0 | WebSocket流式TTS |
+| `lib/services/audio_stream_player.dart` | P0 | 流式音频播放器 |
+| `lib/services/voice/voice_state_machine.dart` | P0 | 层次化状态机 |
+| `lib/services/voice/barge_in_detector.dart` | P1 | 打断检测 |
+| `lib/services/voice/input_preprocessor.dart` | P1 | 输入预处理与清洗 |
 
-## 待决问题
+### 修改文件
+| 文件 | 优先级 | 说明 |
+|------|--------|------|
+| `lib/services/voice/entity_disambiguation_service.dart` | P1 | 扩展操作指代支持 |
+| `lib/services/user_profile_service.dart` | P1 | 扩展对话偏好维度 |
+| `lib/services/tts_service.dart` | P0 | 集成流式模式 |
+| `lib/services/voice_recognition_engine.dart` | P0 | 持续流式识别 |
+| `lib/services/voice_vad_service.dart` | P0 | VAD参数优化 |
+| `lib/services/voice_service_coordinator.dart` | P0 | 集成新架构 |
+| `lib/widgets/global_floating_ball.dart` | P0 | 集成实时会话 |
 
-1. **唤醒词具体用词？** 建议"小白管家"，需产品确认
-2. **阿里云TTS音色选择？** 当前支持6种，是否需要用户可选？
-3. **离线模型预置还是按需下载？** 建议首次使用时下载
-4. **Token代理服务部署位置？** 建议复用现有FastAPI后端
+## 验收指标
 
----
+### 对话体验指标
+| 指标 | 当前 | 目标 |
+|------|------|------|
+| 首字延迟 | 1.5-3.5秒 | < 500ms |
+| 打断响应 | 不支持 | < 200ms |
+| 总轮次延迟 | 3-5秒 | 1-1.5秒 |
+| 并发模式 | 半双工 | 全双工 |
+| 自动语音结束 | 需点击 | 自动 |
+| 主动发起对话 | 不支持 | 支持 |
+| 后台操作 | 阻塞 | 非阻塞 |
+| 自动结束 | 不支持 | 支持 |
 
-## 关键文件变更
-
-| 文件 | 变更类型 | 说明 |
-|------|----------|------|
-| `voice_recognition_engine.dart` | 修改 | 实现真实ASR API |
-| `tts_service.dart` | 修改 | 实现真实TTS API |
-| `voice_wake_word_service.dart` | 修改 | 集成Porcupine |
-| `voice_service_provider.dart` | 修改 | 完成确认流程 |
-| `enhanced_voice_assistant_page.dart` | 修改 | 完成命令历史 |
-| `voice_token_service.dart` | 新增 | Token管理服务 |
-| `server/app/api/voice_token.py` | 新增 | Token代理端点 |
+### 异常处理指标
+| 指标 | 目标值 |
+|------|-------|
+| 异常类型识别率 | > 95% |
+| 异常响应恰当率 | > 90% |
+| 异常后继续使用率 | > 80% |
+| 恶意输入拦截率 | 100% |
+| 正常输入误判率 | < 1% |
+| 中断恢复成功率 | > 70% |

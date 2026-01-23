@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>专利现有技术检索助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #34495e;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .patent-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .patent-btn {
+            padding: 10px 15px;
+            border: 2px solid #3498db;
+            background: white;
+            color: #3498db;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .patent-btn:hover {
+            background: #3498db;
+            color: white;
+        }
+
+        .patent-btn.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .database-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .db-card {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+
+        .db-card h3 {
+            font-size: 16px;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .db-card a {
+            display: inline-block;
+            padding: 8px 15px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .db-card a:hover {
+            background: #2980b9;
+        }
+
+        .query-box {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .query-box h4 {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-bottom: 8px;
+        }
+
+        .query-text {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            border: 1px solid #bdc3c7;
+            word-wrap: break-word;
+        }
+
+        .copy-btn {
+            padding: 5px 10px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .copy-btn:hover {
+            background: #229954;
+        }
+
+        .keywords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .keyword-tag {
+            padding: 5px 12px;
+            background: #e8f4f8;
+            color: #2980b9;
+            border-radius: 15px;
+            font-size: 13px;
+        }
+
+        .record-form {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #34495e;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .submit-btn {
+            padding: 10px 20px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .submit-btn:hover {
+            background: #229954;
+        }
+
+        .records-list {
+            margin-top: 20px;
+        }
+
+        .record-item {
+            background: white;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .record-item h4 {
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .record-item p {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 专利现有技术检索助手</h1>
+        <p class="subtitle">Patent Prior Art Search Assistant</p>
+
+        <!-- 专利选择 -->
+        <div class="section">
+            <div class="section-title">1. 选择专利</div>
+            <div class="patent-selector" id="patentSelector">
+                <!-- 动态生成 -->
+            </div>
+            <div id="patentInfo" style="margin-top: 15px; padding: 15px; background: #e8f4f8; border-radius: 5px; display: none;">
+                <h3 id="patentTitle" style="color: #2980b9; margin-bottom: 10px;"></h3>
+                <p id="patentDesc" style="color: #34495e;"></p>
+            </div>
+        </div>
+
+        <!-- 检索数据库 -->
+        <div class="section">
+            <div class="section-title">2. 检索数据库</div>
+            <div class="database-links">
+                <div class="db-card">
+                    <h3>🇨🇳 国家知识产权局</h3>
+                    <a href="http://pss-system.cnipa.gov.cn" target="_blank">打开检索系统</a>
+                </div>
+                <div class="db-card">
+                    <h3>📚 CNKI（中国知网）</h3>
+                    <a href="https://www.cnki.net" target="_blank">打开CNKI</a>
+                </div>
+                <div class="db-card">
+                    <h3>📖 万方数据库</h3>
+                    <a href="https://www.wanfangdata.com.cn" target="_blank">打开万方</a>
+                </div>
+                <div class="db-card">
+                    <h3>🌐 Google Scholar</h3>
+                    <a href="https://scholar.google.com" target="_blank">打开Google Scholar</a>
+                </div>
+                <div class="db-card">
+                    <h3>🔬 Google Patents</h3>
+                    <a href="https://patents.google.com" target="_blank">打开Google Patents</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 检索式 -->
+        <div class="section" id="queriesSection" style="display: none;">
+            <div class="section-title">3. 检索式</div>
+            <div id="queriesList">
+                <!-- 动态生成 -->
+            </div>
+        </div>
+
+        <!-- 关键词 -->
+        <div class="section" id="keywordsSection" style="display: none;">
+            <div class="section-title">4. 检索关键词</div>
+            <h4 style="margin-bottom: 10px; color: #7f8c8d;">中文关键词：</h4>
+            <div class="keywords" id="chineseKeywords">
+                <!-- 动态生成 -->
+            </div>
+            <h4 style="margin: 20px 0 10px; color: #7f8c8d;">英文关键词：</h4>
+            <div class="keywords" id="englishKeywords">
+                <!-- 动态生成 -->
+            </div>
+        </div>
+
+        <!-- 检索记录 -->
+        <div class="section" id="recordSection" style="display: none;">
+            <div class="section-title">5. 记录检索结果</div>
+            <div class="record-form">
+                <div class="form-group">
+                    <label>数据库：</label>
+                    <select id="database">
+                        <option value="CNIPA">国家知识产权局</option>
+                        <option value="CNKI">CNKI</option>
+                        <option value="Wanfang">万方数据库</option>
+                        <option value="Google Scholar">Google Scholar</option>
+                        <option value="Google Patents">Google Patents</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>检索式：</label>
+                    <textarea id="query" placeholder="输入使用的检索式"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>结果总数：</label>
+                    <input type="number" id="totalResults" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label>相关文献数：</label>
+                    <input type="number" id="relevantResults" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label>备注：</label>
+                    <textarea id="notes" placeholder="记录检索过程中的发现和问题"></textarea>
+                </div>
+                <button class="submit-btn" onclick="saveRecord()">保存记录</button>
+            </div>
+            <div class="records-list" id="recordsList">
+                <!-- 动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 专利数据
+        const patents = {
+            'P05': {
+                name: 'LLM语音交互',
+                fullName: '基于大语言模型的智能语音记账交互方法',
+                queries: [
+                    '(大语言模型 OR LLM OR GPT OR BERT OR Transformer) AND (语音交互 OR 语音对话 OR 语音助手) AND (意图识别 OR 意图理解 OR 自然语言理解)',
+                    '(语音记账 OR 智能记账 OR 自动记账) AND (对话系统 OR 多轮对话 OR 对话管理)',
+                    '(语音识别 OR ASR) AND (大语言模型 OR LLM) AND (财务 OR 记账 OR 账本)'
+                ],
+                keywords: {
+                    chinese: ['大语言模型', 'LLM', '语音交互', '意图识别', '多轮对话', '记账', '语音识别', '自然语言理解'],
+                    english: ['Large Language Model', 'LLM', 'Voice Interaction', 'Intent Recognition', 'Multi-turn Dialog', 'Bookkeeping', 'Speech Recognition']
+                }
+            },
+            'P11': {
+                name: '离线增量同步',
+                fullName: '基于金额精度保护的离线增量同步方法',
+                queries: [
+                    '(离线同步 OR 增量同步 OR 数据同步) AND (金额精度 OR Decimal OR 高精度) AND (冲突解决 OR CRDT OR 分布式一致性)',
+                    '(财务数据 OR 金额数据 OR 账本) AND (离线同步 OR 增量同步) AND (精度保护 OR Decimal)',
+                    '(CRDT OR 无冲突复制) AND (事务原子性 OR 原子操作) AND (数据同步 OR 分布式同步)'
+                ],
+                keywords: {
+                    chinese: ['离线同步', '增量同步', '金额精度', 'Decimal', 'CRDT', '冲突解决', '事务原子性', '分布式一致性'],
+                    english: ['Offline Sync', 'Incremental Sync', 'Decimal Precision', 'CRDT', 'Conflict Resolution', 'Transaction Atomicity']
+                }
+            },
+            'P12': {
+                name: '游戏化激励',
+                fullName: '基于行为分析的游戏化记账激励系统',
+                queries: [
+                    '(游戏化 OR Gamification OR 游戏化设计) AND (激励系统 OR 激励机制 OR 用户激励) AND (行为分析 OR 用户行为)',
+                    '(记账 OR 财务管理 OR 账本) AND (游戏化 OR 激励系统) AND (用户留存 OR 用户活跃)',
+                    '(成就系统 OR 等级系统 OR 积分系统 OR 排行榜) AND (动态难度 OR 自适应) AND (用户行为 OR 行为分析)'
+                ],
+                keywords: {
+                    chinese: ['游戏化', '激励系统', '行为分析', '记账', '用户留存', '成就系统', '等级系统', '积分系统'],
+                    english: ['Gamification', 'Incentive System', 'Behavior Analysis', 'Bookkeeping', 'User Retention', 'Achievement System']
+                }
+            },
+            'P14': {
+                name: '冷静期控制',
+                fullName: '基于情绪识别的消费冷静期控制方法',
+                queries: [
+                    '(情绪识别 OR 情感识别 OR 情感计算) AND (冲动消费 OR 冲动购买 OR 非理性消费) AND (冷静期 OR 延迟机制)',
+                    '(消费控制 OR 消费管理 OR 理性消费) AND (情绪识别 OR 情感分析) AND (移动支付 OR 在线购物)',
+                    '(多模态识别 OR 多模态融合) AND (情绪识别 OR 情感识别) AND (行为干预 OR 决策支持)'
+                ],
+                keywords: {
+                    chinese: ['情绪识别', '情感计算', '冲动消费', '冷静期', '消费控制', '多模态识别', '行为干预'],
+                    english: ['Emotion Recognition', 'Affective Computing', 'Impulsive Buying', 'Cooling-off Period', 'Spending Control', 'Multimodal Recognition']
+                }
+            },
+            'P18': {
+                name: '消费趋势预测',
+                fullName: '基于时间序列分析的消费趋势预测方法',
+                queries: [
+                    '(时间序列 OR 时序分析 OR 时间序列预测) AND (消费预测 OR 消费趋势 OR 支出预测) AND (LSTM OR 长短期记忆网络 OR 循环神经网络)',
+                    '(财务预测 OR 预算预测 OR 支出预测) AND (深度学习 OR 神经网络 OR 机器学习) AND (趋势分析 OR 趋势预测)',
+                    '(LSTM OR RNN OR 循环神经网络) AND (季节性分解 OR 周期性分析) AND (异常检测 OR 异常识别)'
+                ],
+                keywords: {
+                    chinese: ['时间序列', '消费预测', 'LSTM', '趋势分析', '季节性分解', '异常检测', '深度学习'],
+                    english: ['Time Series', 'Spending Prediction', 'LSTM', 'Trend Analysis', 'Seasonal Decomposition', 'Anomaly Detection']
+                }
+            }
+        };
+
+        let currentPatent = null;
+        let searchRecords = [];
+
+        // 初始化
+        function init() {
+            const selector = document.getElementById('patentSelector');
+            Object.keys(patents).forEach(id => {
+                const btn = document.createElement('button');
+                btn.className = 'patent-btn';
+                btn.textContent = `${id} - ${patents[id].name}`;
+                btn.onclick = () => selectPatent(id);
+                selector.appendChild(btn);
+            });
+        }
+
+        // 选择专利
+        function selectPatent(id) {
+            currentPatent = id;
+            const patent = patents[id];
+
+            // 更新按钮状态
+            document.querySelectorAll('.patent-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // 显示专利信息
+            document.getElementById('patentInfo').style.display = 'block';
+            document.getElementById('patentTitle').textContent = patent.fullName;
+            document.getElementById('patentDesc').textContent = `专利ID: ${id}`;
+
+            // 显示检索式
+            const queriesSection = document.getElementById('queriesSection');
+            queriesSection.style.display = 'block';
+            const queriesList = document.getElementById('queriesList');
+            queriesList.innerHTML = '';
+            patent.queries.forEach((query, index) => {
+                const queryBox = document.createElement('div');
+                queryBox.className = 'query-box';
+                queryBox.innerHTML = `
+                    <h4>检索式 ${index + 1}：</h4>
+                    <div class="query-text">${query}</div>
+                    <button class="copy-btn" onclick="copyQuery('${query.replace(/'/g, "\\'")}')">复制</button>
+                `;
+                queriesList.appendChild(queryBox);
+            });
+
+            // 显示关键词
+            const keywordsSection = document.getElementById('keywordsSection');
+            keywordsSection.style.display = 'block';
+            const chineseKeywords = document.getElementById('chineseKeywords');
+            chineseKeywords.innerHTML = '';
+            patent.keywords.chinese.forEach(kw => {
+                const tag = document.createElement('span');
+                tag.className = 'keyword-tag';
+                tag.textContent = kw;
+                chineseKeywords.appendChild(tag);
+            });
+            const englishKeywords = document.getElementById('englishKeywords');
+            englishKeywords.innerHTML = '';
+            patent.keywords.english.forEach(kw => {
+                const tag = document.createElement('span');
+                tag.className = 'keyword-tag';
+                tag.textContent = kw;
+                englishKeywords.appendChild(tag);
+            });
+
+            // 显示记录表单
+            document.getElementById('recordSection').style.display = 'block';
+
+            // 加载已有记录
+            loadRecords();
+        }
+
+        // 复制检索式
+        function copyQuery(query) {
+            navigator.clipboard.writeText(query).then(() => {
+                alert('检索式已复制到剪贴板！');
+            });
+        }
+
+        // 保存记录
+        function saveRecord() {
+            if (!currentPatent) {
+                alert('请先选择专利！');
+                return;
+            }
+
+            const record = {
+                patent_id: currentPatent,
+                search_date: new Date().toISOString().split('T')[0],
+                database: document.getElementById('database').value,
+                query: document.getElementById('query').value,
+                total_results: parseInt(document.getElementById('totalResults').value) || 0,
+                relevant_results: parseInt(document.getElementById('relevantResults').value) || 0,
+                notes: document.getElementById('notes').value
+            };
+
+            searchRecords.push(record);
+            localStorage.setItem('searchRecords', JSON.stringify(searchRecords));
+
+            // 清空表单
+            document.getElementById('query').value = '';
+            document.getElementById('totalResults').value = '';
+            document.getElementById('relevantResults').value = '';
+            document.getElementById('notes').value = '';
+
+            // 刷新记录列表
+            loadRecords();
+
+            alert('记录已保存！');
+        }
+
+        // 加载记录
+        function loadRecords() {
+            const stored = localStorage.getItem('searchRecords');
+            if (stored) {
+                searchRecords = JSON.parse(stored);
+            }
+
+            const recordsList = document.getElementById('recordsList');
+            recordsList.innerHTML = '<h3 style="margin-top: 20px; color: #2c3e50;">已保存的检索记录：</h3>';
+
+            const patentRecords = searchRecords.filter(r => r.patent_id === currentPatent);
+            if (patentRecords.length === 0) {
+                recordsList.innerHTML += '<p style="color: #7f8c8d; margin-top: 10px;">暂无记录</p>';
+                return;
+            }
+
+            patentRecords.forEach((record, index) => {
+                const item = document.createElement('div');
+                item.className = 'record-item';
+                item.innerHTML = `
+                    <h4>记录 ${index + 1} - ${record.database}</h4>
+                    <p><strong>日期：</strong>${record.search_date}</p>
+                    <p><strong>检索式：</strong>${record.query}</p>
+                    <p><strong>结果数：</strong>${record.total_results} 篇（相关：${record.relevant_results} 篇）</p>
+                    ${record.notes ? `<p><strong>备注：</strong>${record.notes}</p>` : ''}
+                `;
+                recordsList.appendChild(item);
+            });
+        }
+
+        // 页面加载时初始化
+        window.onload = init;
+    </script>
+</body>
+</html>

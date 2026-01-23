@@ -1,0 +1,122 @@
+{
+  "patent_id": "P16",
+  "patent_dir": "docs/patents/patents/P16-订阅追踪检测",
+  "disclaimer": "⚠️ 以下为AI辅助分析意见,非最终法律结论",
+  "analysis": {
+    "technical_features": {
+      "name": "技术特征提取",
+      "type": "AI分析",
+      "features": [
+        {
+          "type": "算法",
+          "name": "周期性消费识别",
+          "description": "周期性消费识别\n输入:用户交易历史 Transactions\n输出:订阅列表 Subscriptions\n\n识别流程:\n1. 商户+金额分组:\n   - 按商户名称分组\n   - 同一商户按金额聚类(允许±5%误差)\n   - 形成候选订阅组\n\n2. 时间间隔分析:\n   - 计算相邻交易的时间间隔\n   - intervals = [t[i+1] - t[i] for i in range(n-..."
+        },
+        {
+          "type": "算法",
+          "name": "订阅稳定性评分",
+          "description": "订阅稳定性评分\n输入:订阅记录 Subscription\n输出:稳定性评分 StabilityScore ∈ [0, 100]\n\n评分维度:\n1. 金额稳定性(40分):\n   - 计算金额变异系数:CV = std(amounts) / mean(amounts)\n   - 评分:stability_amount = (1 - CV) × 40\n   - CV < 0.05: 40分(高度稳定)..."
+        },
+        {
+          "type": "算法",
+          "name": "订阅使用状态评估",
+          "description": "订阅使用状态评估\n输入:订阅记录 Subscription, 用户行为数据 Behaviors\n输出:使用状态 UsageStatus\n\n评估方法:\n1. 直接使用数据(如果可获取):\n   - 视频会员:观看次数、观看时长\n   - 音乐会员:播放次数、播放时长\n   - 健身房:打卡次数\n   - 云存储:上传/下载次数\n\n2. 间接推断(无直接数据时):\n   - 关联消费:订阅后是否有相关..."
+        },
+        {
+          "type": "算法",
+          "name": "浪费订阅检测",
+          "description": "浪费订阅检测\n输入:订阅记录 Subscription, 使用状态 UsageStatus\n输出:是否浪费 IsWaste, 潜在节省 PotentialSaving\n\n检测规则:\n1. 完全未使用(高优先级):\n   - 条件:3个月无使用记录\n   - 判定:浪费\n   - 节省:年度成本 × 100%\n\n2. 很少使用(中优先级):\n   - 条件:每季度使用1-2次\n   - 单次成本:年..."
+        },
+        {
+          "type": "算法",
+          "name": "智能续费提醒",
+          "description": "智能续费提醒\n输入:订阅列表 Subscriptions\n输出:提醒通知 Notifications\n\n提醒策略:\n1. 提醒时机:\n   - 提前7天发送首次提醒\n   - 提前3天发送二次提醒\n   - 提前1天发送最后提醒\n\n2. 提醒内容:\n   - 订阅名称和金额\n   - 使用状态评估\n   - 浪费检测结果\n   - 操作建议\n\n3. 提醒模板:\n   【订阅续费提醒】\n   服务:..."
+        }
+      ]
+    },
+    "technical_problem": {
+      "name": "技术问题识别",
+      "type": "AI判断",
+      "technical_problems": [],
+      "business_problems": [],
+      "risk_level": "high"
+    },
+    "technical_effects": {
+      "name": "技术效果分析",
+      "type": "AI判断",
+      "technical_effects": [
+        {
+          "keyword": "准确率",
+          "context": "[0016] 与现有技术相比,本发明具有以下有益效果:\n\n1. **自动识别准确率**:\n   - 传统方案:需要手动添加\n   - 本发明:自动识别准确率较高\n\n2. **浪费检测...",
+          "quantified": false
+        }
+      ],
+      "business_effects": [
+        {
+          "keyword": "用户满意度",
+          "context": "...- 传统方案:无量化\n   - 本发明:平均每用户年节省1,200-3,000元\n\n4. **用户满意度**:\n   - 传统方案:手动管理,满意度60%\n   - 本发明:自动管理,满意度85%\n\n5...."
+        }
+      ],
+      "quantified": false,
+      "risk_level": "medium"
+    },
+    "technical_means": {
+      "name": "技术手段分析",
+      "type": "AI分析",
+      "algorithms": {
+        "count": 5,
+        "found": true
+      },
+      "data_structures": [
+        "struct",
+        "数据结构"
+      ],
+      "system_architecture": [
+        "架构",
+        "模块"
+      ]
+    }
+  },
+  "ai_opinions": [
+    {
+      "type": "no_technical_problem",
+      "severity": "high",
+      "message": "AI判断:未明确识别到技术问题",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节",
+      "recommendation": "必须明确说明解决的技术问题"
+    },
+    {
+      "type": "business_effect_risk",
+      "severity": "medium",
+      "message": "AI判断:技术效果中包含1个商业指标",
+      "legal_basis": "《专利审查指南》第二部分第九章第5.2节",
+      "recommendation": "建议删除商业指标,仅保留技术指标"
+    },
+    {
+      "type": "effect_not_quantified",
+      "severity": "medium",
+      "message": "AI判断:技术效果未量化",
+      "legal_basis": "《专利审查指南》第二部分第二章第2.2.3节",
+      "recommendation": "建议量化技术效果,如'响应时间<80ms'、'准确率>95%'"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "high",
+      "type": "必须改进",
+      "message": "发现1个高风险问题,必须解决",
+      "items": [
+        "必须明确说明解决的技术问题"
+      ]
+    },
+    {
+      "priority": "medium",
+      "type": "建议优化",
+      "message": "发现2个中风险问题,建议优化",
+      "items": [
+        "建议删除商业指标,仅保留技术指标",
+        "建议量化技术效果,如'响应时间<80ms'、'准确率>95%'"
+      ]
+    }
+  ]
+}

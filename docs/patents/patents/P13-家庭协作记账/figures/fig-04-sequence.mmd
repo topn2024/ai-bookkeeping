@@ -1,0 +1,42 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+sequenceDiagram
+    participant A as 用户A(所有者)
+    participant B as 用户B(管理员)
+    participant S as 同步服务器
+    participant DB as 数据库
+
+    Note over A,B: 场景: A和B同时编辑同一条记录
+
+    A->>A: 编辑: 金额改为120元
+    A->>S: 提交修改(版本v2)
+    S->>S: 保存: 金额=120, 版本=v2
+    S-->>A: 同步成功
+
+    B->>B: 编辑: 分类改为交通
+    B->>S: 提交修改(版本v2)
+
+    S->>S: 检测冲突: 本地v2 ≠ 服务器v2
+    S->>S: 分析: 金额冲突(需手动)
+    S->>S: 分析: 分类冲突(需手动)
+
+    S-->>B: 冲突通知
+
+    B->>B: 查看冲突详情
+    B->>B: 选择: 金额=120(采用A)
+    B->>B: 选择: 分类=交通(采用自己)
+    B->>S: 提交解决方案
+
+    S->>DB: 保存合并结果(版本v3)
+    S-->>A: 同步更新
+    S-->>B: 同步完成
+
+    Note over A,B: 场景: 聚餐分摊
+
+    A->>S: 添加聚餐记录: 300元, 分摊给A,B,C
+    S->>S: 计算平均分摊: 100元/人
+    S->>S: 债务关系: B→A:100, C→A:100
+    S->>DB: 保存分摊记录
+
+    S-->>A: 通知: 已创建分摊
+    S-->>B: 通知: 您欠A 100元
+

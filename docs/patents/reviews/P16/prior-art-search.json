@@ -1,0 +1,135 @@
+{
+  "patent_id": "P16",
+  "patent_dir": "docs/patents/patents/P16-订阅追踪检测",
+  "disclaimer": "⚠️ 本检索报告基于关键词提取,实际检索需接入专利数据库API",
+  "search_keywords": [
+    "能与消费管理技术",
+    "理和浪费检测方法",
+    "订阅追踪与浪费检测"
+  ],
+  "patent_search": {
+    "status": "keywords_only",
+    "note": "需要接入国家知识产权局专利检索API (http://epub.cnipa.gov.cn/)",
+    "keywords": [
+      "能与消费管理技术",
+      "理和浪费检测方法",
+      "订阅追踪与浪费检测"
+    ],
+    "search_fields": [
+      "发明名称",
+      "摘要",
+      "权利要求",
+      "说明书"
+    ],
+    "search_formula": "(能与消费管理技术) OR (理和浪费检测方法) OR (订阅追踪与浪费检测)",
+    "filters": {
+      "专利类型": "发明专利",
+      "法律状态": "不限",
+      "申请日": "近10年"
+    },
+    "manual_steps": [
+      "1. 访问国家知识产权局专利检索系统",
+      "2. 使用上述关键词组合检索",
+      "3. 筛选相关度高的专利(至少5-10件)",
+      "4. 下载专利全文进行详细对比",
+      "5. 记录专利号、申请日、技术方案要点"
+    ]
+  },
+  "literature_search": {
+    "status": "keywords_only",
+    "note": "需要接入CNKI、万方、维普等学术数据库API",
+    "keywords": [
+      "能与消费管理技术",
+      "理和浪费检测方法",
+      "订阅追踪与浪费检测"
+    ],
+    "databases": [
+      {
+        "name": "中国知网(CNKI)",
+        "url": "https://www.cnki.net/",
+        "search_fields": [
+          "主题",
+          "关键词",
+          "摘要"
+        ]
+      },
+      {
+        "name": "万方数据",
+        "url": "https://www.wanfangdata.com.cn/",
+        "search_fields": [
+          "主题",
+          "关键词"
+        ]
+      }
+    ],
+    "search_formula": "能与消费管理技术 + 理和浪费检测方法 + 订阅追踪与浪费检测",
+    "filters": {
+      "文献类型": "学术期刊",
+      "发表时间": "近5年",
+      "学科分类": "计算机科学"
+    },
+    "manual_steps": [
+      "1. 访问CNKI或万方数据库",
+      "2. 使用关键词组合检索",
+      "3. 筛选相关度高的文献(至少3-5篇)",
+      "4. 下载全文阅读技术方案",
+      "5. 记录文献标题、作者、发表时间、技术要点"
+    ]
+  },
+  "github_search": {
+    "status": "keywords_only",
+    "note": "可通过GitHub API检索,但需要人工判断相关性",
+    "chinese_keywords": [
+      "能与消费管理技术",
+      "理和浪费检测方法",
+      "订阅追踪与浪费检测"
+    ],
+    "english_keywords": [],
+    "search_query": "",
+    "search_filters": {
+      "language": "Python OR JavaScript OR Java",
+      "stars": ">100",
+      "pushed": ">2020-01-01"
+    },
+    "manual_steps": [
+      "1. 访问 https://github.com/search",
+      "2. 搜索: ",
+      "3. 筛选相关开源项目(至少2-3个)",
+      "4. 阅读README和核心代码",
+      "5. 记录项目名称、star数、技术实现方式"
+    ]
+  },
+  "recommendations": [
+    {
+      "priority": "high",
+      "type": "必须执行",
+      "message": "进行专利检索以评估新颖性和创造性",
+      "steps": [
+        "使用关键词: 能与消费管理技术, 理和浪费检测方法, 订阅追踪与浪费检测",
+        "在国家知识产权局专利检索系统检索",
+        "重点关注申请日早于本专利的相关专利",
+        "至少找到5-10件相关专利进行对比"
+      ]
+    },
+    {
+      "priority": "medium",
+      "type": "建议执行",
+      "message": "检索学术文献了解技术背景",
+      "steps": [
+        "在CNKI或万方检索相关学术论文",
+        "了解该技术领域的研究现状",
+        "识别可能的现有技术组合"
+      ]
+    },
+    {
+      "priority": "low",
+      "type": "可选执行",
+      "message": "检索开源项目了解实现方式",
+      "steps": [
+        "在GitHub检索相关开源项目",
+        "了解常见的技术实现方式",
+        "评估本专利的技术方案是否为常规手段"
+      ]
+    }
+  ]
+}

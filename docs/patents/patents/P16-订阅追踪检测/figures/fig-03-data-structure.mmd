@@ -1,0 +1,74 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 订阅记录 {
+        +UUID id
+        +String merchant
+        +Decimal amount
+        +Enum cycle_type
+        +Integer cycle_days
+        +Date first_date
+        +Date last_date
+        +Integer transaction_count
+        +Float stability_score
+        +Enum usage_status
+        +Boolean is_waste
+        +Decimal annual_cost
+        +Decimal potential_saving
+        +创建订阅() void
+        +更新状态() void
+    }
+
+    class 周期性检测 {
+        +List intervals
+        +Float mean_interval
+        +Float std_interval
+        +Float cv
+        +判定周期类型() Enum
+        +确认周期性() Boolean
+    }
+
+    class 稳定性评分 {
+        +Float amount_score
+        +Float time_score
+        +Float duration_score
+        +Float total_score
+        +计算金额稳定性() Float
+        +计算时间稳定性() Float
+        +计算持续性() Float
+    }
+
+    class 使用状态评估 {
+        +Integer usage_count
+        +Date last_use_date
+        +Float usage_probability
+        +Enum status_level
+        +获取直接数据() Integer
+        +间接推断() Float
+        +时间衰减() Float
+    }
+
+    class 浪费检测结果 {
+        +Boolean is_waste
+        +String waste_type
+        +Decimal potential_saving
+        +String suggestion
+        +检测未使用() Boolean
+        +检测很少使用() Boolean
+        +检测重复() Boolean
+    }
+
+    class 提醒配置 {
+        +Integer days_before
+        +String template
+        +List options
+        +发送提醒() void
+        +记录决策() void
+        +学习偏好() void
+    }
+
+    订阅记录 --> 周期性检测 : 使用
+    订阅记录 --> 稳定性评分 : 计算
+    订阅记录 --> 使用状态评估 : 评估
+    使用状态评估 --> 浪费检测结果 : 触发
+    订阅记录 --> 提醒配置 : 关联
+

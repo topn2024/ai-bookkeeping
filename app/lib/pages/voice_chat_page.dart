@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/global_voice_assistant_provider.dart';
 import '../services/global_voice_assistant_manager.dart';
+import '../widgets/chat_message_list.dart';
 import 'transaction_list_page.dart';
 
 /// 6.12 连续对话记账页面
@@ -17,21 +18,16 @@ class VoiceChatPage extends ConsumerStatefulWidget {
 }
 
 class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
-  final ScrollController _scrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    // 滚动到底部
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
-    });
   }
 
   @override
+  @override
   void dispose() {
-    _scrollController.dispose();
     _textController.dispose();
     super.dispose();
   }
@@ -43,11 +39,6 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
     final messages = ref.watch(conversationHistoryProvider);
     final manager = ref.watch(globalVoiceAssistantProvider);
     final ballState = manager.ballState;
-
-    // 当消息变化时滚动到底部
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
-    });
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
@@ -87,18 +78,13 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
       ),
       body: Column(
         children: [
-          // 消息列表
+          // 消息列表（使用共享组件，统一滚动逻辑）
           Expanded(
-            child: messages.isEmpty
-                ? _buildEmptyState(l10n)
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      return _buildMessageBubble(messages[index]);
-                    },
-                  ),
+            child: ChatMessageListWidget(
+              messages: messages,
+              messageBuilder: (context, message) => _buildMessageBubble(message),
+              emptyBuilder: (context) => _buildEmptyState(l10n),
+            ),
           ),
           // 快捷问题
           _buildQuickQuestions(l10n),
@@ -170,6 +156,7 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
           ],
           Flexible(
             child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
               onTap: isTransactionFeedback ? () => _navigateToTransactions() : null,
               child: Container(
                 padding: const EdgeInsets.all(12),
@@ -622,18 +609,6 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
   }
 
   /// 滚动到底部
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
   /// 确认清除历史
   void _confirmClearHistory() {
     showDialog(

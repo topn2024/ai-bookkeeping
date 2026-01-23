@@ -1,0 +1,53 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+classDiagram
+    class 操作日志 {
+        +String op_id
+        +String op_type
+        +JSON data
+        +String checksum
+        +DateTime timestamp
+        +String device_id
+        +序列化() String
+        +验证校验和() Boolean
+    }
+
+    class CRDT数据结构 {
+        +LWWRegister 金额
+        +ORSet 标签
+        +PNCounter 余额
+        +MVRegister 冲突字段
+        +合并(other) CRDT
+    }
+
+    class 冲突解决策略 {
+        +String 字段名
+        +String 策略类型
+        +Float 优先级
+        +解决冲突(A, B) Value
+    }
+
+    class 一致性验证 {
+        +Decimal 计算余额
+        +Decimal 存储余额
+        +Decimal 差异
+        +验证账户() Boolean
+        +验证预算() Boolean
+        +验证资金池() Boolean
+        +自动修复() void
+    }
+
+    class 同步状态 {
+        +DateTime 最后同步时间
+        +String 检查点ID
+        +Integer 待同步操作数
+        +Boolean 同步中
+        +开始同步() void
+        +完成同步() void
+        +断点续传() void
+    }
+
+    操作日志 --> CRDT数据结构 : 转换
+    CRDT数据结构 --> 冲突解决策略 : 使用
+    冲突解决策略 --> 一致性验证 : 验证
+    同步状态 --> 操作日志 : 管理
+

@@ -1,0 +1,66 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+graph TB
+    subgraph 数据输入层
+        CSV[CSV文件]
+        PDF[PDF账单]
+        IMG[图片账单]
+        EXCEL[Excel文件]
+    end
+
+    subgraph 格式识别层
+        DETECT[格式检测器]
+        PARSER[多格式解析器]
+        OCR[OCR引擎]
+    end
+
+    subgraph 金额精度保护
+        DECIMAL[Decimal类型转换]
+        ROUND[银行家舍入]
+        VALIDATE[金额校验]
+    end
+
+    subgraph 批量处理引擎
+        CHUNK[分片处理器]
+        PARALLEL[并行解析]
+        MERGE[结果合并]
+        DEDUP[去重引擎]
+    end
+
+    subgraph 数据一致性
+        UNIFY[统一数据模型]
+        CONSIST[一致性校验]
+        MERCHANT[商户标准化]
+    end
+
+    subgraph 合规检查
+        TAX[税务合规]
+        EXPENSE[报销规则]
+        INVOICE[发票匹配]
+    end
+
+    CSV --> DETECT
+    PDF --> DETECT
+    IMG --> DETECT
+    EXCEL --> DETECT
+
+    DETECT --> PARSER
+    DETECT --> OCR
+    PARSER --> DECIMAL
+    OCR --> DECIMAL
+
+    DECIMAL --> ROUND
+    ROUND --> VALIDATE
+
+    VALIDATE --> CHUNK
+    CHUNK --> PARALLEL
+    PARALLEL --> MERGE
+    MERGE --> DEDUP
+
+    DEDUP --> UNIFY
+    UNIFY --> CONSIST
+    CONSIST --> MERCHANT
+
+    MERCHANT --> TAX
+    TAX --> EXPENSE
+    EXPENSE --> INVOICE
+

@@ -1,0 +1,53 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000', 'fontFamily': 'SimHei, Arial'}}}%%
+flowchart TD
+    Start([开始]) --> Collect[/收集债务数据/]
+    Collect --> CalcDTI[计算债务收入比]
+    CalcDTI --> CalcPayment[计算还款比]
+
+    CalcPayment --> HealthLevel{健康等级判定}
+    HealthLevel -->|DTI≤20%| Green[健康-绿色]
+    HealthLevel -->|20%<DTI≤30%| Yellow[轻度负债-黄色]
+    HealthLevel -->|30%<DTI≤40%| Orange[中度负债-橙色]
+    HealthLevel -->|40%<DTI≤50%| Red[重度负债-红色]
+    HealthLevel -->|DTI>50%| DarkRed[危险-深红]
+
+    Green --> SelectStrategy{选择还款策略}
+    Yellow --> SelectStrategy
+    Orange --> SelectStrategy
+    Red --> SelectStrategy
+    DarkRed --> SelectStrategy
+
+    SelectStrategy -->|心理型| Snowball[雪球法: 优先小额]
+    SelectStrategy -->|理性型| Avalanche[雪崩法: 优先高息]
+    SelectStrategy -->|平衡型| Hybrid[混合策略]
+
+    Snowball --> SortBalance[按余额升序排序]
+    Avalanche --> SortRate[按利率降序排序]
+    Hybrid --> Phase1[阶段1: 雪球法清小额]
+
+    SortBalance --> PayMin[支付所有最低还款]
+    SortRate --> PayMin
+    Phase1 --> PayMin2[支付所有最低还款]
+
+    PayMin --> CalcExtra[计算剩余金额]
+    PayMin2 --> CalcExtra
+
+    CalcExtra --> AllocExtra[分配额外还款]
+    AllocExtra --> SnowballTarget[目标: 余额最小]
+    AllocExtra --> AvalancheTarget[目标: 利率最高]
+
+    SnowballTarget --> PayExtra[执行额外还款]
+    AvalancheTarget --> PayExtra
+
+    PayExtra --> CheckCleared{是否还清?}
+    CheckCleared -->|是| FreeAmount[释放还款额滚动]
+    CheckCleared -->|否| NextMonth[下月继续]
+
+    FreeAmount --> NextDebt[转向下一笔债务]
+    NextDebt --> NextMonth
+
+    NextMonth --> CalcInterest[计算月利息]
+    CalcInterest --> CompareStrategy[策略对比]
+    CompareStrategy --> Report[/生成还款报告/]
+    Report --> End([结束])
+

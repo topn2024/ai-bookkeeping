@@ -12,6 +12,7 @@ class UserProfile {
   final FinancialFeatures financialFeatures;
   final PersonalityTraits personalityTraits;
   final LifeStage lifeStage;
+  final ConversationPreferences conversationPreferences;
   final DateTime lastUpdated;
   final int dataConfidence; // 0-100, 数据置信度
 
@@ -22,6 +23,7 @@ class UserProfile {
     required this.financialFeatures,
     required this.personalityTraits,
     required this.lifeStage,
+    this.conversationPreferences = const ConversationPreferences(),
     required this.lastUpdated,
     required this.dataConfidence,
   });
@@ -35,6 +37,8 @@ class UserProfile {
 - 沟通偏好: ${personalityTraits.communicationStyle.label}
 - 敏感话题: ${personalityTraits.sensitiveTacics.join('、')}
 - 近期关注: ${lifeStage.currentFocus ?? '无特别关注'}
+- 对话风格: ${conversationPreferences.dialogStyle.label}
+- 主动对话: ${conversationPreferences.likesProactiveChat ? '喜欢' : '不喜欢'}
 ''';
   }
 
@@ -290,6 +294,65 @@ enum FamilyStatus { single, married, withChildren, emptyNest }
 
 /// 职业类型
 enum CareerType { employed, freelance, entrepreneur, retired }
+
+/// 对话偏好
+class ConversationPreferences {
+  /// 是否喜欢主动发起对话
+  final bool likesProactiveChat;
+
+  /// 沉默容忍度（秒），超过这个时间智能体可以主动说话
+  final int silenceToleranceSeconds;
+
+  /// 感兴趣的话题
+  final List<String> favoriteTopics;
+
+  /// 是否喜欢快速确认（简短回复）
+  final bool prefersQuickConfirm;
+
+  /// 对话风格
+  final VoiceDialogStyle dialogStyle;
+
+  /// 打断敏感度（0-1，越高越容易被打断）
+  final double interruptSensitivity;
+
+  const ConversationPreferences({
+    this.likesProactiveChat = true,
+    this.silenceToleranceSeconds = 5,
+    this.favoriteTopics = const [],
+    this.prefersQuickConfirm = true,
+    this.dialogStyle = VoiceDialogStyle.neutral,
+    this.interruptSensitivity = 0.5,
+  });
+}
+
+/// 语音对话风格
+enum VoiceDialogStyle {
+  professional,  // 专业简洁
+  playful,       // 活泼有趣
+  supportive,    // 温暖支持
+  dataFocused,   // 数据导向
+  casual,        // 随意轻松
+  neutral,       // 中性平衡
+}
+
+extension VoiceDialogStyleExtension on VoiceDialogStyle {
+  String get label {
+    switch (this) {
+      case VoiceDialogStyle.professional:
+        return '专业简洁';
+      case VoiceDialogStyle.playful:
+        return '活泼有趣';
+      case VoiceDialogStyle.supportive:
+        return '温暖支持';
+      case VoiceDialogStyle.dataFocused:
+        return '数据导向';
+      case VoiceDialogStyle.casual:
+        return '随意轻松';
+      case VoiceDialogStyle.neutral:
+        return '中性平衡';
+    }
+  }
+}
 
 // ==================== 用户画像分析引擎 ====================
 

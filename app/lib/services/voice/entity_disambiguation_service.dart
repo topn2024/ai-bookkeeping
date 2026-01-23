@@ -89,26 +89,44 @@ class EntityDisambiguationService extends ChangeNotifier {
     required TransactionQueryCallback queryCallback,
     DisambiguationContext? context,
   }) async {
+    debugPrint('[Disambiguate] 开始消歧: "$userInput"');
+
     // Step 1: 指代识别
     final references = _detectReferences(userInput);
+    debugPrint('[Disambiguate] 检测到指代: ${references.map((r) => '${r.type}:${r.rawText}').toList()}');
     if (references.isEmpty) {
+      debugPrint('[Disambiguate] 未检测到指代，返回noReference');
       return DisambiguationResult.noReference();
     }
 
     // Step 2: 构建查询条件
     final queryConditions = _buildQueryConditions(references, context);
+    debugPrint('[Disambiguate] 查询条件: startDate=${queryConditions.startDate}, endDate=${queryConditions.endDate}, limit=${queryConditions.limit}');
 
     // Step 3: 候选记录检索
     final candidates = await queryCallback(queryConditions);
+    debugPrint('[Disambiguate] 查询到${candidates.length}条候选记录');
+    for (var i = 0; i < candidates.length && i < 5; i++) {
+      final c = candidates[i];
+      debugPrint('[Disambiguate]   [$i] ${c.category} ¥${c.amount} ${c.date}');
+    }
     if (candidates.isEmpty) {
+      debugPrint('[Disambiguate] 无候选记录，返回noMatch');
       return DisambiguationResult.noMatch(references);
     }
 
     // Step 4: 计算置信度并排序
     final scoredCandidates = _scoreCandidates(candidates, references, context);
+    debugPrint('[Disambiguate] 评分结果:');
+    for (var i = 0; i < scoredCandidates.length && i < 5; i++) {
+      final sc = scoredCandidates[i];
+      debugPrint('[Disambiguate]   [$i] ${sc.record.category} ¥${sc.record.amount} 置信度=${sc.confidence}');
+    }
 
     // Step 5: 消歧决策
-    return _makeDecision(scoredCandidates, references);
+    final result = _makeDecision(scoredCandidates, references);
+    debugPrint('[Disambiguate] 决策结果: status=${result.status}, resolved=${result.resolvedRecord?.amount}');
+    return result;
   }
 
   /// 检测指代词
@@ -361,7 +379,15 @@ class EntityDisambiguationService extends ChangeNotifier {
   ) {
     final scored = <ScoredCandidate>[];
 
-    for (final candidate in candidates) {
+    // 检查是否有顺序指代（如"上一笔"、"最后一笔"）
+    final orderRefs = references.where((r) => r.type == ReferenceType.order).toList();
+    OrderInfo? orderInfo;
+    if (orderRefs.isNotEmpty) {
+      orderInfo = _parseOrderReference(orderRefs.first);
+    }
+
+    for (var i = 0; i < candidates.length; i++) {
+      final candidate = candidates[i];
       double score = 0.0; // 从0开始，只有匹配才加分
 
       for (final ref in references) {
@@ -394,6 +420,26 @@ class EntityDisambiguationService extends ChangeNotifier {
             }
             break;
           case ReferenceType.order:
+            // 顺序指代的处理：根据位置计算分数
+            // 候选记录已按日期降序排列（最新在前）
+            if (orderInfo != null) {
+              if (orderInfo.direction == OrderDirection.latest) {
+                // "上一笔"、"最后一笔"：第一个记录得分最高
+                if (i == orderInfo.index) {
+                  score += 0.9; // 位置精确匹配，给予高分
+                } else if (i < 3) {
+                  score += 0.3 - (i * 0.1); // 前几个也给一些分数
+                }
+              } else {
+                // "第一笔"、"最早的"：最后一个记录得分最高
+                final reverseIndex = candidates.length - 1 - i;
+                if (reverseIndex == orderInfo.index) {
+                  score += 0.9;
+                } else if (reverseIndex < 3) {
+                  score += 0.3 - (reverseIndex * 0.1);
+                }
+              }
+            }
             break;
         }
       }
