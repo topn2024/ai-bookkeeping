@@ -27,7 +27,7 @@ class StreamingTTSService {
   /// 使用 zhitian_emo（知甜情感女声）- 更自然动听的年轻女性声音
   String _voice = 'zhitian_emo';
   double _rate = 0;
-  double _volume = 50;
+  double _volume = 90;  // 默认音量调高到90%
   double _pitch = 0;
 
   /// 是否使用PCM模式（用于AEC）

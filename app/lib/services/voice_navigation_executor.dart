@@ -9,6 +9,8 @@ import '../pages/ai/ai_learning_report_page.dart';
 import '../pages/voice_learning_report_page.dart';
 import '../pages/voice_assistant_settings_page.dart';
 import '../pages/quick_entry_page.dart';
+import '../pages/transaction_list_page.dart';
+import '../pages/category_detail_page.dart';
 import 'voice_navigation_service.dart';
 
 /// 语音导航执行器
@@ -66,16 +68,19 @@ class VoiceNavigationExecutor {
   }
 
   /// 根据路由导航到对应页面
-  Future<bool> _navigateToRoute(String route) async {
+  /// [params] 可选的导航参数，如 category、timeRange、source 等
+  Future<bool> _navigateToRoute(String route, {Map<String, dynamic>? params}) async {
     final navigator = navigatorKey.currentState;
 
-    // 首先尝试使用底部导航切换（对于主要页面）
-    if (_tryTabSwitch(route)) {
-      return true;
+    // 首先尝试使用底部导航切换（对于主要页面，且没有筛选参数时）
+    if (params == null || params.isEmpty) {
+      if (_tryTabSwitch(route)) {
+        return true;
+      }
     }
 
     // 对于首页路由，如果标签切换失败但已经在首页，返回成功
-    if (route == '/' || route == '/home') {
+    if ((route == '/' || route == '/home') && (params == null || params.isEmpty)) {
       debugPrint('[VoiceNavigationExecutor] 首页路由，标签切换器未设置，可能已在首页');
       // 不认为是失败，因为用户可能已经在首页
       return true;
@@ -87,8 +92,8 @@ class VoiceNavigationExecutor {
       return false;
     }
 
-    // 获取对应的页面 Widget
-    final page = _getPageForRoute(route);
+    // 获取对应的页面 Widget（传递参数）
+    final page = _getPageForRoute(route, params);
     if (page == null) {
       debugPrint('[VoiceNavigationExecutor] 未找到路由对应的页面: $route');
       return false;
@@ -133,8 +138,42 @@ class VoiceNavigationExecutor {
   }
 
   /// 根据路由获取页面 Widget
-  Widget? _getPageForRoute(String route) {
-    // 主要页面路由映射
+  /// [params] 可选的导航参数，如 category、timeRange、source 等
+  Widget? _getPageForRoute(String route, [Map<String, dynamic>? params]) {
+    // 解析时间范围
+    DateTimeRange? timeRange;
+    if (params != null && params.containsKey('timeRange')) {
+      timeRange = _parseTimeRange(params['timeRange'] as String?);
+    }
+
+    // 提取分类和来源参数
+    final category = params?['category'] as String?;
+    final source = params?['source'] as String?;
+
+    // 需要参数的页面路由
+    switch (route) {
+      case '/transaction-list':
+      case '/transactions':
+        return TransactionListPage(
+          initialCategory: category,
+          initialSource: source,
+          initialDateRange: timeRange,
+        );
+
+      case '/statistics':
+      case '/reports':
+      case '/analysis':
+        // 如果有分类参数，跳转到分类详情页
+        if (category != null) {
+          return CategoryDetailPage(
+            categoryId: _mapCategoryNameToId(category),
+            selectedMonth: timeRange?.start,
+          );
+        }
+        return const AnalysisCenterPage();
+    }
+
+    // 主要页面路由映射（无参数版本）
     final pageMap = <String, Widget Function()>{
       // 快速记账
       '/quick-add': () => const QuickEntryPage(),
@@ -143,11 +182,6 @@ class VoiceNavigationExecutor {
       // 设置相关
       '/settings': () => const SettingsPage(),
       '/settings/general': () => const SettingsPage(),
-
-      // 统计报表/分析
-      '/reports': () => const AnalysisCenterPage(),
-      '/statistics': () => const AnalysisCenterPage(),
-      '/analysis': () => const AnalysisCenterPage(),
 
       // 预算
       '/budget': () => const BudgetCenterPage(),
@@ -189,12 +223,80 @@ class VoiceNavigationExecutor {
     return null;
   }
 
+  /// 解析时间范围字符串为 DateTimeRange
+  DateTimeRange? _parseTimeRange(String? timeRangeStr) {
+    if (timeRangeStr == null || timeRangeStr.isEmpty) return null;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    switch (timeRangeStr) {
+      case '今天':
+        return DateTimeRange(
+          start: today,
+          end: today.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1)),
+        );
+      case '昨天':
+        final yesterday = today.subtract(const Duration(days: 1));
+        return DateTimeRange(
+          start: yesterday,
+          end: today.subtract(const Duration(milliseconds: 1)),
+        );
+      case '本周':
+        final weekStart = today.subtract(Duration(days: now.weekday - 1));
+        return DateTimeRange(
+          start: weekStart,
+          end: today.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1)),
+        );
+      case '上周':
+        final lastWeekStart = today.subtract(Duration(days: now.weekday + 6));
+        final lastWeekEnd = today.subtract(Duration(days: now.weekday));
+        return DateTimeRange(
+          start: lastWeekStart,
+          end: lastWeekEnd.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1)),
+        );
+      case '本月':
+        final monthStart = DateTime(now.year, now.month, 1);
+        return DateTimeRange(
+          start: monthStart,
+          end: today.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1)),
+        );
+      case '上月':
+        final lastMonthStart = now.month == 1
+            ? DateTime(now.year - 1, 12, 1)
+            : DateTime(now.year, now.month - 1, 1);
+        final thisMonthStart = DateTime(now.year, now.month, 1);
+        return DateTimeRange(
+          start: lastMonthStart,
+          end: thisMonthStart.subtract(const Duration(milliseconds: 1)),
+        );
+      default:
+        return null;
+    }
+  }
+
+  /// 将分类名称映射为分类ID
+  String _mapCategoryNameToId(String categoryName) {
+    // 常见分类名称到ID的映射
+    const categoryMap = {
+      '餐饮': 'food',
+      '交通': 'transport',
+      '购物': 'shopping',
+      '娱乐': 'entertainment',
+      '居住': 'housing',
+      '医疗': 'medical',
+      '其他': 'other',
+    };
+    return categoryMap[categoryName] ?? categoryName.toLowerCase();
+  }
+
   /// 直接导航到指定路由（不需要重新解析）
   ///
   /// 供外部直接传入路由时使用
-  Future<bool> navigateToRoute(String route) async {
-    debugPrint('[VoiceNavigationExecutor] navigateToRoute: $route');
-    return await _navigateToRoute(route);
+  /// [params] 可选的导航参数，如 category、timeRange、source 等
+  Future<bool> navigateToRoute(String route, {Map<String, dynamic>? params}) async {
+    debugPrint('[VoiceNavigationExecutor] navigateToRoute: $route, params: $params');
+    return await _navigateToRoute(route, params: params);
   }
 
   /// 返回上一页

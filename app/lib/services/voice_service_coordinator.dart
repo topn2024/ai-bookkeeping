@@ -18,6 +18,7 @@ import 'voice/smart_intent_recognizer.dart';
 import 'voice/llm_response_generator.dart';
 import 'voice/intelligence_engine/intelligence_engine.dart';
 import 'voice/intelligence_engine/result_buffer.dart';
+import 'voice/intelligence_engine/models.dart';
 import 'voice/agent/hybrid_intent_router.dart' show NetworkStatus;
 import 'voice/adapters/bookkeeping_operation_adapter.dart';
 import 'voice/adapters/bookkeeping_feedback_adapter.dart';
@@ -305,6 +306,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       }
       // 设置延迟响应回调（deferred操作聚合后的响应）
       _intelligenceEngine!.onDeferredResponse = _handleDeferredResponse;
+
+      // 注册导航操作回调
+      _intelligenceEngine!.registerNavigationCallback(_handleNavigationResult);
     }
 
     _agentModeEnabled = true;
@@ -326,6 +330,31 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     } else {
       // 非流水线模式，直接播放TTS
       _speakWithSkipCheck(response);
+    }
+  }
+
+  /// 处理导航操作结果
+  ///
+  /// 当导航操作执行成功时，提取路由和参数并实际执行导航
+  Future<void> _handleNavigationResult(ExecutionResult result) async {
+    if (!result.success || result.data == null) {
+      return;
+    }
+
+    final data = result.data!;
+    final route = data['route'] as String?;
+    final navigationParams = data['navigationParams'] as Map<String, dynamic>?;
+
+    if (route != null) {
+      debugPrint('[VoiceCoordinator] 执行导航: route=$route, params=$navigationParams');
+      try {
+        await VoiceNavigationExecutor.instance.navigateToRoute(
+          route,
+          params: navigationParams,
+        );
+      } catch (e) {
+        debugPrint('[VoiceCoordinator] 导航执行失败: $e');
+      }
     }
   }
 

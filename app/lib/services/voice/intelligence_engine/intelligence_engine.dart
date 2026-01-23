@@ -80,6 +80,12 @@ class IntelligenceEngine {
   /// 参数：响应文本
   void Function(String response)? onDeferredResponse;
 
+  /// 导航操作回调
+  ///
+  /// 当导航操作执行成功时，通过此回调通知外部执行实际导航
+  /// 参数：ExecutionResult（包含 route 和 navigationParams）
+  Future<void> Function(ExecutionResult result)? _navigationCallback;
+
   IntelligenceEngine({
     required this.operationAdapter,
     required this.feedbackAdapter,
@@ -92,6 +98,31 @@ class IntelligenceEngine {
     );
     _resultBuffer = ResultBuffer();
     _timingJudge = TimingJudge();
+
+    // 注册执行结果回调，监听导航操作
+    _processor.executionChannel.registerCallback(_handleExecutionResult);
+  }
+
+  /// 处理执行结果
+  ///
+  /// 检查是否为导航操作，如果是则调用导航回调
+  void _handleExecutionResult(ExecutionResult result) {
+    if (result.success && result.data != null) {
+      final data = result.data!;
+      // 检查是否为导航操作（包含 route 字段）
+      if (data.containsKey('route') && _navigationCallback != null) {
+        debugPrint('[IntelligenceEngine] 检测到导航操作，触发回调');
+        _navigationCallback!(result);
+      }
+    }
+  }
+
+  /// 注册导航操作回调
+  ///
+  /// 当导航操作执行成功时，会调用此回调
+  void registerNavigationCallback(Future<void> Function(ExecutionResult result) callback) {
+    _navigationCallback = callback;
+    debugPrint('[IntelligenceEngine] 导航回调已注册');
   }
 
   /// 获取结果缓冲器（供外部查询待通知结果）

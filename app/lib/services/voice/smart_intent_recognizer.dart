@@ -303,6 +303,14 @@ class SmartIntentRecognizer {
 【分类】餐饮、交通、购物、娱乐、居住、医疗、其他
 【常用页面】$pageList
 
+【导航操作参数】
+- targetPage: 目标页面名称（如"交易列表"、"统计"等）
+- route: 目标路由（可选，如"/transaction-list"）
+- category: 分类筛选（餐饮/交通/购物/娱乐/居住/医疗/其他）
+- timeRange: 时间范围（今天/昨天/本周/本月/上月）
+- source: 来源筛选（支付宝/微信/银行卡等）
+- account: 账户筛选
+
 【示例】
 输入："打车35，吃饭50"
 输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":35,"category":"交通","note":"打车"}},{"type":"add_transaction","priority":"deferred","params":{"amount":50,"category":"餐饮","note":"吃饭"}}],"chat_content":null,"clarify_question":null}
@@ -348,6 +356,21 @@ class SmartIntentRecognizer {
 
 输入："你好"
 输出：{"result_type":"chat","operations":[],"chat_content":"你好","clarify_question":null}
+
+输入："查看餐饮类的账单"
+输出：{"result_type":"operation","operations":[{"type":"navigate","priority":"immediate","params":{"targetPage":"交易列表","route":"/transaction-list","category":"餐饮"}}],"chat_content":null,"clarify_question":null}
+
+输入："看看本周的交通消费"
+输出：{"result_type":"operation","operations":[{"type":"navigate","priority":"immediate","params":{"targetPage":"统计","route":"/statistics","category":"交通","timeRange":"本周"}}],"chat_content":null,"clarify_question":null}
+
+输入："查看支付宝的支出"
+输出：{"result_type":"operation","operations":[{"type":"navigate","priority":"immediate","params":{"targetPage":"交易列表","route":"/transaction-list","source":"支付宝"}}],"chat_content":null,"clarify_question":null}
+
+输入："打开本月的购物记录"
+输出：{"result_type":"operation","operations":[{"type":"navigate","priority":"immediate","params":{"targetPage":"交易列表","route":"/transaction-list","category":"购物","timeRange":"本月"}}],"chat_content":null,"clarify_question":null}
+
+输入："看看昨天的账单"
+输出：{"result_type":"operation","operations":[{"type":"navigate","priority":"immediate","params":{"targetPage":"交易列表","route":"/transaction-list","timeRange":"昨天"}}],"chat_content":null,"clarify_question":null}
 
 只返回JSON：''';
   }

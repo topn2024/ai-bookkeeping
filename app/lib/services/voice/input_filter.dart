@@ -104,6 +104,53 @@ class InputFilterResult {
 /// 使用纯规则实现，确保 <10ms 的响应时间
 class InputFilter {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ASR质量验证模式（过滤误识别内容）
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /// 时间/度量单位模式（数字+单位，不是金额）
+  /// 如："0.5秒"、"3分钟"、"2小时"、"5点钟"
+  static final _timeMeasurementPattern = RegExp(
+    r'(\d+(?:\.\d+)?)\s*(秒|分钟|分|小时|点钟|点半|毫秒|天|周|个月|年)',
+  );
+
+  /// 疑问句中的数字比较模式（不是金额）
+  /// 如："0.5秒还是0.8秒？"、"是3还是5？"
+  static final _comparisonQuestionPattern = RegExp(
+    r'(\d+(?:\.\d+)?).*(还是|或者|是不是).*(\d+(?:\.\d+)?)',
+  );
+
+  /// ASR误识别常见模式（无意义对话片段）
+  static const _asrMisrecognitionPatterns = <String>[
+    '做这种生意',
+    '结果还是有点难度',
+    '我是在晓得',
+    '那个结果',
+    '看来我是',
+    '不太清楚',
+    '没有问题',
+  ];
+
+  /// 记账相关关键词（有这些词的输入才可能是有效记账指令）
+  static const _bookkeepingKeywords = <String>[
+    // 金额单位
+    '元', '块', '块钱', '毛', '分', '角',
+    // 消费动词
+    '花', '买', '吃', '喝', '打车', '坐车', '付', '消费', '支出',
+    // 收入动词
+    '收', '赚', '收入', '进账', '到账', '工资', '奖金',
+    // 记账动词
+    '记', '记录', '记一笔', '加一笔', '添加',
+    // 查询动词
+    '查', '看', '打开', '统计', '报表',
+    // 分类关键词
+    '餐饮', '交通', '购物', '娱乐', '居住', '医疗', '通讯',
+    '早餐', '午餐', '晚餐', '外卖', '咖啡', '奶茶',
+    '地铁', '公交', '出租', '高铁', '飞机', '加油',
+    '超市', '商场', '淘宝', '京东', '网购',
+    '房租', '水电', '物业', '话费', '网费',
+  ];
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 噪音模式（语气词、填充词）
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -334,6 +381,15 @@ class InputFilter {
       );
     }
 
+    // 1.5 ASR质量验证（过滤误识别内容）
+    if (_isASRMisrecognition(trimmed)) {
+      debugPrint('[InputFilter] 分类: noise (ASR误识别)');
+      return InputFilterResult(
+        category: InputCategory.noise,
+        originalInput: input,
+      );
+    }
+
     // 2. 检测反馈（用户确认/取消等优先于情绪）
     final feedbackResult = _detectFeedback(normalized);
     if (feedbackResult != null) {
@@ -409,6 +465,56 @@ class InputFilter {
     final firstChar = input[0];
     if (_noiseExactPatterns.contains(firstChar)) {
       return input.split('').every((c) => c == firstChar);
+    }
+
+    return false;
+  }
+
+  /// 检测是否为ASR误识别内容
+  ///
+  /// 过滤以下情况：
+  /// 1. 数字出现在时间/度量单位上下文中（如"0.5秒"）
+  /// 2. 疑问句中的数字比较（如"0.5秒还是0.8秒？"）
+  /// 3. 常见的ASR误识别片段
+  /// 4. 包含数字但没有记账关键词的长句
+  bool _isASRMisrecognition(String input) {
+    // 1. 检测时间/度量单位中的数字（如"0.5秒"、"3分钟"）
+    if (_timeMeasurementPattern.hasMatch(input)) {
+      // 检查是否同时有金额单位（如"3分钟花了50块"是有效的）
+      final hasMoneyKeyword = ['元', '块', '块钱', '毛'].any((k) => input.contains(k));
+      if (!hasMoneyKeyword) {
+        debugPrint('[InputFilter] ASR误识别: 时间/度量单位中的数字 - "$input"');
+        return true;
+      }
+    }
+
+    // 2. 检测疑问句中的数字比较（如"0.5秒还是0.8秒？"）
+    if (_comparisonQuestionPattern.hasMatch(input)) {
+      // 检查是否有记账相关关键词
+      final hasBookkeepingKeyword = _bookkeepingKeywords.any((k) => input.contains(k));
+      if (!hasBookkeepingKeyword) {
+        debugPrint('[InputFilter] ASR误识别: 疑问句中的数字比较 - "$input"');
+        return true;
+      }
+    }
+
+    // 3. 检测常见的ASR误识别片段
+    for (final pattern in _asrMisrecognitionPatterns) {
+      if (input.contains(pattern)) {
+        debugPrint('[InputFilter] ASR误识别: 常见误识别片段 - "$input"');
+        return true;
+      }
+    }
+
+    // 4. 包含数字但没有记账关键词的长句（超过15个字符）
+    // 有效的记账指令通常比较简短，或者包含明确的记账关键词
+    final hasNumber = RegExp(r'\d').hasMatch(input);
+    if (hasNumber && input.length > 15) {
+      final hasBookkeepingKeyword = _bookkeepingKeywords.any((k) => input.contains(k));
+      if (!hasBookkeepingKeyword) {
+        debugPrint('[InputFilter] ASR误识别: 长句中的数字但无记账关键词 - "$input"');
+        return true;
+      }
     }
 
     return false;

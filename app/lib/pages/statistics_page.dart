@@ -13,7 +13,17 @@ import 'period_comparison_page.dart';
 enum StatsPeriod { day, week, month, year }
 
 class StatisticsPage extends ConsumerStatefulWidget {
-  const StatisticsPage({super.key});
+  /// 初始统计周期
+  final StatsPeriod? initialPeriod;
+
+  /// 初始日期（用于确定显示哪个时间段）
+  final DateTime? initialDate;
+
+  const StatisticsPage({
+    super.key,
+    this.initialPeriod,
+    this.initialDate,
+  });
 
   @override
   ConsumerState<StatisticsPage> createState() => _StatisticsPageState();

@@ -334,29 +334,46 @@ class BookkeepingOperationAdapter implements OperationAdapter {
 
     debugPrint('[BookkeepingOperationAdapter] 导航: $targetPage, $route');
 
+    // 提取导航参数
+    final navigationParams = <String, dynamic>{};
+    if (params.containsKey('category')) {
+      navigationParams['category'] = params['category'];
+    }
+    if (params.containsKey('timeRange')) {
+      navigationParams['timeRange'] = params['timeRange'];
+    }
+    if (params.containsKey('source')) {
+      navigationParams['source'] = params['source'];
+    }
+    if (params.containsKey('account')) {
+      navigationParams['account'] = params['account'];
+    }
+
+    debugPrint('[BookkeepingOperationAdapter] 导航参数: $navigationParams');
+
     try {
-      // 如果提供了具体的route，直接使用
-      if (route != null) {
+      // 解析路由
+      String? finalRoute = route;
+      String? pageName = targetPage;
+
+      if (finalRoute == null && targetPage != null) {
+        final navigationResult = _navigationService.parseNavigation(targetPage);
+        if (navigationResult.success) {
+          finalRoute = navigationResult.route;
+          pageName = navigationResult.pageName;
+        }
+      }
+
+      if (finalRoute != null) {
         return ExecutionResult.success(data: {
-          'route': route,
+          'route': finalRoute,
           'targetPage': targetPage,
+          'pageName': pageName,
+          'navigationParams': navigationParams,  // 传递导航参数
         });
       }
 
-      // 否则使用VoiceNavigationService解析目标页面
-      final navigationResult = _navigationService.parseNavigation(targetPage!);
-
-      if (navigationResult.success) {
-        return ExecutionResult.success(data: {
-          'route': navigationResult.route,
-          'pageName': navigationResult.pageName,
-          'confidence': navigationResult.confidence,
-        });
-      } else {
-        return ExecutionResult.failure(
-          navigationResult.errorMessage ?? '导航失败'
-        );
-      }
+      return ExecutionResult.failure('无法识别导航目标');
     } catch (e) {
       debugPrint('[BookkeepingOperationAdapter] 导航失败: $e');
       return ExecutionResult.failure('导航失败: $e');

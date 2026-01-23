@@ -419,7 +419,7 @@ class VoiceNavigationService extends ChangeNotifier {
       route: '/statistics/category',
       name: '分类统计',
       module: '统计报表',
-      aliases: ['分类统计', '按分类看'],
+      aliases: ['分类统计', '按分类看', '分类查看账单', '按分类查看', '分类看账单', '查看分类账单', '分类账单'],
       voiceAdaptation: VoiceAdaptation.high,
     ),
     '/statistics/trend': PageConfig(

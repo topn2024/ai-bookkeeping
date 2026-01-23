@@ -19,7 +19,21 @@ import 'advanced_filter_page.dart';
 /// 流水查询页面
 /// 支持按日期、类型、分类、金额筛选，支持关键词搜索
 class TransactionListPage extends ConsumerStatefulWidget {
-  const TransactionListPage({super.key});
+  /// 初始分类筛选（如 "餐饮"、"交通" 等）
+  final String? initialCategory;
+
+  /// 初始来源筛选（如 "支付宝"、"微信" 等）
+  final String? initialSource;
+
+  /// 初始日期范围筛选
+  final DateTimeRange? initialDateRange;
+
+  const TransactionListPage({
+    super.key,
+    this.initialCategory,
+    this.initialSource,
+    this.initialDateRange,
+  });
 
   @override
   ConsumerState<TransactionListPage> createState() => _TransactionListPageState();
@@ -35,6 +49,7 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
   // 筛选条件
   TransactionType? _selectedType;
   String? _selectedCategory;
+  String? _selectedSource;  // 来源筛选
   DateTimeRange? _dateRange;
   double? _minAmount;
   double? _maxAmount;
@@ -48,6 +63,36 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
 
   // 是否显示筛选面板
   final bool _showFilters = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 从构造函数参数初始化筛选条件
+    if (widget.initialCategory != null) {
+      _selectedCategory = _mapCategoryNameToId(widget.initialCategory!);
+    }
+    if (widget.initialSource != null) {
+      _selectedSource = widget.initialSource;
+    }
+    if (widget.initialDateRange != null) {
+      _dateRange = widget.initialDateRange;
+    }
+  }
+
+  /// 将分类名称映射为分类ID
+  String _mapCategoryNameToId(String categoryName) {
+    // 常见分类名称到ID的映射
+    const categoryMap = {
+      '餐饮': 'food',
+      '交通': 'transport',
+      '购物': 'shopping',
+      '娱乐': 'entertainment',
+      '居住': 'housing',
+      '医疗': 'medical',
+      '其他': 'other',
+    };
+    return categoryMap[categoryName] ?? categoryName.toLowerCase();
+  }
 
   @override
   void dispose() {
@@ -65,6 +110,14 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
       // 分类筛选
       if (_selectedCategory != null && t.category != _selectedCategory) {
         return false;
+      }
+
+      // 来源筛选
+      if (_selectedSource != null) {
+        final sourceMatch = _matchSource(t, _selectedSource!);
+        if (!sourceMatch) {
+          return false;
+        }
       }
 
       // 日期范围筛选
@@ -115,10 +168,29 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
     return filtered;
   }
 
+  /// 匹配交易来源
+  bool _matchSource(Transaction t, String source) {
+    final sourceLower = source.toLowerCase();
+    // 检查 externalSource 字段
+    if (t.externalSource != null && t.externalSource!.toLowerCase().contains(sourceLower)) {
+      return true;
+    }
+    // 检查备注中是否包含来源关键词
+    if (t.note != null && t.note!.toLowerCase().contains(sourceLower)) {
+      return true;
+    }
+    // 检查 rawMerchant 字段
+    if (t.rawMerchant != null && t.rawMerchant!.toLowerCase().contains(sourceLower)) {
+      return true;
+    }
+    return false;
+  }
+
   void _clearFilters() {
     setState(() {
       _selectedType = null;
       _selectedCategory = null;
+      _selectedSource = null;
       _dateRange = null;
       _minAmount = null;
       _maxAmount = null;
@@ -130,6 +202,7 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
   bool get _hasActiveFilters {
     return _selectedType != null ||
         _selectedCategory != null ||
+        _selectedSource != null ||
         _dateRange != null ||
         _minAmount != null ||
         _maxAmount != null ||
