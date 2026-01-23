@@ -310,8 +310,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         // 流水线模式：返回实际响应文本，由流水线处理TTS
         // 非流水线模式：返回空字符串，VoiceServiceCoordinator已播放TTS
         if (isPipelineMode) {
-          final responseText = result.message ?? '';
-          debugPrint('[App] 流水线模式，返回响应: ${responseText.length > 30 ? responseText.substring(0, 30) + "..." : responseText}');
+          // 错误时使用 errorMessage，成功时使用 message
+          final responseText = result.status == VoiceSessionStatus.error
+              ? (result.errorMessage ?? '处理时遇到了问题')
+              : (result.message ?? '');
+          debugPrint('[App] 流水线模式，返回响应: ${responseText.length > 30 ? "${responseText.substring(0, 30)}..." : responseText}');
           return responseText;
         }
       } catch (e) {

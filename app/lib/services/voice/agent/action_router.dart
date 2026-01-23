@@ -211,6 +211,15 @@ class ActionRouter {
       ScheduledBookkeepingAction(_databaseService),
     ]);
 
+    // 注册意图映射：LLM输出的意图ID → 实际的ActionID
+    // 这解决了LLM使用 query.* 而实际Action使用 data.* 的命名不一致问题
+    _registry.mapIntents({
+      'query.statistics': 'data.statistics',  // 统计查询（今天/本月花了多少）
+      'query.trend': 'data.statistics',       // 趋势查询
+      'query.transaction': 'transaction.query', // 交易记录查询
+      'query.budget': 'config.budget',        // 预算查询
+    });
+
     debugPrint('[ActionRouter] 注册了 ${_registry.allActionIds.length} 个内置行为');
   }
 

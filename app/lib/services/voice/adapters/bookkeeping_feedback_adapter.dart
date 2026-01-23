@@ -234,14 +234,27 @@ class BookkeepingFeedbackAdapter implements FeedbackAdapter {
     final data = result.data!;
     final queryType = data['queryType'] as String?;
 
+    // 优先使用 responseText（由 BookkeepingOperationAdapter 生成的用户友好响应）
+    final responseText = data['responseText'] as String?;
+    if (responseText != null && responseText.isNotEmpty) {
+      debugPrint('[BookkeepingFeedbackAdapter] 使用 responseText: $responseText');
+      return responseText;
+    }
+
+    debugPrint('[BookkeepingFeedbackAdapter] 无 responseText，使用默认格式化，queryType=$queryType');
+
     switch (queryType) {
       case 'summary':
+      case 'statistics':
         final totalExpense = data['totalExpense'] as num? ?? 0;
         final totalIncome = data['totalIncome'] as num? ?? 0;
         final count = data['transactionCount'] as int? ?? 0;
+        final periodText = data['periodText'] as String? ?? '';
 
         if (count == 0) {
-          return '目前还没有记录任何交易';
+          return periodText.isNotEmpty
+              ? '$periodText暂无记账记录'
+              : '目前还没有记录任何交易';
         }
 
         final parts = <String>[];
@@ -252,20 +265,32 @@ class BookkeepingFeedbackAdapter implements FeedbackAdapter {
           parts.add('收入 ${_formatAmount(totalIncome)} 元');
         }
         if (parts.isEmpty) {
-          return '共有 $count 笔交易记录';
+          return periodText.isNotEmpty
+              ? '$periodText共有 $count 笔交易记录'
+              : '共有 $count 笔交易记录';
         }
-        return parts.join('，');
+        return periodText.isNotEmpty
+            ? '$periodText${parts.join("，")}'
+            : parts.join('，');
 
       case 'recent':
         final transactions = data['transactions'] as List?;
+        final periodText = data['periodText'] as String? ?? '';
         if (transactions == null || transactions.isEmpty) {
-          return '最近没有交易记录';
+          return periodText.isNotEmpty
+              ? '$periodText暂无记录'
+              : '最近没有交易记录';
         }
-        return '最近有 ${transactions.length} 笔交易';
+        return periodText.isNotEmpty
+            ? '$periodText有 ${transactions.length} 笔交易'
+            : '最近有 ${transactions.length} 笔交易';
 
       default:
         final count = data['transactionCount'] as int? ?? 0;
-        return '共有 $count 笔交易记录';
+        final periodText = data['periodText'] as String? ?? '';
+        return periodText.isNotEmpty
+            ? '$periodText有 $count 笔交易记录'
+            : '共有 $count 笔交易记录';
     }
   }
 

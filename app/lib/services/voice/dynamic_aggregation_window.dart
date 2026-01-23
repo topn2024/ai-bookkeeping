@@ -279,9 +279,37 @@ class DynamicAggregationWindow {
     return matches.length;
   }
 
-  /// 检测是否有记账意图（包含金额）
+  /// 记账请求短语（用户表示要记账，但还没说金额）
+  static const _bookkeepingRequestPatterns = <String>[
+    '帮我记',
+    '记一笔',
+    '记两笔',
+    '记三笔',
+    '记几笔',
+    '记笔账',
+    '记个账',
+    '记账',
+    '帮我寄',  // ASR可能误识别"记"为"寄"
+    '寄一笔',
+    '寄两笔',
+    '寄笔账',
+  ];
+
+  /// 检测是否有记账意图（包含金额或记账请求短语）
   bool _hasBookkeepingIntent(String text) {
-    return _amountPattern.hasMatch(text);
+    // 1. 包含数字金额
+    if (_amountPattern.hasMatch(text)) {
+      return true;
+    }
+
+    // 2. 包含记账请求短语（用户说"帮我记两笔账"但还没说具体金额）
+    for (final pattern in _bookkeepingRequestPatterns) {
+      if (text.contains(pattern)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /// 检测是否有结束信号（用户明确表示说完了）

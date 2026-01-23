@@ -17,6 +17,7 @@ import 'voice/ai_intent_decomposer.dart';
 import 'voice/smart_intent_recognizer.dart';
 import 'voice/llm_response_generator.dart';
 import 'voice/intelligence_engine/intelligence_engine.dart';
+import 'voice/intelligence_engine/result_buffer.dart';
 import 'voice/agent/hybrid_intent_router.dart' show NetworkStatus;
 import 'voice/adapters/bookkeeping_operation_adapter.dart';
 import 'voice/adapters/bookkeeping_feedback_adapter.dart';
@@ -279,6 +280,13 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 是否启用对话式智能体模式
   bool get isAgentModeEnabled => _agentModeEnabled;
+
+  /// 获取结果缓冲区（用于查询结果通知）
+  ///
+  /// 返回 IntelligenceEngine 的 ResultBuffer，供外部组件（如 SmartTopicGenerator）
+  /// 在主动对话时检索待通知的查询结果。
+  /// 如果智能引擎未初始化，返回 null。
+  ResultBuffer? get resultBuffer => _intelligenceEngine?.resultBuffer;
 
   /// 启用对话式智能体模式
   ///
@@ -2510,13 +2518,15 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   bool _hasExcessiveRepetition(String text) {
     if (text.length < 4) return false;
 
-    // 检查连续重复字符
+    // 检查连续重复字符（排除数字，因为金额可能有重复数字如1111、2222）
     var maxRepeat = 1;
     var currentRepeat = 1;
     for (var i = 1; i < text.length; i++) {
       if (text[i] == text[i - 1]) {
         currentRepeat++;
-        if (currentRepeat > maxRepeat) {
+        // 只对非数字字符计算重复
+        final isDigit = text[i].codeUnitAt(0) >= 48 && text[i].codeUnitAt(0) <= 57;
+        if (!isDigit && currentRepeat > maxRepeat) {
           maxRepeat = currentRepeat;
         }
       } else {
@@ -2524,7 +2534,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       }
     }
 
-    // 超过3个连续重复字符认为是噪音
+    // 超过3个连续重复非数字字符认为是噪音
     return maxRepeat > 3;
   }
 

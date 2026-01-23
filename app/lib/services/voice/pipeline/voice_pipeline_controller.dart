@@ -58,6 +58,9 @@ class VoicePipelineController {
   /// 句子聚合计时器
   Timer? _sentenceAggregationTimer;
 
+  /// 聚合计时器ID（用于防止竞态条件）
+  int _aggregationTimerId = 0;
+
   /// 最大等待计时器（5秒兜底）
   Timer? _maxWaitTimer;
 
@@ -404,7 +407,8 @@ class VoicePipelineController {
     if (_sentenceAggregationTimer != null && _sentenceBuffer.isNotEmpty) {
       debugPrint('[VoicePipelineController] 收到中间结果"$text"，重置聚合计时器');
       _sentenceAggregationTimer?.cancel();
-      _startDynamicAggregationTimer();
+      // 传入中间结果文本，用于连接词检测
+      _startDynamicAggregationTimer(pendingPartialText: text);
     }
   }
 
@@ -447,7 +451,10 @@ class VoicePipelineController {
   }
 
   /// 启动动态聚合计时器
-  void _startDynamicAggregationTimer() {
+  ///
+  /// [pendingPartialText] 可选的中间结果文本，用于检测连接词
+  /// 当收到中间结果时传入，帮助判断用户是否还要继续说
+  void _startDynamicAggregationTimer({String? pendingPartialText}) {
     // 计算自上次语音结束的时间
     int? msSinceLastSpeechEnd;
     if (_lastSpeechEndTime != null) {
@@ -455,7 +462,12 @@ class VoicePipelineController {
     }
 
     // 合并所有缓存的句子用于语义分析
-    final aggregatedText = _sentenceBuffer.join('');
+    // 如果有中间结果，也要加入分析（用于检测连接词）
+    String aggregatedText = _sentenceBuffer.join('');
+    if (pendingPartialText != null && pendingPartialText.isNotEmpty) {
+      aggregatedText += pendingPartialText;
+      debugPrint('[VoicePipelineController] 包含中间结果进行语义分析: "$aggregatedText"');
+    }
 
     // 创建聚合上下文
     final context = AggregationContext(
@@ -477,12 +489,22 @@ class VoicePipelineController {
       return;
     }
 
+    // 递增计时器ID，用于防止竞态条件
+    // 当旧计时器的回调在取消后仍然执行时，通过ID检查可以忽略它
+    final currentTimerId = ++_aggregationTimerId;
+
     // 启动聚合计时器
     _sentenceAggregationTimer = Timer(
       Duration(milliseconds: waitResult.waitTimeMs),
       () {
+        // 竞态条件防护：检查此回调是否来自当前有效的计时器
+        // 如果计时器ID不匹配，说明这是一个被"取消"但仍执行的旧回调
+        if (_aggregationTimerId != currentTimerId) {
+          debugPrint('[VoicePipelineController] 忽略过期的聚合计时器回调 (id=$currentTimerId, active=$_aggregationTimerId)');
+          return;
+        }
         _cumulativeWaitMs += waitResult.waitTimeMs;
-        debugPrint('[VoicePipelineController] 聚合计时器触发 (累计${_cumulativeWaitMs}ms)');
+        debugPrint('[VoicePipelineController] 聚合计时器触发 (累计${_cumulativeWaitMs}ms, timerId=$currentTimerId)');
         _processAggregatedSentences();
       },
     );

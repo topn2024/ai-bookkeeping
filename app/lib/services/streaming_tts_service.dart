@@ -435,6 +435,8 @@ class StreamingTTSService {
       );
 
       debugPrint('StreamingTTSService: requesting PCM for sentence $index');
+      debugPrint('StreamingTTSService: URL = $uri');
+      debugPrint('StreamingTTSService: Token = ${tokenInfo.token.substring(0, 8)}...');
 
       final response = await _dio.getUri<List<int>>(
         uri,

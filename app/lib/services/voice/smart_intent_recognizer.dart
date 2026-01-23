@@ -295,18 +295,29 @@ class SmartIntentRecognizer {
 【返回格式】
 {"result_type":"operation|chat|clarify","operations":[],"chat_content":"对话内容或null","clarify_question":"澄清问题或null"}
 
+【记账参数说明】
+- amount: 金额（必填）
+- category: 分类（必填）
+- note: 物品/用途说明（可选，用户说了具体物品时必须提取）
+
 【分类】餐饮、交通、购物、娱乐、居住、医疗、其他
 【常用页面】$pageList
 
 【示例】
 输入："打车35，吃饭50"
-输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":35,"category":"交通"}},{"type":"add_transaction","priority":"deferred","params":{"amount":50,"category":"餐饮"}}],"chat_content":null,"clarify_question":null}
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":35,"category":"交通","note":"打车"}},{"type":"add_transaction","priority":"deferred","params":{"amount":50,"category":"餐饮","note":"吃饭"}}],"chat_content":null,"clarify_question":null}
 
 输入："早餐七块"
-输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":7,"category":"餐饮"}}],"chat_content":null,"clarify_question":null}
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":7,"category":"餐饮","note":"早餐"}}],"chat_content":null,"clarify_question":null}
 
 输入："午餐十五，晚餐二十"
-输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":15,"category":"餐饮"}},{"type":"add_transaction","priority":"deferred","params":{"amount":20,"category":"餐饮"}}],"chat_content":null,"clarify_question":null}
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":15,"category":"餐饮","note":"午餐"}},{"type":"add_transaction","priority":"deferred","params":{"amount":20,"category":"餐饮","note":"晚餐"}}],"chat_content":null,"clarify_question":null}
+
+输入："买了个闹钟11块，柜子200，桌子300"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":11,"category":"购物","note":"闹钟"}},{"type":"add_transaction","priority":"deferred","params":{"amount":200,"category":"购物","note":"柜子"}},{"type":"add_transaction","priority":"deferred","params":{"amount":300,"category":"购物","note":"桌子"}}],"chat_content":null,"clarify_question":null}
+
+输入："淘宝买了件衣服199"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":199,"category":"购物","note":"淘宝买衣服"}}],"chat_content":null,"clarify_question":null}
 
 输入："为什么要记账"
 输出：{"result_type":"chat","operations":[],"chat_content":"为什么要记账","clarify_question":null}
@@ -324,13 +335,16 @@ class SmartIntentRecognizer {
 输出：{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"请问花了多少钱呢？"}
 
 输入："查一下昨天花了多少"
-输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"daily_expense"}}],"chat_content":null,"clarify_question":null}
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"statistics","time":"昨天"}}],"chat_content":null,"clarify_question":null}
 
 输入："今天花了多少钱"
-输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"daily_expense"}}],"chat_content":null,"clarify_question":null}
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"statistics","time":"今天"}}],"chat_content":null,"clarify_question":null}
 
 输入："我这个月花了多少"
-输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"monthly_expense"}}],"chat_content":null,"clarify_question":null}
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"statistics","time":"本月"}}],"chat_content":null,"clarify_question":null}
+
+输入："最近一周花了多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"statistics","time":"本周"}}],"chat_content":null,"clarify_question":null}
 
 输入："你好"
 输出：{"result_type":"chat","operations":[],"chat_content":"你好","clarify_question":null}
@@ -721,6 +735,9 @@ class SmartIntentRecognizer {
     // 推断分类
     final category = _inferCategory(input);
 
+    // 提取物品/用途说明
+    final note = _extractItemNote(input, category);
+
     return SmartIntentResult(
       intentType: SmartIntentType.addTransaction,
       confidence: 0.8,
@@ -728,6 +745,7 @@ class SmartIntentRecognizer {
         'amount': amount,
         'category': category,
         'type': isIncome ? 'income' : 'expense',
+        if (note != null) 'note': note,
       },
       source: RecognitionSource.synonymExpansion,
       originalInput: input,
@@ -884,8 +902,14 @@ class SmartIntentRecognizer {
     if (template.contains('{amount}')) {
       final amount = _extractAmount(input);
       if (amount != null) {
+        final category = _inferCategory(input);
         entities['amount'] = amount;
-        entities['category'] = _inferCategory(input);
+        entities['category'] = category;
+        // 提取物品/用途说明
+        final note = _extractItemNote(input, category);
+        if (note != null) {
+          entities['note'] = note;
+        }
         confidence = 0.75;
         return {'confidence': confidence, 'entities': entities};
       }
@@ -1187,7 +1211,12 @@ class SmartIntentRecognizer {
 - system: 系统操作（检查更新、清理缓存）
 
 【返回格式】
-{"intent":"意图类型","confidence":0.9,"entities":{"amount":金额,"category":"分类","targetPage":"页面名","route":"路由","operation":"操作类型","configId":"配置项ID","vaultName":"小金库名称"}}
+{"intent":"意图类型","confidence":0.9,"entities":{"amount":金额,"category":"分类","note":"具体物品或用途","targetPage":"页面名","route":"路由","operation":"操作类型","configId":"配置项ID","vaultName":"小金库名称"}}
+
+【记账参数说明】
+- amount: 金额（必填）
+- category: 分类（必填）
+- note: 物品/用途说明（可选，用户说了具体物品时必须提取，如"闹钟"、"衣服"、"打车"等）
 
 【分类】餐饮、交通、购物、娱乐、居住、医疗、其他
 【常用页面】$pageList
@@ -1376,6 +1405,41 @@ class SmartIntentRecognizer {
     }
 
     return '其他';
+  }
+
+  /// 提取物品/用途说明
+  ///
+  /// 从输入中提取具体的物品名称或用途，作为交易备注
+  /// 例如："买了个闹钟11块" → "闹钟"
+  /// 例如："淘宝买衣服199" → "淘宝买衣服"
+  String? _extractItemNote(String input, String category) {
+    // 移除金额相关的部分
+    String text = input
+        .replaceAll(RegExp(r'\d+(\.\d+)?(元|块|毛|角|分|块钱|元钱)?'), '')
+        .replaceAll(RegExp(r'[零一二两三四五六七八九十百千万]+(\s*(元|块|毛|角|分|块钱|元钱))?'), '');
+
+    // 移除常见的动词和助词
+    final removePatterns = [
+      '花了', '花', '消费', '支出', '付了', '付', '买了', '买', '用了', '支付',
+      '收入', '赚了', '进账', '收到', '入账',
+      '一个', '一件', '一份', '一瓶', '一杯', '一碗', '一盒',
+      '了', '的', '个', '只', '件', '把', '张', '台', '部',
+    ];
+    for (final pattern in removePatterns) {
+      text = text.replaceAll(pattern, '');
+    }
+
+    // 清理空白和标点
+    text = text
+        .replaceAll(RegExp(r'[，。！？、；：,.!?;:\s]+'), '')
+        .trim();
+
+    // 如果提取的内容太短或太长，或者与分类相同，返回null
+    if (text.isEmpty || text.length < 2 || text.length > 20 || text == category) {
+      return null;
+    }
+
+    return text;
   }
 
   SmartIntentType _mapIntentType(VoiceIntentType type) {

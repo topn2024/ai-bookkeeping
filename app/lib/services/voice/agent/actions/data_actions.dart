@@ -346,6 +346,12 @@ class DataStatisticsAction extends Action {
       description: '统计周期: day/week/month/year/all',
     ),
     const ActionParam(
+      name: 'time',
+      type: ActionParamType.string,
+      required: false,
+      description: '时间描述（今天/昨天/最近3天/上个月等）',
+    ),
+    const ActionParam(
       name: 'dimension',
       type: ActionParamType.string,
       required: false,
@@ -357,36 +363,50 @@ class DataStatisticsAction extends Action {
   @override
   Future<ActionResult> execute(Map<String, dynamic> params) async {
     try {
-      final period = params['period'] as String? ?? 'month';
       final dimension = params['dimension'] as String? ?? 'overview';
+      final time = params['time'] as String?;
+      final period = params['period'] as String?;
 
       // 计算时间范围
       final now = DateTime.now();
       DateTime startDate;
       String periodText;
 
-      switch (period) {
-        case 'day':
-          startDate = DateTime(now.year, now.month, now.day);
-          periodText = '今日';
-          break;
-        case 'week':
-          startDate = now.subtract(Duration(days: now.weekday - 1));
-          periodText = '本周';
-          break;
-        case 'year':
-          startDate = DateTime(now.year, 1, 1);
-          periodText = '今年';
-          break;
-        case 'all':
-          startDate = DateTime(2000);
-          periodText = '全部';
-          break;
-        case 'month':
-        default:
-          startDate = DateTime(now.year, now.month, 1);
-          periodText = '本月';
-          break;
+      // 优先使用 time 参数（更灵活的时间描述）
+      if (time != null && time.isNotEmpty) {
+        final result = _parseTimeDescription(time);
+        startDate = result.startDate;
+        periodText = result.periodText;
+      } else if (period != null) {
+        // 使用 period 参数（固定周期）
+        switch (period) {
+          case 'day':
+            startDate = DateTime(now.year, now.month, now.day);
+            periodText = '今日';
+            break;
+          case 'week':
+            startDate = now.subtract(Duration(days: now.weekday - 1));
+            startDate = DateTime(startDate.year, startDate.month, startDate.day);
+            periodText = '本周';
+            break;
+          case 'year':
+            startDate = DateTime(now.year, 1, 1);
+            periodText = '今年';
+            break;
+          case 'all':
+            startDate = DateTime(2000);
+            periodText = '全部';
+            break;
+          case 'month':
+          default:
+            startDate = DateTime(now.year, now.month, 1);
+            periodText = '本月';
+            break;
+        }
+      } else {
+        // 默认本月
+        startDate = DateTime(now.year, now.month, 1);
+        periodText = '本月';
       }
 
       final transactions = await databaseService.queryTransactions(
@@ -401,7 +421,7 @@ class DataStatisticsAction extends Action {
         case 'account':
           return _accountStatistics(transactions, periodText);
         case 'trend':
-          return _trendStatistics(transactions, periodText, period);
+          return _trendStatistics(transactions, periodText, period ?? 'month');
         case 'overview':
         default:
           return _overviewStatistics(transactions, periodText);
@@ -544,6 +564,95 @@ class DataStatisticsAction extends Action {
       actionId: id,
     );
   }
+
+  /// 解析时间描述，返回开始日期和显示文本
+  _TimeParseResult _parseTimeDescription(String time) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // 今天/今日
+    if (time.contains('今天') || time.contains('今日')) {
+      return _TimeParseResult(today, '今日');
+    }
+
+    // 昨天
+    if (time.contains('昨天') || time.contains('昨日')) {
+      return _TimeParseResult(today.subtract(const Duration(days: 1)), '昨天');
+    }
+
+    // 前天
+    if (time.contains('前天')) {
+      return _TimeParseResult(today.subtract(const Duration(days: 2)), '前天');
+    }
+
+    // 最近N天 / 近N天
+    final recentDaysMatch = RegExp(r'(?:最近|近)(\d+)天').firstMatch(time);
+    if (recentDaysMatch != null) {
+      final days = int.parse(recentDaysMatch.group(1)!);
+      return _TimeParseResult(today.subtract(Duration(days: days - 1)), '最近$days天');
+    }
+
+    // 本周/这周
+    if (time.contains('本周') || time.contains('这周') || time.contains('这个星期')) {
+      final weekStart = today.subtract(Duration(days: now.weekday - 1));
+      return _TimeParseResult(weekStart, '本周');
+    }
+
+    // 上周/上个星期
+    if (time.contains('上周') || time.contains('上个星期') || time.contains('上星期')) {
+      final lastWeekStart = today.subtract(Duration(days: now.weekday + 6));
+      return _TimeParseResult(lastWeekStart, '上周');
+    }
+
+    // 本月/这个月
+    if (time.contains('本月') || time.contains('这个月') || time.contains('这月')) {
+      return _TimeParseResult(DateTime(now.year, now.month, 1), '本月');
+    }
+
+    // 上个月/上月
+    if (time.contains('上个月') || time.contains('上月')) {
+      final lastMonth = now.month == 1
+          ? DateTime(now.year - 1, 12, 1)
+          : DateTime(now.year, now.month - 1, 1);
+      return _TimeParseResult(lastMonth, '上月');
+    }
+
+    // 最近N个月
+    final recentMonthsMatch = RegExp(r'(?:最近|近)(\d+)个?月').firstMatch(time);
+    if (recentMonthsMatch != null) {
+      final months = int.parse(recentMonthsMatch.group(1)!);
+      final startMonth = now.month - months + 1;
+      final startYear = now.year + (startMonth <= 0 ? -1 : 0);
+      final adjustedMonth = startMonth <= 0 ? startMonth + 12 : startMonth;
+      return _TimeParseResult(DateTime(startYear, adjustedMonth, 1), '最近$months个月');
+    }
+
+    // 今年/本年
+    if (time.contains('今年') || time.contains('本年')) {
+      return _TimeParseResult(DateTime(now.year, 1, 1), '今年');
+    }
+
+    // 去年/上一年
+    if (time.contains('去年') || time.contains('上一年')) {
+      return _TimeParseResult(DateTime(now.year - 1, 1, 1), '去年');
+    }
+
+    // 全部/所有
+    if (time.contains('全部') || time.contains('所有') || time.contains('一共')) {
+      return _TimeParseResult(DateTime(2000), '全部');
+    }
+
+    // 默认本月
+    return _TimeParseResult(DateTime(now.year, now.month, 1), '本月');
+  }
+}
+
+/// 时间解析结果
+class _TimeParseResult {
+  final DateTime startDate;
+  final String periodText;
+
+  _TimeParseResult(this.startDate, this.periodText);
 }
 
 /// 数据报告Action

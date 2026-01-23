@@ -421,11 +421,23 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
       if (!coordinator.isAgentModeEnabled) {
         debugPrint('[GlobalFloatingBall] 异步启用对话式智能体模式');
         coordinator.enableAgentMode().then((_) {
+          // 传递 ResultBuffer 给 GlobalVoiceAssistantManager
+          // 这样 SmartTopicGenerator 可以在主动对话时检索查询结果
+          final resultBuffer = coordinator.resultBuffer;
+          if (resultBuffer != null) {
+            debugPrint('[GlobalFloatingBall] 传递 ResultBuffer 给语音助手');
+            manager.setResultBuffer(resultBuffer);
+          }
           // 预热LLM连接（在agent初始化完成后）
           coordinator.onVoiceButtonPressed();
         });
       } else {
-        // 如果已启用，直接触发预热
+        // 如果已启用，确保 ResultBuffer 已传递
+        final resultBuffer = coordinator.resultBuffer;
+        if (resultBuffer != null) {
+          manager.setResultBuffer(resultBuffer);
+        }
+        // 直接触发预热
         coordinator.onVoiceButtonPressed();
       }
     }

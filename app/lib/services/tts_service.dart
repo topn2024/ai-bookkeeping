@@ -250,11 +250,25 @@ class TTSService {
         } on TimeoutException {
           _streamingFailCount++;
           debugPrint('TTS: streaming fail count = $_streamingFailCount');
+          // 重要：先停止流式TTS播放，避免两个声音同时播放
+          try {
+            await _streamingTTS!.stop();
+            debugPrint('TTS: streaming TTS stopped before fallback');
+          } catch (e) {
+            debugPrint('TTS: failed to stop streaming TTS: $e');
+          }
           // 降级到离线TTS
           await _speakWithOfflineEngine(processedText);
         } catch (e) {
           _streamingFailCount++;
           debugPrint('TTS: streaming error, fail count = $_streamingFailCount, error: $e');
+          // 重要：先停止流式TTS播放，避免两个声音同时播放
+          try {
+            await _streamingTTS!.stop();
+            debugPrint('TTS: streaming TTS stopped before fallback');
+          } catch (stopError) {
+            debugPrint('TTS: failed to stop streaming TTS: $stopError');
+          }
           // 降级到离线TTS
           await _speakWithOfflineEngine(processedText);
         }

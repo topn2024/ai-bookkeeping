@@ -130,16 +130,28 @@ class BookkeepingOperationAdapter implements OperationAdapter {
   /// 查询
   Future<ExecutionResult> _query(Map<String, dynamic> params) async {
     final queryType = params['queryType'] as String? ?? 'summary';
+    final time = params['time'] as String?;
+    final period = params['period'] as String?;
 
-    debugPrint('[BookkeepingOperationAdapter] 查询: $queryType');
+    debugPrint('[BookkeepingOperationAdapter] 查询: queryType=$queryType, time=$time, period=$period');
 
     try {
-      // 调用 DatabaseService 查询交易
-      final transactions = await _databaseService.getTransactions();
+      // 解析时间范围
+      final timeRange = _parseTimeRange(time, period);
+      debugPrint('[BookkeepingOperationAdapter] 时间范围: ${timeRange.startDate} - ${timeRange.endDate}, 显示: ${timeRange.periodText}');
+
+      // 调用 DatabaseService 查询交易（带时间过滤）
+      final transactions = await _databaseService.queryTransactions(
+        startDate: timeRange.startDate,
+        endDate: timeRange.endDate,
+      );
+
+      debugPrint('[BookkeepingOperationAdapter] 查询到 ${transactions.length} 条记录');
 
       // 根据查询类型返回不同的结果
       switch (queryType) {
         case 'summary':
+        case 'statistics':
           final totalExpense = transactions
               .where((t) => t.type == TransactionType.expense)
               .fold(0.0, (sum, t) => sum + t.amount);
@@ -147,37 +159,168 @@ class BookkeepingOperationAdapter implements OperationAdapter {
               .where((t) => t.type == TransactionType.income)
               .fold(0.0, (sum, t) => sum + t.amount);
 
-          return ExecutionResult.success(data: {
-            'queryType': queryType,
-            'totalExpense': totalExpense,
-            'totalIncome': totalIncome,
-            'balance': totalIncome - totalExpense,
-            'transactionCount': transactions.length,
-          });
+          // 生成用户友好的响应文本
+          String responseText;
+          if (totalExpense > 0 && totalIncome > 0) {
+            responseText = '${timeRange.periodText}您花费了${totalExpense.toStringAsFixed(0)}元，收入${totalIncome.toStringAsFixed(0)}元';
+          } else if (totalExpense > 0) {
+            responseText = '${timeRange.periodText}您一共花费了${totalExpense.toStringAsFixed(0)}元';
+          } else if (totalIncome > 0) {
+            responseText = '${timeRange.periodText}您收入了${totalIncome.toStringAsFixed(0)}元';
+          } else {
+            responseText = '${timeRange.periodText}暂无记账记录';
+          }
+
+          return ExecutionResult.success(
+            data: {
+              'queryType': queryType,
+              'totalExpense': totalExpense,
+              'totalIncome': totalIncome,
+              'balance': totalIncome - totalExpense,
+              'transactionCount': transactions.length,
+              'periodText': timeRange.periodText,
+              'responseText': responseText,
+            },
+          );
 
         case 'recent':
           final recentTransactions = transactions.take(10).toList();
-          return ExecutionResult.success(data: {
-            'queryType': queryType,
-            'transactions': recentTransactions.map((t) => {
-              'id': t.id,
-              'type': t.type.toString(),
-              'amount': t.amount,
-              'category': t.category,
-              'date': t.date.toIso8601String(),
-            }).toList(),
-          });
+          final responseText = recentTransactions.isEmpty
+              ? '${timeRange.periodText}暂无记录'
+              : '${timeRange.periodText}有${recentTransactions.length}笔记录';
+          return ExecutionResult.success(
+            data: {
+              'queryType': queryType,
+              'transactions': recentTransactions.map((t) => {
+                'id': t.id,
+                'type': t.type.toString(),
+                'amount': t.amount,
+                'category': t.category,
+                'date': t.date.toIso8601String(),
+              }).toList(),
+              'periodText': timeRange.periodText,
+              'responseText': responseText,
+            },
+          );
 
         default:
-          return ExecutionResult.success(data: {
-            'queryType': queryType,
-            'transactionCount': transactions.length,
-          });
+          return ExecutionResult.success(
+            data: {
+              'queryType': queryType,
+              'transactionCount': transactions.length,
+              'periodText': timeRange.periodText,
+              'responseText': '${timeRange.periodText}有${transactions.length}笔记录',
+            },
+          );
       }
     } catch (e) {
       debugPrint('[BookkeepingOperationAdapter] 查询失败: $e');
       return ExecutionResult.failure('查询失败: $e');
     }
+  }
+
+  /// 解析时间范围
+  _TimeRange _parseTimeRange(String? time, String? period) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+
+    // 如果有 time 参数，优先使用
+    if (time != null && time.isNotEmpty) {
+      // 今天/今日
+      if (time.contains('今天') || time.contains('今日')) {
+        return _TimeRange(today, tomorrow, '今天');
+      }
+      // 昨天
+      if (time.contains('昨天') || time.contains('昨日')) {
+        final yesterday = today.subtract(const Duration(days: 1));
+        return _TimeRange(yesterday, today, '昨天');
+      }
+      // 前天
+      if (time.contains('前天')) {
+        final dayBeforeYesterday = today.subtract(const Duration(days: 2));
+        final yesterday = today.subtract(const Duration(days: 1));
+        return _TimeRange(dayBeforeYesterday, yesterday, '前天');
+      }
+      // 最近N天 / 近N天
+      final recentDaysMatch = RegExp(r'(?:最近|近)(\d+)天').firstMatch(time);
+      if (recentDaysMatch != null) {
+        final days = int.parse(recentDaysMatch.group(1)!);
+        final startDate = today.subtract(Duration(days: days - 1));
+        return _TimeRange(startDate, tomorrow, '最近$days天');
+      }
+      // 本周/这周
+      if (time.contains('本周') || time.contains('这周') || time.contains('这个星期')) {
+        final weekStart = today.subtract(Duration(days: now.weekday - 1));
+        return _TimeRange(weekStart, tomorrow, '本周');
+      }
+      // 上周/上个星期
+      if (time.contains('上周') || time.contains('上个星期') || time.contains('上星期')) {
+        final lastWeekStart = today.subtract(Duration(days: now.weekday + 6));
+        final lastWeekEnd = today.subtract(Duration(days: now.weekday - 1));
+        return _TimeRange(lastWeekStart, lastWeekEnd, '上周');
+      }
+      // 本月/这个月
+      if (time.contains('本月') || time.contains('这个月') || time.contains('这月')) {
+        final monthStart = DateTime(now.year, now.month, 1);
+        return _TimeRange(monthStart, tomorrow, '本月');
+      }
+      // 上个月/上月
+      if (time.contains('上个月') || time.contains('上月')) {
+        final lastMonth = now.month == 1
+            ? DateTime(now.year - 1, 12, 1)
+            : DateTime(now.year, now.month - 1, 1);
+        final thisMonthStart = DateTime(now.year, now.month, 1);
+        return _TimeRange(lastMonth, thisMonthStart, '上月');
+      }
+      // 最近N个月
+      final recentMonthsMatch = RegExp(r'(?:最近|近)(\d+)个?月').firstMatch(time);
+      if (recentMonthsMatch != null) {
+        final months = int.parse(recentMonthsMatch.group(1)!);
+        final startMonth = now.month - months + 1;
+        final startYear = now.year + (startMonth <= 0 ? -1 : 0);
+        final adjustedMonth = startMonth <= 0 ? startMonth + 12 : startMonth;
+        final startDate = DateTime(startYear, adjustedMonth, 1);
+        return _TimeRange(startDate, tomorrow, '最近$months个月');
+      }
+      // 今年/本年
+      if (time.contains('今年') || time.contains('本年')) {
+        final yearStart = DateTime(now.year, 1, 1);
+        return _TimeRange(yearStart, tomorrow, '今年');
+      }
+      // 去年/上一年
+      if (time.contains('去年') || time.contains('上一年')) {
+        final lastYearStart = DateTime(now.year - 1, 1, 1);
+        final thisYearStart = DateTime(now.year, 1, 1);
+        return _TimeRange(lastYearStart, thisYearStart, '去年');
+      }
+      // 全部/所有
+      if (time.contains('全部') || time.contains('所有') || time.contains('一共')) {
+        return _TimeRange(DateTime(2000), tomorrow, '全部');
+      }
+    }
+
+    // 如果有 period 参数
+    if (period != null && period.isNotEmpty) {
+      switch (period.toLowerCase()) {
+        case 'day':
+        case 'today':
+          return _TimeRange(today, tomorrow, '今天');
+        case 'week':
+          final weekStart = today.subtract(Duration(days: now.weekday - 1));
+          return _TimeRange(weekStart, tomorrow, '本周');
+        case 'month':
+          final monthStart = DateTime(now.year, now.month, 1);
+          return _TimeRange(monthStart, tomorrow, '本月');
+        case 'year':
+          final yearStart = DateTime(now.year, 1, 1);
+          return _TimeRange(yearStart, tomorrow, '今年');
+      }
+    }
+
+    // 默认查询本月
+    final monthStart = DateTime(now.year, now.month, 1);
+    return _TimeRange(monthStart, tomorrow, '本月');
   }
 
   /// 导航
@@ -320,4 +463,13 @@ class BookkeepingOperationAdapter implements OperationAdapter {
       return ExecutionResult.failure('修改失败: $e');
     }
   }
+}
+
+/// 时间范围辅助类
+class _TimeRange {
+  final DateTime startDate;
+  final DateTime endDate;
+  final String periodText;
+
+  _TimeRange(this.startDate, this.endDate, this.periodText);
 }

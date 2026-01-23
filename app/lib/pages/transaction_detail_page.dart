@@ -243,9 +243,44 @@ class TransactionDetailPage extends ConsumerWidget {
             _buildDivider(theme),
             _buildTagsRow(context, theme),
           ],
+          // 数据来源
+          _buildDivider(theme),
+          _buildDetailRow(
+            context,
+            theme,
+            label: '数据来源',
+            value: _getSourceDisplayName(transaction.source),
+          ),
+          // AI置信度（仅非手动录入时显示）
+          if (transaction.source != TransactionSource.manual &&
+              transaction.aiConfidence != null) ...[
+            _buildDivider(theme),
+            _buildDetailRow(
+              context,
+              theme,
+              label: 'AI置信度',
+              value: '${(transaction.aiConfidence! * 100).toStringAsFixed(0)}%',
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  /// 获取数据来源显示名称
+  String _getSourceDisplayName(TransactionSource source) {
+    switch (source) {
+      case TransactionSource.manual:
+        return '手动录入';
+      case TransactionSource.image:
+        return '图片识别';
+      case TransactionSource.voice:
+        return '语音记账';
+      case TransactionSource.email:
+        return '邮件解析';
+      case TransactionSource.import_:
+        return '批量导入';
+    }
   }
 
   Widget _buildDetailRow(
