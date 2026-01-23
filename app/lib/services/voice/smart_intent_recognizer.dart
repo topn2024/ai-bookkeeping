@@ -306,6 +306,18 @@ class SmartIntentRecognizer {
 - modify: 修改记录
 - delete: 删除记录
 
+【查询类型 queryType】
+- summary: 总额统计（"今天花了多少"、"本月支出"）
+- recent: 最近记录（"最近的账单"、"最近10笔"）
+- trend: 趋势分析（"最近三个月的消费趋势"、"每月支出变化"）
+- distribution: 分布查询（"各分类占比"、"餐饮这个月花了多少"）
+- comparison: 对比查询（"本月和上月对比"、"今年和去年对比"）
+
+【分组维度 groupBy】
+- month: 按月份分组（"每月"、"按月"）
+- date: 按日期分组（"每天"、"按日"）
+- category: 按分类分组（"各分类"、"按分类"）
+
 【优先级】
 - immediate: 导航
 - normal: 查询
@@ -318,6 +330,12 @@ class SmartIntentRecognizer {
 - amount: 金额（必填）
 - category: 分类（必填）
 - note: 物品/用途说明（可选，用户说了具体物品时必须提取）
+
+【查询参数说明】
+- queryType: 查询类型（summary/recent/trend/distribution/comparison）
+- time: 时间范围（今天/昨天/本周/本月/上月/最近N天/最近N个月）
+- category: 分类筛选（可选）
+- groupBy: 分组维度（可选，month/date/category）
 
 【分类】餐饮、交通、购物、娱乐、居住、医疗、其他
 【常用页面】$pageList
@@ -409,6 +427,24 @@ class SmartIntentRecognizer {
 
 输入："看看昨天的账单"
 输出：{"result_type":"operation","operations":[{"type":"navigate","priority":"immediate","params":{"targetPage":"交易列表","route":"/transaction-list","timeRange":"昨天"}}],"chat_content":null,"clarify_question":null}
+
+输入："最近三个月的消费趋势"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"trend","time":"最近3个月","groupBy":"month"}}],"chat_content":null,"clarify_question":null}
+
+输入："各分类占比"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"distribution","time":"本月","groupBy":"category"}}],"chat_content":null,"clarify_question":null}
+
+输入："餐饮这个月花了多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"distribution","time":"本月","category":"餐饮"}}],"chat_content":null,"clarify_question":null}
+
+输入："本月和上月对比"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"comparison","time":"本月"}}],"chat_content":null,"clarify_question":null}
+
+输入："每月支出变化"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"trend","time":"今年","groupBy":"month"}}],"chat_content":null,"clarify_question":null}
+
+输入："最近一周每天花了多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"trend","time":"本周","groupBy":"date"}}],"chat_content":null,"clarify_question":null}
 
 只返回JSON：''';
   }
