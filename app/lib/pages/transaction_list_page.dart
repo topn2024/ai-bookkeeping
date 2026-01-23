@@ -171,8 +171,8 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
   /// 匹配交易来源
   bool _matchSource(Transaction t, String source) {
     final sourceLower = source.toLowerCase();
-    // 检查 externalSource 字段
-    if (t.externalSource != null && t.externalSource!.toLowerCase().contains(sourceLower)) {
+    // 检查 externalSource 字段（枚举类型，需要转换为字符串）
+    if (t.externalSource != null && t.externalSource!.name.toLowerCase().contains(sourceLower)) {
       return true;
     }
     // 检查备注中是否包含来源关键词
