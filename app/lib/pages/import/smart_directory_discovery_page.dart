@@ -111,43 +111,23 @@ class _SmartDirectoryDiscoveryPageState
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildPageHeader(context, theme),
-            _buildScanStatus(theme),
-            Expanded(
-              child: _isScanning
-                  ? _buildScanningIndicator(theme)
-                  : _buildFileList(theme),
-            ),
-            if (!_isScanning && _discoveredFiles.isNotEmpty)
-              _buildBottomSection(context, theme),
-          ],
-        ),
+      appBar: AppBar(
+        title: const Text('发现账单'),
+      ),
+      body: Column(
+        children: [
+          _buildScanStatus(theme),
+          Expanded(
+            child: _isScanning
+                ? _buildScanningIndicator(theme)
+                : _buildFileList(theme),
+          ),
+          if (!_isScanning && _discoveredFiles.isNotEmpty)
+            _buildBottomSection(context, theme),
+        ],
       ),
     );
   }
-
-  Widget _buildPageHeader(BuildContext context, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: const Icon(Icons.arrow_back),
-            ),
-          ),
-          const Expanded(
-            child: Text(
-              '发现账单',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
           ),
           GestureDetector(

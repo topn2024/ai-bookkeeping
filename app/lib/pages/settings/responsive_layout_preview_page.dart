@@ -14,52 +14,19 @@ class ResponsiveLayoutPreviewPage extends StatelessWidget {
     final currentBreakpoint = _getCurrentBreakpoint(context);
 
     return Scaffold(
-      body: SafeArea(
+      appBar: AppBar(
+        title: const Text('显示设置'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(context, theme),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildAdaptiveCard(theme),
-                    const SizedBox(height: 16),
-                    _buildLayoutModes(theme, currentBreakpoint),
-                  ],
-                ),
-              ),
-            ),
+            _buildAdaptiveCard(theme),
+            const SizedBox(height: 16),
+            _buildLayoutModes(theme, currentBreakpoint),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: const Icon(Icons.arrow_back),
-            ),
-          ),
-          const Expanded(
-            child: Text(
-              '显示设置',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-          ),
-          const SizedBox(width: 40),
-        ],
       ),
     );
   }

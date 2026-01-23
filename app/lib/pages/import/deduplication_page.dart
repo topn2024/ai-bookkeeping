@@ -77,53 +77,26 @@ class _DeduplicationPageState extends ConsumerState<DeduplicationPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildPageHeader(context, theme),
-            Expanded(
-              child: _isProcessing
-                  ? _buildProcessingView(theme)
-                  : SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildSummaryCard(context, theme),
-                          _buildDeduplicationLayers(context, theme),
-                          _buildSuspectedList(context, theme),
-                        ],
-                      ),
-                    ),
-            ),
-            if (!_isProcessing) _buildActionButton(context, theme),
-          ],
-        ),
+      appBar: AppBar(
+        title: const Text('去重检测'),
       ),
-    );
-  }
-
-  Widget _buildPageHeader(BuildContext context, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
+      body: Column(
         children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: const Icon(Icons.arrow_back),
-            ),
+          Expanded(
+            child: _isProcessing
+                ? _buildProcessingView(theme)
+                : SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSummaryCard(context, theme),
+                        _buildDeduplicationLayers(context, theme),
+                        _buildSuspectedList(context, theme),
+                      ],
+                    ),
+                  ),
           ),
-          const Expanded(
-            child: Text(
-              '去重检测',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-          ),
-          const SizedBox(width: 40),
+          if (!_isProcessing) _buildActionButton(context, theme),
         ],
       ),
     );
