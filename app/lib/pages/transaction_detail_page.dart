@@ -34,60 +34,32 @@ class TransactionDetailPage extends ConsumerWidget {
     final isIncome = transaction.type == TransactionType.income;
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildPageHeader(context, theme, ref),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _buildAmountDisplay(context, theme, category, isExpense, isIncome),
-                    _buildDetailsCard(context, theme, category, ref),
-                    if (transaction.hasMoneyAge && isExpense)
-                      _buildMoneyAgeCard(context, theme),
-                    const SizedBox(height: 20),
-                  ],
-                ),
+      appBar: AppBar(
+        title: Text(context.l10n.transactionDetails),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () => _navigateToEdit(context, ref),
+            tooltip: '编辑',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildAmountDisplay(context, theme, category, isExpense, isIncome),
+                  _buildDetailsCard(context, theme, category, ref),
+                  if (transaction.hasMoneyAge && isExpense)
+                    _buildMoneyAgeCard(context, theme),
+                  const SizedBox(height: 20),
+                ],
               ),
             ),
-            _buildActionButtons(context, theme, ref),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPageHeader(BuildContext context, ThemeData theme, WidgetRef ref) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: const Icon(Icons.arrow_back),
-            ),
           ),
-          Expanded(
-            child: Text(
-              context.l10n.transactionDetails,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => _navigateToEdit(context, ref),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: Icon(Icons.edit, color: theme.colorScheme.onSurfaceVariant),
-            ),
-          ),
+          _buildActionButtons(context, theme, ref),
         ],
       ),
     );

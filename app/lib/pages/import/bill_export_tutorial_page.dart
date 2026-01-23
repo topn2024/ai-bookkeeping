@@ -145,69 +145,40 @@ class _BillExportTutorialPageState extends ConsumerState<BillExportTutorialPage>
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildPageHeader(context, theme),
-            _buildPlatformTabs(theme),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: _tutorials.map((tutorial) {
-                  return _buildTutorialContent(theme, tutorial);
-                }).toList(),
+      appBar: AppBar(
+        title: const Text('导出账单教程'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: theme.colorScheme.outlineVariant),
               ),
             ),
-            _buildBottomButton(context, theme),
-          ],
+            child: TabBar(
+              controller: _tabController,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              indicatorColor: Colors.white,
+              tabs: _tutorials.map((tutorial) {
+                return Tab(text: tutorial.name);
+              }).toList(),
+            ),
+          ),
         ),
       ),
-    );
-  }
-
-  Widget _buildPageHeader(BuildContext context, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
+      body: Column(
         children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: const Icon(Icons.arrow_back),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: _tutorials.map((tutorial) {
+                return _buildTutorialContent(theme, tutorial);
+              }).toList(),
             ),
           ),
-          const Expanded(
-            child: Text(
-              '导出账单教程',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-          ),
-          const SizedBox(width: 40),
+          _buildBottomButton(context, theme),
         ],
-      ),
-    );
-  }
-
-  /// 平台选择标签
-  Widget _buildPlatformTabs(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
-        ),
-      ),
-      child: TabBar(
-        controller: _tabController,
-        labelColor: theme.colorScheme.primary,
-        unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-        indicatorColor: theme.colorScheme.primary,
-        tabs: _tutorials.map((tutorial) {
-          return Tab(text: tutorial.name);
-        }).toList(),
       ),
     );
   }

@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:csv/csv.dart';
 import 'package:flutter/foundation.dart';
+import 'package:gbk_codec/gbk_codec.dart';
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
 import 'bill_format_detector.dart';
@@ -42,16 +44,11 @@ class WechatBillParser extends BillParser {
     Map<String, dynamic>? metadata;
 
     try {
-      // Decode content
-      String content;
-      if (bytes.length > 3 &&
-          bytes[0] == 0xEF &&
-          bytes[1] == 0xBB &&
-          bytes[2] == 0xBF) {
-        content = utf8.decode(bytes.sublist(3));
-      } else {
-        content = utf8.decode(bytes);
-      }
+      // Decode content with encoding detection
+      String content = _decodeContent(bytes);
+
+      // Normalize line endings (handle both \r\n and \n)
+      content = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
       // Split into lines
       final lines = content.split('\n').where((l) => l.trim().isNotEmpty).toList();
@@ -285,5 +282,45 @@ class WechatBillParser extends BillParser {
       return '$note ($transactionType)';
     }
     return note ?? transactionType;
+  }
+
+  /// Decode content with encoding detection (UTF-8 or GBK)
+  String _decodeContent(Uint8List bytes) {
+    // Remove UTF-8 BOM if present
+    Uint8List dataBytes = bytes;
+    if (bytes.length > 3 &&
+        bytes[0] == 0xEF &&
+        bytes[1] == 0xBB &&
+        bytes[2] == 0xBF) {
+      dataBytes = bytes.sublist(3);
+      debugPrint('[WechatBillParser] Removed UTF-8 BOM');
+    }
+
+    // Try UTF-8 first (strict mode)
+    try {
+      final content = utf8.decode(dataBytes, allowMalformed: false);
+      // Verify the content contains expected Chinese characters
+      if (content.contains('交易时间') || content.contains('微信') || content.contains('金额')) {
+        debugPrint('[WechatBillParser] Successfully decoded as UTF-8');
+        return content;
+      }
+    } catch (e) {
+      debugPrint('[WechatBillParser] UTF-8 decode failed: $e');
+    }
+
+    // Try GBK encoding (common for WeChat bills exported on Windows)
+    try {
+      final content = gbk_bytes.decode(dataBytes);
+      if (content.contains('交易时间') || content.contains('微信') || content.contains('金额')) {
+        debugPrint('[WechatBillParser] Successfully decoded as GBK');
+        return content;
+      }
+    } catch (e) {
+      debugPrint('[WechatBillParser] GBK decode failed: $e');
+    }
+
+    // Fallback: UTF-8 with malformed bytes allowed
+    debugPrint('[WechatBillParser] Falling back to UTF-8 with allowMalformed');
+    return utf8.decode(dataBytes, allowMalformed: true);
   }
 }

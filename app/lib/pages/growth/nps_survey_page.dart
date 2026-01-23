@@ -36,57 +36,41 @@ class _NpsSurveyPageState extends ConsumerState<NpsSurveyPage> {
     }
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context, theme),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildQuestion(context, theme),
-                    const SizedBox(height: 24),
-                    _buildScoreSelector(context, theme),
-                    const SizedBox(height: 32),
-                    if (_selectedScore != null) ...[
-                      _buildFeedbackSection(context, theme),
-                      const SizedBox(height: 24),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            if (_selectedScore != null) _buildSubmitButton(context, theme),
-          ],
+      appBar: AppBar(
+        title: const Text('用户反馈'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+          tooltip: '关闭',
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.close, color: theme.colorScheme.onSurface),
-            ),
-          ),
-          const Spacer(),
+        actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('稍后再说'),
+            child: const Text('稍后再说', style: TextStyle(color: Colors.white)),
           ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildQuestion(context, theme),
+                  const SizedBox(height: 24),
+                  _buildScoreSelector(context, theme),
+                  const SizedBox(height: 32),
+                  if (_selectedScore != null) ...[
+                    _buildFeedbackSection(context, theme),
+                    const SizedBox(height: 24),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          if (_selectedScore != null) _buildSubmitButton(context, theme),
         ],
       ),
     );

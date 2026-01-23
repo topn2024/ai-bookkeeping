@@ -41,62 +41,26 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
     final todayRemaining = dailyAllowance - todayExpense;
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context, theme),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _buildAllowanceCard(context, theme, todayRemaining, dailyAllowance),
-                    _buildProgressSection(context, theme, budgetRemaining, monthlyBudget, daysRemaining),
-                    _buildTodayExpenseList(context, theme, todayExpense),
-                    _buildSmartSuggestions(context, theme, todayRemaining),
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.arrow_back,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Text(
-            '今日可支出',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const Spacer(),
+      appBar: AppBar(
+        title: const Text('今日可支出'),
+        actions: [
           IconButton(
-            onPressed: _showAllowanceSettings,
             icon: const Icon(Icons.settings_outlined),
+            onPressed: _showAllowanceSettings,
+            tooltip: '设置',
           ),
         ],
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildAllowanceCard(context, theme, todayRemaining, dailyAllowance),
+            _buildProgressSection(context, theme, budgetRemaining, monthlyBudget, daysRemaining),
+            _buildTodayExpenseList(context, theme, todayExpense),
+            _buildSmartSuggestions(context, theme, todayRemaining),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }
