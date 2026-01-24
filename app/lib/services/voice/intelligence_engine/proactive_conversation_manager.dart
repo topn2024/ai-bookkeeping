@@ -16,6 +16,10 @@ class ProactiveConversationManager {
   /// 会话结束回调（连续3次不回应或30秒无响应）
   VoidCallback? onSessionEnd;
 
+  /// 声音播放状态查询回调
+  /// 返回 true 表示有声音在播放（用户说话 OR TTS播放）
+  final bool Function()? isSoundPlaying;
+
   // 计时器
   Timer? _silenceTimer; // 5秒静默计时器
   Timer? _totalSilenceTimer; // 30秒总计无响应计时器
@@ -38,12 +42,19 @@ class ProactiveConversationManager {
     required this.topicGenerator,
     required this.onProactiveMessage,
     this.onSessionEnd,
+    this.isSoundPlaying,
   });
 
   /// 启动静默监听
   void startSilenceMonitoring() {
     if (_proactiveDisabled) {
       debugPrint('[ProactiveConversationManager] 主动对话已禁用');
+      return;
+    }
+
+    // 检查是否有声音在播放（用户说话 OR TTS播放）
+    if (isSoundPlaying?.call() == true) {
+      debugPrint('[ProactiveConversationManager] 有声音在播放，不启动静默监听');
       return;
     }
 

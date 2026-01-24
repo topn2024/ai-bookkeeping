@@ -16,11 +16,11 @@ import 'output_pipeline.dart';
 
 /// 流水线状态
 enum VoicePipelineState {
-  idle,       // 空闲
-  listening,  // 监听用户输入
+  idle, // 空闲
+  listening, // 监听用户输入
   processing, // 处理用户输入（等待LLM响应）
-  speaking,   // 播放响应
-  stopping,   // 停止中
+  speaking, // 播放响应
+  stopping, // 停止中
 }
 
 /// 语音流水线控制器
@@ -81,7 +81,12 @@ class VoicePipelineController {
 
   /// 回调
   /// 处理用户输入，返回LLM响应流
-  Future<void> Function(String userInput, void Function(String chunk) onChunk, VoidCallback onComplete)? onProcessInput;
+  Future<void> Function(
+    String userInput,
+    void Function(String chunk) onChunk,
+    VoidCallback onComplete,
+  )?
+  onProcessInput;
 
   /// 状态变化回调
   void Function(VoicePipelineState state)? onStateChanged;
@@ -117,10 +122,10 @@ class VoicePipelineController {
     RealtimeVADService? vadService,
     PipelineConfig? config,
     ResultBuffer? resultBuffer,
-  })  : _asrEngine = asrEngine,
-        _ttsService = ttsService,
-        _vadService = vadService,
-        _config = config ?? PipelineConfig.defaultConfig {
+  }) : _asrEngine = asrEngine,
+       _ttsService = ttsService,
+       _vadService = vadService,
+       _config = config ?? PipelineConfig.defaultConfig {
     _dynamicWindow = DynamicAggregationWindow();
     _responseTracker = ResponseTracker();
     _bargeInDetector = BargeInDetectorV2(config: _config);
@@ -148,6 +153,7 @@ class VoicePipelineController {
       topicGenerator: _topicGenerator,
       onProactiveMessage: _handleProactiveMessage,
       onSessionEnd: _handleSessionTimeout,
+      isSoundPlaying: () => _isUserSpeaking || _outputPipeline.isSpeaking,
     );
 
     _setupCallbacks();
@@ -174,7 +180,7 @@ class VoicePipelineController {
     _inputPipeline.onPartialResult = _handlePartialResult;
     _inputPipeline.onFinalResult = _handleFinalResult;
     _inputPipeline.onBargeIn = _handleBargeIn;
-    _inputPipeline.onError = _handleInputError;  // ASR错误处理
+    _inputPipeline.onError = _handleInputError; // ASR错误处理
     _inputPipeline.onSpeechStart = _handleSpeechStart;
     _inputPipeline.onSpeechEnd = _handleSpeechEnd;
 
@@ -204,21 +210,22 @@ class VoicePipelineController {
   void _handleSpeechEnd() {
     _isUserSpeaking = false;
     _lastSpeechEndTime = DateTime.now();
-    debugPrint('[VoicePipelineController] VAD: 用户停止说话，缓冲区=${_sentenceBuffer.length}句');
+    debugPrint(
+      '[VoicePipelineController] VAD: 用户停止说话，缓冲区=${_sentenceBuffer.length}句',
+    );
 
     if (_sentenceBuffer.isNotEmpty) {
-      // 有缓存句子，启动聚合计时器，不启动主动对话监听
-      // 等聚合完成、处理完成后，状态回到listening时才重启监听
+      // 有缓存句子，启动聚合计时器
       _startDynamicAggregationTimer();
 
       // 用户停止说话后，启动最大等待计时器（基于语音结束时间）
-      // 这样确保只有在用户真正停顿后才开始计算最大等待时间
       _startMaxWaitTimerFromSpeechEnd();
-    } else {
-      // 没有句子，用户可能只是噪音或短暂触发VAD，重启主动对话监听
-      debugPrint('[VoicePipelineController] 无缓存句子，重启主动对话监听');
-      _proactiveManager.startSilenceMonitoring();
     }
+
+    // 用户停止说话，尝试启动静默监听
+    // 如果TTS正在播放，startSilenceMonitoring会自动跳过
+    debugPrint('[VoicePipelineController] 用户停止说话，尝试启动静默监听');
+    _proactiveManager.startSilenceMonitoring();
   }
 
   /// 是否正在重启输入流水线（防止重复重启）
@@ -257,21 +264,29 @@ class VoicePipelineController {
 
     _isRestartingInput = true;
     debugPrint('[VoicePipelineController] ===== 开始重启输入流水线 =====');
-    debugPrint('[VoicePipelineController] 当前状态: controller=$_state, input=${_inputPipeline.state}');
+    debugPrint(
+      '[VoicePipelineController] 当前状态: controller=$_state, input=${_inputPipeline.state}',
+    );
 
     try {
       debugPrint('[VoicePipelineController] 调用 stop()...');
       await _inputPipeline.stop();
-      debugPrint('[VoicePipelineController] stop() 完成，状态: ${_inputPipeline.state}');
+      debugPrint(
+        '[VoicePipelineController] stop() 完成，状态: ${_inputPipeline.state}',
+      );
 
       debugPrint('[VoicePipelineController] 调用 reset()...');
       _inputPipeline.reset();
-      debugPrint('[VoicePipelineController] reset() 完成，状态: ${_inputPipeline.state}');
+      debugPrint(
+        '[VoicePipelineController] reset() 完成，状态: ${_inputPipeline.state}',
+      );
 
       // 先启动输入流水线，确保音频流控制器已创建
       debugPrint('[VoicePipelineController] 调用 start()...');
       await _inputPipeline.start();
-      debugPrint('[VoicePipelineController] start() 完成，状态: ${_inputPipeline.state}');
+      debugPrint(
+        '[VoicePipelineController] start() 完成，状态: ${_inputPipeline.state}',
+      );
 
       // 再通知外部重启音频录制（此时音频流控制器已就绪，可以接收数据）
       // 注意：顺序很重要！必须先创建控制器再重启录制，否则会丢失音频数据
@@ -279,7 +294,9 @@ class VoicePipelineController {
       onNeedRestartRecording?.call();
 
       debugPrint('[VoicePipelineController] ===== 输入流水线重启成功，准备接收音频 =====');
-      debugPrint('[VoicePipelineController] 最终状态: controller=$_state, input=${_inputPipeline.state}');
+      debugPrint(
+        '[VoicePipelineController] 最终状态: controller=$_state, input=${_inputPipeline.state}',
+      );
     } catch (e, stack) {
       debugPrint('[VoicePipelineController] !!!!! 重启输入流水线失败 !!!!!');
       debugPrint('[VoicePipelineController] 错误: $e');
@@ -294,7 +311,9 @@ class VoicePipelineController {
         _inputPipeline.reset();
         debugPrint('[VoicePipelineController] InputPipeline 清理完成');
       } catch (cleanupError) {
-        debugPrint('[VoicePipelineController] InputPipeline 清理也失败: $cleanupError');
+        debugPrint(
+          '[VoicePipelineController] InputPipeline 清理也失败: $cleanupError',
+        );
       }
 
       // 然后重置控制器状态
@@ -320,7 +339,9 @@ class VoicePipelineController {
       // 确保 InputPipeline 处于 idle 状态，否则先重置
       // 这解决了停止后重新启动时状态为 stopped 的问题
       if (_inputPipeline.state != InputPipelineState.idle) {
-        debugPrint('[VoicePipelineController] InputPipeline状态为${_inputPipeline.state}，先重置');
+        debugPrint(
+          '[VoicePipelineController] InputPipeline状态为${_inputPipeline.state}，先重置',
+        );
         _inputPipeline.reset();
       }
 
@@ -386,7 +407,9 @@ class VoicePipelineController {
   /// 外部调用此方法可以在流水线listening状态下播放消息
   /// [isUserResponse] 为true时表示这是对用户输入的响应（延迟响应），不计入主动对话次数
   void triggerProactiveMessage(String message, {bool isUserResponse = false}) {
-    debugPrint('[VoicePipelineController] 触发主动消息: $message (isUserResponse=$isUserResponse)');
+    debugPrint(
+      '[VoicePipelineController] 触发主动消息: $message (isUserResponse=$isUserResponse)',
+    );
     _handleProactiveMessage(message, isUserResponse: isUserResponse);
   }
 
@@ -422,15 +445,10 @@ class VoicePipelineController {
   Future<void> _handleFinalResult(String text) async {
     if (text.trim().isEmpty) return;
 
-    debugPrint('[VoicePipelineController] 收到ASR句子: "$text", VAD说话中=$_isUserSpeaking');
+    debugPrint(
+      '[VoicePipelineController] 收到ASR句子: "$text", VAD说话中=$_isUserSpeaking',
+    );
 
-    // 关键：聚合等待开始时，停止主动对话监听
-    // 防止用户说多笔交易时被主动对话打断
-    // 主动对话监听会在聚合处理完成后（状态变为listening时）重新启动
-    if (_sentenceBuffer.isEmpty) {
-      debugPrint('[VoicePipelineController] 开始聚合等待，暂停主动对话监听');
-      _proactiveManager.stopMonitoring();
-    }
 
     // 将句子加入缓冲区
     _sentenceBuffer.add(text);
@@ -458,7 +476,9 @@ class VoicePipelineController {
     // 计算自上次语音结束的时间
     int? msSinceLastSpeechEnd;
     if (_lastSpeechEndTime != null) {
-      msSinceLastSpeechEnd = DateTime.now().difference(_lastSpeechEndTime!).inMilliseconds;
+      msSinceLastSpeechEnd = DateTime.now()
+          .difference(_lastSpeechEndTime!)
+          .inMilliseconds;
     }
 
     // 合并所有缓存的句子用于语义分析
@@ -500,11 +520,15 @@ class VoicePipelineController {
         // 竞态条件防护：检查此回调是否来自当前有效的计时器
         // 如果计时器ID不匹配，说明这是一个被"取消"但仍执行的旧回调
         if (_aggregationTimerId != currentTimerId) {
-          debugPrint('[VoicePipelineController] 忽略过期的聚合计时器回调 (id=$currentTimerId, active=$_aggregationTimerId)');
+          debugPrint(
+            '[VoicePipelineController] 忽略过期的聚合计时器回调 (id=$currentTimerId, active=$_aggregationTimerId)',
+          );
           return;
         }
         _cumulativeWaitMs += waitResult.waitTimeMs;
-        debugPrint('[VoicePipelineController] 聚合计时器触发 (累计${_cumulativeWaitMs}ms, timerId=$currentTimerId)');
+        debugPrint(
+          '[VoicePipelineController] 聚合计时器触发 (累计${_cumulativeWaitMs}ms, timerId=$currentTimerId)',
+        );
         _processAggregatedSentences();
       },
     );
@@ -520,7 +544,9 @@ class VoicePipelineController {
     // 取消之前的计时器，重新计时
     _maxWaitTimer?.cancel();
 
-    debugPrint('[VoicePipelineController] 启动最大等待计时器（${AggregationTiming.maxWaitMs}ms，基于语音结束时间）');
+    debugPrint(
+      '[VoicePipelineController] 启动最大等待计时器（${AggregationTiming.maxWaitMs}ms，基于语音结束时间）',
+    );
 
     _maxWaitTimer = Timer(
       Duration(milliseconds: AggregationTiming.maxWaitMs),
@@ -530,7 +556,9 @@ class VoicePipelineController {
           debugPrint('[VoicePipelineController] 最大等待触发时用户正在说话，跳过');
           return;
         }
-        debugPrint('[VoicePipelineController] 最大等待计时器触发（${AggregationTiming.maxWaitMs}ms，基于语音结束）');
+        debugPrint(
+          '[VoicePipelineController] 最大等待计时器触发（${AggregationTiming.maxWaitMs}ms，基于语音结束）',
+        );
         _processAggregatedSentences();
       },
     );
@@ -588,7 +616,9 @@ class VoicePipelineController {
         // 安全检查：如果 onProcessInput 完成后状态仍然是 processing
         // 说明 onChunk 回调没有被调用（可能响应为空），需要手动转换状态
         if (_state == VoicePipelineState.processing) {
-          debugPrint('[VoicePipelineController] onProcessInput完成后状态仍为processing，手动切换到listening');
+          debugPrint(
+            '[VoicePipelineController] onProcessInput完成后状态仍为processing，手动切换到listening',
+          );
           _setState(VoicePipelineState.listening);
         }
       } catch (e) {
@@ -641,7 +671,9 @@ class VoicePipelineController {
   /// 在 await _restartInputPipeline() 期间，stop() 可能被调用
   Future<void> _handleOutputCompleted() async {
     debugPrint('[VoicePipelineController] ========== 输出完成回调 ==========');
-    debugPrint('[VoicePipelineController] 当前状态: $_state, feedDataCount=$_feedDataCount');
+    debugPrint(
+      '[VoicePipelineController] 当前状态: $_state, feedDataCount=$_feedDataCount',
+    );
 
     // 检查是否已释放
     if (_isDisposed) {
@@ -669,6 +701,12 @@ class VoicePipelineController {
 
       // 输出完成后重启输入流水线（确保ASR正常运行）
       await _restartInputPipeline();
+
+      // TTS播放完成，尝试启动静默监听
+      // 如果用户正在说话，startSilenceMonitoring会自动跳过
+      debugPrint('[VoicePipelineController] TTS播放完成，尝试启动静默监听');
+      _proactiveManager.startSilenceMonitoring();
+
       debugPrint('[VoicePipelineController] ========== 输出完成处理结束 ==========');
     } else {
       debugPrint('[VoicePipelineController] 状态不符合条件($_state)，跳过重启');
@@ -701,16 +739,20 @@ class VoicePipelineController {
   }
 
   /// 更新主动对话监听状态
-  void _updateProactiveMonitoring(VoicePipelineState oldState, VoicePipelineState newState) {
-    // 进入 listening 状态：启动静默监听
+  ///
+  /// 静默计时器现在基于声音状态自动管理：
+  /// - 有声音（用户说话 OR TTS播放）→ 自动停止
+  /// - 没有声音 → 自动启动
+  /// 这里只需要在状态变化时尝试启动/停止，具体是否执行由 ProactiveConversationManager 判断
+  void _updateProactiveMonitoring(
+    VoicePipelineState oldState,
+    VoicePipelineState newState,
+  ) {
+    // 进入 listening 状态：尝试启动静默监听
+    // 如果有声音在播放，startSilenceMonitoring会自动跳过
     if (newState == VoicePipelineState.listening) {
-      debugPrint('[VoicePipelineController] 进入listening，启动主动对话监听');
+      debugPrint('[VoicePipelineController] 进入listening，尝试启动主动对话监听');
       _proactiveManager.startSilenceMonitoring();
-    }
-    // 离开 listening 状态（processing/speaking/stopping/idle）：停止监听
-    else if (oldState == VoicePipelineState.listening) {
-      debugPrint('[VoicePipelineController] 离开listening，暂停主动对话监听');
-      _proactiveManager.stopMonitoring();
     }
     // 进入 idle 状态：重置会话
     if (newState == VoicePipelineState.idle) {
@@ -746,7 +788,9 @@ class VoicePipelineController {
 
     if (shouldLog) {
       final inputState = _inputPipeline.state;
-      debugPrint('[VoicePipelineController] feedAudioData #$_feedDataCount, 状态=$_state, inputState=$inputState');
+      debugPrint(
+        '[VoicePipelineController] feedAudioData #$_feedDataCount, 状态=$_state, inputState=$inputState',
+      );
     }
 
     // listening 状态：发送给ASR+VAD进行识别
@@ -761,7 +805,9 @@ class VoicePipelineController {
       // speaking 状态下检测高振幅打断
       _checkAmplitudeBargeIn(audioData);
     } else if (shouldLog) {
-      debugPrint('[VoicePipelineController] 状态=$_state，跳过feedAudioData（等待状态变为listening或speaking）');
+      debugPrint(
+        '[VoicePipelineController] 状态=$_state，跳过feedAudioData（等待状态变为listening或speaking）',
+      );
     }
   }
 
@@ -784,13 +830,17 @@ class VoicePipelineController {
         sumAmplitude += sample.abs();
       }
     }
-    final avgAmplitude = audioData.length > 2 ? sumAmplitude ~/ (audioData.length ~/ 2) : 0;
+    final avgAmplitude = audioData.length > 2
+        ? sumAmplitude ~/ (audioData.length ~/ 2)
+        : 0;
 
     // 检查是否超过阈值
     if (avgAmplitude > _bargeInAmplitudeThreshold) {
       _highAmplitudeFrameCount++;
       if (_highAmplitudeFrameCount >= _bargeInFrameThreshold) {
-        debugPrint('[VoicePipelineController] 检测到高振幅打断: 平均振幅=$avgAmplitude, 连续帧=$_highAmplitudeFrameCount');
+        debugPrint(
+          '[VoicePipelineController] 检测到高振幅打断: 平均振幅=$avgAmplitude, 连续帧=$_highAmplitudeFrameCount',
+        );
         _highAmplitudeFrameCount = 0; // 重置计数器
         _handleAmplitudeBargeIn();
       }
@@ -851,7 +901,9 @@ class VoicePipelineController {
   ///
   /// 当用户30秒无操作时，系统主动发起对话
   void _handleProactiveMessage(String message, {bool isUserResponse = false}) {
-    debugPrint('[VoicePipelineController] 收到主动对话消息: $message (isUserResponse=$isUserResponse)');
+    debugPrint(
+      '[VoicePipelineController] 收到主动对话消息: $message (isUserResponse=$isUserResponse)',
+    );
 
     // 检查是否已释放或状态不对
     if (_isDisposed) {
