@@ -264,6 +264,7 @@ class TransactionDetailPage extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
@@ -272,8 +273,8 @@ class TransactionDetailPage extends ConsumerWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const Spacer(),
-          Flexible(
+          const SizedBox(width: 16),
+          Expanded(
             child: Text(
               value,
               style: const TextStyle(
@@ -281,7 +282,7 @@ class TransactionDetailPage extends ConsumerWidget {
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.right,
-              overflow: TextOverflow.ellipsis,
+              maxLines: null,
             ),
           ),
         ],
