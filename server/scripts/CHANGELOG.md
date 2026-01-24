@@ -12,15 +12,29 @@
 
 ### 🔧 实现方式
 
-使用 SQLAlchemy 的元数据管理：
+使用 PostgreSQL 的 CASCADE 删除来处理循环外键依赖：
 
 ```python
-# 删除所有表
-await conn.run_sync(Base.metadata.drop_all)
+# 删除整个 public schema（包含所有表）
+await conn.execute(text("DROP SCHEMA public CASCADE"))
 
-# 重新创建所有表
+# 重新创建 schema
+await conn.execute(text("CREATE SCHEMA public"))
+
+# 恢复默认权限
+await conn.execute(text("GRANT ALL ON SCHEMA public TO PUBLIC"))
+
+# 使用 SQLAlchemy 创建所有表
 await conn.run_sync(Base.metadata.create_all)
 ```
+
+### 🐛 解决的问题
+
+**循环外键依赖**：`transactions` 和 `resource_pools` 表之间存在循环依赖：
+- `transactions.resource_pool_id` → `resource_pools.id`
+- `resource_pools.income_transaction_id` → `transactions.id`
+
+使用 `DROP SCHEMA CASCADE` 可以一次性删除所有表，避免外键约束冲突。
 
 ### 📋 三种模式
 

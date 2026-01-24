@@ -31,6 +31,8 @@
 
 ⭐ **支持表结构变更**：脚本会删除所有表并重新创建，因此当数据库模型发生变化时（添加字段、修改类型等），可以直接使用此脚本重建数据库。
 
+⭐ **处理循环外键依赖**：使用 PostgreSQL 的 `DROP SCHEMA CASCADE` 来处理表之间的循环外键依赖（如 `transactions` ↔ `resource_pools`），确保可靠删除。
+
 ### 使用方法
 
 #### 基本用法
@@ -181,8 +183,22 @@ cat .env | grep DATABASE_URL
 #### 问题：权限不足
 
 ```bash
-# 确保数据库用户有足够的权限执行 TRUNCATE 操作
+# 确保数据库用户有足够的权限
+# 需要 DROP SCHEMA 和 CREATE SCHEMA 权限
 ```
+
+如果遇到权限问题，请联系数据库管理员授予相应权限：
+
+```sql
+-- 授予 schema 权限
+GRANT ALL ON SCHEMA public TO your_user;
+
+-- 或者使用超级用户执行脚本
+```
+
+#### 问题：循环外键依赖
+
+脚本已经处理了循环外键依赖问题（如 `transactions` ↔ `resource_pools`）。如果仍然遇到问题，请查看 [技术说明文档](./TECHNICAL_NOTES.md)。
 
 ### 开发建议
 

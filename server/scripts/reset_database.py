@@ -72,10 +72,15 @@ async def drop_and_create_tables():
     print("\n🔨 重建数据库表结构...")
 
     try:
-        # 删除所有表
+        # 删除所有表 - 使用 CASCADE 处理循环依赖
         print("  🗑️  删除所有表...")
         async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
+            # 对于 PostgreSQL，使用 CASCADE 删除所有表
+            # 这会自动处理外键依赖关系
+            await conn.execute(text("DROP SCHEMA public CASCADE"))
+            await conn.execute(text("CREATE SCHEMA public"))
+            # 恢复默认权限
+            await conn.execute(text("GRANT ALL ON SCHEMA public TO PUBLIC"))
         print("  ✓ 所有表已删除")
 
         # 重新创建所有表
