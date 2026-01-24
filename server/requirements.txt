@@ -54,3 +54,6 @@ ruff==0.8.0
 
 # Aliyun SMS (阿里云短信服务)
 alibabacloud-dysmsapi20170525==2.0.24
+jwt==1.4.0
+psutil==7.2.1
+pyotp==2.9.0

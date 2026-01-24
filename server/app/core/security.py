@@ -139,3 +139,62 @@ def decode_access_token(token: str) -> Optional[str]:
         return user_id
     except JWTError:
         return None
+
+
+def create_email_verification_token(user_id: str, email: str, expires_delta: Optional[timedelta] = None) -> str:
+    """创建邮箱验证 token。
+
+    Args:
+        user_id: 用户 ID
+        email: 待验证的邮箱地址
+        expires_delta: 可选的过期时间，默认1小时
+
+    Returns:
+        JWT token 字符串
+    """
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(hours=1)
+
+    to_encode = {
+        "sub": user_id,
+        "email": email,
+        "type": "email_verification",
+        "exp": expire,
+        "iat": datetime.utcnow(),
+        "jti": str(uuid.uuid4()),
+    }
+    return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+
+def decode_email_verification_token(token: str) -> Optional[dict]:
+    """解码邮箱验证 token。
+
+    Args:
+        token: JWT token 字符串
+
+    Returns:
+        包含 user_id, email, jti 的字典，如果无效则返回 None
+    """
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+
+        # 验证 token 类型
+        if payload.get("type") != "email_verification":
+            return None
+
+        user_id = payload.get("sub")
+        email = payload.get("email")
+        jti = payload.get("jti")
+
+        if not all([user_id, email, jti]):
+            return None
+
+        return {
+            "user_id": user_id,
+            "email": email,
+            "jti": jti
+        }
+    except JWTError:
+        return None

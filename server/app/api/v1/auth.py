@@ -1,4 +1,6 @@
 """Authentication endpoints."""
+import asyncio
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -7,12 +9,15 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.redis import get_redis
+from app.core.config import settings
 from app.core.security import (
     verify_password,
     get_password_hash,
     create_access_token,
     create_refresh_token,
     decode_refresh_token,
+    create_email_verification_token,
+    decode_email_verification_token,
 )
 from app.models.user import User
 from app.models.book import Book
@@ -22,6 +27,7 @@ from app.schemas.user import (
     UserUpdate, CheckEmailRequest, CheckEmailResponse,
     ResetPasswordRequest, ResetPasswordResponse, ResetPasswordConfirm,
     SendSmsCodeRequest, SendSmsCodeResponse, SmsLoginRequest,
+    SendVerificationEmailResponse, VerifyEmailResponse, EmailVerificationStatusResponse,
 )
 from app.api.deps import get_current_user
 from app.services.init_service import init_user_data
@@ -70,6 +76,7 @@ async def register(
         email=user_data.email,
         password_hash=get_password_hash(user_data.password),
         nickname=user_data.nickname or (user_data.phone[:3] + "****" + user_data.phone[-4:] if user_data.phone else "User"),
+        email_verified=False,
     )
     db.add(user)
     await db.flush()
@@ -79,6 +86,25 @@ async def register(
 
     await db.commit()
     await db.refresh(user)
+
+    # 如果注册时填写了邮箱，异步发送验证邮件（不阻塞注册流程）
+    if user_data.email:
+        try:
+            verification_token = create_email_verification_token(str(user.id), user_data.email)
+            verification_url = f"{settings.APP_BASE_URL}/api/v1/auth/verify-email?token={verification_token}"
+
+            # 异步发送邮件
+            asyncio.create_task(
+                notification_email_service.send_email_verification(
+                    to_email=user_data.email,
+                    verification_url=verification_url,
+                    expires_minutes=60,
+                )
+            )
+            logger.info(f"Verification email queued for {user_data.email}")
+        except Exception as e:
+            # 发送失败不影响注册
+            logger.warning(f"Failed to queue verification email for {user_data.email}: {e}")
 
     # Generate tokens
     access_token = create_access_token(str(user.id))
@@ -525,4 +551,172 @@ async def sms_login(
         access_token=access_token,
         refresh_token=refresh_token,
         user=UserResponse.model_validate(user),
+    )
+
+
+@router.post("/send-verification-email", response_model=SendVerificationEmailResponse)
+async def send_verification_email(
+    current_user: User = Depends(get_current_user),
+):
+    """发送邮箱验证邮件。
+
+    需要登录。如果用户已有邮箱且未验证，发送验证邮件。
+    支持重新发送（每小时最多5次）。
+    """
+    if not current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No email address to verify",
+        )
+
+    # 检查是否已验证
+    if current_user.email_verified:
+        return SendVerificationEmailResponse(
+            success=True,
+            message="Email already verified",
+            expires_in=0,
+        )
+
+    # 检查发送频率限制（每用户每小时最多5次）
+    redis = await get_redis()
+    if redis:
+        rate_key = f"email_verify:rate:{current_user.id}"
+        send_count = await redis.incr(rate_key)
+        if send_count == 1:
+            await redis.expire(rate_key, 3600)  # 1小时窗口
+        elif send_count > 5:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many verification emails sent. Please try again later.",
+            )
+
+    # 生成验证 token
+    token = create_email_verification_token(str(current_user.id), current_user.email)
+
+    # 构建验证 URL
+    verification_url = f"{settings.APP_BASE_URL}/api/v1/auth/verify-email?token={token}"
+
+    # 发送邮件
+    email_sent = await notification_email_service.send_email_verification(
+        to_email=current_user.email,
+        verification_url=verification_url,
+        expires_minutes=60,
+    )
+
+    if not email_sent:
+        logger.warning(f"Failed to send verification email to {current_user.email}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Failed to send verification email. Please try again later.",
+        )
+
+    logger.info(f"Verification email sent to {current_user.email}")
+    return SendVerificationEmailResponse(
+        success=True,
+        message="Verification email sent. Please check your inbox.",
+        expires_in=3600,
+    )
+
+
+@router.get("/verify-email", response_model=VerifyEmailResponse)
+async def verify_email(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """验证邮箱。
+
+    用户点击邮件中的链接后调用此端点。
+    成功后更新用户的 email_verified 状态。
+    """
+    # 解码 token
+    token_data = decode_email_verification_token(token)
+
+    if not token_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification link",
+        )
+
+    user_id = token_data["user_id"]
+    email = token_data["email"]
+    jti = token_data["jti"]
+
+    # 检查 token 是否已使用
+    redis = await get_redis()
+    if redis:
+        used_key = f"email_verify:used:{jti}"
+        if await redis.exists(used_key):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This verification link has already been used",
+            )
+
+    # 查找用户
+    try:
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification link",
+        )
+
+    result = await db.execute(select(User).where(User.id == user_uuid))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # 检查邮箱是否匹配（防止用新token验证旧邮箱）
+    if user.email != email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email address mismatch. Please request a new verification email.",
+        )
+
+    # 检查是否已验证
+    if user.email_verified:
+        return VerifyEmailResponse(
+            success=True,
+            message="Email already verified",
+            email=email,
+        )
+
+    # 更新验证状态
+    user.email_verified = True
+    user.email_verified_at = datetime.utcnow()
+
+    try:
+        await db.commit()
+        logger.info(f"Email verified for user {user_id}: {email}")
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Failed to verify email for {user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to verify email",
+        )
+
+    # 标记 token 为已使用
+    if redis:
+        await redis.setex(f"email_verify:used:{jti}", 3600, "1")
+
+    return VerifyEmailResponse(
+        success=True,
+        message="Email verified successfully",
+        email=email,
+    )
+
+
+@router.get("/email-verification-status", response_model=EmailVerificationStatusResponse)
+async def get_email_verification_status(
+    current_user: User = Depends(get_current_user),
+):
+    """获取当前用户的邮箱验证状态。"""
+    return EmailVerificationStatusResponse(
+        email=current_user.email,
+        is_verified=current_user.email_verified,
+        verified_at=current_user.email_verified_at,
     )

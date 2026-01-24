@@ -79,6 +79,71 @@ class NotificationEmailService:
 """
         return await self._send_email(to_email, subject, html_body, text_body)
 
+    async def send_email_verification(
+        self,
+        to_email: str,
+        verification_url: str,
+        expires_minutes: int = 60,
+    ) -> bool:
+        """发送邮箱验证邮件。
+
+        Args:
+            to_email: 收件人邮箱
+            verification_url: 完整的验证链接
+            expires_minutes: 链接有效期（分钟）
+
+        Returns:
+            是否发送成功
+        """
+        subject = f"【{self.settings.SMTP_FROM_NAME}】验证您的邮箱"
+        html_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+                <h1 style="color: white; margin: 0;">邮箱验证</h1>
+            </div>
+            <div style="padding: 30px; background: #f9f9f9;">
+                <p>您好，</p>
+                <p>感谢您注册 {self.settings.SMTP_FROM_NAME}！请点击下方按钮验证您的邮箱：</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{verification_url}"
+                       style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                              color: white; padding: 15px 40px; text-decoration: none;
+                              border-radius: 8px; font-weight: bold; font-size: 16px;">
+                        验证邮箱
+                    </a>
+                </div>
+                <p style="color: #666;">或复制以下链接到浏览器打开：</p>
+                <p style="word-break: break-all; background: white; padding: 15px;
+                          border-radius: 4px; color: #667eea; font-size: 12px;">
+                    {verification_url}
+                </p>
+                <p style="color: #999; font-size: 12px; margin-top: 20px;">
+                    此链接将在 <strong>{expires_minutes} 分钟</strong>后失效。<br>
+                    如果您没有注册此账户，请忽略此邮件。
+                </p>
+            </div>
+            <div style="padding: 20px; text-align: center; color: #999; font-size: 12px;">
+                <p>此邮件由系统自动发送，请勿回复。</p>
+            </div>
+        </body>
+        </html>
+        """
+        text_body = f"""
+邮箱验证
+
+您好，
+
+感谢您注册 {self.settings.SMTP_FROM_NAME}！请点击以下链接验证您的邮箱：
+
+{verification_url}
+
+此链接将在 {expires_minutes} 分钟后失效。
+
+如果您没有注册此账户，请忽略此邮件。
+"""
+        return await self._send_email(to_email, subject, html_body, text_body)
+
     async def _send_email(
         self,
         to_email: str,

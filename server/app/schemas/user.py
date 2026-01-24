@@ -32,6 +32,7 @@ class UserResponse(BaseModel):
     id: UUID
     phone: Optional[str] = None
     email: Optional[str] = None
+    email_verified: bool = False
     nickname: Optional[str] = None
     avatar_url: Optional[str] = None
     member_level: int
@@ -109,3 +110,25 @@ class SmsLoginRequest(BaseModel):
         default=True,
         description="如果用户不存在，是否自动注册"
     )
+
+
+# 邮箱验证相关 Schema
+class SendVerificationEmailResponse(BaseModel):
+    """发送验证邮件响应"""
+    success: bool
+    message: str
+    expires_in: int = Field(default=3600, description="验证链接有效期（秒）")
+
+
+class VerifyEmailResponse(BaseModel):
+    """邮箱验证响应"""
+    success: bool
+    message: str
+    email: Optional[str] = None
+
+
+class EmailVerificationStatusResponse(BaseModel):
+    """邮箱验证状态响应"""
+    email: Optional[str] = None
+    is_verified: bool
+    verified_at: Optional[datetime] = None
