@@ -150,8 +150,8 @@ install_dependencies() {
     cd "${APP_DIR}/server"
 
     # 激活虚拟环境并安装依赖
-    source "${VENV_DIR}/bin/activate"
-    pip install -r requirements.txt --quiet
+    sudo -u "$APP_USER" source "${VENV_DIR}/bin/activate"
+    sudo -u "$APP_USER" pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 
     log_info "依赖安装完成"
 }
