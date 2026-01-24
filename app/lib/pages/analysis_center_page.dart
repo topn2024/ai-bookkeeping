@@ -5,6 +5,8 @@ import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../providers/ledger_context_provider.dart';
+import '../services/category_localization_service.dart';
+import '../extensions/category_extensions.dart';
 
 // 趋势分析相关
 import 'reports/trend_drill_page.dart';
@@ -1287,7 +1289,7 @@ class _CategoryItem extends StatelessWidget {
           size: 20,
         ),
       ),
-      title: Text(categoryData?.name ?? category),
+      title: Text(categoryData?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(category)),
       subtitle: showPercentage
         ? LinearProgressIndicator(
             value: percentage / 100,

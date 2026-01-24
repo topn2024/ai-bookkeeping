@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 import '../theme/app_theme.dart';
 
 /// 可滑入操作按钮的交易条目组件
@@ -240,7 +241,7 @@ class _SwipeableTransactionItemState extends State<SwipeableTransactionItem>
                 Row(
                   children: [
                     Text(
-                      category?.localizedName ?? transaction.category,
+                      _getCategoryDisplayName(transaction, category),
                       style: const TextStyle(
                         fontWeight: FontWeight.w500,
                         fontSize: 16,
@@ -349,5 +350,38 @@ class _SwipeableTransactionItemState extends State<SwipeableTransactionItem>
         ),
       ),
     );
+  }
+
+  /// 获取分类显示名称
+  /// 优先使用本地化名称，如果找不到分类定义则尝试本地化服务
+  String _getCategoryDisplayName(Transaction transaction, Category? category) {
+    // 如果找到了分类定义，使用本地化名称
+    if (category != null) {
+      return category.localizedName;
+    }
+
+    // 如果没找到分类定义，尝试通过本地化服务获取
+    // 这样可以处理不规范的分类ID（如大小写不一致、英文名称等）
+    final localizedName = transaction.category.localizedCategoryName;
+
+    // 如果本地化服务也无法处理，返回原始值
+    // 但至少尝试美化一下（首字母大写）
+    if (localizedName == transaction.category.toLowerCase()) {
+      return _beautifyCategoryName(transaction.category);
+    }
+
+    return localizedName;
+  }
+
+  /// 美化分类名称（用于无法识别的分类）
+  /// 将 'food' 转换为 'Food'，'food_breakfast' 转换为 'Food Breakfast'
+  String _beautifyCategoryName(String category) {
+    if (category.isEmpty) return category;
+
+    // 将下划线替换为空格，并将每个单词首字母大写
+    return category
+        .split('_')
+        .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
+        .join(' ');
   }
 }

@@ -43,26 +43,26 @@ abstract class BillParser {
     final text = '${merchant ?? ''} ${note ?? ''}'.toLowerCase();
 
     if (type == TransactionType.income) {
-      // Income categories
+      // Income categories - 使用标准分类ID
       if (text.contains('工资') || text.contains('薪资') || text.contains('salary')) {
         return 'salary';
       }
       if (text.contains('奖金') || text.contains('bonus')) {
-        return 'income_bonus';
+        return 'bonus';  // 修复：从 income_bonus 改为 bonus
       }
       if (text.contains('红包')) {
-        return 'income_redpacket';
+        return 'redpacket';  // 修复：从 income_redpacket 改为 redpacket
       }
-      if (text.contains('退款') || text.contains('refund')) {
-        return 'income_refund';
+      if (text.contains('退款') || text.contains('refund') || text.contains('报销')) {
+        return 'reimburse';  // 修复：从 income_refund 改为 reimburse
       }
       if (text.contains('利息') || text.contains('理财') || text.contains('收益')) {
-        return 'income_investment';
+        return 'investment';  // 修复：从 income_investment 改为 investment
       }
-      return 'income_other';
+      return 'other_income';  // 修复：从 income_other 改为 other_income
     }
 
-    // Expense categories
+    // Expense categories - 使用标准分类ID
     // Food & Dining
     if (text.contains('早餐') || text.contains('早点') || text.contains('breakfast')) {
       return 'food_breakfast';
@@ -120,19 +120,19 @@ abstract class BillParser {
     // Shopping
     if (text.contains('淘宝') || text.contains('天猫') || text.contains('京东') || text.contains('拼多多') ||
         text.contains('电商') || text.contains('网购')) {
-      return 'shopping_online';
+      return 'shopping_digital';  // 修复：从 shopping_online 改为 shopping_digital
     }
     if (text.contains('超市') || text.contains('便利店') || text.contains('7-11') || text.contains('全家') ||
         text.contains('罗森') || text.contains('沃尔玛') || text.contains('永辉')) {
-      return 'shopping_grocery';
+      return 'shopping_daily';  // 修复：从 shopping_grocery 改为 shopping_daily
     }
     if (text.contains('服装') || text.contains('衣服') || text.contains('鞋') || text.contains('clothes') ||
         text.contains('优衣库') || text.contains('zara') || text.contains('hm')) {
-      return 'shopping_clothes';
+      return 'clothing_clothes';  // 修复：从 shopping_clothes 改为 clothing_clothes
     }
     if (text.contains('数码') || text.contains('电子') || text.contains('手机') || text.contains('电脑') ||
         text.contains('苹果') || text.contains('apple') || text.contains('华为')) {
-      return 'shopping_electronics';
+      return 'shopping_digital';  // 修复：从 shopping_electronics 改为 shopping_digital
     }
     if (text.contains('购物') || text.contains('shopping') || text.contains('商城') || text.contains('百货')) {
       return 'shopping';
@@ -155,13 +155,13 @@ abstract class BillParser {
     // Health & Medical
     if (text.contains('医院') || text.contains('诊所') || text.contains('看病') || text.contains('挂号') ||
         text.contains('hospital') || text.contains('medical')) {
-      return 'health_medical';
+      return 'medical_clinic';  // 修复：从 health_medical 改为 medical_clinic
     }
     if (text.contains('药') || text.contains('药店') || text.contains('pharmacy')) {
-      return 'health_medicine';
+      return 'medical_medicine';  // 修复：从 health_medicine 改为 medical_medicine
     }
     if (text.contains('健身') || text.contains('gym') || text.contains('运动') || text.contains('瑜伽')) {
-      return 'health_fitness';
+      return 'entertainment_fitness';  // 修复：从 health_fitness 改为 entertainment_fitness
     }
 
     // Education
@@ -175,20 +175,20 @@ abstract class BillParser {
 
     // Living
     if (text.contains('房租') || text.contains('租金') || text.contains('rent')) {
-      return 'living_rent';
+      return 'housing_rent';  // 修复：从 living_rent 改为 housing_rent
     }
     if (text.contains('水费') || text.contains('电费') || text.contains('燃气') || text.contains('物业') ||
         text.contains('utility')) {
-      return 'living_utilities';
+      return 'utilities';  // 修复：从 living_utilities 改为 utilities（一级分类）
     }
     if (text.contains('通讯') || text.contains('话费') || text.contains('流量') || text.contains('宽带') ||
         text.contains('mobile') || text.contains('联通') || text.contains('移动') || text.contains('电信')) {
-      return 'living_phone';
+      return 'communication_phone';  // 修复：从 living_phone 改为 communication_phone
     }
 
     // Personal
     if (text.contains('美容') || text.contains('理发') || text.contains('化妆') || text.contains('护肤')) {
-      return 'personal_beauty';
+      return 'beauty';  // 修复：从 personal_beauty 改为 beauty（一级分类）
     }
 
     // Transfer - not expense
@@ -196,7 +196,7 @@ abstract class BillParser {
       return 'transfer';
     }
 
-    return 'other';
+    return 'other_expense';  // 修复：从 'other' 改为 'other_expense'
   }
 
   /// Parse amount string to double

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 import 'category_detail_page.dart';
 
 /// 拿铁因子分析页面
@@ -54,7 +55,7 @@ class LatteFactorPage extends ConsumerWidget {
       return LatteFactorCategory(
         categoryId: stats.category,
         emoji: _getCategoryEmoji(stats.category),
-        name: category?.name ?? stats.category,
+        name: category?.localizedName ?? stats.category,
         weeklyCount: weeklyCount,
         averageAmount: avgAmount,
         monthlyTotal: stats.total,

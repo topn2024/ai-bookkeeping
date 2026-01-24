@@ -5,6 +5,7 @@ import '../../providers/budget_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../../models/transaction.dart';
 import '../../models/category.dart';
+import '../../extensions/category_extensions.dart';
 import '../budget_management_page.dart';
 import '../category_detail_page.dart';
 
@@ -117,7 +118,7 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
 
         categories.add(_BudgetCategoryData(
           categoryId: categoryId,
-          name: category?.name ?? categoryId,
+          name: category?.localizedName ?? categoryId,
           budget: budget,
           used: spent,
           color: color,
@@ -136,7 +137,7 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
 
         categories.add(_BudgetCategoryData(
           categoryId: entry.key,
-          name: category?.name ?? entry.key,
+          name: category?.localizedName ?? entry.key,
           budget: 0, // 无预算
           used: entry.value,
           color: color,

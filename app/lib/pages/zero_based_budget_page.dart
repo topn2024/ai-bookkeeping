@@ -341,7 +341,7 @@ class _CategoryItem extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        category.name,
+                        category.localizedName,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,

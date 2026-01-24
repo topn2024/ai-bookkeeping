@@ -308,7 +308,7 @@ class _VaultCarryoverPageState extends ConsumerState<VaultCarryoverPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            category.name,
+                            category.localizedName,
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,

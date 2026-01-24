@@ -446,28 +446,172 @@ class DefaultCategories {
   ];
 
   /// 根据ID或名称查找分类（包含子分类）
-  /// 优先按ID匹配，如果找不到则按名称匹配
+  /// 支持多种匹配方式：
+  /// 1. 精确ID匹配（如 'food'）
+  /// 2. 大小写不敏感ID匹配（如 'Food' -> 'food'）
+  /// 3. 中文名称匹配（如 '餐饮' -> 'food'）
+  /// 4. 英文名称映射（如 'Food & Dining' -> 'food'）
   static Category? findById(String idOrName) {
+    if (idOrName.isEmpty) return null;
+
+    // 1. 精确ID匹配
     try {
-      // 首先尝试按ID精确匹配
       return allCategories.firstWhere((c) => c.id == idOrName);
     } catch (e) {
-      // 如果ID找不到，尝试按名称匹配
+      // 继续尝试其他匹配方式
+    }
+
+    // 2. 大小写不敏感ID匹配
+    final lowerIdOrName = idOrName.toLowerCase().trim();
+    try {
+      return allCategories.firstWhere((c) => c.id.toLowerCase() == lowerIdOrName);
+    } catch (e) {
+      // 继续尝试其他匹配方式
+    }
+
+    // 3. 中文名称精确匹配
+    try {
+      return allCategories.firstWhere((c) => c.name == idOrName);
+    } catch (e) {
+      // 继续尝试其他匹配方式
+    }
+
+    // 4. 英文名称映射匹配
+    final mappedId = _englishNameMap[idOrName] ?? _englishNameMap[lowerIdOrName];
+    if (mappedId != null) {
       try {
-        return allCategories.firstWhere((c) => c.name == idOrName);
+        return allCategories.firstWhere((c) => c.id == mappedId);
       } catch (e) {
-        return null;
+        // 继续尝试其他匹配方式
       }
     }
+
+    // 5. 模糊匹配 - 检查是否包含关键词
+    for (final category in allCategories) {
+      // 检查是否包含分类名称
+      if (idOrName.contains(category.name) || category.name.contains(idOrName)) {
+        return category;
+      }
+    }
+
+    return null;
   }
 
+  /// 英文名称到分类ID的映射表
+  /// 用于处理AI识别或导入数据中的英文分类名称
+  static const Map<String, String> _englishNameMap = {
+    // 支出分类 - 英文全称
+    'Food': 'food',
+    'Food & Dining': 'food',
+    'Dining': 'food',
+    'Restaurant': 'food',
+    'Meal': 'food',
+    'Transportation': 'transport',
+    'Transport': 'transport',
+    'Travel': 'transport',
+    'Shopping': 'shopping',
+    'Entertainment': 'entertainment',
+    'Fun': 'entertainment',
+    'Housing': 'housing',
+    'Home': 'housing',
+    'Rent': 'housing',
+    'Utilities': 'utilities',
+    'Bills': 'utilities',
+    'Medical': 'medical',
+    'Healthcare': 'medical',
+    'Health': 'medical',
+    'Education': 'education',
+    'Learning': 'education',
+    'Communication': 'communication',
+    'Phone': 'communication',
+    'Clothing': 'clothing',
+    'Clothes': 'clothing',
+    'Beauty': 'beauty',
+    'Cosmetics': 'beauty',
+    'Subscription': 'subscription',
+    'Social': 'social',
+    'Gift': 'social',
+    'Finance': 'finance',
+    'Finance & Insurance': 'finance',
+    'Insurance': 'finance',
+    'Pet': 'pet',
+    'Other': 'other_expense',
+    'Other Expense': 'other_expense',
+    'Miscellaneous': 'other_expense',
+
+    // 收入分类 - 英文全称
+    'Salary': 'salary',
+    'Wage': 'salary',
+    'Income': 'salary',
+    'Bonus': 'bonus',
+    'Award': 'bonus',
+    'Investment': 'investment',
+    'Returns': 'investment',
+    'Part-time': 'parttime',
+    'Parttime': 'parttime',
+    'Side Job': 'parttime',
+    'Gift Money': 'redpacket',
+    'Red Packet': 'redpacket',
+    'Reimbursement': 'reimburse',
+    'Refund': 'reimburse',
+    'Business': 'business',
+    'Business Income': 'business',
+    'Other Income': 'other_income',
+
+    // 小写变体
+    'food': 'food',
+    'transport': 'transport',
+    'shopping': 'shopping',
+    'entertainment': 'entertainment',
+    'housing': 'housing',
+    'utilities': 'utilities',
+    'medical': 'medical',
+    'education': 'education',
+    'communication': 'communication',
+    'clothing': 'clothing',
+    'beauty': 'beauty',
+    'subscription': 'subscription',
+    'social': 'social',
+    'finance': 'finance',
+    'pet': 'pet',
+    'other': 'other_expense',
+    'salary': 'salary',
+    'bonus': 'bonus',
+    'investment': 'investment',
+    'parttime': 'parttime',
+    'redpacket': 'redpacket',
+    'reimburse': 'reimburse',
+    'business': 'business',
+  };
+
   /// 根据名称查找分类
+  /// 支持中文名称和英文名称
   static Category? findByName(String name) {
+    if (name.isEmpty) return null;
+
+    // 1. 精确中文名称匹配
     try {
       return allCategories.firstWhere((c) => c.name == name);
     } catch (e) {
-      return null;
+      // 继续尝试其他匹配方式
     }
+
+    // 2. 通过英文名称映射查找
+    final mappedId = _englishNameMap[name] ?? _englishNameMap[name.toLowerCase()];
+    if (mappedId != null) {
+      return findById(mappedId);
+    }
+
+    // 3. 模糊匹配
+    final lowerName = name.toLowerCase().trim();
+    for (final category in allCategories) {
+      if (category.name.toLowerCase().contains(lowerName) ||
+          lowerName.contains(category.name.toLowerCase())) {
+        return category;
+      }
+    }
+
+    return null;
   }
 
   /// 获取指定父分类的所有子分类（支持支出和收入）

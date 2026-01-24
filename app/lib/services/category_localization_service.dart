@@ -26,15 +26,140 @@ class CategoryLocalizationService extends BaseLocalizationService<String> {
   }
 
   /// 获取分类的本地化名称
+  /// 支持不规范的分类ID（如大小写不一致、英文名称等）
   String getCategoryName(String categoryId) {
-    // 先检查自定义翻译
-    final custom = _customTranslations[categoryId]?[currentLocale];
+    if (categoryId.isEmpty) return categoryId;
+
+    // 先规范化分类ID
+    final normalizedId = _normalizeCategoryId(categoryId);
+
+    // 检查自定义翻译
+    final custom = _customTranslations[normalizedId]?[currentLocale];
     if (custom != null) {
       return custom;
     }
 
-    return getLocalizedName(categoryId);
+    return getLocalizedName(normalizedId);
   }
+
+  /// 规范化分类ID
+  /// 将各种不规范的分类ID转换为标准的小写ID
+  String _normalizeCategoryId(String categoryId) {
+    // 1. 如果已经是有效的分类ID，直接返回
+    if (_categoryTranslations.containsKey(categoryId)) {
+      return categoryId;
+    }
+
+    // 2. 尝试小写转换
+    final lowerCategoryId = categoryId.toLowerCase().trim();
+    if (_categoryTranslations.containsKey(lowerCategoryId)) {
+      return lowerCategoryId;
+    }
+
+    // 3. 尝试通过英文名称映射
+    final mappedId = _englishNameMap[categoryId] ?? _englishNameMap[lowerCategoryId];
+    if (mappedId != null && _categoryTranslations.containsKey(mappedId)) {
+      return mappedId;
+    }
+
+    // 4. 尝试通过中文名称反向查找
+    for (final entry in _categoryTranslations.entries) {
+      final zhName = entry.value['zh'];
+      if (zhName == categoryId) {
+        return entry.key;
+      }
+    }
+
+    // 5. 如果都找不到，返回原始ID
+    return lowerCategoryId;
+  }
+
+  /// 英文名称到分类ID的映射表
+  /// 与 Category.dart 中的映射保持一致
+  static const Map<String, String> _englishNameMap = {
+    // 支出分类 - 英文全称
+    'Food': 'food',
+    'Food & Dining': 'food',
+    'Dining': 'food',
+    'Restaurant': 'food',
+    'Meal': 'food',
+    'Transportation': 'transport',
+    'Transport': 'transport',
+    'Travel': 'transport',
+    'Shopping': 'shopping',
+    'Entertainment': 'entertainment',
+    'Fun': 'entertainment',
+    'Housing': 'housing',
+    'Home': 'housing',
+    'Rent': 'housing',
+    'Utilities': 'utilities',
+    'Bills': 'utilities',
+    'Medical': 'medical',
+    'Healthcare': 'medical',
+    'Health': 'medical',
+    'Education': 'education',
+    'Learning': 'education',
+    'Communication': 'communication',
+    'Phone': 'communication',
+    'Clothing': 'clothing',
+    'Clothes': 'clothing',
+    'Beauty': 'beauty',
+    'Cosmetics': 'beauty',
+    'Subscription': 'subscription',
+    'Social': 'social',
+    'Gift': 'social',
+    'Finance': 'finance',
+    'Finance & Insurance': 'finance',
+    'Insurance': 'finance',
+    'Pet': 'pet',
+    'Other': 'other_expense',
+    'Other Expense': 'other_expense',
+    'Miscellaneous': 'other_expense',
+
+    // 收入分类 - 英文全称
+    'Salary': 'salary',
+    'Wage': 'salary',
+    'Income': 'salary',
+    'Bonus': 'bonus',
+    'Award': 'bonus',
+    'Investment': 'investment',
+    'Returns': 'investment',
+    'Part-time': 'parttime',
+    'Parttime': 'parttime',
+    'Side Job': 'parttime',
+    'Gift Money': 'redpacket',
+    'Red Packet': 'redpacket',
+    'Reimbursement': 'reimburse',
+    'Refund': 'reimburse',
+    'Business': 'business',
+    'Business Income': 'business',
+    'Other Income': 'other_income',
+
+    // 小写变体
+    'food': 'food',
+    'transport': 'transport',
+    'shopping': 'shopping',
+    'entertainment': 'entertainment',
+    'housing': 'housing',
+    'utilities': 'utilities',
+    'medical': 'medical',
+    'education': 'education',
+    'communication': 'communication',
+    'clothing': 'clothing',
+    'beauty': 'beauty',
+    'subscription': 'subscription',
+    'social': 'social',
+    'finance': 'finance',
+    'pet': 'pet',
+    'other': 'other_expense',
+    'salary': 'salary',
+    'bonus': 'bonus',
+    'investment': 'investment',
+    'parttime': 'parttime',
+    'redpacket': 'redpacket',
+    'reimburse': 'reimburse',
+    'business': 'business',
+  };
 
   /// 获取指定语言的分类名称
   String getCategoryNameForLocale(String categoryId, String locale) {
@@ -444,12 +569,6 @@ class CategoryLocalizationService extends BaseLocalizationService<String> {
       'en': 'Internet',
       'ja': 'インターネット',
       'ko': '인터넷요금',
-    },
-    'communication_subscription': {
-      'zh': '会员订阅',
-      'en': 'Subscriptions',
-      'ja': 'サブスク',
-      'ko': '구독서비스',
     },
 
     // ============ 服饰子分类 ============
