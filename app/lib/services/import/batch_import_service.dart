@@ -375,6 +375,12 @@ class BatchImportService {
     _lastFileName = null;
   }
 
+  /// Set candidates directly (for non-file imports like SMS)
+  void setCandidates(List<ImportCandidate> candidates, {String? fileName}) {
+    _lastCandidates = candidates;
+    _lastFileName = fileName;
+  }
+
   /// Update candidate action
   void updateCandidateAction(int index, ImportAction action) {
     if (_lastCandidates != null && index < _lastCandidates!.length) {

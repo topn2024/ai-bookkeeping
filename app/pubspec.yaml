@@ -89,6 +89,7 @@ dependencies:
   just_audio: ^0.9.40  # Audio playback for source audio files
   flutter_pcm_sound: ^3.3.3  # PCM audio playback for AEC reference signal
   http: ^1.2.2  # HTTP client for file sync
+  telephony: ^0.2.0  # SMS reading for Android
 
   # Voice Activity Detection
   vad: ^0.0.7+1  # Silero VAD for accurate voice detection

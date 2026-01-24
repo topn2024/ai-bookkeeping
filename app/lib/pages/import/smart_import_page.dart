@@ -9,6 +9,7 @@ import '../../services/import/bill_format_detector.dart';
 import '../../services/import/bill_parser.dart';
 import 'import_preview_page.dart';
 import 'import_history_page.dart';
+import 'sms_import_config_page.dart';
 
 /// Smart import page with format detection and deduplication
 class SmartImportPage extends ConsumerStatefulWidget {
@@ -49,6 +50,8 @@ class _SmartImportPageState extends ConsumerState<SmartImportPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildInfoCard(),
+            const SizedBox(height: 20),
+            _buildImportOptions(),
             const SizedBox(height: 20),
             _buildSupportedFormats(),
             const SizedBox(height: 20),
@@ -123,6 +126,138 @@ class _SmartImportPageState extends ConsumerState<SmartImportPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildImportOptions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '导入方式',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildImportOptionCard(
+                title: '文件导入',
+                subtitle: 'CSV、Excel账单',
+                icon: Icons.file_upload,
+                color: Colors.indigo,
+                onTap: () {
+                  // 滚动到文件选择器
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildImportOptionCard(
+                title: '短信导入',
+                subtitle: '读取支付短信',
+                icon: Icons.sms,
+                color: Colors.orange,
+                onTap: _startSmsImport,
+                badge: Platform.isAndroid ? null : 'iOS不支持',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImportOptionCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    String? badge,
+  }) {
+    final isDisabled = badge != null;
+
+    return InkWell(
+      onTap: isDisabled ? null : onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDisabled ? Colors.grey.shade300 : color.withValues(alpha: 0.3),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDisabled
+                        ? Colors.grey.shade200
+                        : color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: isDisabled ? Colors.grey : color,
+                    size: 24,
+                  ),
+                ),
+                if (badge != null) ...[
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      badge,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: isDisabled ? Colors.grey : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDisabled ? Colors.grey : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -786,6 +921,25 @@ class _SmartImportPageState extends ConsumerState<SmartImportPage> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ImportHistoryPage()),
+    );
+  }
+
+  void _startSmsImport() {
+    if (!Platform.isAndroid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('短信导入功能仅支持 Android 平台'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SmsImportConfigPage(),
+      ),
     );
   }
 }

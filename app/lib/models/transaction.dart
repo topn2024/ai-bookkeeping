@@ -27,6 +27,7 @@ enum ExternalSource {
   bocBank,      // 中国银行
   otherBank,    // 其他银行
   generic,      // 通用格式
+  sms,          // 短信导入
 }
 
 class Transaction {

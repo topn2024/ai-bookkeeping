@@ -20,6 +20,9 @@
     <!-- 录音权限 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
+    <!-- 短信读取权限（短信导入功能）-->
+    <uses-permission android:name="android.permission.READ_SMS"/>
+
     <!-- 振动权限（提醒功能）-->
     <uses-permission android:name="android.permission.VIBRATE"/>
 
