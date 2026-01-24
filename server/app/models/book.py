@@ -36,7 +36,7 @@ class Book(Base):
     currency: Mapped[str] = mapped_column(String(10), default='CNY')
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)  # Archive status for soft delete
     created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, onupdate=beijing_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=beijing_now_naive, onupdate=beijing_now_naive)
 
     # Settings as JSON
     settings: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
