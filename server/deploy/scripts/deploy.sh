@@ -101,7 +101,7 @@ create_backup() {
     # 记录当前 Git commit
     if [ -d "${APP_DIR}/.git" ]; then
         cd "$APP_DIR"
-        git rev-parse HEAD > "${backup_path}/git_commit.txt"
+        sudo -u "$APP_USER" git rev-parse HEAD > "${backup_path}/git_commit.txt"
         log_info "Git commit 记录: $(cat ${backup_path}/git_commit.txt)"
     fi
 
@@ -124,14 +124,14 @@ pull_code() {
 
     cd "$APP_DIR"
 
-    # 保存当前 commit
-    local old_commit=$(git rev-parse HEAD 2>/dev/null || echo "none")
+    # 保存当前 commit（使用 ai-bookkeeping 用户执行 git 操作）
+    local old_commit=$(sudo -u "$APP_USER" git rev-parse HEAD 2>/dev/null || echo "none")
 
-    # 拉取代码
-    git fetch origin "$GIT_BRANCH"
-    git reset --hard "origin/$GIT_BRANCH"
+    # 拉取代码（使用 ai-bookkeeping 用户，确保文件权限正确）
+    sudo -u "$APP_USER" git fetch origin "$GIT_BRANCH"
+    sudo -u "$APP_USER" git reset --hard "origin/$GIT_BRANCH"
 
-    local new_commit=$(git rev-parse HEAD)
+    local new_commit=$(sudo -u "$APP_USER" git rev-parse HEAD)
 
     if [ "$old_commit" = "$new_commit" ]; then
         log_info "代码已是最新版本: $new_commit"
@@ -139,7 +139,7 @@ pull_code() {
         log_info "代码已更新: $old_commit -> $new_commit"
 
         # 显示变更日志
-        git log --oneline "${old_commit}..${new_commit}" 2>/dev/null || true
+        sudo -u "$APP_USER" git log --oneline "${old_commit}..${new_commit}" 2>/dev/null || true
     fi
 }
 
@@ -363,11 +363,11 @@ rollback() {
         log_info "代码已恢复"
     fi
 
-    # 如果有 Git commit 记录，回滚到该版本
+    # 如果有 Git commit 记录，回滚到该版本（使用 ai-bookkeeping 用户）
     if [ -f "${backup_path}/git_commit.txt" ]; then
         local commit=$(cat "${backup_path}/git_commit.txt")
         cd "$APP_DIR"
-        git reset --hard "$commit"
+        sudo -u "$APP_USER" git reset --hard "$commit"
         log_info "Git 已回滚到: $commit"
     fi
 
