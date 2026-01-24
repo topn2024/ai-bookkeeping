@@ -3823,8 +3823,7 @@ class DatabaseService implements IDatabaseService {
 
     // 分类过滤
     if (category != null && category.isNotEmpty) {
-      whereConditions.add('(category LIKE ? OR sub_category LIKE ?)');
-      whereArgs.add('%$category%');
+      whereConditions.add('category LIKE ?');
       whereArgs.add('%$category%');
     }
 

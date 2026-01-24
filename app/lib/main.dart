@@ -26,6 +26,7 @@ import 'services/aliyun_nls_token_service.dart';
 import 'core/config/secrets.dart';
 import 'services/voice_service_coordinator.dart' show VoiceSessionResult, VoiceSessionStatus;
 import 'services/voice/config/feature_flags.dart';
+import 'services/voice/events/query_result_event_bus.dart';
 import 'providers/voice_coordinator_provider.dart';
 import 'providers/transaction_provider.dart';
 import 'widgets/global_floating_ball.dart';
@@ -192,6 +193,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   // 路由观察器
   final _voiceContextRouteObserver = VoiceContextRouteObserver();
 
+  // 查询结果事件总线
+  final _eventBus = QueryResultEventBus();
+
   @override
   void initState() {
     super.initState();
@@ -258,6 +262,20 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         }
 
         debugPrint('[App] 处理完成: ${result.status}');
+
+        // 如果是查询操作，订阅事件以接收异步查询结果
+        debugPrint('[App] 检查是否有operationId: result.data=${result.data}');
+        final operationId = result.data?['operationId'] as String?;
+        debugPrint('[App] operationId=$operationId');
+        if (operationId != null) {
+          debugPrint('[App] 订阅查询事件: $operationId');
+          _eventBus.subscribe(operationId, (event) {
+            debugPrint('[App] 收到查询结果: ${event.operationId}');
+            _handleQueryResult(event);
+          });
+        } else {
+          debugPrint('[App] operationId为null，跳过订阅');
+        }
 
         // 根据处理结果，向聊天记录添加详细反馈
         // 注意：流水线模式下，_handlePipelineProcessInput 已经添加了消息，
@@ -416,6 +434,26 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       '/': '首页',
     };
     return routeNames[route] ?? route;
+  }
+
+  /// 处理查询结果事件
+  ///
+  /// 当查询操作异步完成后，更新最后一条助手消息的元数据
+  void _handleQueryResult(QueryResultEvent event) {
+    debugPrint('[App] 处理查询结果事件: ${event.operationId}');
+
+    final cardData = event.result.data?['cardData'];
+    final chartData = event.result.data?['chartData'];
+
+    if (cardData != null || chartData != null) {
+      GlobalVoiceAssistantManager.instance.updateLastMessageMetadata({
+        if (cardData != null) 'cardData': cardData,
+        if (chartData != null) 'chartData': chartData,
+      });
+      debugPrint('[App] 已更新消息元数据');
+    } else {
+      debugPrint('[App] 查询结果中没有可视化数据');
+    }
   }
 
   @override

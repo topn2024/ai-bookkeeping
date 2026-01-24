@@ -28,6 +28,7 @@ import 'voice_navigation_service.dart';
 import 'voice_navigation_executor.dart';
 import 'voice_feedback_system.dart';
 import 'screen_reader_service.dart';
+import 'global_voice_assistant_manager.dart';
 import 'automation_task_service.dart';
 import 'nl_search_service.dart';
 import 'voice_budget_query_service.dart';
@@ -250,6 +251,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       if (result.success) {
         return VoiceSessionResult.success(responseText, {
           'intelligenceEngine': true,
+          ...?result.data, // 传递 IntelligenceEngine 返回的所有数据（包括 operationId）
         });
       } else {
         return VoiceSessionResult.error(responseText);
@@ -309,6 +311,11 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       // 注册导航操作回调
       _intelligenceEngine!.registerNavigationCallback(_handleNavigationResult);
+
+      // 将 ResultBuffer 传递给 GlobalVoiceAssistantManager
+      // 使 SmartTopicGenerator 能够在主动对话时检索待通知的查询结果
+      GlobalVoiceAssistantManager.instance.setResultBuffer(_intelligenceEngine!.resultBuffer);
+      debugPrint('[VoiceCoordinator] ResultBuffer 已传递给 GlobalVoiceAssistantManager');
     }
 
     _agentModeEnabled = true;

@@ -142,8 +142,9 @@ class BookkeepingOperationAdapter implements OperationAdapter {
     final time = params['time'] as String?;
     final period = params['period'] as String?;
     final category = params['category'] as String?;
+    final operationId = params['operationId'] as String?;
 
-    debugPrint('[BookkeepingOperationAdapter] 查询: queryType=$queryType, time=$time, period=$period, category=$category');
+    debugPrint('[BookkeepingOperationAdapter] 查询: queryType=$queryType, time=$time, period=$period, category=$category, operationId=$operationId');
 
     try {
       // 1. 解析时间范围
@@ -169,6 +170,7 @@ class BookkeepingOperationAdapter implements OperationAdapter {
       // 5. 返回执行结果
       return ExecutionResult.success(
         data: {
+          if (operationId != null) 'operationId': operationId,
           'queryType': queryType,
           'level': queryResponse.level.toString(),
           'complexityScore': queryResponse.complexityScore,

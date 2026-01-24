@@ -282,18 +282,63 @@ class IntelligenceEngine {
       // 如果有立即操作，立即响应
       if (immediateOps.isNotEmpty) {
         debugPrint('[IntelligenceEngine] 有立即操作，立即响应');
+        debugPrint('[IntelligenceEngine] ===== 开始为查询操作生成operationId =====');
+        debugPrint('[IntelligenceEngine] recognitionResult.operations.length=${recognitionResult.operations.length}');
+
+        // 为查询操作生成 operationId（在执行前）
+        final enhancedOperations = recognitionResult.operations.map((op) {
+          debugPrint('[IntelligenceEngine] 处理操作: type=${op.type}, isQuery=${op.type == OperationType.query}');
+          if (op.type == OperationType.query) {
+            final operationId = 'query_${DateTime.now().millisecondsSinceEpoch}_${op.hashCode}';
+            debugPrint('[IntelligenceEngine] [立即模式] 生成查询operationId: $operationId');
+            return Operation(
+              type: op.type,
+              priority: op.priority,
+              params: {
+                ...op.params,
+                'operationId': operationId,
+              },
+              originalText: op.originalText,
+            );
+          }
+          debugPrint('[IntelligenceEngine] 非查询操作，跳过');
+          return op;
+        }).toList();
+
+        debugPrint('[IntelligenceEngine] enhancedOperations.length=${enhancedOperations.length}');
+
+        // 创建增强后的 recognitionResult
+        final enhancedRecognitionResult = MultiOperationResult(
+          resultType: recognitionResult.resultType,
+          operations: enhancedOperations,
+          chatContent: recognitionResult.chatContent,
+          confidence: recognitionResult.confidence,
+          source: recognitionResult.source,
+          originalInput: recognitionResult.originalInput,
+          isOfflineMode: recognitionResult.isOfflineMode,
+        );
 
         // 执行所有操作
-        _executeOperationsAsync(recognitionResult, input);
+        _executeOperationsAsync(enhancedRecognitionResult, input);
 
         // 生成响应
         final quickAck = _generateQuickAcknowledgment(operations.length);
         _lastRoundWasOperation = true;
         _lastResponse = quickAck;
 
+        // 提取第一个查询操作的 operationId（如果有）
+        String? operationId;
+        for (final op in enhancedOperations) {
+          if (op.type == OperationType.query) {
+            operationId = op.params['operationId'] as String?;
+            break;
+          }
+        }
+
         return VoiceSessionResult(
           success: true,
           message: quickAck,
+          data: operationId != null ? {'operationId': operationId} : null,
         );
       }
 
@@ -556,17 +601,48 @@ class IntelligenceEngine {
       (feedbackAdapter as BookkeepingFeedbackAdapter).setLastUserInput(input);
     }
 
+    debugPrint('[IntelligenceEngine] ===== 准备进入for循环，operations.length=${recognitionResult.operations.length} =====');
+
     // 逐个执行操作，记录每个操作的结果
     for (int i = 0; i < recognitionResult.operations.length; i++) {
       final operation = recognitionResult.operations[i];
       final description = _generateOperationDescription(operation);
       final amount = _safeParseAmount(operation.params['amount']);
 
+      debugPrint('[IntelligenceEngine] 处理操作 $i: type=${operation.type}, priority=${operation.priority}');
+
       try {
+        // 如果是查询操作，确保有operationId（如果已存在则使用现有的，否则生成新的）
+        final Operation enhancedOperation;
+        debugPrint('[IntelligenceEngine] 检查是否为查询操作: ${operation.type} == ${OperationType.query} ? ${operation.type == OperationType.query}');
+        if (operation.type == OperationType.query) {
+          // 检查是否已有operationId（在立即执行路径中已生成）
+          final existingOperationId = operation.params['operationId'] as String?;
+          if (existingOperationId != null) {
+            debugPrint('[IntelligenceEngine] 使用已有的查询operationId: $existingOperationId');
+            enhancedOperation = operation;
+          } else {
+            // 如果没有，生成新的（兜底逻辑）
+            final operationId = 'query_${DateTime.now().millisecondsSinceEpoch}_${operation.hashCode}';
+            enhancedOperation = Operation(
+              type: operation.type,
+              priority: operation.priority,
+              params: {
+                ...operation.params,
+                'operationId': operationId,
+              },
+              originalText: operation.originalText,
+            );
+            debugPrint('[IntelligenceEngine] 生成新的查询operationId: $operationId');
+          }
+        } else {
+          enhancedOperation = operation;
+        }
+
         // 创建单操作的 MultiOperationResult 进行处理
         final singleOpResult = MultiOperationResult(
           resultType: recognitionResult.resultType,
-          operations: [operation],
+          operations: [enhancedOperation],
           chatContent: i == 0 ? recognitionResult.chatContent : null,
           confidence: recognitionResult.confidence,
           source: recognitionResult.source,
@@ -819,7 +895,36 @@ class IntelligenceEngine {
             (feedbackAdapter as BookkeepingFeedbackAdapter).setLastUserInput(pending.input);
           }
 
-          await _processor.process(pending.recognitionResult);
+          // 如果是查询操作，生成operationId
+          final Operation enhancedOperation;
+          if (pending.operation.type == OperationType.query) {
+            final operationId = 'query_${DateTime.now().millisecondsSinceEpoch}_${pending.operation.hashCode}';
+            enhancedOperation = Operation(
+              type: pending.operation.type,
+              priority: pending.operation.priority,
+              params: {
+                ...pending.operation.params,
+                'operationId': operationId,
+              },
+              originalText: pending.operation.originalText,
+            );
+            debugPrint('[IntelligenceEngine] 生成延迟查询operationId: $operationId');
+          } else {
+            enhancedOperation = pending.operation;
+          }
+
+          // 创建增强后的 MultiOperationResult
+          final enhancedResult = MultiOperationResult(
+            resultType: pending.recognitionResult.resultType,
+            operations: [enhancedOperation],
+            chatContent: pending.recognitionResult.chatContent,
+            confidence: pending.recognitionResult.confidence,
+            source: pending.recognitionResult.source,
+            originalInput: pending.recognitionResult.originalInput,
+            isOfflineMode: pending.recognitionResult.isOfflineMode,
+          );
+
+          await _processor.process(enhancedResult);
 
           // 获取执行结果
           final results = _processor.conversationChannel.getRecentResults();
@@ -992,9 +1097,11 @@ enum ConversationMode {
 class VoiceSessionResult {
   final bool success;
   final String? message;
+  final Map<String, dynamic>? data;
 
   const VoiceSessionResult({
     required this.success,
     this.message,
+    this.data,
   });
 }

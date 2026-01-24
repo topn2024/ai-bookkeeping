@@ -33,8 +33,7 @@ extension VoiceQueryExtension on DatabaseService {
 
     // 分类过滤
     if (category != null && category.isNotEmpty) {
-      whereConditions.add('(category LIKE ? OR sub_category LIKE ?)');
-      whereArgs.add('%$category%');
+      whereConditions.add('category LIKE ?');
       whereArgs.add('%$category%');
     }
 
@@ -131,10 +130,9 @@ extension VoiceQueryExtension on DatabaseService {
         (LOWER(description) LIKE ? OR
          LOWER(merchant) LIKE ? OR
          LOWER(category) LIKE ? OR
-         LOWER(sub_category) LIKE ? OR
          LOWER(tags) LIKE ?)
       ''');
-      whereArgs.addAll(['%$term%', '%$term%', '%$term%', '%$term%', '%$term%']);
+      whereArgs.addAll(['%$term%', '%$term%', '%$term%', '%$term%']);
     }
 
     final whereClause = whereConditions.join(' AND ');

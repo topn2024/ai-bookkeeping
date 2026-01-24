@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../smart_intent_recognizer.dart';
 import 'intelligence_engine.dart';
 import 'models.dart';
+import '../events/query_result_event_bus.dart';
 
 /// 双通道处理器
 ///
@@ -16,6 +17,9 @@ class DualChannelProcessor {
   final ExecutionChannel executionChannel;
   final ConversationChannel conversationChannel;
 
+  /// 查询结果事件总线
+  final QueryResultEventBus _eventBus = QueryResultEventBus();
+
   DualChannelProcessor({
     required this.executionChannel,
     required this.conversationChannel,
@@ -24,6 +28,13 @@ class DualChannelProcessor {
     executionChannel.registerCallback((result) {
       debugPrint('[DualChannelProcessor] 执行结果回调: success=${result.success}');
       conversationChannel.addExecutionResult(result);
+
+      // 如果是查询操作，发布事件
+      final operationId = result.data?['operationId'] as String?;
+      if (operationId != null) {
+        _eventBus.publishResult(operationId, result);
+        debugPrint('[DualChannelProcessor] 发布查询结果事件: $operationId');
+      }
     });
   }
 

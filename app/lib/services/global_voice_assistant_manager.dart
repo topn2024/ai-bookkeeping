@@ -2381,6 +2381,44 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 更新最后一条助手消息的元数据
+  ///
+  /// 用于在查询操作异步完成后，更新消息的可视化数据（cardData, chartData等）
+  void updateLastMessageMetadata(Map<String, dynamic> metadata) {
+    final lastAssistantMessage = _findLastAssistantMessage();
+
+    if (lastAssistantMessage != null) {
+      // 创建新的消息对象（不可变模式）
+      final updatedMessage = lastAssistantMessage.copyWith(
+        metadata: {
+          ...?lastAssistantMessage.metadata,
+          ...metadata,
+        },
+      );
+
+      // 替换消息
+      final index = _conversationHistory.indexOf(lastAssistantMessage);
+      _conversationHistory[index] = updatedMessage;
+
+      // 通知 UI 更新
+      notifyListeners();
+
+      debugPrint('[GlobalVoiceAssistant] 已更新消息元数据: ${metadata.keys.join(", ")}');
+    } else {
+      debugPrint('[GlobalVoiceAssistant] 未找到助手消息，无法更新元数据');
+    }
+  }
+
+  /// 查找最后一条助手消息
+  ChatMessage? _findLastAssistantMessage() {
+    for (int i = _conversationHistory.length - 1; i >= 0; i--) {
+      if (_conversationHistory[i].type == ChatMessageType.assistant) {
+        return _conversationHistory[i];
+      }
+    }
+    return null;
+  }
+
   /// 添加系统消息
   void _addSystemMessage(String content) {
     _addMessage(ChatMessage(

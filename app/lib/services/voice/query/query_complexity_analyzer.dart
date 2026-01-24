@@ -44,14 +44,11 @@ class QueryComplexityAnalyzer {
   /// 确定响应层级
   ///
   /// 评分规则：
-  /// - 0-1分：Level 1（纯语音）
-  /// - 2-4分：Level 2（语音+卡片）
+  /// - 0分：Level 2（语音+卡片）- 即使是最简单的查询也应该有可视化
+  /// - 1-4分：Level 2（语音+卡片）
   /// - 5分及以上：Level 3（语音+图表）
   QueryLevel determineLevel(int complexityScore) {
-    if (complexityScore <= 1) {
-      debugPrint('[QueryComplexityAnalyzer] 判定为Level 1: 纯语音响应');
-      return QueryLevel.simple;
-    }
+    // 所有查询至少提供Level 2（卡片数据），提升用户体验
     if (complexityScore <= 4) {
       debugPrint('[QueryComplexityAnalyzer] 判定为Level 2: 语音+轻量卡片');
       return QueryLevel.medium;
