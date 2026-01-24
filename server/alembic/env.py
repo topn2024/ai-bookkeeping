@@ -21,7 +21,9 @@ config = context.config
 
 # Set sqlalchemy.url from settings if not already set
 if not config.get_main_option("sqlalchemy.url"):
-    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    # Escape % for configparser (% is used for interpolation)
+    escaped_url = settings.DATABASE_URL.replace("%", "%%")
+    config.set_main_option("sqlalchemy.url", escaped_url)
 
 # Interpret the config file for Python logging
 if config.config_file_name is not None:
