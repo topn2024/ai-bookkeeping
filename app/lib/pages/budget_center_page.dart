@@ -247,8 +247,9 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
             )
           else
             ...vaults.map((vault) {
-              final percent = vault.targetAmount > 0
-                  ? (vault.allocatedAmount / vault.targetAmount * 100).round()
+              // 显示使用率（已花费/已分配），而不是达成率
+              final percent = vault.allocatedAmount > 0
+                  ? (vault.spentAmount / vault.allocatedAmount * 100).round()
                   : 0;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -263,8 +264,9 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
                     context,
                     theme,
                     name: vault.name,
-                    balance: vault.allocatedAmount,
-                    target: vault.targetAmount,
+                    balance: vault.allocatedAmount - vault.spentAmount,  // 显示剩余金额
+                    target: vault.allocatedAmount,  // 预算总额
+                    spent: vault.spentAmount,  // 已花费
                     percent: percent,
                     gradient: [vault.color, vault.color.withValues(alpha: 0.7)],
                     icon: vault.icon,
@@ -284,17 +286,21 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
     required String name,
     required double balance,
     required double target,
+    double? spent,
     required int percent,
     required List<Color> gradient,
     required IconData icon,
   }) {
+    // 使用率颜色：0-50%健康，50-80%警告，80-100%危险，>100%超支
     Color progressColor;
-    if (percent >= 80) {
-      progressColor = AppColors.success;
+    if (percent >= 100) {
+      progressColor = AppColors.expense;  // 超支 - 红色
+    } else if (percent >= 80) {
+      progressColor = AppColors.warning;  // 警告 - 橙色
     } else if (percent >= 50) {
-      progressColor = AppColors.warning;
+      progressColor = Colors.blue;  // 中等使用 - 蓝色
     } else {
-      progressColor = theme.colorScheme.primary;
+      progressColor = AppColors.success;  // 健康 - 绿色
     }
 
     return Container(
@@ -326,20 +332,41 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    if (percent > 100)
+                      Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.expense.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '超支',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.expense,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '¥${balance.toStringAsFixed(0)}',
+                  balance >= 0 ? '剩余 ¥${balance.toStringAsFixed(0)}' : '超支 ¥${(-balance).toStringAsFixed(0)}',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface,
+                    color: balance >= 0 ? theme.colorScheme.onSurface : AppColors.expense,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -352,7 +379,7 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
                   ),
                   child: FractionallySizedBox(
                     alignment: Alignment.centerLeft,
-                    widthFactor: percent / 100,
+                    widthFactor: (percent / 100).clamp(0.0, 1.0),
                     child: Container(
                       decoration: BoxDecoration(
                         color: progressColor,
@@ -363,7 +390,9 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '目标 ¥${target.toStringAsFixed(0)} · 已达成$percent%',
+                  spent != null
+                      ? '已花 ¥${spent.toStringAsFixed(0)} / ¥${target.toStringAsFixed(0)} · 使用$percent%'
+                      : '预算 ¥${target.toStringAsFixed(0)} · 使用$percent%',
                   style: TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.onSurfaceVariant,

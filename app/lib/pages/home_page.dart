@@ -70,6 +70,19 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  /// 下拉刷新数据
+  Future<void> _refreshData() async {
+    try {
+      // 刷新交易数据
+      await ref.read(transactionProvider.notifier).refresh();
+
+      // 刷新小金库数据（会自动同步支出）
+      await ref.read(budgetVaultProvider.notifier).refresh();
+    } catch (e) {
+      // 刷新失败不影响用户使用
+    }
+  }
+
   /// 显示功能引导（3步）
   void _showFeatureGuide() {
     final steps = [
@@ -149,24 +162,28 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
 
     return Scaffold(
-      body: Container(
-        key: appContentKey,  // Add key for feature guide
-        child: SingleChildScrollView(
-          child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeaderGradient(context, theme, balance, colors),
-            const BudgetAlertBanner(),
-            _buildTodayAllowanceCard(context, theme, monthlyIncome, monthlyExpense),
-            _buildCelebrationCard(context, theme),
-            _buildMoneyAgeCard(context, theme, ref),
-            _buildQuickStats(context, theme, monthlyIncome, monthlyExpense, colors),
-            _buildBudgetOverview(context, theme),
-            _buildRecentTransactions(context, theme, transactions, colors),
-            const SizedBox(height: 100), // 底部导航栏留白
-          ],
+      body: RefreshIndicator(
+        onRefresh: _refreshData,
+        child: Container(
+          key: appContentKey,  // Add key for feature guide
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeaderGradient(context, theme, balance, colors),
+              const BudgetAlertBanner(),
+              _buildTodayAllowanceCard(context, theme, monthlyIncome, monthlyExpense),
+              _buildCelebrationCard(context, theme),
+              _buildMoneyAgeCard(context, theme, ref),
+              _buildQuickStats(context, theme, monthlyIncome, monthlyExpense, colors),
+              _buildBudgetOverview(context, theme),
+              _buildRecentTransactions(context, theme, transactions, colors),
+              const SizedBox(height: 100), // 底部导航栏留白
+            ],
+          ),
         ),
-      ),
+        ),
       ),
     );
   }

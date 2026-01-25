@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/budget_vault.dart';
+import '../models/transaction.dart';
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
 import '../services/allocation_service.dart';
+import '../services/category_localization_service.dart';
 import 'transaction_provider.dart';
 
 /// 小金库状态
@@ -133,8 +135,11 @@ class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
         vaults: vaults,
       );
 
+      // 自动同步小金库支出（从交易记录计算）
+      final updatedVaults = await _syncVaultSpending(vaults);
+
       state = state.copyWith(
-        vaults: vaults,
+        vaults: updatedVaults,
         isLoading: false,
         unallocatedAmount: unallocated,
         lastUpdated: DateTime.now(),
@@ -144,6 +149,114 @@ class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
         isLoading: false,
         error: e.toString(),
       );
+    }
+  }
+
+  /// 从交易记录同步小金库的支出金额
+  Future<List<BudgetVault>> _syncVaultSpending(List<BudgetVault> vaults) async {
+    try {
+      // 获取本月的所有支出交易
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+
+      final transactions = await _db.queryTransactions(
+        startDate: startOfMonth,
+        endDate: endOfMonth,
+        limit: 100000, // 设置足够大的limit以获取所有交易
+      );
+
+      // 按分类统计支出
+      final spendingByCategory = <String, double>{};
+
+      for (final tx in transactions) {
+        // 跳过收入和转账
+        if (tx.type == TransactionType.income ||
+            tx.category.contains('转账') ||
+            tx.category == 'transfer') {
+          continue;
+        }
+
+        if (tx.type == TransactionType.expense) {
+          // 将分类ID转换成中文显示名称
+          final categoryName = CategoryLocalizationService.instance.getCategoryName(tx.category);
+          spendingByCategory[categoryName] = (spendingByCategory[categoryName] ?? 0) + tx.amount;
+        }
+      }
+
+      // 更新每个小金库的spentAmount
+      final updatedVaults = <BudgetVault>[];
+      for (final vault in vaults) {
+        // 根据小金库名称匹配分类支出
+        double totalSpent = 0;
+        final matchedCategories = <String>[];
+
+        // 1. 完全匹配
+        if (spendingByCategory.containsKey(vault.name)) {
+          totalSpent = spendingByCategory[vault.name]!;
+          matchedCategories.add(vault.name);
+        }
+
+        // 2. 模糊匹配：根据语义关联匹配相关分类
+        for (final entry in spendingByCategory.entries) {
+          final category = entry.key;
+          final amount = entry.value;
+
+          // 已经完全匹配过的跳过
+          if (matchedCategories.contains(category)) continue;
+
+          // 餐饮类：匹配"餐饮"、"外卖"、"饮品"、"食品"等
+          if (vault.name == '餐饮' &&
+              (category.contains('餐') || category.contains('饮') ||
+               category.contains('外卖') || category.contains('食品') ||
+               category.contains('早餐') || category.contains('午餐') || category.contains('晚餐'))) {
+            totalSpent += amount;
+            matchedCategories.add(category);
+          }
+          // 交通类：匹配"交通"、"打车"、"公交"、"地铁"、"停车"等
+          else if (vault.name == '交通' &&
+                   (category.contains('交通') || category.contains('打车') ||
+                    category.contains('公交') || category.contains('地铁') ||
+                    category.contains('停车') || category.contains('出行'))) {
+            totalSpent += amount;
+            matchedCategories.add(category);
+          }
+          // 购物类：匹配"购物"、"网购"、"数码"等
+          else if (vault.name == '购物' &&
+                   (category.contains('购物') || category.contains('数码') ||
+                    category.contains('服饰') || category.contains('日用'))) {
+            totalSpent += amount;
+            matchedCategories.add(category);
+          }
+          // 娱乐类：匹配"娱乐"、"电影"、"游戏"、"订阅"、"会员"等
+          else if (vault.name == '娱乐' &&
+                   (category.contains('娱乐') || category.contains('电影') ||
+                    category.contains('游戏') || category.contains('订阅') ||
+                    category.contains('会员') || category.contains('视频'))) {
+            totalSpent += amount;
+            matchedCategories.add(category);
+          }
+          // 通用匹配：分类名包含小金库名，或小金库名包含分类名
+          else if (category.contains(vault.name) || vault.name.contains(category)) {
+            totalSpent += amount;
+            matchedCategories.add(category);
+          }
+        }
+
+        if (totalSpent != vault.spentAmount) {
+          // 更新数据库
+          final updatedVault = vault.copyWith(spentAmount: totalSpent);
+          await _db.updateBudgetVault(updatedVault);
+          updatedVaults.add(updatedVault);
+        } else {
+          updatedVaults.add(vault);
+        }
+      }
+
+      return updatedVaults;
+    } catch (e) {
+      // 同步失败时返回原始数据，不影响其他功能
+      return vaults;
     }
   }
 
