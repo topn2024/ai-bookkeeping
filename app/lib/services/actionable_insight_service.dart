@@ -1,6 +1,8 @@
 import 'database_service.dart';
 import 'subscription_tracking_service.dart';
 import 'latte_factor_analyzer.dart';
+import 'category_localization_service.dart';
+import '../models/transaction.dart';
 
 /// 洞察类型
 enum InsightType {
@@ -460,8 +462,102 @@ class ActionableInsightService {
   }
 
   Future<List<ActionableInsight>> _generateBudgetInsights(String? ledgerId) async {
-    // 预算相关洞察（简化实现）
-    return [];
+    final insights = <ActionableInsight>[];
+    final locService = CategoryLocalizationService.instance;
+
+    // 获取近3个月的交易数据
+    final now = DateTime.now();
+    final threeMonthsAgo = DateTime(now.year, now.month - 3, 1);
+    final allTransactions = await _db.getTransactions();
+
+    final recentTransactions = allTransactions.where((tx) =>
+        tx.date.isAfter(threeMonthsAgo) && tx.date.isBefore(now)).toList();
+
+    if (recentTransactions.isEmpty) return insights;
+
+    // 计算总收入和总支出
+    double totalIncome = 0;
+    double totalExpense = 0;
+    final categoryExpenses = <String, double>{}; // key是categoryId
+
+    for (final tx in recentTransactions) {
+      if (tx.type == TransactionType.income) {
+        totalIncome += tx.amount;
+      } else if (tx.type == TransactionType.expense) {
+        totalExpense += tx.amount;
+        final categoryId = tx.categoryId;
+        categoryExpenses[categoryId] = (categoryExpenses[categoryId] ?? 0) + tx.amount;
+      }
+    }
+
+    // 检测入不敷出
+    if (totalExpense > totalIncome && totalIncome > 0) {
+      final deficit = totalExpense - totalIncome;
+      final monthlyDeficit = deficit / 3;
+      final deficitRatio = deficit / totalIncome;
+
+      // 找出最大支出类别
+      final sortedCategories = categoryExpenses.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      final topCategories = sortedCategories.take(3).toList();
+
+      // 获取最大支出类别的中文名称
+      final topCategoryName = topCategories.isNotEmpty
+          ? locService.getCategoryName(topCategories.first.key)
+          : '日常';
+
+      String suggestion;
+      if (deficitRatio > 0.3) {
+        suggestion = '近3个月支出超过收入${(deficitRatio * 100).toStringAsFixed(0)}%，'
+            '建议重点关注$topCategoryName支出';
+      } else {
+        suggestion = '近3个月支出略超收入，月均缺口¥${monthlyDeficit.toStringAsFixed(0)}，'
+            '可从高频小额消费入手优化';
+      }
+
+      insights.add(ActionableInsight(
+        insight: SpendingInsight(
+          id: 'budget_deficit_${now.millisecondsSinceEpoch}',
+          type: InsightType.budgetOverrunRisk,
+          title: '入不敷出预警',
+          description: suggestion,
+          priority: deficitRatio > 0.3 ? InsightPriority.urgent : InsightPriority.high,
+          potentialSavings: monthlyDeficit,
+          createdAt: now,
+        ),
+        actionGuides: [],
+        estimatedSaving: monthlyDeficit,
+        priority: deficitRatio > 0.3 ? InsightPriority.urgent : InsightPriority.high,
+      ));
+
+      // 对最大支出类别提供具体建议
+      if (topCategories.isNotEmpty) {
+        final topCategory = topCategories.first;
+        final categoryPercentage = topCategory.value / totalExpense * 100;
+        final categoryDisplayName = locService.getCategoryName(topCategory.key);
+
+        if (categoryPercentage > 30) {
+          insights.add(ActionableInsight(
+            insight: SpendingInsight(
+              id: 'category_optimize_${now.millisecondsSinceEpoch}',
+              type: InsightType.savingsOpportunity,
+              title: '$categoryDisplayName支出偏高',
+              description: '$categoryDisplayName占总支出${categoryPercentage.toStringAsFixed(0)}%，'
+                  '近3个月共¥${topCategory.value.toStringAsFixed(0)}，'
+                  '适当控制可有效改善财务状况',
+              priority: InsightPriority.medium,
+              potentialSavings: topCategory.value * 0.2, // 假设可减少20%
+              createdAt: now,
+            ),
+            actionGuides: [],
+            estimatedSaving: topCategory.value * 0.2,
+            priority: InsightPriority.medium,
+          ));
+        }
+      }
+    }
+
+    return insights;
   }
 
   Future<List<OperationGuide>> _getSubscriptionCancellationGuides(

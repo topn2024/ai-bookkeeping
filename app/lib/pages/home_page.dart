@@ -464,9 +464,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     final moneyAgeData = ref.watch(moneyAgeProvider);
     final moneyAge = moneyAgeData.days;
 
-    // 从Provider获取动态文案（支持千人千面和定期刷新）
-    final textState = ref.watch(homePageTextProvider);
-
     // 根据钱龄天数确定等级
     String level;
     if (moneyAge >= 90) {

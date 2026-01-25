@@ -258,7 +258,7 @@ class RealtimeConversationSession {
 
     try {
       // 获取个性化系统提示词
-      _systemPrompt = await _dialogService!.getSystemPrompt(_userId!);
+      _systemPrompt = await _dialogService.getSystemPrompt(_userId);
       debugPrint('[RealtimeSession] 已加载用户画像，系统提示词已生成');
     } catch (e) {
       debugPrint('[RealtimeSession] 加载用户画像失败: $e');
@@ -660,7 +660,7 @@ class RealtimeConversationSession {
 
     // 如果有用户ID，持久化学习结果
     if (_userId != null) {
-      await _learningService.persistLearning(_userId!);
+      await _learningService.persistLearning(_userId);
     }
   }
 

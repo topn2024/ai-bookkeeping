@@ -302,31 +302,35 @@ class LevelDetails {
     final nextMin = nextLevel?.minDays ?? (days + 30);
     final progress = ((days - currentMin) / (nextMin - currentMin)).clamp(0.0, 1.0);
 
-    // 生成健康状态
+    // 生成健康状态（区分负钱龄）
     String healthStatus;
-    switch (level) {
-      case MoneyAgeLevel.danger:
-        healthStatus = '危险：您正在花费刚收到的钱';
-        break;
-      case MoneyAgeLevel.warning:
-        healthStatus = '警告：资金缓冲不足';
-        break;
-      case MoneyAgeLevel.normal:
-        healthStatus = '一般：有基本的资金缓冲';
-        break;
-      case MoneyAgeLevel.good:
-        healthStatus = '良好：财务状况健康';
-        break;
-      case MoneyAgeLevel.excellent:
-        healthStatus = '优秀：财务状况非常稳健';
-        break;
-      case MoneyAgeLevel.ideal:
-        healthStatus = '理想：可以从容应对各种情况';
-        break;
+    if (days < 0) {
+      healthStatus = '透支：已消费超过收入${-days}天的额度';
+    } else {
+      switch (level) {
+        case MoneyAgeLevel.danger:
+          healthStatus = '危险：您正在花费刚收到的钱';
+          break;
+        case MoneyAgeLevel.warning:
+          healthStatus = '警告：资金缓冲不足';
+          break;
+        case MoneyAgeLevel.normal:
+          healthStatus = '一般：有基本的资金缓冲';
+          break;
+        case MoneyAgeLevel.good:
+          healthStatus = '良好：财务状况健康';
+          break;
+        case MoneyAgeLevel.excellent:
+          healthStatus = '优秀：财务状况非常稳健';
+          break;
+        case MoneyAgeLevel.ideal:
+          healthStatus = '理想：可以从容应对各种情况';
+          break;
+      }
     }
 
-    // 生成建议
-    final suggestions = _getSuggestions(level);
+    // 生成建议（区分负钱龄）
+    final suggestions = days < 0 ? _getNegativeSuggestions(days) : _getSuggestions(level);
 
     return LevelDetails(
       level: level,
@@ -401,6 +405,18 @@ class LevelDetails {
           '分享您的经验帮助更多人',
         ];
     }
+  }
+
+  /// 负钱龄专用建议
+  static List<String> _getNegativeSuggestions(int negativeDays) {
+    final absdays = -negativeDays;
+    return [
+      '当前入不敷出，已透支约$absdays天的收入',
+      '建议立即审视并削减非必要支出',
+      '寻找增加收入的机会',
+      '避免任何冲动消费，优先还清透支',
+      '使用预算功能严格控制每项开支',
+    ];
   }
 }
 

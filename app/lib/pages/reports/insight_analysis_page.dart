@@ -23,7 +23,6 @@ class InsightAnalysisPage extends ConsumerWidget {
     final monthlyExpense = ref.watch(monthlyExpenseProvider);
     final monthlyIncome = ref.watch(monthlyIncomeProvider);
     final budgets = ref.watch(budgetProvider);
-    final totalMonthlyBudget = ref.watch(monthlyBudgetProvider);
 
     // 计算拿铁因子（小额高频消费，如咖啡、奶茶等）
     final latteCategories = ['咖啡', '奶茶', '饮料', '零食'];

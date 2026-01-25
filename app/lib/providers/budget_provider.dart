@@ -360,8 +360,9 @@ final moneyAgeProvider = Provider<MoneyAge>((ref) {
   final avgDailyExpense = recentExpenses / 30;
 
   // 钱龄 = 当前余额 / 平均日支出
+  // 允许负值：负钱龄表示已透支多少天的收入
   int moneyAgeDays = 0;
-  if (avgDailyExpense > 0 && totalBalance > 0) {
+  if (avgDailyExpense > 0) {
     moneyAgeDays = (totalBalance / avgDailyExpense).round();
   }
 
@@ -432,8 +433,9 @@ final moneyAgeHistoryProvider = Provider<List<MapEntry<DateTime, int>>>((ref) {
 
     final avgDailyExpense = monthExpenses / daysInMonth;
 
+    // 允许负值：负钱龄表示已透支多少天的收入
     int moneyAge = 0;
-    if (avgDailyExpense > 0 && balance > 0) {
+    if (avgDailyExpense > 0) {
       moneyAge = (balance / avgDailyExpense).round();
     }
 

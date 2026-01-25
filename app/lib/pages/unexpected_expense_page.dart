@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/budget_vault_provider.dart';
-import '../providers/budget_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../models/budget_vault.dart';
 

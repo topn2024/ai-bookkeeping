@@ -852,7 +852,8 @@
       "Bash(timeout 90 adb:*)",
       "Bash(osascript:*)",
       "Bash(openspec-cn change show:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(md5:*)"
     ]
   }
 }

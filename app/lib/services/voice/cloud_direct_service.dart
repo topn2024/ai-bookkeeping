@@ -200,7 +200,7 @@ class CloudDirectService {
   Future<void> _initializeLLMService() async {
     // 尝试从存储加载LLM配置
     // 检查各个provider
-    for (final provider in LLMProvider.values) {
+    for (final _ in LLMProvider.values) {
       final keyManager = SecureKeyManager();
       // 这里简化处理，实际应该有更好的provider标识机制
       final hasKey = await keyManager.getKey();

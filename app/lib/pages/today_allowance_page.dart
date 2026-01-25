@@ -8,7 +8,6 @@ import '../widgets/glass_components.dart';
 import '../widgets/antigravity_animations.dart';
 import '../models/transaction.dart';
 import '../providers/transaction_provider.dart';
-import '../providers/budget_provider.dart';
 import 'budget_center_page.dart';
 
 /// 今日可支出页面

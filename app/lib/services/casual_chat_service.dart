@@ -47,7 +47,7 @@ class CasualChatService {
     // 3. 获取用户画像（如果有profileService的话）
     UserProfile? profile;
     if (_profileService != null) {
-      profile = await _profileService!.getProfile(userId);
+      profile = await _profileService.getProfile(userId);
     }
 
     // 4. 生成回复

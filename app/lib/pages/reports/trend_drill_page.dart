@@ -314,7 +314,25 @@ class _TrendDrillPageState extends ConsumerState<TrendDrillPage> {
                       reservedSize: 22,
                     ),
                   ),
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 42,
+                      interval: maxY / 4,
+                      getTitlesWidget: (value, meta) {
+                        if (value < 0) return const SizedBox.shrink();
+                        return Text(
+                          value >= 1000
+                              ? '${(value / 1000).toStringAsFixed(1)}k'
+                              : '${value.toInt()}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                   topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 ),

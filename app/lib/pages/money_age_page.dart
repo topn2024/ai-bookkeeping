@@ -5,10 +5,16 @@ import 'package:intl/intl.dart';
 
 import '../models/resource_pool.dart';
 import '../services/money_age_level_service.dart';
+import '../services/actionable_insight_service.dart';
+import '../services/subscription_tracking_service.dart';
+import '../services/latte_factor_analyzer.dart';
 import '../theme/app_theme.dart';
 import '../providers/money_age_provider.dart';
 import '../providers/ledger_context_provider.dart';
 import '../providers/budget_provider.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
+import '../services/database_service.dart';
 import '../models/budget.dart' as budget_model;
 
 /// 钱龄详情页
@@ -37,11 +43,12 @@ class MoneyAgePage extends ConsumerWidget {
     final dashboardAsync = ref.watch(moneyAgeDashboardProvider(bookId));
     // 本地钱龄数据作为备用
     final localMoneyAge = ref.watch(moneyAgeProvider);
+    final moneyAgeHistory = ref.watch(moneyAgeHistoryProvider);
 
     return dashboardAsync.when(
       data: (dashboard) {
         // 如果 API 返回 null，使用本地计算的钱龄数据
-        final effectiveDashboard = dashboard ?? _createDashboardFromLocal(localMoneyAge);
+        final effectiveDashboard = dashboard ?? _createDashboardFromLocal(localMoneyAge, moneyAgeHistory);
         return _buildContent(context, theme, effectiveDashboard, ref);
       },
       loading: () => Scaffold(
@@ -135,17 +142,19 @@ class MoneyAgePage extends ConsumerWidget {
 
   /// 核心数据区：钱龄数字
   Widget _buildCoreDataSection(BuildContext context, ThemeData theme, int averageAge, LevelDetails levelDetails) {
-    final levelColor = _getLevelColor(levelDetails.level);
+    // 负钱龄使用红色
+    final isNegative = averageAge < 0;
+    final levelColor = isNegative ? const Color(0xFFE57373) : _getLevelColor(levelDetails.level);
+    final gradientColors = isNegative
+        ? [const Color(0xFFFFEBEE), const Color(0xFFFFCDD2)]
+        : [levelColor.withValues(alpha: 0.15), levelColor.withValues(alpha: 0.08)];
 
     return Container(
       margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            levelColor.withValues(alpha: 0.15),
-            levelColor.withValues(alpha: 0.08),
-          ],
+          colors: gradientColors,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -178,7 +187,7 @@ class MoneyAgePage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 8),
-          // 等级徽章
+          // 等级徽章（负钱龄显示"透支"）
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             decoration: BoxDecoration(
@@ -186,7 +195,9 @@ class MoneyAgePage extends ConsumerWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              '${_getLevelEmoji(levelDetails.level)} ${levelDetails.level.displayName} Lv.${_getLevelNumber(levelDetails.level)}',
+              isNegative
+                  ? '⚠️ 透支 已超支${-averageAge}天'
+                  : '${_getLevelEmoji(levelDetails.level)} ${levelDetails.level.displayName} Lv.${_getLevelNumber(levelDetails.level)}',
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -207,7 +218,8 @@ class MoneyAgePage extends ConsumerWidget {
     int monthlyChange = 0;
 
     if (dashboard.trendData.isNotEmpty) {
-      final ages = dashboard.trendData.map((d) => (d['avg_age'] as num?)?.toInt() ?? 0).where((a) => a > 0).toList();
+      // 允许负值，不再过滤 > 0
+      final ages = dashboard.trendData.map((d) => (d['avg_age'] as num?)?.toInt() ?? 0).toList();
       if (ages.isNotEmpty) {
         monthlyMax = ages.reduce((a, b) => a > b ? a : b);
         monthlyMin = ages.reduce((a, b) => a < b ? a : b);
@@ -216,6 +228,10 @@ class MoneyAgePage extends ConsumerWidget {
         }
       }
     }
+
+    // 根据值正负决定颜色
+    final maxColor = monthlyMax >= 0 ? AppColors.success : AppColors.error;
+    final minColor = monthlyMin >= 0 ? null : AppColors.error;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -227,7 +243,7 @@ class MoneyAgePage extends ConsumerWidget {
               theme,
               label: '本月最高',
               value: '$monthlyMax天',
-              valueColor: AppColors.success,
+              valueColor: maxColor,
             ),
           ),
           const SizedBox(width: 8),
@@ -237,6 +253,7 @@ class MoneyAgePage extends ConsumerWidget {
               theme,
               label: '本月最低',
               value: '$monthlyMin天',
+              valueColor: minColor,
             ),
           ),
           const SizedBox(width: 8),
@@ -369,14 +386,93 @@ class MoneyAgePage extends ConsumerWidget {
 
   /// 趋势迷你图
   Widget _buildTrendMiniChart(BuildContext context, ThemeData theme, MoneyAgeDashboard dashboard) {
-    // Calculate trend from trend data
-    int monthlyChange = 0;
-    if (dashboard.trendData.isNotEmpty) {
-      final ages = dashboard.trendData.map((d) => (d['avg_age'] as num?)?.toInt() ?? 0).where((a) => a > 0).toList();
-      if (ages.length > 1) {
-        monthlyChange = ages.first - ages.last;
-      }
+    if (dashboard.trendData.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '近30天趋势',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => _navigateToHistory(context),
+                  child: Text(
+                    '查看详情 →',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              height: 80,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Text(
+                  '暂无趋势数据',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
     }
+
+    // 获取近30天数据
+    final recentData = dashboard.trendData.take(30).toList();
+    final ages = recentData.map((d) => (d['avg_age'] as num?)?.toInt() ?? 0).toList();
+
+    // 计算变化趋势
+    int monthlyChange = 0;
+    if (ages.length > 1) {
+      monthlyChange = ages.last - ages.first;
+    }
+
+    // 生成折线图数据点
+    final spots = <FlSpot>[];
+    for (int i = 0; i < ages.length; i++) {
+      spots.add(FlSpot(i.toDouble(), ages[i].toDouble()));
+    }
+
+    // 计算Y轴范围
+    final minAge = ages.reduce((a, b) => a < b ? a : b);
+    final maxAge = ages.reduce((a, b) => a > b ? a : b);
+    final yMin = (minAge - 2).toDouble();
+    final yMax = (maxAge + 2).toDouble();
+    final yRange = yMax - yMin;
+
+    // 根据是否有负值决定颜色
+    final hasNegative = minAge < 0;
+    final lineColor = hasNegative ? AppColors.warning : AppColors.success;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12),
@@ -397,12 +493,34 @@ class MoneyAgePage extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '近30天趋势',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
+              Row(
+                children: [
+                  const Text(
+                    '近30天趋势',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        monthlyChange >= 0 ? Icons.trending_up : Icons.trending_down,
+                        size: 14,
+                        color: monthlyChange >= 0 ? AppColors.success : AppColors.error,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        monthlyChange >= 0 ? '+$monthlyChange天' : '$monthlyChange天',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: monthlyChange >= 0 ? AppColors.success : AppColors.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
               GestureDetector(
                 onTap: () => _navigateToHistory(context),
@@ -418,28 +536,115 @@ class MoneyAgePage extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Container(
-            height: 80,
+            height: 120,
+            padding: const EdgeInsets.only(right: 4, top: 8, bottom: 4, left: 4),
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Center(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    monthlyChange >= 0 ? Icons.trending_up : Icons.trending_down,
-                    color: monthlyChange >= 0 ? AppColors.success : AppColors.error,
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: yRange > 0 ? yRange / 3 : 5,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 32,
+                      interval: yRange > 0 ? yRange / 3 : 5,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          '${value.toInt()}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    monthlyChange >= 0 ? '稳步上升中' : '有所下降',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: theme.colorScheme.onSurfaceVariant,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 20,
+                      interval: (spots.length / 5).ceilToDouble(),
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= recentData.length) {
+                          return const SizedBox.shrink();
+                        }
+                        final dateStr = recentData[index]['date'] as String?;
+                        if (dateStr == null) return const SizedBox.shrink();
+
+                        try {
+                          final date = DateTime.parse(dateStr);
+                          return Text(
+                            '${date.month}/${date.day}',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          );
+                        } catch (_) {
+                          return const SizedBox.shrink();
+                        }
+                      },
+                    ),
+                  ),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                borderData: FlBorderData(show: false),
+                minX: 0,
+                maxX: (spots.length - 1).toDouble(),
+                minY: yRange > 0 ? yMin : -10,
+                maxY: yRange > 0 ? yMax : 10,
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: lineColor,
+                    barWidth: 2,
+                    isStrokeCapRound: true,
+                    dotData: FlDotData(show: spots.length <= 7),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: lineColor.withValues(alpha: 0.1),
                     ),
                   ),
                 ],
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        final index = spot.x.toInt();
+                        if (index < 0 || index >= recentData.length) return null;
+                        final dateStr = recentData[index]['date'] as String?;
+                        if (dateStr == null) return null;
+
+                        try {
+                          final date = DateTime.parse(dateStr);
+                          return LineTooltipItem(
+                            '${date.month}/${date.day}\n${spot.y.toInt()}天',
+                            const TextStyle(color: Colors.white, fontSize: 11),
+                          );
+                        } catch (_) {
+                          return null;
+                        }
+                      }).toList();
+                    },
+                  ),
+                ),
               ),
             ),
           ),
@@ -478,9 +683,20 @@ class MoneyAgePage extends ConsumerWidget {
 
   /// 从本地 MoneyAge 创建 MoneyAgeDashboard
   /// 用于 API 返回 null 时的降级方案
-  MoneyAgeDashboard _createDashboardFromLocal(budget_model.MoneyAge localMoneyAge) {
+  MoneyAgeDashboard _createDashboardFromLocal(
+    budget_model.MoneyAge localMoneyAge,
+    List<MapEntry<DateTime, int>> historyData,
+  ) {
     final days = localMoneyAge.days;
     final healthLevel = days >= 30 ? 'good' : (days >= 14 ? 'normal' : (days >= 7 ? 'warning' : 'danger'));
+
+    // 从历史数据生成 trendData
+    final trendData = historyData.map((entry) {
+      return {
+        'date': entry.key.toIso8601String(),
+        'avg_age': entry.value,
+      };
+    }).toList();
 
     return MoneyAgeDashboard(
       avgMoneyAge: days.toDouble(),
@@ -492,7 +708,7 @@ class MoneyAgePage extends ConsumerWidget {
       totalResourcePools: 1,
       activeResourcePools: 1,
       totalRemainingAmount: localMoneyAge.totalBalance,
-      trendData: [],
+      trendData: trendData,
     );
   }
 
@@ -597,7 +813,7 @@ class MoneyAgePage extends ConsumerWidget {
 
 /// 钱龄升级引导页
 /// 原��设计 2.02：钱龄升级引导
-class MoneyAgeUpgradePage extends StatelessWidget {
+class MoneyAgeUpgradePage extends ConsumerStatefulWidget {
   final int currentAge;
   final LevelDetails levelDetails;
 
@@ -608,11 +824,158 @@ class MoneyAgeUpgradePage extends StatelessWidget {
   });
 
   @override
+  ConsumerState<MoneyAgeUpgradePage> createState() => _MoneyAgeUpgradePageState();
+}
+
+/// 建议卡片数据
+class _ActionSuggestion {
+  final IconData icon;
+  final Color iconBgColor;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final String effect;
+  final Color effectColor;
+  final double progress;
+  final List<String>? details;
+
+  const _ActionSuggestion({
+    required this.icon,
+    required this.iconBgColor,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.effect,
+    required this.effectColor,
+    required this.progress,
+    this.details,
+  });
+}
+
+class _MoneyAgeUpgradePageState extends ConsumerState<MoneyAgeUpgradePage> {
+  final List<_ActionSuggestion> _suggestions = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSuggestions();
+  }
+
+  Future<void> _loadSuggestions() async {
+    try {
+      final db = sl<IDatabaseService>() as DatabaseService;
+
+      // 使用现有的 ActionableInsightService
+      final insightService = ActionableInsightService(
+        db,
+        SubscriptionTrackingService(db),
+        LatteFactorAnalyzer(db),
+      );
+
+      // 生成所有洞察
+      final insights = await insightService.generateInsights();
+      debugPrint('[MoneyAgeUpgradePage] 生成了 ${insights.length} 条洞察');
+
+      // 转换为建议卡片
+      final suggestions = <_ActionSuggestion>[];
+      for (final actionableInsight in insights) {
+        debugPrint('[MoneyAgeUpgradePage] 洞察类型: ${actionableInsight.insight.type}');
+        debugPrint('[MoneyAgeUpgradePage] 标题: ${actionableInsight.insight.title}');
+        debugPrint('[MoneyAgeUpgradePage] 描述: ${actionableInsight.insight.description}');
+        debugPrint('[MoneyAgeUpgradePage] 潜在节省: ${actionableInsight.insight.potentialSavings}');
+        final suggestion = _convertInsightToSuggestion(actionableInsight);
+        if (suggestion != null) {
+          suggestions.add(suggestion);
+        }
+      }
+
+      debugPrint('[MoneyAgeUpgradePage] 转换后有 ${suggestions.length} 条建议');
+
+      if (mounted) {
+        setState(() {
+          _suggestions.clear();
+          _suggestions.addAll(suggestions);
+          _isLoading = false;
+        });
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[MoneyAgeUpgradePage] 加载建议失败: $e');
+      debugPrint('[MoneyAgeUpgradePage] 堆栈: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// 将洞察转换为建议卡片
+  _ActionSuggestion? _convertInsightToSuggestion(ActionableInsight actionableInsight) {
+    final insight = actionableInsight.insight;
+
+    // 根据洞察类型生成不同的建议卡片
+    switch (insight.type) {
+      case InsightType.subscriptionOverload:
+        return _ActionSuggestion(
+          icon: Icons.subscriptions,
+          iconBgColor: const Color(0xFFEBF3FF),
+          iconColor: AppColors.info,
+          title: insight.title,
+          subtitle: insight.description,
+          effect: insight.potentialSavings != null
+              ? '+${(insight.potentialSavings! / 1000).ceil()}天'
+              : '+1天',
+          effectColor: AppColors.info,
+          progress: 0.0,
+          details: actionableInsight.actionGuides.map((g) => g.title).toList().cast<String>(),
+        );
+
+      case InsightType.latteFactor:
+      case InsightType.recurringExpenseOptimization:
+        return _ActionSuggestion(
+          icon: Icons.restaurant,
+          iconBgColor: const Color(0xFFFFF3E0),
+          iconColor: AppColors.warning,
+          title: insight.title,
+          subtitle: insight.description,
+          effect: insight.potentialSavings != null
+              ? '+${(insight.potentialSavings! / 1000).ceil()}天'
+              : '+2天',
+          effectColor: AppColors.warning,
+          progress: 0.3,
+          details: actionableInsight.actionGuides.map((g) => g.title).toList().cast<String>(),
+        );
+
+      case InsightType.budgetOverrunRisk:
+      case InsightType.savingsOpportunity:
+        return _ActionSuggestion(
+          icon: Icons.savings,
+          iconBgColor: const Color(0xFFE8F5E9),
+          iconColor: AppColors.success,
+          title: insight.title,
+          subtitle: insight.description,
+          effect: insight.potentialSavings != null
+              ? '+${(insight.potentialSavings! / 500).ceil()}天'
+              : '+5天',
+          effectColor: AppColors.success,
+          progress: 0.0,
+          details: actionableInsight.actionGuides.map((g) => g.title).toList().cast<String>(),
+        );
+
+      default:
+        // 其他类型的洞察暂不显示
+        return null;
+    }
+  }
+
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final nextLevel = levelDetails.nextLevel;
+    final nextLevel = widget.levelDetails.nextLevel;
     final targetAge = nextLevel?.minDays ?? 90;
-    final daysNeeded = targetAge - currentAge;
+    final daysNeeded = targetAge - widget.currentAge;
 
     return Scaffold(
       body: SafeArea(
@@ -621,55 +984,54 @@ class MoneyAgeUpgradePage extends StatelessWidget {
             // 页面头部
             _buildPageHeader(context, theme, nextLevel),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    // 目标展示
-                    _buildTargetDisplay(context, theme, targetAge, daysNeeded),
-                    const SizedBox(height: 24),
-                    // 行动卡片
-                    _buildActionCard(
-                      context,
-                      theme,
-                      icon: Icons.savings,
-                      iconBgColor: const Color(0xFFE8F5E9),
-                      iconColor: AppColors.success,
-                      title: '增加应急金储蓄',
-                      subtitle: '每月多存¥500',
-                      effect: '+5天',
-                      effectColor: AppColors.success,
-                      progress: 0.0,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          // 目标展示
+                          _buildTargetDisplay(context, theme, targetAge, daysNeeded),
+                          const SizedBox(height: 24),
+                          // 动态生成的行动卡片
+                          if (_suggestions.isEmpty)
+                            Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: Text(
+                                  '暂无可优化项，继续保持良好的财务习惯！',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            )
+                          else
+                            ...List.generate(_suggestions.length, (index) {
+                              final suggestion = _suggestions[index];
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: index < _suggestions.length - 1 ? 12 : 0,
+                                ),
+                                child: _buildActionCard(
+                                  context,
+                                  theme,
+                                  icon: suggestion.icon,
+                                  iconBgColor: suggestion.iconBgColor,
+                                  iconColor: suggestion.iconColor,
+                                  title: suggestion.title,
+                                  subtitle: suggestion.subtitle,
+                                  effect: suggestion.effect,
+                                  effectColor: suggestion.effectColor,
+                                  progress: suggestion.progress,
+                                  details: suggestion.details,
+                                ),
+                              );
+                            }),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildActionCard(
-                      context,
-                      theme,
-                      icon: Icons.restaurant,
-                      iconBgColor: const Color(0xFFFFF3E0),
-                      iconColor: AppColors.warning,
-                      title: '减少外卖支出',
-                      subtitle: '每周少点2次外卖',
-                      effect: '+2天',
-                      effectColor: AppColors.warning,
-                      progress: 0.3,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildActionCard(
-                      context,
-                      theme,
-                      icon: Icons.subscriptions,
-                      iconBgColor: const Color(0xFFEBF3FF),
-                      iconColor: AppColors.info,
-                      title: '取消闲置订阅',
-                      subtitle: '发现2个未使用的订阅',
-                      effect: '+1天',
-                      effectColor: AppColors.info,
-                      progress: 0.0,
-                    ),
-                  ],
-                ),
-              ),
             ),
             // 底部按钮
             Padding(
@@ -787,9 +1149,59 @@ class MoneyAgeUpgradePage extends StatelessWidget {
     required String effect,
     required Color effectColor,
     required double progress,
+    List<String>? details, // 可选的详细信息列表
   }) {
+    return _ExpandableActionCard(
+      icon: icon,
+      iconBgColor: iconBgColor,
+      iconColor: iconColor,
+      title: title,
+      subtitle: subtitle,
+      effect: effect,
+      effectColor: effectColor,
+      progress: progress,
+      details: details,
+    );
+  }
+}
+
+/// 可展开的行动卡片
+class _ExpandableActionCard extends StatefulWidget {
+  final IconData icon;
+  final Color iconBgColor;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final String effect;
+  final Color effectColor;
+  final double progress;
+  final List<String>? details;
+
+  const _ExpandableActionCard({
+    required this.icon,
+    required this.iconBgColor,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.effect,
+    required this.effectColor,
+    required this.progress,
+    this.details,
+  });
+
+  @override
+  State<_ExpandableActionCard> createState() => _ExpandableActionCardState();
+}
+
+class _ExpandableActionCardState extends State<_ExpandableActionCard> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasDetails = widget.details != null && widget.details!.isNotEmpty;
+
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
@@ -801,75 +1213,153 @@ class MoneyAgeUpgradePage extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: iconBgColor,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: hasDetails
+              ? () {
+                  setState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+                }
+              : null,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: widget.iconBgColor,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(widget.icon, color: widget.iconColor, size: 20),
                     ),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: theme.colorScheme.onSurfaceVariant,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.title,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  widget.subtitle,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                              if (hasDetails)
+                                Icon(
+                                  _isExpanded
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.keyboard_arrow_down,
+                                  size: 20,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: widget.effectColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        widget.effect,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: widget.effectColor,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: effectColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  effect,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: effectColor,
+                const SizedBox(height: 12),
+                // 进度条
+                Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: widget.progress,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: widget.effectColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // 进度条
-          Container(
-            height: 4,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(2),
+                // 展开的详细信息
+                if (_isExpanded && hasDetails) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: widget.iconBgColor.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: widget.details!.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final detail = entry.value;
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: index < widget.details!.length - 1 ? 8 : 0,
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                margin: const EdgeInsets.only(top: 4),
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: widget.iconColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  detail,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ],
             ),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: progress,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: effectColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -917,7 +1407,8 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
       final dateStr = item['date'] as String?;
       final avgAge = (item['avg_age'] as num?)?.toInt() ?? 0;
 
-      if (dateStr != null && avgAge > 0) {
+      // 允许负值钱龄
+      if (dateStr != null) {
         try {
           final date = DateTime.parse(dateStr);
           final level = levelService.determineLevel(avgAge);
@@ -1064,12 +1555,16 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
       return FlSpot(entry.key.toDouble(), entry.value.averageAge.toDouble());
     }).toList();
 
-    // 计算Y轴范围
+    // 计算Y轴范围（允许负值）
     final ages = sortedData.map((d) => d.averageAge).toList();
     final minAge = ages.reduce((a, b) => a < b ? a : b);
     final maxAge = ages.reduce((a, b) => a > b ? a : b);
-    final yMin = (minAge - 5).clamp(0, 1000).toDouble();
+    final yMin = (minAge - 5).toDouble(); // 不再限制为0
     final yMax = (maxAge + 10).toDouble();
+
+    // 根据是否有负值决定颜色
+    final hasNegative = minAge < 0;
+    final lineColor = hasNegative ? AppColors.warning : AppColors.success;
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -1089,12 +1584,30 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '钱龄变化趋势',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: theme.colorScheme.onSurface,
-            ),
+          Row(
+            children: [
+              Text(
+                '钱龄变化趋势',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              if (hasNegative) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '有透支',
+                    style: TextStyle(fontSize: 10, color: AppColors.error),
+                  ),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 12),
           Expanded(
@@ -1104,14 +1617,16 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
                   LineChartBarData(
                     spots: spots,
                     isCurved: true,
-                    color: AppColors.success,
+                    color: lineColor,
                     barWidth: 2.5,
                     dotData: FlDotData(
                       show: sortedData.length <= 15,
                       getDotPainter: (spot, percent, barData, index) {
+                        // 根据值正负决定点的颜色
+                        final dotColor = spot.y >= 0 ? AppColors.success : AppColors.error;
                         return FlDotCirclePainter(
                           radius: 3,
-                          color: AppColors.success,
+                          color: dotColor,
                           strokeWidth: 1.5,
                           strokeColor: Colors.white,
                         );
@@ -1119,7 +1634,7 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
                     ),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: AppColors.success.withValues(alpha: 0.1),
+                      color: lineColor.withValues(alpha: 0.1),
                     ),
                   ),
                 ],
@@ -1226,6 +1741,11 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
       minAge = ages.reduce((a, b) => a < b ? a : b);
     }
 
+    // 根据值正负决定颜色
+    final avgColor = avgAge >= 0 ? AppColors.success : AppColors.error;
+    final maxColor = maxAge >= 0 ? AppColors.success : AppColors.error;
+    final minColor = minAge >= 0 ? null : AppColors.error;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -1243,9 +1763,9 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildSummaryItem('平均钱龄', trendData.isEmpty ? '--' : '$avgAge', AppColors.success),
-          _buildSummaryItem('最高', trendData.isEmpty ? '--' : '$maxAge', null),
-          _buildSummaryItem('最低', trendData.isEmpty ? '--' : '$minAge', null),
+          _buildSummaryItem('平均钱龄', trendData.isEmpty ? '--' : '$avgAge', avgColor),
+          _buildSummaryItem('最高', trendData.isEmpty ? '--' : '$maxAge', maxColor),
+          _buildSummaryItem('最低', trendData.isEmpty ? '--' : '$minAge', minColor),
         ],
       ),
     );
@@ -1372,7 +1892,8 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
-                  color: change > 0 ? AppColors.success : null,
+                  // 负值显示红色，正值且上升显示绿色
+                  color: age < 0 ? AppColors.error : (change > 0 ? AppColors.success : null),
                 ),
               ),
               Text(
@@ -1489,6 +2010,16 @@ class MoneyAgeStagePage extends StatelessWidget {
   }
 
   Widget _buildCurrentStageDisplay(BuildContext context, ThemeData theme) {
+    // 负钱龄使用红色
+    final isNegative = currentAge < 0;
+    final gradientColors = isNegative
+        ? [const Color(0xFFE57373), const Color(0xFFEF5350)]
+        : [const Color(0xFF66BB6A), const Color(0xFF4CAF50)];
+    final shadowColor = isNegative
+        ? const Color(0xFFC62828).withValues(alpha: 0.3)
+        : const Color(0xFF2E7D32).withValues(alpha: 0.3);
+    final labelColor = isNegative ? AppColors.error : AppColors.success;
+
     return Container(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -1497,15 +2028,15 @@ class MoneyAgeStagePage extends StatelessWidget {
             width: 100,
             height: 100,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF66BB6A), Color(0xFF4CAF50)],
+              gradient: LinearGradient(
+                colors: gradientColors,
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF2E7D32).withValues(alpha: 0.3),
+                  color: shadowColor,
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
@@ -1531,16 +2062,18 @@ class MoneyAgeStagePage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '🏆 ${stageProgress.currentStage.name}',
+            isNegative ? '⚠️ 透支状态' : '🏆 ${stageProgress.currentStage.name}',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: AppColors.success,
+              color: labelColor,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            '您花的钱平均是$currentAge天前赚的',
+            isNegative
+                ? '已透支${-currentAge}天的收入额度'
+                : '您花的钱平均是$currentAge天前赚的',
             style: TextStyle(
               fontSize: 13,
               color: theme.colorScheme.onSurfaceVariant,

@@ -1664,7 +1664,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       final llmGen = LLMResponseGenerator.instance;
       final txInfos = validBills.map((b) => TransactionInfo(
         amount: b.amount!,
-        category: b.typeDisplayName ?? '其他',
+        category: b.typeDisplayName,
         isIncome: b.type == 'income',
         merchant: b.merchant,
       )).toList();

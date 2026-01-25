@@ -291,13 +291,11 @@ class ExecutionChannel {
     debugPrint('[ExecutionChannel] 等待执行锁，队列长度: ${_executionWaitQueue.length}');
 
     // 等待被唤醒（带超时保护）
-    bool timedOut = false;
     try {
       await completer.future.timeout(
         Duration(seconds: _lockTimeoutSeconds),
       );
     } on TimeoutException {
-      timedOut = true;
       debugPrint('[ExecutionChannel] 等待执行锁超时（${_lockTimeoutSeconds}秒）');
 
       // 从队列中移除自己（如果还在队列中）

@@ -22,7 +22,6 @@ import 'services/database_service.dart';
 import 'services/global_voice_assistant_manager.dart';
 import 'services/voice_token_service.dart';
 import 'services/voice_context_route_observer.dart';
-import 'services/aliyun_nls_token_service.dart';
 import 'core/config/secrets.dart';
 import 'services/voice_service_coordinator.dart' show VoiceSessionResult, VoiceSessionStatus;
 import 'services/voice/config/feature_flags.dart';

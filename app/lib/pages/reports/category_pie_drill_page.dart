@@ -277,6 +277,10 @@ class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          // 图例（只显示前5个）
+          if (categories.isNotEmpty)
+            _buildPieLegend(theme, categories.take(5).toList(), colors, totalExpense),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -298,6 +302,50 @@ class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
           ),
         ],
       ),
+    );
+  }
+
+  /// 构建饼图图例
+  Widget _buildPieLegend(
+    ThemeData theme,
+    List<MapEntry<String, double>> categories,
+    List<Color> colors,
+    double totalExpense,
+  ) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      alignment: WrapAlignment.center,
+      children: categories.asMap().entries.map((entry) {
+        final index = entry.key;
+        final categoryEntry = entry.value;
+        final category = DefaultCategories.findById(categoryEntry.key);
+        final percentage = totalExpense > 0
+            ? (categoryEntry.value / totalExpense * 100)
+            : 0.0;
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: colors[index % colors.length],
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '${category?.name ?? '未知'} ${percentage.toStringAsFixed(0)}%',
+              style: TextStyle(
+                fontSize: 11,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        );
+      }).toList(),
     );
   }
 

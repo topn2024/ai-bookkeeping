@@ -437,31 +437,50 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
   }
 
   /// 钱龄表现卡片 - 使用真实数据
-  /// 钱龄：从收入到支出的平均时间差
+  /// 钱龄：余额 ÷ 日均支出 = 能撑多少天（标准YNAB定义）
   Widget _buildMoneyAgeCard(ThemeData theme, List<Transaction> transactions) {
-    // 计算本月平均钱龄
-    // 简化算法：用月初到每笔支出的天数的平均值
-    final monthStart = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+    final monthEnd = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
+
+    // 计算到该月末的累计余额
+    double balance = 0;
+    for (final t in transactions.where((t) => t.date.isBefore(monthEnd.add(const Duration(days: 1))))) {
+      if (t.type == TransactionType.income) {
+        balance += t.amount;
+      } else if (t.type == TransactionType.expense) {
+        balance -= t.amount;
+      }
+    }
+
+    // 计算该月的支出和日均支出
     final expenseTransactions = transactions
         .where((t) => t.type == TransactionType.expense)
         .toList();
 
-    double avgMoneyAge = 0;
-    if (expenseTransactions.isNotEmpty) {
-      final totalDays = expenseTransactions.fold<int>(0, (sum, t) {
-        return sum + t.date.difference(monthStart).inDays;
-      });
-      avgMoneyAge = totalDays / expenseTransactions.length;
+    final monthExpenses = expenseTransactions.fold<double>(0, (sum, t) => sum + t.amount);
+    final daysInMonth = monthEnd.day;
+    final avgDailyExpense = daysInMonth > 0 ? monthExpenses / daysInMonth : 0;
+
+    // 钱龄 = 余额 / 日均支出
+    // 允许负值：负钱龄表示已透支多少天的收入
+    int moneyAgeDays = 0;
+    if (avgDailyExpense > 0) {
+      moneyAgeDays = (balance / avgDailyExpense).round();
     }
 
-    final moneyAgeDays = avgMoneyAge.round();
+    // 根据钱龄正负决定颜色
+    final isNegative = moneyAgeDays < 0;
+    final primaryColor = isNegative ? Colors.red[700] : Colors.green[700];
+    final secondaryColor = isNegative ? Colors.red[800] : Colors.green[800];
+    final gradientColors = isNegative
+        ? [const Color(0xFFFFEBEE), const Color(0xFFFFCDD2)]
+        : [const Color(0xFFE8F5E9), const Color(0xFFC8E6C9)];
 
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
+        gradient: LinearGradient(
+          colors: gradientColors,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -471,15 +490,29 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
         children: [
           Row(
             children: [
-              Icon(Icons.access_time, color: Colors.green[700]),
+              Icon(Icons.access_time, color: primaryColor),
               const SizedBox(width: 8),
               Text(
                 '钱龄表现',
                 style: TextStyle(
                   fontWeight: FontWeight.w500,
-                  color: Colors.green[800],
+                  color: secondaryColor,
                 ),
               ),
+              if (isNegative) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red[100],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '透支',
+                    style: TextStyle(fontSize: 10, color: Colors.red[700]),
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -491,7 +524,7 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
                 expenseTransactions.isEmpty ? '--' : '$moneyAgeDays天',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: Colors.green[700],
+                  color: primaryColor,
                 ),
               ),
             ],
@@ -503,7 +536,7 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
               const Text('支出笔数'),
               Text(
                 '${expenseTransactions.length}笔',
-                style: TextStyle(color: Colors.green[700]),
+                style: TextStyle(color: primaryColor),
               ),
             ],
           ),

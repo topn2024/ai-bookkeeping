@@ -253,8 +253,15 @@ class _TrendAnalysisTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final transactions = ref.watch(transactionProvider);
+    final allTransactions = ref.watch(transactionProvider);
     final monthlyExpense = ref.watch(monthlyExpenseProvider);
+
+    // 根据选中的周期过滤交易
+    final range = _getDateRange();
+    final transactions = allTransactions.where((t) {
+      return t.date.isAfter(range.start.subtract(const Duration(days: 1))) &&
+             t.date.isBefore(range.end.add(const Duration(days: 1)));
+    }).toList();
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -322,7 +329,6 @@ class _TrendAnalysisTab extends ConsumerWidget {
   Widget _buildMiniTrendChart(BuildContext context, ThemeData theme, List<Transaction> transactions) {
     // 计算每日支出
     final expenseByDay = <String, double>{};
-    final range = _getDateRange();
 
     for (final tx in transactions) {
       if (tx.type == TransactionType.expense) {
@@ -365,16 +371,73 @@ class _TrendAnalysisTab extends ConsumerWidget {
     final maxY = sortedEntries.map((e) => e.value).reduce((a, b) => a > b ? a : b);
 
     return Container(
-      height: 200,
-      padding: const EdgeInsets.all(16),
+      height: 220,
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
       ),
       child: LineChart(
         LineChartData(
-          gridData: FlGridData(show: false),
-          titlesData: FlTitlesData(show: false),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: maxY > 0 ? maxY / 4 : 100,
+            getDrawingHorizontalLine: (value) {
+              return FlLine(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                strokeWidth: 1,
+              );
+            },
+          ),
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 42,
+                interval: maxY > 0 ? maxY / 4 : 100,
+                getTitlesWidget: (value, meta) {
+                  if (value < 0) return const SizedBox.shrink();
+                  return Text(
+                    value >= 1000
+                        ? '${(value / 1000).toStringAsFixed(1)}k'
+                        : '${value.toInt()}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  );
+                },
+              ),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 24,
+                interval: (sortedEntries.length / 5).ceilToDouble(),
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= sortedEntries.length) {
+                    return const SizedBox.shrink();
+                  }
+                  // 解析日期 "2024-1-25"
+                  final dateKey = sortedEntries[index].key;
+                  final parts = dateKey.split('-');
+                  if (parts.length != 3) return const SizedBox.shrink();
+
+                  return Text(
+                    '${parts[1]}/${parts[2]}',
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  );
+                },
+              ),
+            ),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          ),
           borderData: FlBorderData(show: false),
           minX: 0,
           maxX: (spots.length - 1).toDouble(),
@@ -394,6 +457,25 @@ class _TrendAnalysisTab extends ConsumerWidget {
               ),
             ),
           ],
+          lineTouchData: LineTouchData(
+            enabled: true,
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipItems: (touchedSpots) {
+                return touchedSpots.map((spot) {
+                  final index = spot.x.toInt();
+                  if (index < 0 || index >= sortedEntries.length) return null;
+                  final dateKey = sortedEntries[index].key;
+                  final parts = dateKey.split('-');
+                  if (parts.length != 3) return null;
+
+                  return LineTooltipItem(
+                    '${parts[1]}/${parts[2]}\n¥${spot.y.toStringAsFixed(0)}',
+                    const TextStyle(color: Colors.white, fontSize: 11),
+                  );
+                }).toList();
+              },
+            ),
+          ),
         ),
       ),
     );
@@ -526,10 +608,48 @@ class _CategoryAnalysisTab extends ConsumerWidget {
 
   const _CategoryAnalysisTab({required this.selectedPeriod});
 
+  /// 根据选中的周期获取日期范围
+  DateTimeRange _getDateRange() {
+    final now = DateTime.now();
+    switch (selectedPeriod) {
+      case 0: // 本月
+        return DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: now,
+        );
+      case 1: // 上月
+        final lastMonth = DateTime(now.year, now.month - 1, 1);
+        final lastMonthEnd = DateTime(now.year, now.month, 0);
+        return DateTimeRange(start: lastMonth, end: lastMonthEnd);
+      case 2: // 近3月
+        return DateTimeRange(
+          start: DateTime(now.year, now.month - 2, 1),
+          end: now,
+        );
+      case 3: // 今年
+        return DateTimeRange(
+          start: DateTime(now.year, 1, 1),
+          end: now,
+        );
+      default:
+        return DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: now,
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final transactions = ref.watch(transactionProvider);
+    final allTransactions = ref.watch(transactionProvider);
+
+    // 根据选中的周期过滤交易
+    final range = _getDateRange();
+    final transactions = allTransactions.where((t) {
+      return t.date.isAfter(range.start.subtract(const Duration(days: 1))) &&
+             t.date.isBefore(range.end.add(const Duration(days: 1)));
+    }).toList();
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -644,42 +764,93 @@ class _CategoryAnalysisTab extends ConsumerWidget {
     }).toList();
 
     return Container(
-      height: 200,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Stack(
-        alignment: Alignment.center,
+      child: Column(
         children: [
-          PieChart(
-            PieChartData(
-              sections: sections,
-              centerSpaceRadius: 50,
-              sectionsSpace: 2,
+          // 饼图
+          SizedBox(
+            height: 200,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                PieChart(
+                  PieChartData(
+                    sections: sections,
+                    centerSpaceRadius: 50,
+                    sectionsSpace: 2,
+                  ),
+                ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '总支出',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.hintColor,
+                      ),
+                    ),
+                    Text(
+                      '¥${totalExpense.toStringAsFixed(0)}',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                '总支出',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.hintColor,
-                ),
-              ),
-              Text(
-                '¥${totalExpense.toStringAsFixed(0)}',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(height: 16),
+          // 图例
+          _buildPieLegend(context, theme, categories, colors, totalExpense),
         ],
       ),
+    );
+  }
+
+  /// 构建饼图图例
+  Widget _buildPieLegend(BuildContext context, ThemeData theme,
+      List<MapEntry<String, double>> categories,
+      List<Color> colors,
+      double totalExpense) {
+    final locService = CategoryLocalizationService.instance;
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      children: categories.asMap().entries.map((entry) {
+        final index = entry.key;
+        final categoryEntry = entry.value;
+        final percentage = (categoryEntry.value / totalExpense * 100);
+        final categoryName = locService.getCategoryName(categoryEntry.key);
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: colors[index % colors.length],
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$categoryName ${percentage.toStringAsFixed(0)}%',
+              style: TextStyle(
+                fontSize: 11,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        );
+      }).toList(),
     );
   }
 
