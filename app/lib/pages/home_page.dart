@@ -476,9 +476,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       level = '需改善';
     }
 
-    // 趋势（从moneyAgeData获取）
-    final trendDays = moneyAgeData.trend == 'up' ? 5 : (moneyAgeData.trend == 'down' ? -5 : 0);
-
     return InkWell(
       onTap: () {
         Navigator.push(
