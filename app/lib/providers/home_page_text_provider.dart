@@ -57,6 +57,7 @@ class HomePageTextNotifier extends StateNotifier<HomePageTextState> {
   int _currentStreakDays = 0;
   int _currentTrendDays = 0;
   String _currentTrend = 'stable';
+  int _currentMoneyAgeDays = 0;
 
   /// 刷新间隔（默认5分钟）
   static const Duration refreshInterval = Duration(minutes: 5);
@@ -88,6 +89,7 @@ class HomePageTextNotifier extends StateNotifier<HomePageTextState> {
     int? streakDays,
     int? trendDays,
     String? trend,
+    int? moneyAgeDays,
   }) {
     bool needsRefresh = false;
 
@@ -105,6 +107,10 @@ class HomePageTextNotifier extends StateNotifier<HomePageTextState> {
     }
     if (trend != null && trend != _currentTrend) {
       _currentTrend = trend;
+      needsRefresh = true;
+    }
+    if (moneyAgeDays != null && moneyAgeDays != _currentMoneyAgeDays) {
+      _currentMoneyAgeDays = moneyAgeDays;
       needsRefresh = true;
     }
 
@@ -142,6 +148,7 @@ class HomePageTextNotifier extends StateNotifier<HomePageTextState> {
         _currentTrendDays,
         _currentTrend,
         userId: _userId,
+        moneyAgeDays: _currentMoneyAgeDays,
       ),
       lastRefreshedAt: DateTime.now(),
       refreshCount: state.refreshCount + 1,

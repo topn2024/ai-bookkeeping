@@ -142,6 +142,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         streakDays: streakStats.currentStreak,
         trendDays: trendDays,
         trend: moneyAgeData.trend ?? 'stable',
+        moneyAgeDays: moneyAgeData.days,
       );
     });
 

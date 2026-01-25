@@ -67,6 +67,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               _buildAchievementCards(context, theme, ref),
               _buildAccountGroup(context, theme),
               _buildBudgetGroup(context, theme),
+              _buildZeroBasedBudgetGroup(context, theme),
               _buildFinancialToolsGroup(context, theme),
               _buildDataGroup(context, theme),
               _buildReportGroup(context, theme),
@@ -299,15 +300,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
         ),
         _SettingsItem(
-          icon: Icons.account_balance_wallet,
-          title: '零基预算',
-          subtitle: '让每一分钱都有去处',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ZeroBasedBudgetPage()),
-          ),
-        ),
-        _SettingsItem(
           icon: Icons.flag,
           title: context.l10n.savingsGoal,
           subtitle: '储蓄目标管理',
@@ -350,6 +342,26 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const ReimbursementPage()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 零基预算分组
+  Widget _buildZeroBasedBudgetGroup(BuildContext context, ThemeData theme) {
+    return _buildSettingsGroup(
+      context,
+      theme,
+      title: '零基预算',
+      items: [
+        _SettingsItem(
+          icon: Icons.account_balance_wallet,
+          title: '零基预算分配',
+          subtitle: '让每一分钱都有去处',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ZeroBasedBudgetPage()),
           ),
         ),
       ],

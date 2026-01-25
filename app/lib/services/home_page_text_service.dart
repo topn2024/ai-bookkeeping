@@ -194,7 +194,13 @@ class HomePageTextService {
   /// [trendDays] 趋势变化天数，正数表示提升，负数表示下降
   /// [trend] 趋势方向 'up', 'down', 或 'stable'
   /// [userId] 用户ID，用于千人千面
-  static String getMoneyAgeTrendText(int trendDays, String trend, {String? userId}) {
+  /// [moneyAgeDays] 钱龄天数，用于判断是否为0
+  static String getMoneyAgeTrendText(int trendDays, String trend, {String? userId, int? moneyAgeDays}) {
+    // 如果钱龄为0，显示警告信息
+    if (moneyAgeDays != null && moneyAgeDays == 0) {
+      return '当前钱龄为0，建议关注收支平衡';
+    }
+
     final absDays = trendDays.abs();
     List<String> candidates;
 
