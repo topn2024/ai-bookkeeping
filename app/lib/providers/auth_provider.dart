@@ -152,7 +152,11 @@ class AuthNotifier extends Notifier<AuthState> {
 
     state = state.copyWith(status: AuthStatus.loading, error: null);
 
+    debugPrint('[AuthProvider] Starting registration...');
+    debugPrint('[AuthProvider] Email: $email, Phone: $phone');
+
     try {
+      debugPrint('[AuthProvider] Calling HTTP POST /auth/register');
       final response = await _http.post('/auth/register', data: {
         if (email != null) 'email': email,
         if (phone != null) 'phone': phone,
@@ -201,13 +205,23 @@ class AuthNotifier extends Notifier<AuthState> {
         return false;
       }
     } on DioException catch (e) {
+      // 详细日志，帮助定位真机问题
+      debugPrint('[AuthProvider] DioException type: ${e.type}');
+      debugPrint('[AuthProvider] DioException message: ${e.message}');
+      debugPrint('[AuthProvider] DioException error: ${e.error}');
+      debugPrint('[AuthProvider] Response: ${e.response}');
+      debugPrint('[AuthProvider] RequestOptions baseUrl: ${e.requestOptions.baseUrl}');
+      debugPrint('[AuthProvider] RequestOptions path: ${e.requestOptions.path}');
+
       final errorMessage = _parseError(e);
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
         error: errorMessage,
       );
       return false;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('[AuthProvider] Unexpected error: $e');
+      debugPrint('[AuthProvider] StackTrace: $stackTrace');
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
         error: '注册失败: $e',

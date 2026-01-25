@@ -4,7 +4,7 @@
 library;
 
 import 'package:flutter/foundation.dart';
-import '../../../extensions/category_extensions.dart';
+import '../../../services/category_localization_service.dart';
 import 'query_models.dart';
 import 'query_complexity_analyzer.dart';
 
@@ -14,6 +14,11 @@ class QueryResultRouter {
 
   QueryResultRouter({QueryComplexityAnalyzer? analyzer})
       : _analyzer = analyzer ?? QueryComplexityAnalyzer();
+
+  /// 获取分类的本地化名称
+  String getCategoryLocalizedName(String categoryId) {
+    return CategoryLocalizationService.instance.getCategoryName(categoryId);
+  }
 
   /// 路由查询结果到合适的响应方式
   ///

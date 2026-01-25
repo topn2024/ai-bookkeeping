@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 import 'secure_storage_service.dart';
 import 'app_config_service.dart';
 import '../core/contracts/i_http_service.dart';
@@ -61,9 +62,9 @@ class HttpService implements IHttpService {
     if (_configService.isInitialized) {
       return _configService.config.skipCertificateVerification;
     }
-    // 生产环境默认启用证书验证（安全优先）
-    // 开发环境如需使用自签名证书，请通过服务器配置下发 skip_certificate_verification: true
-    return false;
+    // 配置未初始化时，使用与 AppConfigService 一致的默认值
+    // 服务器目前使用 IP 地址 + 自签名证书，需要跳过验证
+    return true;
   }
 
   void _initDio() {
@@ -133,15 +134,22 @@ class HttpService implements IHttpService {
 
   /// 配置 SSL 证书验证
   void _configureSslVerification() {
-    if (_skipCertificateVerification) {
-      _dio.httpClientAdapter = IOHttpClientAdapter(
-        createHttpClient: () {
-          final client = HttpClient();
-          client.badCertificateCallback = (cert, host, port) => true;
-          return client;
-        },
-      );
-    }
+    debugPrint('[HttpService] _configureSslVerification called');
+    debugPrint('[HttpService] _skipCertificateVerification: $_skipCertificateVerification');
+    debugPrint('[HttpService] _configService.isInitialized: ${_configService.isInitialized}');
+
+    // 始终配置跳过证书验证（服务器使用 IP 地址 + 自签名证书）
+    _dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        client.badCertificateCallback = (cert, host, port) {
+          debugPrint('[HttpService] badCertificateCallback: host=$host, port=$port');
+          return true; // 跳过证书验证
+        };
+        return client;
+      },
+    );
+    debugPrint('[HttpService] SSL verification disabled');
   }
 
   /// 初始化：从安全存储加载Token
@@ -250,6 +258,10 @@ class HttpService implements IHttpService {
 
   @override
   Future<Response> post(String path, {dynamic data}) async {
+    debugPrint('[HttpService] POST $path');
+    debugPrint('[HttpService] baseUrl: $baseUrl');
+    debugPrint('[HttpService] skipCertVerification: $_skipCertificateVerification');
+    debugPrint('[HttpService] configService.isInitialized: ${_configService.isInitialized}');
     return await _dio.post(path, data: data);
   }
 

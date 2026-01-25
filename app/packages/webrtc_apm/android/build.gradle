@@ -26,6 +26,7 @@ apply plugin: 'kotlin-android'
 android {
     namespace 'com.anthropic.webrtc_apm'
     compileSdk 34
+    ndkVersion "27.0.11902837"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8

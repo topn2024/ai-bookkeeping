@@ -353,6 +353,8 @@ class Transaction {
         return '其他银行';
       case ExternalSource.generic:
         return '通用导入';
+      case ExternalSource.sms:
+        return '短信导入';
     }
   }
 
