@@ -178,6 +178,8 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
       '娱乐': {'keywords': ['娱乐', '电影', '游戏', '运动', '健身', 'entertainment'], 'icon': Icons.celebration, 'color': Colors.pink},
     };
 
+    // 收集所有弹性支出分类的历史数据
+    final flexibleCategoryData = <String, Map<String, dynamic>>{};
     for (final entry in flexibleCategories.entries) {
       double categoryTotal = 0;
       final details = <String>[];
@@ -195,6 +197,30 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
 
       // 只添加有消费记录的分类（至少100元）
       if (categoryTotal > 100) {
+        flexibleCategoryData[entry.key] = {
+          'amount': categoryTotal,
+          'icon': entry.value['icon'],
+          'color': entry.value['color'],
+          'details': details.isEmpty ? null : details,
+        };
+      }
+    }
+
+    // 计算已分配金额和剩余可用金额
+    final totalAllocatedSoFar = allocations.fold(0.0, (sum, item) => sum + item.amount);
+    final remainingForFlexible = (widget.incomeAmount - totalAllocatedSoFar).clamp(0.0, double.infinity);
+
+    // 如果有剩余金额，按比例分配给弹性支出分类
+    if (remainingForFlexible > 0 && flexibleCategoryData.isNotEmpty) {
+      final totalFlexibleFromHistory = flexibleCategoryData.values.fold(0.0, (sum, data) => sum + (data['amount'] as double));
+
+      for (final entry in flexibleCategoryData.entries) {
+        final historyAmount = entry.value['amount'] as double;
+        // 按历史比例分配剩余金额
+        final allocatedAmount = totalFlexibleFromHistory > 0
+            ? (historyAmount / totalFlexibleFromHistory * remainingForFlexible)
+            : (remainingForFlexible / flexibleCategoryData.length);
+
         allocations.add(AllocationItem(
           id: priorityId.toString(),
           name: entry.key,
@@ -202,19 +228,22 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
           color: entry.value['color'] as Color,
           priority: priorityId,
           priorityLabel: 'P$priorityId',
-          amount: categoryTotal.clamp(0.0, widget.incomeAmount * 0.3).toDouble(),
+          amount: allocatedAmount,
           type: AllocationPriorityType.flexible,
           reason: '${entry.key} · 基于过去3个月平均',
-          details: details.isEmpty ? null : details,
+          details: entry.value['details'] as List<String>?,
         ));
         priorityId++;
       }
     }
 
-    // 如果剩余金额>0，添加弹性支出
+    // 检查是否还有剩余金额（由于精度问题可能会有小额剩余）
     final totalAllocated = allocations.fold(0.0, (sum, item) => sum + item.amount);
     final remaining = widget.incomeAmount - totalAllocated;
-    if (remaining > 100) {
+
+    // 如果剩余金额>10元，添加到"其他弹性支出"
+    // （小于10元的差额可能是精度问题，忽略）
+    if (remaining > 10) {
       allocations.add(AllocationItem(
         id: priorityId.toString(),
         name: '其他弹性支出',
@@ -226,6 +255,16 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
         type: AllocationPriorityType.flexible,
         reason: '剩余可支配金额',
       ));
+    } else if (remaining > 1) {
+      // 小额剩余分配到第一个弹性支出分类
+      if (allocations.isNotEmpty) {
+        for (final item in allocations.reversed) {
+          if (item.type == AllocationPriorityType.flexible) {
+            item.amount += remaining;
+            break;
+          }
+        }
+      }
     }
   }
 
@@ -355,6 +394,16 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
   }
 
   void _applyAllocation() {
+    // 调试信息
+    final totalAllocated = _allocations.fold(0.0, (sum, item) => sum + item.amount);
+    print('🔍 [SmartAllocation] 收入: ${widget.incomeAmount}');
+    print('🔍 [SmartAllocation] 分配总额: $totalAllocated');
+    print('🔍 [SmartAllocation] 差额: ${widget.incomeAmount - totalAllocated}');
+    print('🔍 [SmartAllocation] 分类数量: ${_allocations.length}');
+    for (final item in _allocations) {
+      print('  - ${item.name}: ¥${item.amount}');
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
