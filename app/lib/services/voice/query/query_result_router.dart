@@ -4,6 +4,7 @@
 library;
 
 import 'package:flutter/foundation.dart';
+import '../../../extensions/category_extensions.dart';
 import 'query_models.dart';
 import 'query_complexity_analyzer.dart';
 
@@ -85,7 +86,7 @@ class QueryResultRouter {
         return _generateTrendText(result);
 
       case QueryType.distribution:
-        return _generateDistributionText(result);
+        return _generateDistributionText(result, request.limit);
 
       case QueryType.comparison:
         return _generateComparisonText(result);
@@ -150,7 +151,7 @@ class QueryResultRouter {
   }
 
   /// 生成分布文本
-  String _generateDistributionText(QueryResult result) {
+  String _generateDistributionText(QueryResult result, int? limit) {
     if (result.groupedData == null || result.groupedData!.isEmpty) {
       return _generateSummaryText(result);
     }
@@ -158,12 +159,46 @@ class QueryResultRouter {
     final grouped = result.groupedData!;
     final total = grouped.values.reduce((a, b) => a + b);
 
-    // 找出占比最大的分类
-    final maxEntry = grouped.entries.reduce((a, b) => a.value > b.value ? a : b);
-    final maxPercentage = (maxEntry.value / total * 100).toStringAsFixed(1);
+    // 按金额排序
+    final sortedEntries = grouped.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
-    return '${maxEntry.key}最多，占${maxPercentage}%，'
-        '总计${total.toStringAsFixed(0)}元';
+    // 如果指定了limit=1，只返回最多的一项
+    if (limit == 1 && sortedEntries.isNotEmpty) {
+      final maxEntry = sortedEntries.first;
+      final categoryName = getCategoryLocalizedName(maxEntry.key);
+      final amount = maxEntry.value.toStringAsFixed(0);
+      final percentage = (maxEntry.value / total * 100).toStringAsFixed(1);
+      return '$categoryName最多，${amount}元，占${percentage}%';
+    }
+
+    // 根据分类数量和limit决定显示多少个
+    int topCount;
+    if (limit != null && limit > 0) {
+      topCount = limit < sortedEntries.length ? limit : sortedEntries.length;
+    } else {
+      topCount = sortedEntries.length >= 5 ? 5 : sortedEntries.length;
+    }
+    final topEntries = sortedEntries.take(topCount).toList();
+
+    // 如果只有1-2个分类，使用简单格式
+    if (topEntries.length <= 2) {
+      final maxEntry = topEntries.first;
+      final maxPercentage = (maxEntry.value / total * 100).toStringAsFixed(1);
+      final categoryName = getCategoryLocalizedName(maxEntry.key);
+      return '$categoryName最多，占${maxPercentage}%，'
+          '总计${total.toStringAsFixed(0)}元';
+    }
+
+    // 多个分类时，列出前几名
+    final categoryList = topEntries.map((entry) {
+      final categoryName = getCategoryLocalizedName(entry.key);
+      final percentage = (entry.value / total * 100).toStringAsFixed(1);
+      final amount = entry.value.toStringAsFixed(0);
+      return '$categoryName${amount}元（${percentage}%）';
+    }).join('，');
+
+    return '总计${total.toStringAsFixed(0)}元，主要花费在：$categoryList';
   }
 
   /// 生成对比文本
@@ -233,7 +268,7 @@ class QueryResultRouter {
         // 饼图
         if (result.groupedData != null && result.groupedData!.isNotEmpty) {
           final dataPoints = result.groupedData!.entries
-              .map((e) => DataPoint(label: e.key, value: e.value))
+              .map((e) => DataPoint(label: getCategoryLocalizedName(e.key), value: e.value))
               .toList();
 
           return QueryChartData(

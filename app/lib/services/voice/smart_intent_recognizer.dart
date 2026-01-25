@@ -336,6 +336,7 @@ class SmartIntentRecognizer {
 - time: 时间范围（今天/昨天/本周/本月/上月/最近N天/最近N个月）
 - category: 分类筛选（可选）
 - groupBy: 分组维度（可选，month/date/category）
+- limit: 结果数量限制（可选，当用户问"最多的一项"、"最少的一项"、"前N项"时使用）
 
 【分类】餐饮、交通、购物、娱乐、居住、医疗、其他
 【常用页面】$pageList
@@ -433,6 +434,9 @@ class SmartIntentRecognizer {
 
 输入："各分类占比"
 输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"distribution","time":"本月","groupBy":"category"}}],"chat_content":null,"clarify_question":null}
+
+输入："这个月花钱最多的是哪一项"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"distribution","time":"本月","groupBy":"category","limit":1}}],"chat_content":null,"clarify_question":null}
 
 输入："餐饮这个月花了多少"
 输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"distribution","time":"本月","category":"餐饮"}}],"chat_content":null,"clarify_question":null}

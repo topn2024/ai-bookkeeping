@@ -1293,7 +1293,11 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   /// 4. 收到最终结果时处理命令
   /// 5. 录音流持续活跃，继续监听
   Future<void> startRecording() async {
-    if (_ballState == FloatingBallState.recording) return;
+    debugPrint('[GlobalVoiceAssistant] startRecording() 被调用，当前状态: $_ballState');
+    if (_ballState == FloatingBallState.recording) {
+      debugPrint('[GlobalVoiceAssistant] 已经在录音中，跳过');
+      return;
+    }
 
     try {
       // 先检查权限状态
