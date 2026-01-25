@@ -137,7 +137,10 @@ class SavingsGoal {
     if (targetDate == null) return null;
     final now = DateTime.now();
     final monthsRemaining = (targetDate!.year - now.year) * 12 + (targetDate!.month - now.month);
-    if (monthsRemaining <= 0) return remainingAmount;
+    // 修复：如果已过期（monthsRemaining < 0），返回null而非remainingAmount
+    if (monthsRemaining < 0) return null;
+    // 如果是当月（monthsRemaining == 0），返回全部剩余金额
+    if (monthsRemaining == 0) return remainingAmount;
     return remainingAmount / monthsRemaining;
   }
 
