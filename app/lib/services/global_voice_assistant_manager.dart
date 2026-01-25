@@ -505,10 +505,10 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       debugPrint('[GlobalVoiceAssistant] [预加载] 2/5 初始化TTS服务...');
       _ttsService = TTSService.instance;
       await _ttsService!.initialize();
-      await _ttsService!.enableStreamingMode();
+      // 不在这里启用streaming mode，避免创建重复的StreamingTTSService
       debugPrint('[GlobalVoiceAssistant] [预加载] 2/5 TTS服务已初始化');
 
-      // 3. 预初始化流式TTS服务和音频播放器
+      // 3. 预初始化流式TTS服务和音频播放器（用于流水线模式）
       debugPrint('[GlobalVoiceAssistant] [预加载] 3/5 初始化流式TTS服务...');
       _streamingTtsService = StreamingTTSService();
       await _streamingTtsService!.initialize();
@@ -1565,10 +1565,10 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
           // 由GlobalVoiceAssistantManager自己播放TTS，确保_isProcessingCommand
           // 在TTS播放完成前保持为true，防止回声被当作用户输入
-          if (_ttsService != null) {
+          if (_streamingTtsService != null) {
             debugPrint('[GlobalVoiceAssistant] 开始播放TTS响应: $response');
             try {
-              await _ttsService!.speak(response);
+              await _streamingTtsService!.speak(response);
               debugPrint('[GlobalVoiceAssistant] TTS播放完成');
             } catch (ttsError) {
               debugPrint('[GlobalVoiceAssistant] TTS播放失败: $ttsError');
@@ -1633,9 +1633,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         _enableBargeInDetection();
 
         // 播放即时反馈
-        if (_ttsService != null) {
+        if (_streamingTtsService != null) {
           try {
-            await _ttsService!.speak(immediateResponse);
+            await _streamingTtsService!.speak(immediateResponse);
           } catch (ttsError) {
             debugPrint('[GlobalVoiceAssistant] TTS播报失败: $ttsError');
           }
@@ -1737,7 +1737,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
     // 4. 播放简短告别语
     try {
-      await _ttsService?.speak('好的');
+      await _streamingTtsService?.speak('好的');
     } catch (e) {
       debugPrint('[GlobalVoiceAssistant] 播放告别语失败: $e');
     }
@@ -1770,7 +1770,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
     // 4. 播放简短告别语
     try {
-      await _ttsService?.speak('有需要随时叫我');
+      await _streamingTtsService?.speak('有需要随时叫我');
     } catch (e) {
       debugPrint('[GlobalVoiceAssistant] 播放告别语失败: $e');
     }
@@ -2160,10 +2160,10 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _enableBargeInDetection();
 
     // 播放TTS（打断检测模式下，用户说话会触发打断）
-    if (_ttsService != null) {
+    if (_streamingTtsService != null) {
       try {
         debugPrint('[GlobalVoiceAssistant] 主动对话TTS开始播放（支持打断）: $proactiveMessage');
-        await _ttsService!.speak(proactiveMessage);
+        await _streamingTtsService!.speak(proactiveMessage);
         debugPrint('[GlobalVoiceAssistant] 主动对话TTS播放完成');
       } catch (e) {
         debugPrint('[GlobalVoiceAssistant] 主动对话TTS失败: $e');
