@@ -738,14 +738,19 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
       return '让我帮您查一下...\n\n今天您还没有消费记录 🎉\n\n继续保持节俭的习惯！';
     }
 
-    // 计算总支出
-    final totalSpent = todayExpenses.fold<double>(0, (sum, t) => sum + t.amount);
-
     // 按分类汇总
     final categoryTotals = <String, double>{};
     for (final t in todayExpenses) {
+      // 跳过转账和无效分类
+      if (t.category == 'transfer' || t.type == TransactionType.transfer) continue;
+      final category = DefaultCategories.findById(t.category);
+      if (category == null || !category.isExpense) continue;
+
       categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
     }
+
+    // 计算总支出
+    final totalSpent = categoryTotals.values.fold<double>(0, (sum, v) => sum + v);
 
     // 按金额排序，取前3个分类
     final sortedCategories = categoryTotals.entries.toList()
@@ -808,17 +813,22 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
     final expenses = monthlyTransactions.where((t) => t.type == TransactionType.expense);
     final incomes = monthlyTransactions.where((t) => t.type == TransactionType.income);
 
-    final totalExpense = expenses.fold<double>(0, (sum, t) => sum + t.amount);
+    // 按分类汇总支出
+    final categoryTotals = <String, double>{};
+    for (final t in expenses) {
+      // 跳过转账和无效分类
+      if (t.category == 'transfer' || t.type == TransactionType.transfer) continue;
+      final category = DefaultCategories.findById(t.category);
+      if (category == null || !category.isExpense) continue;
+
+      categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
+    }
+
+    final totalExpense = categoryTotals.values.fold<double>(0, (sum, v) => sum + v);
     final totalIncome = incomes.fold<double>(0, (sum, t) => sum + t.amount);
 
     if (totalExpense == 0 && totalIncome == 0) {
       return '📊 本月消费统计\n\n本月暂无交易记录\n\n开始记录您的第一笔账吧！';
-    }
-
-    // 按分类汇总支出
-    final categoryTotals = <String, double>{};
-    for (final t in expenses) {
-      categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
     }
 
     // 按金额排序，取前5个分类
@@ -859,6 +869,11 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
     // 按分类汇总
     final categoryTotals = <String, double>{};
     for (final t in monthlyExpenses) {
+      // 跳过转账和无效分类
+      if (t.category == 'transfer' || t.type == TransactionType.transfer) continue;
+      final category = DefaultCategories.findById(t.category);
+      if (category == null || !category.isExpense) continue;
+
       categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
     }
 

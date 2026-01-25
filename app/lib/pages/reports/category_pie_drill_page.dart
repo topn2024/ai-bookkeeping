@@ -7,10 +7,11 @@ import '../../models/category.dart';
 import '../../providers/transaction_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../extensions/category_extensions.dart';
+import 'drill_navigation_page.dart';
 
 /// 分类饼图下钻页面
 /// 原型设计 7.05：分类饼图下钻
-/// - 时间选择器（本月、本季、本年、自定义）
+/// - 时间选择器（本月、上月、近3月、今年）
 /// - 环形图显示总支出
 /// - 点击扇区可下钻查看详情
 /// - 分类列表（可点击下钻）
@@ -23,7 +24,7 @@ class CategoryPieDrillPage extends ConsumerStatefulWidget {
 
 class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
   int _selectedPeriod = 0;
-  final List<String> _periods = ['本月', '本季', '本年', '自定义'];
+  final List<String> _periods = ['本月', '上月', '近3月', '今年'];
 
   /// 获取当前选择周期的日期范围
   DateTimeRange _getDateRange() {
@@ -34,17 +35,23 @@ class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
           start: DateTime(now.year, now.month, 1),
           end: now,
         );
-      case 1: // 本季
-        final quarterStart = DateTime(now.year, ((now.month - 1) ~/ 3) * 3 + 1, 1);
-        return DateTimeRange(start: quarterStart, end: now);
-      case 2: // 本年
+      case 1: // 上月
+        final lastMonth = DateTime(now.year, now.month - 1, 1);
+        final lastMonthEnd = DateTime(now.year, now.month, 0);
+        return DateTimeRange(start: lastMonth, end: lastMonthEnd);
+      case 2: // 近3月
+        return DateTimeRange(
+          start: DateTime(now.year, now.month - 2, 1),
+          end: now,
+        );
+      case 3: // 今年
         return DateTimeRange(
           start: DateTime(now.year, 1, 1),
           end: now,
         );
-      default: // 自定义 - 默认最近30天
+      default:
         return DateTimeRange(
-          start: now.subtract(const Duration(days: 30)),
+          start: DateTime(now.year, now.month, 1),
           end: now,
         );
     }
@@ -70,15 +77,23 @@ class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
         .where((t) => t.type == TransactionType.expense)
         .toList();
 
-    // 按分类汇总
+    // 按分类汇总（排除转账和无效分类）
     final categoryTotals = <String, double>{};
     final categoryCounts = <String, int>{};
     for (final t in expenseTransactions) {
+      // 跳过转账类型（这些交易不应该在支出分析中）
+      if (t.category == 'transfer' || t.type == TransactionType.transfer) continue;
+
+      // 确保分类在定义中存在
+      final category = DefaultCategories.findById(t.category);
+      if (category == null || !category.isExpense) continue;
+
       categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
       categoryCounts[t.category] = (categoryCounts[t.category] ?? 0) + 1;
     }
 
     final totalExpense = expenseTransactions.fold<double>(0, (sum, t) => sum + t.amount);
+
     final sortedCategories = categoryTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
@@ -480,80 +495,10 @@ class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => DrillNavigationPage(
+        builder: (_) => DrillDownNavigationPage(
           categoryId: categoryId,
-          categoryName: DefaultCategories.findById(categoryId)?.localizedName ?? categoryId,
-        ),
-      ),
-    );
-  }
-}
-
-/// 下钻导航页面（简化版，完整版在drill_navigation_page.dart）
-class DrillNavigationPage extends StatelessWidget {
-  final String categoryId;
-  final String categoryName;
-
-  const DrillNavigationPage({
-    super.key,
-    required this.categoryId,
-    required this.categoryName,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      alignment: Alignment.center,
-                      child: const Icon(Icons.arrow_back),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      categoryName,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  const SizedBox(width: 40),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.analytics_outlined,
-                      size: 64,
-                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      '$categoryName 详细分析',
-                      style: TextStyle(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+          dateRange: _getDateRange(),
+          timeRangeLabel: _periods[_selectedPeriod],
         ),
       ),
     );

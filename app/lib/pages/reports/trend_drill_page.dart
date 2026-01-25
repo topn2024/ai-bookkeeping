@@ -7,6 +7,7 @@ import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../providers/transaction_provider.dart';
 import '../../extensions/category_extensions.dart';
+import '../transaction_detail_page.dart';
 
 /// 趋势图下钻页面
 /// 原型设计 7.06：趋势图下钻
@@ -455,7 +456,7 @@ class _TrendDrillPageState extends ConsumerState<TrendDrillPage> {
                   itemBuilder: (context, index) {
                     final t = transactions[index];
                     final category = DefaultCategories.findById(t.category);
-                    return _buildTransactionItem(theme, t, category);
+                    return _buildTransactionItem(context, theme, t, category);
                   },
                 ),
         ),
@@ -463,22 +464,31 @@ class _TrendDrillPageState extends ConsumerState<TrendDrillPage> {
     );
   }
 
-  Widget _buildTransactionItem(ThemeData theme, Transaction t, Category? category) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+  Widget _buildTransactionItem(BuildContext context, ThemeData theme, Transaction t, Category? category) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TransactionDetailPage(transaction: t),
           ),
-        ],
-      ),
-      child: Row(
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
         children: [
           Container(
             width: 40,
@@ -523,6 +533,7 @@ class _TrendDrillPageState extends ConsumerState<TrendDrillPage> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

@@ -564,6 +564,11 @@ class _TrendAnalysisTab extends ConsumerWidget {
     final expenses = transactions.where((t) => t.type == TransactionType.expense).toList();
     final categoryTotals = <String, double>{};
     for (final t in expenses) {
+      // 跳过转账和无效分类
+      if (t.category == 'transfer' || t.type == TransactionType.transfer) continue;
+      final category = DefaultCategories.findById(t.category);
+      if (category == null || !category.isExpense) continue;
+
       categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
     }
     final sorted = categoryTotals.entries.toList()
@@ -674,9 +679,14 @@ class _CategoryAnalysisTab extends ConsumerWidget {
     final expenses = transactions.where((t) => t.type == TransactionType.expense).toList();
     final categoryTotals = <String, double>{};
     for (final t in expenses) {
+      // 跳过转账和无效分类
+      if (t.category == 'transfer' || t.type == TransactionType.transfer) continue;
+      final category = DefaultCategories.findById(t.category);
+      if (category == null || !category.isExpense) continue;
+
       categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
     }
-    final totalExpense = expenses.fold<double>(0, (sum, t) => sum + t.amount);
+    final totalExpense = categoryTotals.values.fold<double>(0, (sum, v) => sum + v);
     final sortedCategories = categoryTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
@@ -898,11 +908,16 @@ class _CategoryAnalysisTab extends ConsumerWidget {
     final expenses = transactions.where((t) => t.type == TransactionType.expense).toList();
     final categoryTotals = <String, double>{};
     for (final t in expenses) {
+      // 跳过转账和无效分类
+      if (t.category == 'transfer' || t.type == TransactionType.transfer) continue;
+      final category = DefaultCategories.findById(t.category);
+      if (category == null || !category.isExpense) continue;
+
       categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
     }
     final sorted = categoryTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    final total = expenses.fold<double>(0, (sum, t) => sum + t.amount);
+    final total = categoryTotals.values.fold<double>(0, (sum, v) => sum + v);
 
     return Card(
       child: Padding(

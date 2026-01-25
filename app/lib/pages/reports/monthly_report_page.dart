@@ -310,13 +310,18 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
 
     final categoryTotals = <String, double>{};
     for (final t in expenseTransactions) {
+      // 跳过转账和无效分类
+      if (t.category == 'transfer' || t.type == TransactionType.transfer) continue;
+      final category = DefaultCategories.findById(t.category);
+      if (category == null || !category.isExpense) continue;
+
       categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
     }
 
     final sortedCategories = categoryTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    final totalExpense = expenseTransactions.fold<double>(0, (sum, t) => sum + t.amount);
+    final totalExpense = categoryTotals.values.fold<double>(0, (sum, v) => sum + v);
 
     return Container(
       margin: const EdgeInsets.all(16),

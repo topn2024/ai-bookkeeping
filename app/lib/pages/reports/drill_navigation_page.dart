@@ -6,6 +6,7 @@ import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../providers/transaction_provider.dart';
 import '../../extensions/category_extensions.dart';
+import '../transaction_detail_page.dart';
 
 /// 下钻导航页面
 /// 原型设计 7.08：下钻导航
@@ -16,13 +17,15 @@ import '../../extensions/category_extensions.dart';
 class DrillDownNavigationPage extends ConsumerWidget {
   final String categoryId;
   final String? subCategoryId;
-  final String? timeRange;
+  final DateTimeRange? dateRange;
+  final String? timeRangeLabel;
 
   const DrillDownNavigationPage({
     super.key,
     required this.categoryId,
     this.subCategoryId,
-    this.timeRange,
+    this.dateRange,
+    this.timeRangeLabel,
   });
 
   @override
@@ -37,6 +40,16 @@ class DrillDownNavigationPage extends ConsumerWidget {
     // 过滤交易
     final filteredTransactions = transactions.where((t) {
       if (t.type != TransactionType.expense) return false;
+
+      // 时间范围过滤
+      if (dateRange != null) {
+        if (t.date.isBefore(dateRange!.start) ||
+            t.date.isAfter(dateRange!.end.add(const Duration(days: 1)))) {
+          return false;
+        }
+      }
+
+      // 分类过滤
       if (subCategoryId != null) {
         return t.category == subCategoryId;
       }
@@ -204,7 +217,7 @@ class DrillDownNavigationPage extends ConsumerWidget {
         spacing: 8,
         runSpacing: 8,
         children: [
-          _buildFilterTag(theme, '12月'),
+          if (timeRangeLabel != null) _buildFilterTag(theme, timeRangeLabel!),
           _buildFilterTag(theme, DefaultCategories.findById(categoryId)?.localizedName ?? categoryId),
           if (subCategoryId != null)
             _buildFilterTag(theme, DefaultCategories.findById(subCategoryId!)?.localizedName ?? subCategoryId!),
@@ -375,27 +388,36 @@ class DrillDownNavigationPage extends ConsumerWidget {
       itemBuilder: (context, index) {
         final t = transactions[index];
         final category = DefaultCategories.findById(t.category);
-        return _buildTransactionItem(theme, t, category);
+        return _buildTransactionItem(context, theme, t, category);
       },
     );
   }
 
-  Widget _buildTransactionItem(ThemeData theme, Transaction t, Category? category) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+  Widget _buildTransactionItem(BuildContext context, ThemeData theme, Transaction t, Category? category) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TransactionDetailPage(transaction: t),
           ),
-        ],
-      ),
-      child: Row(
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
         children: [
           Container(
             width: 40,
@@ -440,6 +462,7 @@ class DrillDownNavigationPage extends ConsumerWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }
