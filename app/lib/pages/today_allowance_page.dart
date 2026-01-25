@@ -30,11 +30,12 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final todayExpense = ref.watch(todayExpenseProvider);
-    final monthlyBudget = ref.watch(monthlyBudgetProvider);
+    final monthlyIncome = ref.watch(monthlyIncomeProvider);
+    final monthlyExpense = ref.watch(monthlyExpenseProvider);
     final daysRemaining = _getDaysRemainingInMonth();
 
-    // 计算今日可支出额度
-    final budgetRemaining = monthlyBudget - ref.watch(monthlyExpenseProvider);
+    // 计算今日可支出额度（使用本月收入作为基准）
+    final budgetRemaining = monthlyIncome - monthlyExpense;
     final dailyAllowance = budgetRemaining > 0
         ? budgetRemaining / daysRemaining
         : 0.0;
@@ -55,7 +56,7 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
         child: Column(
           children: [
             _buildAllowanceCard(context, theme, todayRemaining, dailyAllowance),
-            _buildProgressSection(context, theme, budgetRemaining, monthlyBudget, daysRemaining),
+            _buildProgressSection(context, theme, budgetRemaining, monthlyIncome, daysRemaining),
             _buildTodayExpenseList(context, theme, todayExpense),
             _buildSmartSuggestions(context, theme, todayRemaining),
             const SizedBox(height: 24),
@@ -187,11 +188,12 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
     BuildContext context,
     ThemeData theme,
     double budgetRemaining,
-    double monthlyBudget,
+    double monthlyIncome,
     int daysRemaining,
   ) {
-    final progress = monthlyBudget > 0
-        ? (monthlyBudget - budgetRemaining) / monthlyBudget
+    final monthlyExpense = ref.watch(monthlyExpenseProvider);
+    final progress = monthlyIncome > 0
+        ? monthlyExpense / monthlyIncome
         : 0.0;
     final progressColor = progress > 0.9
         ? AppColors.expense
@@ -212,7 +214,7 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '本月预算',
+                '本月收支',
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -240,11 +242,11 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '已用 ¥${(monthlyBudget - budgetRemaining).toStringAsFixed(0)}',
+                '已支出 ¥${monthlyExpense.toStringAsFixed(0)}',
                 style: theme.textTheme.bodySmall,
               ),
               Text(
-                '预算 ¥${monthlyBudget.toStringAsFixed(0)}',
+                '收入 ¥${monthlyIncome.toStringAsFixed(0)}',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
