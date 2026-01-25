@@ -223,6 +223,9 @@ class LatteFactorAnalyzer {
     final monthlyTotal = totalAmount / period;
     final yearlyTotal = monthlyTotal * 12;
 
+    // 修复：添加expenses非空检查，避免访问.first时崩溃
+    if (expenses.isEmpty) return null;
+
     return LatteFactor(
       category: category,
       description: expenses.first.categoryName,
@@ -297,6 +300,15 @@ class LatteFactorAnalyzer {
 
     return grouped.entries.map((entry) {
       final txList = entry.value;
+      // 修复：添加txList非空检查，虽然理论上不会为空，但增加安全性
+      if (txList.isEmpty) {
+        return _ExpenseCluster(
+          category: '',
+          commonDescription: '',
+          transactions: [],
+        );
+      }
+
       final firstTx = txList.first;
 
       return _ExpenseCluster(
@@ -304,7 +316,7 @@ class LatteFactorAnalyzer {
         commonDescription: _findCommonDescription(txList),
         transactions: txList,
       );
-    }).toList();
+    }).where((cluster) => cluster.transactions.isNotEmpty).toList();
   }
 
   String _simplifyDescription(String description) {
@@ -328,7 +340,10 @@ class LatteFactorAnalyzer {
       }
     }
 
-    if (descCounts.isEmpty) return transactions.first.categoryName;
+    // 修复：添加transactions非空检查，避免逻辑矛盾
+    if (descCounts.isEmpty) {
+      return transactions.isNotEmpty ? transactions.first.categoryName : '';
+    }
 
     final sorted = descCounts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
