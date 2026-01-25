@@ -258,8 +258,10 @@ class VaultZeroBasedPage extends ConsumerWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
-            children: allocations.map((item) {
-              final isLast = item == allocations.last;
+            children: allocations.asMap().entries.map((entry) {
+              final index = entry.key;
+              final item = entry.value;
+              final isLast = index == allocations.length - 1;
               return Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
