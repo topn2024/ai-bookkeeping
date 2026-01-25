@@ -482,6 +482,8 @@ class _BudgetStatusBarState extends State<BudgetStatusBar>
     final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
     final remainingDays = daysInMonth - now.day + 1;
 
+    // 修复：添加remainingDays > 0检查，避免除以零
+    if (remainingDays <= 0) return 0;
     return remaining / remainingDays;
   }
 }

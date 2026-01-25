@@ -188,6 +188,11 @@ class TrendPredictionService {
       final recentAvg = recent.reduce((a, b) => a + b) / 3;
       final previousAvg = previous.reduce((a, b) => a + b) / 3;
 
+      // 修复：添加除零检查，避免previousAvg为0时除零
+      if (previousAvg == 0) {
+        return recentAvg > 0 ? TrendDirection.increasing : TrendDirection.stable;
+      }
+
       final changeRate = (recentAvg - previousAvg) / previousAvg;
 
       if (changeRate > 0.1) return TrendDirection.increasing;
@@ -198,6 +203,12 @@ class TrendPredictionService {
     // 数据较少时，比较最近两个月
     final last = data.last;
     final secondLast = data[data.length - 2];
+
+    // 修复：添加除零检查，避免secondLast为0时除零
+    if (secondLast == 0) {
+      return last > 0 ? TrendDirection.increasing : TrendDirection.stable;
+    }
+
     final changeRate = (last - secondLast) / secondLast;
 
     if (changeRate > 0.15) return TrendDirection.increasing;

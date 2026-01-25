@@ -72,7 +72,9 @@ class _VaultAllocationPageState extends ConsumerState<VaultAllocationPage> {
           strategy = '固定支出';
         } else {
           // 其他：平均分配剩余
-          suggestedAmount = remaining / (vaults.length - allocations.length);
+          // 修复：添加除零检查，避免vaults.length == allocations.length时除零
+          final remainingVaults = vaults.length - allocations.length;
+          suggestedAmount = remainingVaults > 0 ? remaining / remainingVaults : 0;
           strategy = '剩余金额';
         }
 

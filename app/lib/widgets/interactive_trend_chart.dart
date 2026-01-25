@@ -736,10 +736,14 @@ class _TrendChartPainter extends CustomPainter {
 
     // 计算数据点在画布上的位置
     final points = s.data.map((p) {
+      // 修复：添加除零检查，避免maxX == minX或maxY == minY时除零
+      final xRange = maxX - minX;
+      final yRange = maxY - minY;
+
       final x = chartArea.left +
-          ((p.x - minX) / (maxX - minX)) * chartArea.width;
+          (xRange > 0 ? ((p.x - minX) / xRange) * chartArea.width : chartArea.width / 2);
       final y = chartArea.bottom -
-          ((p.y - minY) / (maxY - minY)) * chartArea.height * animationValue;
+          (yRange > 0 ? ((p.y - minY) / yRange) * chartArea.height * animationValue : chartArea.height / 2);
       return Offset(x, y);
     }).toList();
 
