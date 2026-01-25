@@ -375,6 +375,9 @@ class SocialComparisonService {
 
       if (userAmount == 0) continue;
 
+      // 修复：添加avgAmount > 0检查，避免除零
+      if (avgAmount <= 0) continue;
+
       final difference = (userAmount - avgAmount) / avgAmount;
 
       if (difference.abs() > 0.2) {
@@ -546,14 +549,22 @@ class SocialComparisonService {
     if (higherIsBetter) {
       if (userValue >= topValue) return 95;
       if (userValue >= avgValue) {
+        // 修复：添加除零检查，避免topValue == avgValue时除零
+        if (topValue == avgValue) return 50;
         return 50 + ((userValue - avgValue) / (topValue - avgValue) * 45).round();
       }
+      // 修复：添加除零检查
+      if (avgValue == 0) return 5;
       return (userValue / avgValue * 50).round().clamp(5, 50);
     } else {
       if (userValue <= topValue) return 95;
       if (userValue <= avgValue) {
+        // 修复：添加除零检查，避免avgValue == topValue时除零
+        if (avgValue == topValue) return 50;
         return 50 + ((avgValue - userValue) / (avgValue - topValue) * 45).round();
       }
+      // 修复：添加除零检查
+      if (userValue == 0) return 5;
       return (avgValue / userValue * 50).round().clamp(5, 50);
     }
   }

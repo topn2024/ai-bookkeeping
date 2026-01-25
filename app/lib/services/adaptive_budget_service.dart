@@ -318,11 +318,14 @@ class AdaptiveBudgetService {
     final history = await _getSpendingHistory(vaultId, months: 6);
     if (history.isEmpty) return null;
 
+    // 修复：添加空列表检查，避免reduce()在空列表时抛出异常
     // ignore: unused_local_variable
-    final avgSpending = history.reduce((a, b) => a + b) / history.length;
+    final avgSpending = history.isEmpty ? 0.0 : history.reduce((a, b) => a + b) / history.length;
 
     // 2. 检查是否持续超支或结余
     final recentMonths = history.take(3).toList();
+    // 修复：添加空列表检查
+    if (recentMonths.isEmpty) return null;
     final avgRecent = recentMonths.reduce((a, b) => a + b) / recentMonths.length;
 
     if (avgRecent > currentBudget * 1.1) {
@@ -644,8 +647,9 @@ class AdaptiveBudgetService {
     if (history.isEmpty) return 0.5;
 
     // 基于历史数据的稳定性计算置信度
-    final avg = history.reduce((a, b) => a + b) / history.length;
-    final variance = history.map((x) => math.pow(x - avg, 2)).reduce((a, b) => a + b) / history.length;
+    // 修复：添加空列表检查，避免reduce()在空列表时抛出异常
+    final avg = history.isEmpty ? 0.0 : history.reduce((a, b) => a + b) / history.length;
+    final variance = history.isEmpty ? 0.0 : history.map((x) => math.pow(x - avg, 2)).reduce((a, b) => a + b) / history.length;
     final stdDev = math.sqrt(variance);
     final cv = avg > 0 ? stdDev / avg : 1;
 
@@ -653,9 +657,12 @@ class AdaptiveBudgetService {
     double confidence = 1 - cv.clamp(0.0, 1.0).toDouble();
 
     // 如果建议值接近历史平均，置信度更高
-    final deviation = (suggested - avg).abs() / avg;
-    if (deviation < 0.2) {
-      confidence += 0.1;
+    // 修复：添加avg > 0检查，避免除零
+    if (avg > 0) {
+      final deviation = (suggested - avg).abs() / avg;
+      if (deviation < 0.2) {
+        confidence += 0.1;
+      }
     }
 
     return confidence.clamp(0.3, 0.95);

@@ -30,6 +30,8 @@ class LatteFactor {
   /// 如果减少到每周N次，能节省多少
   double savingsIfReduceTo(double targetWeeklyFrequency) {
     if (targetWeeklyFrequency >= weeklyFrequency) return 0;
+    // 修复：添加weeklyFrequency > 0检查，避免除零
+    if (weeklyFrequency <= 0) return 0;
     final reduction = (weeklyFrequency - targetWeeklyFrequency) / weeklyFrequency;
     return yearlyTotal * reduction;
   }
@@ -138,6 +140,17 @@ class LatteFactorAnalyzer {
 
     // 计算每周频率并筛选高频消费
     final weeksInPeriod = period * 4.3; // 约4.3周/月
+    // 修复：添加weeksInPeriod > 0检查，避免除零
+    if (weeksInPeriod <= 0) {
+      return LatteFactorReport(
+        factors: [],
+        totalMonthlyImpact: 0,
+        totalYearlyImpact: 0,
+        topSuggestion: '暂无数据',
+        potentialYearlySavings: 0,
+      );
+    }
+
     final latteFactors = <LatteFactor>[];
 
     for (final cluster in clusters) {
@@ -203,6 +216,9 @@ class LatteFactorAnalyzer {
     final totalAmount = expenses.fold(0.0, (sum, tx) => sum + tx.amount);
     final avgAmount = totalAmount / expenses.length;
     final weeksInPeriod = period * 4.3;
+    // 修复：添加weeksInPeriod和period的零检查，避免除零
+    if (weeksInPeriod <= 0 || period <= 0) return null;
+
     final weeklyFrequency = expenses.length / weeksInPeriod;
     final monthlyTotal = totalAmount / period;
     final yearlyTotal = monthlyTotal * 12;

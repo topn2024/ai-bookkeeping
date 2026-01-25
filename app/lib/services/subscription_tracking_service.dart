@@ -204,6 +204,16 @@ class SubscriptionTrackingService {
     '保险', '话费', '宽带', '水电', '燃气',
   };
 
+  // 需要排除的通用描述(不是真正的商家名)
+  static const Set<String> _excludedDescriptions = {
+    '二维码收款', '扫码付款', '扫二维码付款', '转账',
+    '收款方备注', '付款方备注', '红包', '转账收款',
+    '支付宝', '微信支付', '银行卡', '现金',
+    '餐饮', '交通', '购物', '娱乐', '其他',
+    '商户消费', '消费', '扫码', '付款', '收款',
+    '日常', '生活', '消费支出', '支出',
+  };
+
   SubscriptionTrackingService(this._db);
 
   /// 自动识别订阅类消费
@@ -345,13 +355,45 @@ class SubscriptionTrackingService {
 
     for (final tx in transactions) {
       final desc = tx.description;
-      final merchant = (desc != null && desc.isNotEmpty) ? desc : tx.categoryName;
-      final key = _MerchantAmountKey(merchant, tx.amount);
+      // 如果描述为空或是通用描述，跳过这笔交易
+      if (desc == null || desc.isEmpty || _isExcludedDescription(desc)) {
+        continue;
+      }
+      final key = _MerchantAmountKey(desc, tx.amount);
 
       grouped.putIfAbsent(key, () => []).add(tx);
     }
 
     return grouped;
+  }
+
+  /// 检查是否是需要排除的通用描述
+  bool _isExcludedDescription(String description) {
+    // 排除太短的描述(少于2个字符)
+    if (description.trim().length < 2) {
+      return true;
+    }
+
+    // 提取有效字符(中文、英文、数字)
+    final cleaned = description.replaceAll(RegExp(r'[^\u4e00-\u9fa5a-zA-Z0-9]'), '');
+
+    // 排除只有标点符号或特殊字符的描述
+    if (cleaned.isEmpty) {
+      return true;
+    }
+
+    // 排除有效字符太少的描述(至少需要2个有效字符)
+    if (cleaned.length < 2) {
+      return true;
+    }
+
+    final lowerDesc = description.toLowerCase();
+    for (final excluded in _excludedDescriptions) {
+      if (lowerDesc.contains(excluded.toLowerCase())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   SubscriptionInterval _detectInterval(List<Transaction> transactions) {
@@ -399,15 +441,20 @@ class SubscriptionTrackingService {
 
     final daysSincePayment = DateTime.now().difference(lastPayment).inDays;
 
-    // 检查用户反馈
-    final feedback = await _db.rawQuery('''
-      SELECT needed FROM subscription_feedback WHERE merchant = ?
-    ''', [merchant]);
+    // 检查用户反馈(如果表存在)
+    try {
+      final feedback = await _db.rawQuery('''
+        SELECT needed FROM subscription_feedback WHERE merchant = ?
+      ''', [merchant]);
 
-    if (feedback.isNotEmpty) {
-      final needed = feedback.first['needed'] as int?;
-      if (needed == 1) return UsageStatus.active;
-      if (needed == 0) return UsageStatus.unused;
+      if (feedback.isNotEmpty) {
+        final needed = feedback.first['needed'] as int?;
+        if (needed == 1) return UsageStatus.active;
+        if (needed == 0) return UsageStatus.unused;
+      }
+    } catch (e) {
+      // 表不存在或其他数据库错误，跳过用户反馈检查
+      // debugPrint('[SubscriptionTracking] 无法查询用户反馈: $e');
     }
 
     // 基于时间估算
@@ -433,10 +480,17 @@ class SubscriptionTrackingService {
 
     // 金额稳定性
     final amounts = transactions.map((t) => t.amount).toList();
+    // 修复：添加空列表检查，避免reduce()在空列表时抛出异常
+    if (amounts.isEmpty) return countFactor * 0.5;
+
     final avgAmount = amounts.reduce((a, b) => a + b) / amounts.length;
     final amountVariance = amounts
         .map((a) => pow(a - avgAmount, 2))
         .reduce((a, b) => a + b) / amounts.length;
+
+    // 修复：添加avgAmount > 0检查，避免除零
+    if (avgAmount <= 0) return countFactor * 0.5;
+
     final amountStability = 1.0 / (1.0 + sqrt(amountVariance) / avgAmount);
 
     return countFactor * 0.5 + amountStability * 0.5;
