@@ -403,7 +403,8 @@ class _TrendAnalysisTab extends ConsumerWidget {
       List<Transaction> transactions) {
     final expenses = transactions.where((t) => t.type == TransactionType.expense).toList();
     final days = DateTime.now().day;
-    final dailyAvg = expenses.isEmpty ? 0.0 :
+    // 修复：添加days > 0检查，避免除零
+    final dailyAvg = expenses.isEmpty || days <= 0 ? 0.0 :
         expenses.fold<double>(0, (sum, t) => sum + t.amount) / days;
 
     return Row(
