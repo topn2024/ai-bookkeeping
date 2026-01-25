@@ -6,6 +6,7 @@ import '../models/transaction.dart';
 import '../models/category.dart';
 import '../providers/recurring_provider.dart';
 import '../providers/budget_provider.dart';
+import '../providers/transaction_provider.dart';
 
 /// 智能分配建议页面
 ///
@@ -35,25 +36,100 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
     super.initState();
   }
 
-  /// 根据周期性交易和预算数据生成智能分配方案
+  /// 根据历史交易数据生成智能分配方案
   void _generateSmartAllocations(
     List<RecurringTransaction> recurring,
     List<BudgetUsage> budgetUsages,
   ) {
+    // 获取历史交易数据
+    final transactions = ref.read(transactionProvider);
     final allocations = <AllocationItem>[];
     int priorityId = 1;
 
-    // P1: 固定支出 - 从启用的周期性支出交易获取
-    final fixedExpenses = recurring
-        .where((r) => r.isEnabled && r.type == TransactionType.expense)
-        .where((r) => _isFixedExpenseCategory(r.category))
+    // 分析最近3个月的消费模式
+    final now = DateTime.now();
+    final threeMonthsAgo = DateTime(now.year, now.month - 3, now.day);
+    final recentExpenses = transactions
+        .where((t) =>
+            t.type == TransactionType.expense &&
+            t.date.isAfter(threeMonthsAgo))
         .toList();
 
+    // 按分类统计平均月支出
+    final categorySpending = <String, double>{};
+    for (final expense in recentExpenses) {
+      categorySpending[expense.category] =
+          (categorySpending[expense.category] ?? 0) + expense.amount;
+    }
+
+    // 转换为月平均值
+    final monthsDiff = now.difference(threeMonthsAgo).inDays / 30;
+    categorySpending.forEach((category, total) {
+      categorySpending[category] = total / monthsDiff.clamp(1, 3);
+    });
+
+    // 检测是否有历史数据
+    final hasHistoryData = categorySpending.isNotEmpty;
+
+    // 如果没有历史数据，使用冷启动方案
+    if (!hasHistoryData) {
+      _generateColdStartAllocation(allocations, priorityId);
+    } else {
+      // 有历史数据，基于实际消费生成智能分配
+      _generateDataDrivenAllocation(allocations, priorityId, categorySpending);
+    }
+
+    _allocations = allocations;
+    final totalAllocated = _allocations.fold(0.0, (sum, item) => sum + item.amount);
+    _unallocated = widget.incomeAmount - totalAllocated;
+  }
+
+  /// 冷启动方案 - 没有历史数据时使用
+  void _generateColdStartAllocation(List<AllocationItem> allocations, int startPriority) {
+    // 使用合理的默认比例，总和=100%
+    final coldStartPlan = [
+      {'name': '固定支出', 'icon': Icons.home, 'color': Colors.red, 'percentage': 0.33, 'reason': '房租、水电、物业等必要支出', 'type': AllocationPriorityType.fixed},
+      {'name': '储蓄优先', 'icon': Icons.savings, 'color': Colors.green, 'percentage': 0.20, 'reason': '先存后花，养成储蓄习惯', 'type': AllocationPriorityType.savings},
+      {'name': '餐饮', 'icon': Icons.restaurant, 'color': Colors.orange, 'percentage': 0.20, 'reason': '日常三餐、外卖等', 'type': AllocationPriorityType.flexible},
+      {'name': '交通', 'icon': Icons.directions_car, 'color': Colors.blue, 'percentage': 0.10, 'reason': '通勤、出行费用', 'type': AllocationPriorityType.flexible},
+      {'name': '购物', 'icon': Icons.shopping_bag, 'color': Colors.purple, 'percentage': 0.10, 'reason': '服饰、日用品等', 'type': AllocationPriorityType.flexible},
+      {'name': '娱乐', 'icon': Icons.celebration, 'color': Colors.pink, 'percentage': 0.07, 'reason': '电影、运动、游戏等', 'type': AllocationPriorityType.flexible},
+    ];
+
+    var priority = startPriority;
+    for (final plan in coldStartPlan) {
+      allocations.add(AllocationItem(
+        id: priority.toString(),
+        name: plan['name'] as String,
+        icon: plan['icon'] as IconData,
+        color: plan['color'] as Color,
+        priority: priority,
+        priorityLabel: 'P$priority',
+        amount: widget.incomeAmount * (plan['percentage'] as double),
+        type: plan['type'] as AllocationPriorityType,
+        reason: '${plan['name']} · ${plan['reason']}',
+      ));
+      priority++;
+    }
+  }
+
+  /// 基于历史数据的智能分配
+  void _generateDataDrivenAllocation(
+    List<AllocationItem> allocations,
+    int startPriority,
+    Map<String, double> categorySpending,
+  ) {
+    var priorityId = startPriority;
+
+    // P1: 固定支出 - 基于历史数据识别
     double totalFixed = 0;
-    for (final expense in fixedExpenses) {
-      final monthlyAmount = _getMonthlyAmount(expense);
-      if (monthlyAmount > 0) {
-        totalFixed += monthlyAmount;
+    final fixedDetails = <String>[];
+
+    for (final entry in categorySpending.entries) {
+      if (_isFixedExpenseCategory(entry.key)) {
+        totalFixed += entry.value;
+        final cat = DefaultCategories.findById(entry.key);
+        fixedDetails.add('${cat?.name ?? entry.key}: ¥${entry.value.toStringAsFixed(0)}');
       }
     }
 
@@ -63,59 +139,30 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
         name: '固定支出',
         icon: Icons.home,
         color: Colors.red,
-        priority: 1,
-        priorityLabel: 'P1',
-        amount: totalFixed,
+        priority: priorityId,
+        priorityLabel: 'P$priorityId',
+        amount: totalFixed.clamp(0, widget.incomeAmount * 0.5),
         type: AllocationPriorityType.fixed,
-        reason: '固定支出 · 必须优先保障',
-        details: fixedExpenses.map((e) => '${e.name}: ¥${_getMonthlyAmount(e).toStringAsFixed(0)}').toList(),
+        reason: '固定支出 · 基于过去3个月平均',
+        details: fixedDetails.take(5).toList(),
       ));
       priorityId++;
     }
 
-    // P2: 债务还款 - 从包含债务相关分类的周期性交易获取
-    final debtPayments = recurring
-        .where((r) => r.isEnabled && r.type == TransactionType.expense)
-        .where((r) => _isDebtCategory(r.category))
-        .toList();
-
-    double totalDebt = 0;
-    for (final debt in debtPayments) {
-      final monthlyAmount = _getMonthlyAmount(debt);
-      if (monthlyAmount > 0) {
-        totalDebt += monthlyAmount;
-      }
-    }
-
-    if (totalDebt > 0) {
-      allocations.add(AllocationItem(
-        id: priorityId.toString(),
-        name: '债务还款',
-        icon: Icons.credit_card,
-        color: Colors.orange,
-        priority: 2,
-        priorityLabel: 'P2',
-        amount: totalDebt,
-        type: AllocationPriorityType.debt,
-        reason: '债务还款 · 避免利息和信用影响',
-        details: debtPayments.map((e) => '${e.name}: ¥${_getMonthlyAmount(e).toStringAsFixed(0)}').toList(),
-      ));
-      priorityId++;
-    }
-
-    // P3: 储蓄目标 - 建议储蓄收入的20%
+    // P2: 储蓄优先 - 建议20%
     final suggestedSavings = widget.incomeAmount * 0.2;
-    final remainingAfterFixedAndDebt = widget.incomeAmount - totalFixed - totalDebt;
-    final actualSavings = suggestedSavings.clamp(0.0, remainingAfterFixedAndDebt * 0.5);
+    final allocatedSoFar = allocations.fold(0.0, (sum, item) => sum + item.amount);
+    final remainingAfterFixed = widget.incomeAmount - allocatedSoFar;
+    final actualSavings = suggestedSavings.clamp(0.0, remainingAfterFixed * 0.4);
 
     if (actualSavings > 0) {
       allocations.add(AllocationItem(
         id: priorityId.toString(),
-        name: '储蓄目标',
+        name: '储蓄优先',
         icon: Icons.savings,
         color: Colors.green,
-        priority: 3,
-        priorityLabel: 'P3',
+        priority: priorityId,
+        priorityLabel: 'P$priorityId',
         amount: actualSavings,
         type: AllocationPriorityType.savings,
         reason: '储蓄目标 · 建议储蓄20%收入',
@@ -123,82 +170,63 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
       priorityId++;
     }
 
-    // P4: 弹性支出 - 剩余金额用于日常消费
-    final flexibleAmount = widget.incomeAmount - totalFixed - totalDebt - actualSavings;
-    if (flexibleAmount > 0) {
-      // 从预算中获取日常消费分类
-      final flexibleCategories = budgetUsages
-          .where((u) => _isFlexibleCategory(u.budget.categoryId))
-          .map((u) => u.budget.categoryId)
-          .whereType<String>()
-          .toList();
+    // P3-P6: 细分日常消费 - 基于历史数据
+    final flexibleCategories = {
+      '餐饮': {'keywords': ['餐饮', '美食', '食品', '外卖', 'food', '早餐', '午餐', '晚餐'], 'icon': Icons.restaurant, 'color': Colors.orange},
+      '交通': {'keywords': ['交通', '出行', '打车', '公交', '地铁', 'transport'], 'icon': Icons.directions_car, 'color': Colors.blue},
+      '购物': {'keywords': ['购物', '服饰', '美容', 'shopping', '电商'], 'icon': Icons.shopping_bag, 'color': Colors.purple},
+      '娱乐': {'keywords': ['娱乐', '电影', '游戏', '运动', '健身', 'entertainment'], 'icon': Icons.celebration, 'color': Colors.pink},
+    };
 
+    for (final entry in flexibleCategories.entries) {
+      double categoryTotal = 0;
+      final details = <String>[];
+
+      for (final spending in categorySpending.entries) {
+        final keywords = entry.value['keywords'] as List<String>;
+        if (keywords.any((k) => spending.key.toLowerCase().contains(k.toLowerCase()))) {
+          categoryTotal += spending.value;
+          final cat = DefaultCategories.findById(spending.key);
+          if (details.length < 3) {
+            details.add('${cat?.name ?? spending.key}: ¥${spending.value.toStringAsFixed(0)}');
+          }
+        }
+      }
+
+      // 只添加有消费记录的分类（至少100元）
+      if (categoryTotal > 100) {
+        allocations.add(AllocationItem(
+          id: priorityId.toString(),
+          name: entry.key,
+          icon: entry.value['icon'] as IconData,
+          color: entry.value['color'] as Color,
+          priority: priorityId,
+          priorityLabel: 'P$priorityId',
+          amount: categoryTotal.clamp(0.0, widget.incomeAmount * 0.3).toDouble(),
+          type: AllocationPriorityType.flexible,
+          reason: '${entry.key} · 基于过去3个月平均',
+          details: details.isEmpty ? null : details,
+        ));
+        priorityId++;
+      }
+    }
+
+    // 如果剩余金额>0，添加弹性支出
+    final totalAllocated = allocations.fold(0.0, (sum, item) => sum + item.amount);
+    final remaining = widget.incomeAmount - totalAllocated;
+    if (remaining > 100) {
       allocations.add(AllocationItem(
         id: priorityId.toString(),
-        name: '日常消费',
-        icon: Icons.restaurant,
-        color: Colors.blue,
-        priority: 4,
-        priorityLabel: 'P4',
-        amount: flexibleAmount,
+        name: '其他弹性支出',
+        icon: Icons.more_horiz,
+        color: Colors.grey,
+        priority: priorityId,
+        priorityLabel: 'P$priorityId',
+        amount: remaining,
         type: AllocationPriorityType.flexible,
-        reason: '弹性支出 · 分配剩余金额',
-        details: flexibleCategories.isEmpty
-            ? null
-            : flexibleCategories.map((c) {
-                final cat = DefaultCategories.findById(c);
-                return cat?.name ?? c;
-              }).take(3).toList(),
+        reason: '剩余可支配金额',
       ));
     }
-
-    // 如果没有任何周期性数据，显示默认的分配建议
-    if (allocations.isEmpty) {
-      // 使用标准50/30/20规则
-      final needs = widget.incomeAmount * 0.5;  // 50% 必要支出
-      final wants = widget.incomeAmount * 0.3;  // 30% 弹性支出
-      final savings = widget.incomeAmount * 0.2; // 20% 储蓄
-
-      allocations.addAll([
-        AllocationItem(
-          id: '1',
-          name: '必要支出',
-          icon: Icons.home,
-          color: Colors.red,
-          priority: 1,
-          priorityLabel: 'P1',
-          amount: needs,
-          type: AllocationPriorityType.fixed,
-          reason: '建议将50%用于必要支出（房租、水电等）',
-        ),
-        AllocationItem(
-          id: '2',
-          name: '弹性支出',
-          icon: Icons.restaurant,
-          color: Colors.blue,
-          priority: 2,
-          priorityLabel: 'P2',
-          amount: wants,
-          type: AllocationPriorityType.flexible,
-          reason: '建议将30%用于日常消费（餐饮、娱乐等）',
-        ),
-        AllocationItem(
-          id: '3',
-          name: '储蓄目标',
-          icon: Icons.savings,
-          color: Colors.green,
-          priority: 3,
-          priorityLabel: 'P3',
-          amount: savings,
-          type: AllocationPriorityType.savings,
-          reason: '建议将20%存入储蓄',
-        ),
-      ]);
-    }
-
-    _allocations = allocations;
-    final totalAllocated = _allocations.fold(0.0, (sum, item) => sum + item.amount);
-    _unallocated = widget.incomeAmount - totalAllocated;
   }
 
   /// 判断是否为固定支出分类（房租、水电、物业等）
@@ -207,32 +235,6 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
     return fixedCategories.any((c) => category.toLowerCase().contains(c.toLowerCase()));
   }
 
-  /// 判断是否为债务分类（信用卡、贷款等）
-  bool _isDebtCategory(String category) {
-    final debtCategories = ['信用卡', '贷款', '还款', '花呗', '借呗', '白条', 'credit', 'loan', 'debt'];
-    return debtCategories.any((c) => category.toLowerCase().contains(c.toLowerCase()));
-  }
-
-  /// 判断是否为弹性支出分类
-  bool _isFlexibleCategory(String? category) {
-    if (category == null) return false;
-    final flexibleCategories = ['餐饮', '娱乐', '购物', '交通', '美容', '服饰', 'food', 'entertainment', 'shopping'];
-    return flexibleCategories.any((c) => category.toLowerCase().contains(c.toLowerCase()));
-  }
-
-  /// 将周期性交易金额转换为月度金额
-  double _getMonthlyAmount(RecurringTransaction recurring) {
-    switch (recurring.frequency) {
-      case RecurringFrequency.daily:
-        return recurring.amount * 30;
-      case RecurringFrequency.weekly:
-        return recurring.amount * 4;
-      case RecurringFrequency.monthly:
-        return recurring.amount;
-      case RecurringFrequency.yearly:
-        return recurring.amount / 12;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -315,20 +317,31 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
   }
 
   void _showHelpDialog(BuildContext context) {
+    final transactions = ref.read(transactionProvider);
+    final hasData = transactions.isNotEmpty;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('智能分配说明'),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('系统根据您的消费习惯和财务目标，智能规划分配方案：'),
-            SizedBox(height: 12),
-            Text('P1 固定支出：房租、水电等必须支出'),
-            Text('P2 债务还款：信用卡、贷款等'),
-            Text('P3 储蓄目标：建议储蓄20%收入'),
-            Text('P4 弹性支出：餐饮、娱乐等日常消费'),
+            Text(hasData
+              ? '系统分析了您过去3个月的消费记录，为您生成个性化分配方案：'
+              : '由于暂无历史数据，系统使用合理的默认比例为您生成分配方案：'),
+            const SizedBox(height: 12),
+            const Text('P1 固定支出：房租、水电等必要支出'),
+            const Text('P2 储蓄优先：建议储蓄20%收入'),
+            const Text('P3+ 日常消费：餐饮、交通、购物、娱乐等'),
+            const SizedBox(height: 12),
+            Text(
+              hasData
+                ? '💡 基于您的消费习惯，分配金额会随消费变化而调整'
+                : '💡 记录一段时间后，系统会根据您的消费习惯优化方案',
+              style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+            ),
           ],
         ),
         actions: [
@@ -438,7 +451,7 @@ class _PriorityHint extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '分配顺序：固定支出 → 债务还款 → 储蓄目标 → 弹性支出',
+              '分配原则：固定支出优先 → 储蓄20% → 剩余按消费习惯分配',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.orange[900],
