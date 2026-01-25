@@ -32,6 +32,7 @@ import 'growth/achievement_share_page.dart';
 import 'growth/invite_friend_page.dart';
 import 'growth/viral_campaign_page.dart';
 import 'multimodal_wakeup_settings_page.dart';
+import 'zero_based_budget_page.dart';
 
 /// 我的页面
 class ProfilePage extends ConsumerStatefulWidget {
@@ -295,6 +296,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const BudgetManagementPage()),
+          ),
+        ),
+        _SettingsItem(
+          icon: Icons.account_balance_wallet,
+          title: '零基预算',
+          subtitle: '让每一分钱都有去处',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ZeroBasedBudgetPage()),
           ),
         ),
         _SettingsItem(

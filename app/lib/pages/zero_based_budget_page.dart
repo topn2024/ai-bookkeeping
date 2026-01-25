@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/transaction_provider.dart';
+import '../models/transaction.dart';
+import 'smart_allocation_page.dart';
 
 /// 零基预算分配页面
 ///
 /// 对应原型设计 3.09 零基预算分配
 /// 展示零基预算原则：收入 - 支出 - 储蓄 = 0
 class ZeroBasedBudgetPage extends ConsumerStatefulWidget {
-  final double totalIncome;
-
   const ZeroBasedBudgetPage({
     super.key,
-    this.totalIncome = 15000,
   });
 
   @override
@@ -26,14 +26,30 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
     _initCategories();
   }
 
+  /// 计算本月实际收入
+  double _calculateMonthlyIncome() {
+    final transactions = ref.read(transactionProvider);
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+    final monthEnd = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+
+    return transactions
+        .where((t) =>
+            t.type == TransactionType.income &&
+            t.date.isAfter(monthStart.subtract(const Duration(days: 1))) &&
+            t.date.isBefore(monthEnd.add(const Duration(days: 1))))
+        .fold<double>(0, (sum, t) => sum + t.amount);
+  }
+
   void _initCategories() {
+    // 初始分配为0，用户需要手动分配或使用智能分配
     _categories = [
       BudgetCategory(
         id: 'savings',
         name: '储蓄优先',
         icon: Icons.savings,
         color: Colors.green,
-        amount: 3000,
+        amount: 0,
         percentage: 0.20,
         hint: '推荐20%',
         isHighlighted: true,
@@ -43,7 +59,7 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
         name: '固定支出',
         icon: Icons.home,
         color: Colors.blue,
-        amount: 5000,
+        amount: 0,
         percentage: 0.33,
         hint: '房租、水电、通讯',
       ),
@@ -52,7 +68,7 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
         name: '生活消费',
         icon: Icons.restaurant,
         color: Colors.orange,
-        amount: 4000,
+        amount: 0,
         percentage: 0.27,
         hint: '餐饮、购物、交通',
       ),
@@ -61,7 +77,7 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
         name: '弹性支出',
         icon: Icons.celebration,
         color: Colors.purple,
-        amount: 3000,
+        amount: 0,
         percentage: 0.20,
         hint: '娱乐、社交',
       ),
@@ -71,12 +87,14 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
   double get _totalAllocated =>
       _categories.fold(0.0, (sum, c) => sum + c.amount);
 
-  double get _remaining => widget.totalIncome - _totalAllocated;
+  double get _remaining => _calculateMonthlyIncome() - _totalAllocated;
 
   bool get _isBalanced => _remaining.abs() < 0.01;
 
   @override
   Widget build(BuildContext context) {
+    final monthlyIncome = _calculateMonthlyIncome();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('零基预算分配'),
@@ -86,14 +104,44 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
         children: [
           // 可分配收入卡片
           _IncomeCard(
-            totalIncome: widget.totalIncome,
-            incomeDetails: '= 工资¥12,000 + 副业¥3,000',
+            totalIncome: monthlyIncome,
+            incomeDetails: monthlyIncome > 0 ? '本月实际收入' : '暂无收入记录',
           ),
 
           const SizedBox(height: 12),
 
           // 零基预算原则说明
           _PrincipleCard(),
+
+          const SizedBox(height: 12),
+
+          // 快速分配按钮组
+          if (monthlyIncome > 0)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _navigateToSmartAllocation(monthlyIncome),
+                    icon: const Icon(Icons.psychology, size: 18),
+                    label: const Text('智能分配'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 44),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _allocateByRecommendation,
+                    icon: const Icon(Icons.auto_awesome, size: 18),
+                    label: const Text('推荐比例'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 44),
+                    ),
+                  ),
+                ),
+              ],
+            ),
 
           const SizedBox(height: 16),
 
@@ -115,7 +163,7 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
               setState(() {
                 final category = _categories.firstWhere((c) => c.id == id);
                 category.amount = amount;
-                category.percentage = amount / widget.totalIncome;
+                category.percentage = monthlyIncome > 0 ? amount / monthlyIncome : 0;
               });
             },
           ),
@@ -136,6 +184,31 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
         onConfirm: _confirmBudget,
       ),
     );
+  }
+
+  /// 跳转到智能分配页面
+  void _navigateToSmartAllocation(double income) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SmartAllocationPage(
+          incomeAmount: income,
+          incomeSource: '本月收入',
+        ),
+      ),
+    );
+
+    // 如果智能分配返回了数据，应用到当前页面
+    if (result != null && result is Map<String, double>) {
+      setState(() {
+        for (final category in _categories) {
+          if (result.containsKey(category.id)) {
+            category.amount = result[category.id]!;
+            category.percentage = income > 0 ? category.amount / income : 0;
+          }
+        }
+      });
+    }
   }
 
   void _confirmBudget() {
@@ -163,7 +236,20 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
     setState(() {
       final flexible = _categories.firstWhere((c) => c.id == 'flexible');
       flexible.amount += _remaining;
-      flexible.percentage = flexible.amount / widget.totalIncome;
+      final monthlyIncome = _calculateMonthlyIncome();
+      flexible.percentage = monthlyIncome > 0 ? flexible.amount / monthlyIncome : 0;
+    });
+  }
+
+  /// 按推荐比例自动分配
+  void _allocateByRecommendation() {
+    final monthlyIncome = _calculateMonthlyIncome();
+    if (monthlyIncome <= 0) return;
+
+    setState(() {
+      for (final category in _categories) {
+        category.amount = monthlyIncome * category.percentage;
+      }
     });
   }
 }
@@ -341,7 +427,7 @@ class _CategoryItem extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        category.localizedName,
+                        category.name,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
