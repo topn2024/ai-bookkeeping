@@ -121,8 +121,10 @@ class DataLinkageService extends ChangeNotifier {
       metadata: metadata,
     );
 
-    if (targetPage != null && pushPage && navigatorKey?.currentState != null) {
-      await navigatorKey!.currentState!.push(
+    // 安全地访问navigator state
+    final navState = navigatorKey?.currentState;
+    if (targetPage != null && pushPage && navState != null) {
+      await navState.push(
         MaterialPageRoute(builder: (_) => targetPage),
       );
       _pageStack.add(title);
@@ -152,8 +154,10 @@ class DataLinkageService extends ChangeNotifier {
       metadata: metadata,
     );
 
-    if (targetPage != null && pushPage && navigatorKey?.currentState != null) {
-      await navigatorKey!.currentState!.push(
+    // 安全地访问navigator state
+    final navState = navigatorKey?.currentState;
+    if (targetPage != null && pushPage && navState != null) {
+      await navState.push(
         MaterialPageRoute(builder: (_) => targetPage),
       );
       _pageStack.add(title);
@@ -176,8 +180,10 @@ class DataLinkageService extends ChangeNotifier {
         _pageStack.removeLast();
       }
 
-      if (navigatorKey?.currentState?.canPop() == true) {
-        navigatorKey!.currentState!.pop();
+      // 安全地访问navigator state
+      final navState = navigatorKey?.currentState;
+      if (navState?.canPop() == true) {
+        navState!.pop();
       }
 
       _emitEvent(DataLinkageBackEvent());
@@ -194,8 +200,10 @@ class DataLinkageService extends ChangeNotifier {
     if (success) {
       // 计算需要pop的页面数
       final popCount = _pageStack.length - depth - 1;
-      for (int i = 0; i < popCount && navigatorKey?.currentState?.canPop() == true; i++) {
-        navigatorKey!.currentState!.pop();
+      // 安全地访问navigator state
+      final navState = navigatorKey?.currentState;
+      for (int i = 0; i < popCount && navState?.canPop() == true; i++) {
+        navState!.pop();
         if (_pageStack.isNotEmpty) {
           _pageStack.removeLast();
         }
@@ -213,8 +221,10 @@ class DataLinkageService extends ChangeNotifier {
     drillDownService.reset();
 
     // 返回到根页面
-    while (_pageStack.isNotEmpty && navigatorKey?.currentState?.canPop() == true) {
-      navigatorKey!.currentState!.pop();
+    // 安全地访问navigator state
+    final navState = navigatorKey?.currentState;
+    while (_pageStack.isNotEmpty && navState?.canPop() == true) {
+      navState!.pop();
       _pageStack.removeLast();
     }
 
