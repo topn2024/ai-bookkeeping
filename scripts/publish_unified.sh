@@ -56,6 +56,59 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# 更新版本号文件
+update_version_files() {
+    local version=$1
+    local code=$2
+
+    print_info "更新版本号文件..."
+
+    # 更新 pubspec.yaml
+    local pubspec_file="app/pubspec.yaml"
+    if [ -f "$pubspec_file" ]; then
+        sed -i.bak "s/^version: .*/version: ${version}+${code}/" "$pubspec_file"
+        rm -f "${pubspec_file}.bak"
+        print_success "  ✓ pubspec.yaml 已更新为 ${version}+${code}"
+    else
+        print_warning "  ⚠ pubspec.yaml 文件不存在"
+    fi
+
+    # 更新 build_info.dart
+    local build_info_file="app/lib/core/build_info.dart"
+    local build_time=$(date -u +"%Y-%m-%dT%H:%M:%S.000000")
+    local build_time_formatted=$(date +"%Y-%m-%d %H:%M:%S")
+
+    cat > "$build_info_file" <<EOF
+/// 自动生成的构建信息 - 请勿手动修改
+/// 生成时间: $build_time_formatted
+
+class BuildInfo {
+  /// 构建时间 (ISO 8601)
+  static const String buildTime = '$build_time';
+
+  /// 构建时间 (格式化显示)
+  static const String buildTimeFormatted = '$build_time_formatted';
+
+  /// 版本号
+  static const String version = '$version';
+
+  /// 构建号
+  static const int buildNumber = $code;
+
+  /// 完整版本
+  static const String fullVersion = '$version+$code';
+
+  /// 构建类型 (Debug/Release)
+  static const String buildType = 'Release';
+
+  /// 带类型的完整版本号
+  static const String displayVersion = '$version';
+}
+EOF
+
+    print_success "  ✓ build_info.dart 已更新为 ${version}+${code}"
+}
+
 # 帮助信息
 show_help() {
     echo "统一发布脚本 (新策略: 服务器2 → 服务器1)"
@@ -270,6 +323,13 @@ if [ "$AUTO_CONFIRM" = false ]; then
     fi
 fi
 
+# 0. 更新版本号文件
+echo ""
+echo "=========================================="
+echo "[准备] 更新版本号文件"
+echo "=========================================="
+update_version_files "$VERSION" "$CODE"
+
 # 1. 构建APK
 if [ "$SKIP_BUILD" = false ]; then
     echo ""
@@ -421,6 +481,30 @@ else
     echo ""
     echo "如需同步到服务器1，请运行:"
     echo "  ./scripts/sync_version.sh --auto"
+fi
+
+# 提交版本号更改到Git
+echo ""
+echo "=========================================="
+echo "[Git] 提交版本号更改"
+echo "=========================================="
+
+if git diff --quiet app/pubspec.yaml app/lib/core/build_info.dart; then
+    print_info "版本号文件无变化，跳过Git提交"
+else
+    print_info "提交版本号更改到Git..."
+    git add app/pubspec.yaml app/lib/core/build_info.dart
+    git commit -m "chore: 发布版本 ${VERSION}+${CODE}
+
+${NOTES}
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+    if git push origin master; then
+        print_success "✓ 已推送到GitHub"
+    else
+        print_warning "⚠️  推送到GitHub失败，请手动推送"
+    fi
 fi
 
 echo ""
