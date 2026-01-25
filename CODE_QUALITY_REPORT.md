@@ -254,7 +254,38 @@ final isLast = item == allocations.last;
 2. ✅ Line 303: 添加 txList 非空检查
 3. ✅ Line 334: 修复逻辑矛盾，添加 transactions 非空检查
 
-**Commit**: 待提交
+**Commit**: 2912c4e
+
+---
+
+### 2. split_transaction_page.dart
+
+**修复内容**:
+1. ✅ Line 693: 在_saveTransaction()开始处添加_splits非空检查
+
+**Commit**: a77dfbb
+
+---
+
+### 3. vault_overview_page.dart
+
+**修复内容**:
+1. ✅ Line 624: 在_showTransferDialog()开始处添加vaults非空检查
+
+**Commit**: a77dfbb
+
+---
+
+### 4. data_linkage_service.dart
+
+**修复内容**:
+1. ✅ Line 125: 使用局部变量navState缓存navigatorKey?.currentState
+2. ✅ Line 156: 使用局部变量navState缓存navigatorKey?.currentState
+3. ✅ Line 180: 使用局部变量navState缓存navigatorKey?.currentState
+4. ✅ Line 198: 使用局部变量navState缓存navigatorKey?.currentState
+5. ✅ Line 217: 使用局部变量navState缓存navigatorKey?.currentState
+
+**Commit**: 006cd72
 
 ---
 
@@ -368,7 +399,7 @@ final results = await Future.wait(
 - 大部分问题集中在服务层和页面层
 
 **修复进度**:
-- ✅ 已修复: 3个（6%）
-- ⏳ 待修复: 48个（94%）
+- ✅ 已修复: 12个（24%）
+- ⏳ 待修复: 39个（76%）
 
 建议优先修复影响应用稳定性的高风险问题，然后逐步改进代码质量。
