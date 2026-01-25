@@ -32,7 +32,7 @@ class _UnexpectedExpensePageState
   @override
   Widget build(BuildContext context) {
     final vaultState = ref.watch(budgetVaultProvider);
-    final monthlyBudget = ref.watch(monthlyBudgetProvider);
+    final monthlyIncome = ref.watch(monthlyIncomeProvider);
     final monthlyExpense = ref.watch(monthlyExpenseProvider);
 
     // 获取应急金小金库
@@ -47,8 +47,8 @@ class _UnexpectedExpensePageState
     ).toList();
     final firstSavingsVault = savingsVaults.isNotEmpty ? savingsVaults.first : null;
 
-    // 计算弹性预算剩余
-    final flexibleRemaining = monthlyBudget - monthlyExpense;
+    // 计算弹性预算剩余（使用本月收入作为基准）
+    final flexibleRemaining = monthlyIncome - monthlyExpense;
 
     return Scaffold(
       appBar: AppBar(
