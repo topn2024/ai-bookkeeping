@@ -660,6 +660,14 @@ class _SplitTransactionPageState extends ConsumerState<SplitTransactionPage> {
   void _saveTransaction() {
     if (!_isBalanced) return;
 
+    // 确保至少有一个拆分项
+    if (_splits.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请至少添加一个拆分项')),
+      );
+      return;
+    }
+
     // 验证所有拆分项
     for (int i = 0; i < _splits.length; i++) {
       if (_splits[i].categoryId == null) {

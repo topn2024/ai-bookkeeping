@@ -621,6 +621,14 @@ class VaultOverviewPage extends ConsumerWidget {
     required Future<void> Function(BudgetVault vault, double amount) onConfirm,
     bool isWithdraw = false,
   }) {
+    // 确保至少有一个小金库
+    if (vaults.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('没有可用的小金库')),
+      );
+      return;
+    }
+
     BudgetVault selectedVault = vaults.first;
     final amountController = TextEditingController();
     final formKey = GlobalKey<FormState>();
