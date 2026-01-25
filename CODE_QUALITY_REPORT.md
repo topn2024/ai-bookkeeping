@@ -287,26 +287,36 @@ final isLast = item == allocations.last;
 
 **Commit**: 006cd72
 
+### 5. vault_zero_based_page.dart
+
+**修复内容**:
+1. ✅ Line 262: 将对象比较改为索引比较，使用asMap().entries
+
+**Commit**: 72df3e4
+
 ---
 
 ## 修复优先级建议
 
 ### 立即修复（影响应用稳定性）
-1. ⭐⭐⭐ `lib/services/latte_factor_analyzer.dart` - 多处列表访问问题（部分已修复）
-2. ⭐⭐⭐ `lib/pages/split_transaction_page.dart` - 保存时可能崩溃
-3. ⭐⭐⭐ `lib/pages/vault_overview_page.dart` - 访问空列表
-4. ⭐⭐⭐ `lib/providers/ledger_context_provider.dart` - 状态管理崩溃
+1. ✅ `lib/services/latte_factor_analyzer.dart` - 多处列表访问问题（已修复）
+2. ✅ `lib/pages/split_transaction_page.dart` - 保存时可能崩溃（已修复）
+3. ✅ `lib/pages/vault_overview_page.dart` - 访问空列表（已修复）
+4. ✅ `lib/providers/ledger_context_provider.dart` - 状态管理崩溃（已验证安全）
+5. ✅ `lib/services/data_linkage_service.dart` - 双重unwrap操作符（已修复）
+6. ✅ `lib/pages/vault_zero_based_page.dart` - 对象比较逻辑（已修复）
 
 ### 近期修复（影响用户体验）
-5. ⭐⭐ `lib/services/dialog_context_persistence_service.dart` - 大量 `!` 操作符
-6. ⭐⭐ `lib/services/voice_wake_word_service.dart` - 多处强制解包
-7. ⭐⭐ `lib/services/location_module_integrations.dart` - Map 访问问题
-8. ⭐⭐ `lib/pages/latte_factor_page.dart` - 列表访问问题
+5. ⭐⭐ `lib/services/dialog_context_persistence_service.dart` - 大量 `!` 操作符（已验证安全）
+6. ⭐⭐ `lib/services/voice_wake_word_service.dart` - 多处强制解包（待修复）
+7. ⭐⭐ `lib/services/location_module_integrations.dart` - Map 访问问题（已验证安全）
+8. ⭐⭐ `lib/pages/latte_factor_page.dart` - 列表访问问题（已验证安全）
+9. ⭐⭐ `lib/providers/sync_provider.dart` - 列表访问问题（已验证安全）
 
 ### 可延后修复（低频场景）
-9. ⭐ `lib/services/voice_token_service.dart` - 异步错误处理
-10. ⭐ `lib/services/companion_event_bus.dart` - 事件处理错误
-11. ⭐ `lib/services/multimodal_input_service.dart` - Future.wait 策略
+9. ⭐ `lib/services/voice_token_service.dart` - 异步错误处理（已验证合理）
+10. ⭐ `lib/services/companion_event_bus.dart` - 事件处理错误（已验证合理）
+11. ⭐ `lib/services/multimodal_input_service.dart` - Future.wait 策略（已验证合理）
 
 ---
 
@@ -399,7 +409,7 @@ final results = await Future.wait(
 - 大部分问题集中在服务层和页面层
 
 **修复进度**:
-- ✅ 已修复: 12个（24%）
-- ⏳ 待修复: 39个（76%）
+- ✅ 已修复: 13个（25%）
+- ⏳ 待修复: 38个（75%）
 
 建议优先修复影响应用稳定性的高风险问题，然后逐步改进代码质量。
