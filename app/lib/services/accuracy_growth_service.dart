@@ -203,6 +203,9 @@ class AccuracyGrowthService {
     final last = recentPoints.last.accuracy;
     final weeks = recentPoints.length - 1;
 
+    // 修复：添加weeks > 0检查，避免除零
+    if (weeks <= 0) return null;
+
     final weeklyImprovement = (last - first) / weeks;
 
     if (weeklyImprovement <= 0) return null;

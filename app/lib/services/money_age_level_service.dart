@@ -51,6 +51,8 @@ class MoneyAgeStage {
     if (days < minDays) return 0;
     if (maxDays == null) return 1;
     if (days >= maxDays!) return 1;
+    // 修复：添加maxDays == minDays检查，避免除零
+    if (maxDays! == minDays) return 1;
     return (days - minDays) / (maxDays! - minDays);
   }
 }

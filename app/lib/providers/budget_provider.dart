@@ -427,6 +427,9 @@ final moneyAgeHistoryProvider = Provider<List<MapEntry<DateTime, int>>>((ref) {
         .fold<double>(0, (sum, t) => sum + t.amount);
 
     final daysInMonth = monthEnd.day;
+    // 修复：添加daysInMonth > 0检查，避免除零（虽然理论上不会发生）
+    if (daysInMonth <= 0) continue;
+
     final avgDailyExpense = monthExpenses / daysInMonth;
 
     int moneyAge = 0;

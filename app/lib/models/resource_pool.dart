@@ -477,6 +477,9 @@ class MoneyAgeStatistics {
     final older = trend.skip(7).take(7).map((e) => e.averageAge).toList();
     if (recent.isEmpty || older.isEmpty) return 'stable';
 
+    // 修复：虽然有isEmpty检查，但为了安全起见，再次确认列表不为空
+    if (recent.isEmpty || older.isEmpty) return 'stable';
+
     final recentAvg = recent.reduce((a, b) => a + b) / recent.length;
     final olderAvg = older.reduce((a, b) => a + b) / older.length;
 
