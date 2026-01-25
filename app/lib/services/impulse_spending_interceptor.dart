@@ -199,6 +199,8 @@ class ImpulseSpendingInterceptor {
   InterceptionConfig _config = const InterceptionConfig();
 
   // 用户月收入（用于计算大额消费比例）
+  // 重要：使用此服务前，必须调用 setMonthlyIncome() 设置实际的月收入
+  // 默认值 10000 仅用于初始化，不应依赖此默认值
   double _monthlyIncome = 10000;
 
   // 最近拦截记录（用于分析）
@@ -506,15 +508,15 @@ class ImpulseSpendingInterceptor {
     final dayOfMonth = DateTime.now().day;
     if (dayOfMonth > _config.earlyMonthDays) return null;
 
-    // 如果有月预算，检查占比；否则检查绝对金额
-    final budget = monthlyBudget ?? _monthlyIncome;
+    // 统一使用月收入作为基准，确保与其他页面计算一致
+    final budget = _monthlyIncome;
     final portion = amount / budget;
 
     if (portion > _config.earlyMonthThreshold) {
       return InterceptionReason(
         code: 'EARLY_MONTH_LARGE',
         title: '月初大额消费',
-        description: '月初大额消费可能影响本月预算控制（占预算${(portion * 100).toStringAsFixed(0)}%）',
+        description: '月初大额消费可能影响本月预算控制（占收入${(portion * 100).toStringAsFixed(0)}%）',
         severity: 0.5,
       );
     }

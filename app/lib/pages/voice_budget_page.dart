@@ -118,16 +118,20 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
 
   Widget _buildAssistantBubble() {
     final budgets = ref.watch(budgetProvider);
+    final monthlyIncome = ref.watch(monthlyIncomeProvider);
     final monthlyExpense = ref.watch(monthlyExpenseProvider);
     final transactions = ref.watch(transactionProvider);
     final now = DateTime.now();
     final monthStart = DateTime(now.year, now.month, 1);
 
-    // 计算总预算
+    // 计算总预算（如果用户设置了预算，使用预算；否则使用收入）
     final enabledBudgets = budgets.where((b) => b.isEnabled).toList();
     final totalBudget = enabledBudgets.fold<double>(0, (sum, b) => sum + b.amount);
-    final remaining = totalBudget - monthlyExpense;
-    final usagePercent = totalBudget > 0 ? monthlyExpense / totalBudget : 0.0;
+    final hasBudget = totalBudget > 0;
+
+    // 使用收入作为基准计算剩余金额，确保与首页一致
+    final remaining = monthlyIncome - monthlyExpense;
+    final usagePercent = monthlyIncome > 0 ? monthlyExpense / monthlyIncome : 0.0;
 
     // 计算剩余天数
     final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
@@ -242,14 +246,7 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: totalBudget == 0
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text('暂未设置预算，请先设置月度预算'),
-                      ),
-                    )
-                  : Column(
+              child: Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -258,7 +255,7 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '总预算',
+                                  hasBudget ? '总预算' : '本月收入',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: AppTheme.textSecondaryColor,
@@ -266,7 +263,7 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '¥${totalBudget.toStringAsFixed(2)}',
+                                  '¥${(hasBudget ? totalBudget : monthlyIncome).toStringAsFixed(2)}',
                                   style: const TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w600,
@@ -278,7 +275,7 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Text(
-                                  '剩余',
+                                  '本月结余',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: AppTheme.textSecondaryColor,
@@ -315,7 +312,9 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '已使用 ${(usagePercent * 100).toStringAsFixed(1)}%',
+                              hasBudget
+                                  ? '已使用 ${(usagePercent * 100).toStringAsFixed(1)}%'
+                                  : '已支出 ¥${monthlyExpense.toStringAsFixed(0)}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.textSecondaryColor,
