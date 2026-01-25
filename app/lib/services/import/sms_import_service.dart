@@ -70,13 +70,24 @@ class SmsImportService {
       },
     );
 
-    // 过滤掉null（非交易短信）并转换为ImportCandidate
+    // 过滤掉null（非交易短信）和无效金额，并转换为ImportCandidate
     final candidates = <ImportCandidate>[];
+    int skippedCount = 0;
     for (int i = 0; i < parsedResults.length; i++) {
       final result = parsedResults[i];
       if (result != null) {
+        // 过滤无效金额（金额为0或负数）
+        if (result.amount <= 0) {
+          skippedCount++;
+          print('[SmsImportService] 跳过无效交易 #$i: 金额=${result.amount}, 商户=${result.merchant}');
+          continue;
+        }
         candidates.add(_parserService.toImportCandidate(result, candidates.length));
       }
+    }
+
+    if (skippedCount > 0) {
+      print('[SmsImportService] 已过滤 $skippedCount 条无效交易（金额<=0）');
     }
 
     if (candidates.isEmpty) {
