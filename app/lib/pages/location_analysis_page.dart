@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/transaction_provider.dart';
+import '../models/transaction.dart';
+import '../models/transaction_location.dart';
 
 /// 8.17 位置分析报告页面
 /// 展示消费位置分布和热点地图
@@ -13,9 +16,23 @@ class LocationAnalysisPage extends ConsumerStatefulWidget {
 }
 
 class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
+  String _selectedPeriod = '本月';
+  final List<String> _periods = ['本月', '上月', '近3月', '今年'];
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final allTransactions = ref.watch(transactionProvider);
+    final dateRange = _getDateRange();
+
+    // 过滤有位置信息的支出交易
+    final transactionsWithLocation = allTransactions.where((t) {
+      if (t.type != TransactionType.expense) return false;
+      if (t.location == null) return false;
+      if (!t.date.isAfter(dateRange.start.subtract(const Duration(days: 1)))) return false;
+      if (!t.date.isBefore(dateRange.end.add(const Duration(days: 1)))) return false;
+      return true;
+    }).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -32,20 +49,19 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.calendar_today, color: AppColors.textSecondary),
-            onPressed: _selectDateRange,
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildMapPreview(),
-            _buildLocationDistribution(),
-            _buildTopLocations(),
-            _buildInsights(),
+            _buildPeriodSelector(),
+            if (transactionsWithLocation.isEmpty)
+              _buildEmptyState()
+            else ...[
+              _buildMapPreview(transactionsWithLocation),
+              _buildLocationDistribution(transactionsWithLocation),
+              _buildTopLocations(transactionsWithLocation),
+              _buildInsights(transactionsWithLocation),
+            ],
             const SizedBox(height: 24),
           ],
         ),
@@ -53,7 +69,122 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
     );
   }
 
-  Widget _buildMapPreview() {
+  DateTimeRange _getDateRange() {
+    final now = DateTime.now();
+    switch (_selectedPeriod) {
+      case '本月':
+        return DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: DateTime(now.year, now.month + 1, 0, 23, 59, 59),
+        );
+      case '上月':
+        final lastMonth = DateTime(now.year, now.month - 1, 1);
+        final lastMonthEnd = DateTime(now.year, now.month, 0, 23, 59, 59);
+        return DateTimeRange(start: lastMonth, end: lastMonthEnd);
+      case '近3月':
+        return DateTimeRange(
+          start: DateTime(now.year, now.month - 2, 1),
+          end: DateTime(now.year, now.month + 1, 0, 23, 59, 59),
+        );
+      case '今年':
+        return DateTimeRange(
+          start: DateTime(now.year, 1, 1),
+          end: DateTime(now.year, 12, 31, 23, 59, 59),
+        );
+      default:
+        return DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: DateTime(now.year, now.month + 1, 0, 23, 59, 59),
+        );
+    }
+  }
+
+  Widget _buildPeriodSelector() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: _periods.map((period) {
+          final isSelected = _selectedPeriod == period;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedPeriod = period),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  period,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isSelected ? Colors.white : AppColors.textSecondary,
+                    fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.location_off, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              '暂无位置数据',
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '记账时添加位置信息后，这里将显示消费热点分析',
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapPreview(List<Transaction> transactions) {
+    // 按地点分组计算消费金额
+    final Map<String, double> placeAmounts = {};
+    for (final t in transactions) {
+      final placeName = t.location?.shortDisplay ?? '未知位置';
+      placeAmounts[placeName] = (placeAmounts[placeName] ?? 0) + t.amount;
+    }
+
+    // 找出金额最大的几个地点
+    final sortedPlaces = placeAmounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final topPlaces = sortedPlaces.take(4).toList();
+
     return Container(
       margin: const EdgeInsets.all(16),
       height: 180,
@@ -67,27 +198,18 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
       ),
       child: Stack(
         children: [
-          // 模拟消费点
-          Positioned(
-            left: 60,
-            top: 45,
-            child: _buildMapPoint(24, AppColors.error),
-          ),
-          Positioned(
-            left: 140,
-            top: 72,
-            child: _buildMapPoint(32, AppTheme.primaryColor),
-          ),
-          Positioned(
-            left: 200,
-            top: 108,
-            child: _buildMapPoint(20, const Color(0xFFFF9800)),
-          ),
-          Positioned(
-            left: 75,
-            top: 117,
-            child: _buildMapPoint(28, AppColors.success),
-          ),
+          // 根据真实数据显示消费点
+          if (topPlaces.isNotEmpty) ...[
+            for (int i = 0; i < topPlaces.length; i++)
+              Positioned(
+                left: 60.0 + i * 45.0,
+                top: 45.0 + i * 25.0,
+                child: _buildMapPoint(
+                  24 + (4 - i) * 2.0,
+                  _getColorForIndex(i),
+                ),
+              ),
+          ],
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -99,10 +221,17 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '本月消费热点地图',
+                  '$_selectedPeriod消费热点地图',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.primary.withValues(alpha: 0.6),
+                  ),
+                ),
+                Text(
+                  '共${transactions.length}笔位置记录',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.primary.withValues(alpha: 0.5),
                   ),
                 ),
               ],
@@ -111,6 +240,16 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
         ],
       ),
     );
+  }
+
+  Color _getColorForIndex(int index) {
+    const colors = [
+      Color(0xFFFF6B6B),
+      Color(0xFF4ECDC4),
+      Color(0xFFFF9800),
+      Color(0xFF66BB6A),
+    ];
+    return colors[index % colors.length];
   }
 
   Widget _buildMapPoint(double size, Color color) {
@@ -132,13 +271,32 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
     );
   }
 
-  Widget _buildLocationDistribution() {
-    final locations = [
-      {'name': '家附近', 'amount': 2340, 'percent': 0.45, 'icon': Icons.home, 'color': const Color(0xFFFF6B6B)},
-      {'name': '公司附近', 'amount': 1680, 'percent': 0.32, 'icon': Icons.business, 'color': const Color(0xFF4ECDC4)},
-      {'name': '商圈消费', 'amount': 860, 'percent': 0.16, 'icon': Icons.shopping_bag, 'color': AppTheme.primaryColor},
-      {'name': '其他区域', 'amount': 340, 'percent': 0.07, 'icon': Icons.place, 'color': const Color(0xFF9E9E9E)},
-    ];
+  Widget _buildLocationDistribution(List<Transaction> transactions) {
+    // 按位置类型分组统计
+    final Map<LocationType, double> typeAmounts = {};
+    double totalAmount = 0;
+
+    for (final t in transactions) {
+      final locType = t.location?.locationType ?? LocationType.other;
+      typeAmounts[locType] = (typeAmounts[locType] ?? 0) + t.amount;
+      totalAmount += t.amount;
+    }
+
+    // 排序
+    final sortedTypes = typeAmounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    // 构建显示列表
+    final locations = sortedTypes.map((entry) {
+      final percent = totalAmount > 0 ? entry.value / totalAmount : 0.0;
+      return {
+        'name': entry.key.displayName,
+        'amount': entry.value,
+        'percent': percent,
+        'icon': entry.key.icon,
+        'color': entry.key.color,
+      };
+    }).toList();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -183,7 +341,7 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
                         ),
                         const Spacer(),
                         Text(
-                          '¥${loc['amount']}',
+                          '¥${(loc['amount'] as double).toStringAsFixed(0)}',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
@@ -209,13 +367,28 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
     );
   }
 
-  Widget _buildTopLocations() {
-    final topSpots = [
-      {'name': '星巴克 陆家嘴店', 'visits': 8, 'amount': 320},
-      {'name': '盒马鲜生 浦东店', 'visits': 5, 'amount': 680},
-      {'name': '全家便利店', 'visits': 12, 'amount': 156},
-      {'name': '海底捞 人民广场', 'visits': 2, 'amount': 560},
-    ];
+  Widget _buildTopLocations(List<Transaction> transactions) {
+    // 按地点名称分组统计
+    final Map<String, Map<String, dynamic>> placeStats = {};
+
+    for (final t in transactions) {
+      final placeName = t.location?.placeName ?? t.location?.shortDisplay ?? '未知位置';
+      if (!placeStats.containsKey(placeName)) {
+        placeStats[placeName] = {'visits': 0, 'amount': 0.0};
+      }
+      placeStats[placeName]!['visits'] = (placeStats[placeName]!['visits'] as int) + 1;
+      placeStats[placeName]!['amount'] = (placeStats[placeName]!['amount'] as double) + t.amount;
+    }
+
+    // 按访问次数排序
+    final sortedPlaces = placeStats.entries.toList()
+      ..sort((a, b) => (b.value['visits'] as int).compareTo(a.value['visits'] as int));
+
+    final topSpots = sortedPlaces.take(10).map((entry) => {
+      'name': entry.key,
+      'visits': entry.value['visits'] as int,
+      'amount': entry.value['amount'] as double,
+    }).toList();
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -272,7 +445,7 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
                 style: const TextStyle(fontSize: 14),
               ),
               subtitle: Text(
-                '${spot['visits']}次 · 共消费¥${spot['amount']}',
+                '${spot['visits']}次 · 共消费¥${(spot['amount'] as double).toStringAsFixed(0)}',
                 style: TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -285,7 +458,13 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
     );
   }
 
-  Widget _buildInsights() {
+  Widget _buildInsights(List<Transaction> transactions) {
+    final insights = _generateInsights(transactions);
+
+    if (insights.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -312,12 +491,58 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildInsightItem('公司附近的午餐消费占餐饮支出的45%'),
-          _buildInsightItem('商圈消费比上月减少了¥280'),
-          _buildInsightItem('本月新发现3个消费地点'),
+          ...insights.map((insight) => _buildInsightItem(insight)),
         ],
       ),
     );
+  }
+
+  List<String> _generateInsights(List<Transaction> transactions) {
+    final insights = <String>[];
+
+    // 统计位置类型分布
+    final Map<LocationType, double> typeAmounts = {};
+    double totalAmount = 0;
+
+    for (final t in transactions) {
+      final locType = t.location?.locationType ?? LocationType.other;
+      typeAmounts[locType] = (typeAmounts[locType] ?? 0) + t.amount;
+      totalAmount += t.amount;
+    }
+
+    // 找出最大的位置类型
+    if (typeAmounts.isNotEmpty) {
+      final maxType = typeAmounts.entries.reduce((a, b) => a.value > b.value ? a : b);
+      final percent = (maxType.value / totalAmount * 100).toStringAsFixed(0);
+      insights.add('${maxType.key.displayName}消费占比最高，达到$percent%');
+    }
+
+    // 统计不同地点数量
+    final uniquePlaces = transactions
+        .map((t) => t.location?.placeName ?? t.location?.shortDisplay)
+        .where((p) => p != null)
+        .toSet()
+        .length;
+    if (uniquePlaces > 0) {
+      insights.add('$_selectedPeriod共在$uniquePlaces个不同地点消费');
+    }
+
+    // 找出访问最多的地点
+    final Map<String, int> placeVisits = {};
+    for (final t in transactions) {
+      final placeName = t.location?.placeName ?? t.location?.shortDisplay;
+      if (placeName != null) {
+        placeVisits[placeName] = (placeVisits[placeName] ?? 0) + 1;
+      }
+    }
+    if (placeVisits.isNotEmpty) {
+      final mostVisited = placeVisits.entries.reduce((a, b) => a.value > b.value ? a : b);
+      if (mostVisited.value >= 3) {
+        insights.add('${mostVisited.key}是最常去的地点，共${mostVisited.value}次');
+      }
+    }
+
+    return insights;
   }
 
   Widget _buildInsightItem(String text) {
@@ -346,45 +571,4 @@ class _LocationAnalysisPageState extends ConsumerState<LocationAnalysisPage> {
     );
   }
 
-  void _selectDateRange() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              '选择时间范围',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              title: const Text('本周'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              title: const Text('本月'),
-              trailing: Icon(Icons.check, color: AppColors.primary),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              title: const Text('近三个月'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              title: const Text('自定义范围'),
-              onTap: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

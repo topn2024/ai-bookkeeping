@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'money_age_page.dart';
 import 'budget_center_page.dart';
+import '../providers/budget_provider.dart';
+import '../providers/budget_vault_provider.dart';
+import '../providers/transaction_provider.dart';
 
 /// 财务健康仪表盘页面
 ///
@@ -14,6 +17,43 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 获取真实数据
+    final moneyAge = ref.watch(moneyAgeProvider);
+    final vaultState = ref.watch(budgetVaultProvider);
+    final transactions = ref.watch(transactionProvider);
+
+    // 计算钱龄得分 (0-20分)
+    final moneyAgeScore = _calculateMoneyAgeScore(moneyAge);
+    final moneyAgeStatus = _getMoneyAgeStatus(moneyAge);
+    final moneyAgeColor = moneyAge >= 30 ? Colors.green : (moneyAge >= 15 ? Colors.orange : Colors.red);
+
+    // 计算预算控制得分
+    final budgetScore = _calculateBudgetScore(vaultState);
+    final budgetStatus = _getBudgetStatus(vaultState);
+    final budgetColor = budgetScore >= 15 ? Colors.green : (budgetScore >= 10 ? Colors.orange : Colors.red);
+
+    // 计算应急金得分（暂时给固定分数，未来可以实现应急金功能）
+    final emergencyScore = 12;
+    final emergencyStatus = '建议建立应急金储备';
+    final emergencyColor = Colors.orange;
+
+    // 计算消费结构得分（暂时给固定分数）
+    final structureScore = 15;
+    final structureStatus = '消费结构合理';
+    final structureColor = Colors.green;
+
+    // 计算记账习惯得分
+    final habitScore = _calculateHabitScore(transactions);
+    final habitStatus = _getHabitStatus(transactions);
+    final habitColor = habitScore >= 15 ? Colors.green : (habitScore >= 10 ? Colors.orange : Colors.red);
+
+    // 计算总分
+    final totalScore = moneyAgeScore + budgetScore + emergencyScore + structureScore + habitScore;
+    final healthStatus = totalScore >= 80 ? '财务优秀' : (totalScore >= 60 ? '财务良好' : '需要改进');
+
+    // 生成改进建议
+    final suggestion = _generateSuggestion(moneyAgeScore, budgetScore, habitScore);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('财务健康'),
@@ -28,9 +68,9 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
         children: [
           // 总分展示
           _HealthScoreCard(
-            score: 78,
-            status: '财务良好',
-            change: 5,
+            score: totalScore,
+            status: healthStatus,
+            change: 0,
           ),
 
           // 5维度得分
@@ -56,10 +96,10 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
               iconColor: AppTheme.primaryColor,
               iconBgColor: const Color(0xFFEBF3FF),
               title: '钱龄',
-              score: 16,
+              score: moneyAgeScore,
               maxScore: 20,
-              status: '当前42天，良好状态',
-              statusColor: Colors.green,
+              status: moneyAgeStatus,
+              statusColor: moneyAgeColor,
             ),
           ),
 
@@ -74,10 +114,10 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
               iconColor: const Color(0xFFFFB74D),
               iconBgColor: const Color(0xFFFFF3E0),
               title: '预算控制',
-              score: 14,
+              score: budgetScore,
               maxScore: 20,
-              status: '餐饮预算略有超支',
-              statusColor: Colors.orange,
+              status: budgetStatus,
+              statusColor: budgetColor,
             ),
           ),
 
@@ -87,10 +127,10 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
             iconColor: const Color(0xFF66BB6A),
             iconBgColor: const Color(0xFFE8F5E9),
             title: '应急金',
-            score: 18,
+            score: emergencyScore,
             maxScore: 20,
-            status: '已覆盖3.6个月支出',
-            statusColor: Colors.green,
+            status: emergencyStatus,
+            statusColor: emergencyColor,
           ),
 
           // 消费结构
@@ -99,10 +139,10 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
             iconColor: const Color(0xFF7B1FA2),
             iconBgColor: const Color(0xFFF3E5F5),
             title: '消费结构',
-            score: 15,
+            score: structureScore,
             maxScore: 20,
-            status: '必要支出占比68%',
-            statusColor: Colors.green,
+            status: structureStatus,
+            statusColor: structureColor,
           ),
 
           // 记账习惯
@@ -111,22 +151,157 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
             iconColor: const Color(0xFFEF5350),
             iconBgColor: const Color(0xFFFFEBEE),
             title: '记账习惯',
-            score: 15,
+            score: habitScore,
             maxScore: 20,
-            status: '连续记账23天',
-            statusColor: Colors.green,
+            status: habitStatus,
+            statusColor: habitColor,
           ),
 
           // 改进建议
           _ImprovementSuggestionCard(
             title: '本月改进重点',
-            suggestion: '餐饮预算控制是提升空间最大的维度，建议设置每周预算上限',
+            suggestion: suggestion,
           ),
 
           const SizedBox(height: 24),
         ],
       ),
     );
+  }
+
+  // 计算钱龄得分 (0-20分)
+  int _calculateMoneyAgeScore(int moneyAge) {
+    if (moneyAge >= 60) return 20;
+    if (moneyAge >= 45) return 18;
+    if (moneyAge >= 30) return 16;
+    if (moneyAge >= 20) return 14;
+    if (moneyAge >= 10) return 10;
+    if (moneyAge >= 5) return 6;
+    if (moneyAge < 0) return 0; // 负钱龄0分
+    return 3;
+  }
+
+  String _getMoneyAgeStatus(int moneyAge) {
+    if (moneyAge < 0) return '透支：已超支${-moneyAge}天';
+    if (moneyAge >= 60) return '当前${moneyAge}天，优秀状态';
+    if (moneyAge >= 30) return '当前${moneyAge}天，良好状态';
+    if (moneyAge >= 15) return '当前${moneyAge}天，尚可状态';
+    return '当前${moneyAge}天，需要改进';
+  }
+
+  // 计算预算控制得分
+  int _calculateBudgetScore(BudgetVaultState vaultState) {
+    final vaults = vaultState.vaults.where((v) => v.isEnabled).toList();
+    if (vaults.isEmpty) return 15; // 没有设置预算给默认分
+
+    int overspentCount = 0;
+    int almostEmptyCount = 0;
+
+    for (final vault in vaults) {
+      final remaining = vault.targetAmount - vault.allocatedAmount;
+      final remainingPercent = vault.targetAmount > 0
+          ? ((remaining / vault.targetAmount) * 100).round()
+          : 100;
+
+      if (remaining < 0) {
+        overspentCount++;
+      } else if (remainingPercent <= 20 && remainingPercent > 0) {
+        almostEmptyCount++;
+      }
+    }
+
+    // 根据问题数量扣分
+    int score = 20;
+    score -= overspentCount * 3; // 每个超支扣3分
+    score -= almostEmptyCount * 1; // 每个即将用完扣1分
+    return score.clamp(0, 20);
+  }
+
+  String _getBudgetStatus(BudgetVaultState vaultState) {
+    final vaults = vaultState.vaults.where((v) => v.isEnabled).toList();
+    if (vaults.isEmpty) return '未设置预算';
+
+    for (final vault in vaults) {
+      final remaining = vault.targetAmount - vault.allocatedAmount;
+      if (remaining < 0) {
+        return '${vault.name}预算超支';
+      }
+    }
+
+    for (final vault in vaults) {
+      final remaining = vault.targetAmount - vault.allocatedAmount;
+      final remainingPercent = vault.targetAmount > 0
+          ? ((remaining / vault.targetAmount) * 100).round()
+          : 100;
+      if (remainingPercent <= 20 && remainingPercent > 0) {
+        return '${vault.name}预算即将用完';
+      }
+    }
+
+    return '预算执行良好';
+  }
+
+  // 计算记账习惯得分
+  int _calculateHabitScore(List transactions) {
+    if (transactions.isEmpty) return 0;
+
+    final now = DateTime.now();
+    final last30Days = now.subtract(const Duration(days: 30));
+    final recentTransactions = transactions.where((t) => t.date.isAfter(last30Days)).toList();
+
+    // 按日期分组
+    final dayGroups = <String, int>{};
+    for (final t in recentTransactions) {
+      final dateKey = '${t.date.year}-${t.date.month}-${t.date.day}';
+      dayGroups[dateKey] = (dayGroups[dateKey] ?? 0) + 1;
+    }
+
+    final recordedDays = dayGroups.length;
+
+    // 根据记账天数打分
+    if (recordedDays >= 25) return 20;
+    if (recordedDays >= 20) return 18;
+    if (recordedDays >= 15) return 15;
+    if (recordedDays >= 10) return 12;
+    if (recordedDays >= 5) return 8;
+    return 5;
+  }
+
+  String _getHabitStatus(List transactions) {
+    final now = DateTime.now();
+    final last30Days = now.subtract(const Duration(days: 30));
+    final recentTransactions = transactions.where((t) => t.date.isAfter(last30Days)).toList();
+
+    final dayGroups = <String, int>{};
+    for (final t in recentTransactions) {
+      final dateKey = '${t.date.year}-${t.date.month}-${t.date.day}';
+      dayGroups[dateKey] = (dayGroups[dateKey] ?? 0) + 1;
+    }
+
+    final recordedDays = dayGroups.length;
+    return '近30天记账${recordedDays}天';
+  }
+
+  String _generateSuggestion(int moneyAgeScore, int budgetScore, int habitScore) {
+    // 找出得分最低的维度给出建议
+    final scores = {
+      'moneyAge': moneyAgeScore,
+      'budget': budgetScore,
+      'habit': habitScore,
+    };
+
+    final lowestDimension = scores.entries.reduce((a, b) => a.value < b.value ? a : b).key;
+
+    switch (lowestDimension) {
+      case 'moneyAge':
+        return '钱龄是提升空间最大的维度，建议延迟非必要消费，让资金在账户中停留更长时间';
+      case 'budget':
+        return '预算控制是提升空间最大的维度，建议设置每周预算上限，及时调整超支分类';
+      case 'habit':
+        return '记账习惯是提升空间最大的维度，建议每天记录消费，养成良好的记账习惯';
+      default:
+        return '继续保持良好的财务习惯，您的财务状况正在稳步改善';
+    }
   }
 
   void _showHelpDialog(BuildContext context) {

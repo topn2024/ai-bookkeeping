@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models/resource_pool.dart';
+import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 
 /// 钱龄影响因素分析组件
 ///
@@ -130,7 +132,7 @@ class MoneyAgeInfluenceAnalysisCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
-              _getCategoryIcon(factor.categoryName),
+              DefaultCategories.findById(factor.categoryId)?.icon ?? Icons.category,
               color: color,
               size: 20,
             ),
@@ -143,7 +145,7 @@ class MoneyAgeInfluenceAnalysisCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  factor.categoryName,
+                  DefaultCategories.findById(factor.categoryId)?.localizedName ?? factor.categoryName,
                   style: const TextStyle(
                     fontWeight: FontWeight.w500,
                   ),
@@ -221,27 +223,6 @@ class MoneyAgeInfluenceAnalysisCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  IconData _getCategoryIcon(String categoryName) {
-    switch (categoryName) {
-      case '餐饮':
-        return Icons.restaurant;
-      case '购物':
-        return Icons.shopping_bag;
-      case '交通':
-        return Icons.directions_car;
-      case '娱乐':
-        return Icons.movie;
-      case '居住':
-        return Icons.home;
-      case '工资':
-        return Icons.account_balance;
-      case '理财':
-        return Icons.trending_up;
-      default:
-        return Icons.category;
-    }
   }
 
   void _showAllFactors(BuildContext context) {
@@ -366,9 +347,10 @@ class MoneyAgeInfluenceChart extends StatelessWidget {
                   SizedBox(
                     height: 16,
                     child: Text(
-                      factor.categoryName.length > 4
-                          ? '${factor.categoryName.substring(0, 3)}...'
-                          : factor.categoryName,
+                      () {
+                        final name = DefaultCategories.findById(factor.categoryId)?.localizedName ?? factor.categoryName;
+                        return name.length > 4 ? '${name.substring(0, 3)}...' : name;
+                      }(),
                       style: TextStyle(
                         fontSize: 10,
                         color: Colors.grey.shade600,
