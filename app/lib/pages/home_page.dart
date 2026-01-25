@@ -585,24 +585,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(
-                  trendDays >= 0 ? Icons.trending_up : Icons.trending_down,
-                  size: 16,
-                  color: trendDays >= 0 ? AppColors.success : AppColors.warning,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  textState.moneyAgeTrendText,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: trendDays >= 0 ? AppColors.success : AppColors.warning,
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
