@@ -350,7 +350,7 @@ class MoneyAge {
     } else if (days >= 7) {
       return '您的资金周转尚可，建议增加储蓄缓冲';
     } else {
-      return '您可能在花费刚收到的钱，建议建立更多储蓄';
+      return '您的资金储备较少，建议增加储蓄以应对突发情况';
     }
   }
 }

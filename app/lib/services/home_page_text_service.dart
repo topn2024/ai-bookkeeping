@@ -207,17 +207,17 @@ class HomePageTextService {
     if (trend == 'up' || trendDays > 0) {
       if (absDays >= 10) {
         candidates = [
-          '较上月提升$absDays天，资金周转效率大幅提升！💪',
-          '钱龄降低$absDays天，财务状况明显改善！✨',
-          '太棒了！钱龄改善$absDays天，继续保持！🎉',
+          '较上月增加$absDays天，资金周转效率大幅提升！💪',
+          '钱龄增加$absDays天，财务状况明显改善！✨',
+          '太棒了！钱龄增加$absDays天，继续保持！🎉',
           '进步显著！钱龄提升$absDays天！🌟',
           '钱龄大幅改善，你的理财越来越棒了！',
         ];
       } else {
         candidates = [
-          '较上月提升$absDays天，继续保持！',
+          '较上月增加$absDays天，继续保持！',
           '钱龄有所改善，做得不错！',
-          '进步$absDays天，稳步向好～',
+          '增加$absDays天，稳步向好～',
           '小有进步，继续加油！',
           '钱龄在改善，保持这个趋势！',
         ];
