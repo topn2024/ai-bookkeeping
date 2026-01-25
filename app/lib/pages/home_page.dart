@@ -127,7 +127,8 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     // 计算数据并更新文案上下文
     final lastMonthBalance = ref.watch(lastMonthBalanceProvider);
-    final growth = balance > 0 && lastMonthBalance > 0
+    // 修复：只要上月结余不为0就计算增长率，允许负数结余的对比
+    final growth = lastMonthBalance != 0
         ? ((balance - lastMonthBalance) / lastMonthBalance * 100)
         : 0.0;
     final streakStats = ref.watch(gamificationProvider);
@@ -187,7 +188,8 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     // 计算同比增长（仅用于图标显示）
     final lastMonthBalance = ref.watch(lastMonthBalanceProvider);
-    final growth = balance > 0 && lastMonthBalance > 0
+    // 修复：只要上月结余不为0就计算增长率，允许负数结余的对比
+    final growth = lastMonthBalance != 0
         ? ((balance - lastMonthBalance) / lastMonthBalance * 100)
         : 0.0;
     final isPositiveGrowth = growth >= 0;
@@ -312,7 +314,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     final lastDay = DateTime(now.year, now.month + 1, 0);
     final daysRemaining = lastDay.day - now.day + 1;
     final budgetRemaining = monthlyIncome - monthlyExpense;
-    final dailyAllowance = budgetRemaining > 0 ? budgetRemaining / daysRemaining : 0.0;
+    // 修复：添加daysRemaining > 0的检查，避免除以零
+    final dailyAllowance = budgetRemaining > 0 && daysRemaining > 0
+        ? budgetRemaining / daysRemaining
+        : 0.0;
 
     return InkWell(
       onTap: () {

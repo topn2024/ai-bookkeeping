@@ -21,6 +21,7 @@ class InsightAnalysisPage extends ConsumerWidget {
     final theme = Theme.of(context);
     final categoryExpenses = ref.watch(monthlyExpenseByCategoryProvider);
     final monthlyExpense = ref.watch(monthlyExpenseProvider);
+    final monthlyIncome = ref.watch(monthlyIncomeProvider);
     final budgets = ref.watch(budgetProvider);
     final totalMonthlyBudget = ref.watch(monthlyBudgetProvider);
 
@@ -39,8 +40,9 @@ class InsightAnalysisPage extends ConsumerWidget {
     // 从预算列表中查找餐饮类预算
     final foodBudgetItem = budgets.where((b) =>
         b.categoryId == '餐饮' || b.categoryId == '吃饭').firstOrNull;
+    // 修复：使��monthlyIncome * 0.3作为默认值，而非totalMonthlyBudget * 0.3
     final foodBudget = foodBudgetItem?.amount ??
-        (totalMonthlyBudget > 0 ? totalMonthlyBudget * 0.3 : 0); // 默认30%
+        (monthlyIncome > 0 ? monthlyIncome * 0.3 : 0);
     final foodUsagePercent = foodBudget > 0 ? (foodExpense / foodBudget * 100) : 0.0;
     final projectedOverspend = foodBudget > 0 && now.day > 0
         ? (foodExpense / now.day * DateTime(now.year, now.month + 1, 0).day - foodBudget)
