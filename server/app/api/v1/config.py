@@ -1,26 +1,28 @@
 """Client configuration endpoints."""
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from typing import Optional
 
-from app.core.config import get_settings
 from app.api.deps import get_current_user, get_current_user_optional
+from app.core.config import get_settings
 from app.models.user import User
-
 
 router = APIRouter(prefix="/config", tags=["Configuration"])
 
 
 # ============== 基础配置模型 ==============
 
+
 class AIConfig(BaseModel):
     """AI API configuration for client - only shows availability status."""
+
     qwen_available: bool = False
     zhipu_available: bool = False
 
 
 class AIModelConfig(BaseModel):
     """AI model configuration."""
+
     vision_model: str = "qwen-vl-plus"
     text_model: str = "qwen-turbo"
     audio_model: str = "qwen-omni-turbo"
@@ -30,6 +32,7 @@ class AIModelConfig(BaseModel):
 
 class NetworkConfig(BaseModel):
     """Network configuration."""
+
     connect_timeout_seconds: int = 30
     receive_timeout_seconds: int = 30
     ai_receive_timeout_seconds: int = 60
@@ -40,6 +43,7 @@ class NetworkConfig(BaseModel):
 
 class DuplicateDetectionConfig(BaseModel):
     """Duplicate transaction detection configuration."""
+
     strict_time_minutes: int = 10
     loose_time_minutes: int = 60
     max_time_minutes: int = 120
@@ -48,11 +52,22 @@ class DuplicateDetectionConfig(BaseModel):
 
 class CategoryMapping(BaseModel):
     """Category mapping configuration."""
+
     # 有效分类ID列表
     valid_ids: list[str] = [
-        "food", "transport", "shopping", "entertainment", "housing",
-        "medical", "education", "other_expense", "other_income",
-        "salary", "bonus", "parttime", "investment"
+        "food",
+        "transport",
+        "shopping",
+        "entertainment",
+        "housing",
+        "medical",
+        "education",
+        "other_expense",
+        "other_income",
+        "salary",
+        "bonus",
+        "parttime",
+        "investment",
     ]
 
     # 精确匹配映射 (中文 -> 英文ID)
@@ -96,63 +111,278 @@ class CategoryMapping(BaseModel):
     # 关键词映射 (分类ID -> 关键词列表)
     keywords: dict[str, list[str]] = {
         "food": [
-            "餐", "饭", "食", "吃", "喝", "咖啡", "奶茶", "外卖", "早餐", "午餐", "晚餐", "夜宵", "零食", "水果",
-            "星巴克", "瑞幸", "喜茶", "奈雪", "蜜雪冰城", "茶百道", "COCO", "一点点",
-            "麦当劳", "肯德基", "必胜客", "汉堡王", "德克士", "赛百味",
-            "海底捞", "西贝", "外婆家", "绿茶", "太二", "九毛九",
-            "美团外卖", "饿了么", "盒马", "永辉", "沃尔玛", "家乐福", "大润发", "物美",
-            "便利店", "全家", "711", "罗森", "便利蜂", "美宜佳",
-            "面包", "蛋糕", "烘焙", "甜品", "火锅", "烧烤", "小吃", "快餐",
+            "餐",
+            "饭",
+            "食",
+            "吃",
+            "喝",
+            "咖啡",
+            "奶茶",
+            "外卖",
+            "早餐",
+            "午餐",
+            "晚餐",
+            "夜宵",
+            "零食",
+            "水果",
+            "星巴克",
+            "瑞幸",
+            "喜茶",
+            "奈雪",
+            "蜜雪冰城",
+            "茶百道",
+            "COCO",
+            "一点点",
+            "麦当劳",
+            "肯德基",
+            "必胜客",
+            "汉堡王",
+            "德克士",
+            "赛百味",
+            "海底捞",
+            "西贝",
+            "外婆家",
+            "绿茶",
+            "太二",
+            "九毛九",
+            "美团外卖",
+            "饿了么",
+            "盒马",
+            "永辉",
+            "沃尔玛",
+            "家乐福",
+            "大润发",
+            "物美",
+            "便利店",
+            "全家",
+            "711",
+            "罗森",
+            "便利蜂",
+            "美宜佳",
+            "面包",
+            "蛋糕",
+            "烘焙",
+            "甜品",
+            "火锅",
+            "烧烤",
+            "小吃",
+            "快餐",
         ],
         "transport": [
-            "车", "交通", "打车", "出租", "地铁", "公交", "滴滴", "加油", "停车", "高铁", "火车", "飞机", "机票",
-            "滴滴出行", "高德打车", "T3出行", "曹操出行", "首汽约车", "享道出行",
-            "哈啰", "美团单车", "青桔", "共享单车", "摩拜",
-            "中国石化", "中国石油", "壳牌", "加油站",
-            "12306", "铁路", "携程", "去哪儿", "飞猪", "航空",
-            "过路费", "高速", "ETC", "路费", "车费",
+            "车",
+            "交通",
+            "打车",
+            "出租",
+            "地铁",
+            "公交",
+            "滴滴",
+            "加油",
+            "停车",
+            "高铁",
+            "火车",
+            "飞机",
+            "机票",
+            "滴滴出行",
+            "高德打车",
+            "T3出行",
+            "曹操出行",
+            "首汽约车",
+            "享道出行",
+            "哈啰",
+            "美团单车",
+            "青桔",
+            "共享单车",
+            "摩拜",
+            "中国石化",
+            "中国石油",
+            "壳牌",
+            "加油站",
+            "12306",
+            "铁路",
+            "携程",
+            "去哪儿",
+            "飞猪",
+            "航空",
+            "过路费",
+            "高速",
+            "ETC",
+            "路费",
+            "车费",
         ],
         "shopping": [
-            "购", "买", "超市", "商场", "淘宝", "京东", "网购", "衣服", "鞋",
-            "天猫", "拼多多", "唯品会", "苏宁", "国美", "当当", "亚马逊",
-            "优衣库", "ZARA", "HM", "GAP", "无印良品", "MUJI",
-            "苹果", "Apple", "小米", "华为", "OPPO", "vivo", "三星",
-            "化妆品", "护肤", "口红", "香水", "丝芙兰", "屈臣氏",
-            "日用品", "生活用品", "家居", "百货",
+            "购",
+            "买",
+            "超市",
+            "商场",
+            "淘宝",
+            "京东",
+            "网购",
+            "衣服",
+            "鞋",
+            "天猫",
+            "拼多多",
+            "唯品会",
+            "苏宁",
+            "国美",
+            "当当",
+            "亚马逊",
+            "优衣库",
+            "ZARA",
+            "HM",
+            "GAP",
+            "无印良品",
+            "MUJI",
+            "苹果",
+            "Apple",
+            "小米",
+            "华为",
+            "OPPO",
+            "vivo",
+            "三星",
+            "化妆品",
+            "护肤",
+            "口红",
+            "香水",
+            "丝芙兰",
+            "屈臣氏",
+            "日用品",
+            "生活用品",
+            "家居",
+            "百货",
         ],
         "entertainment": [
-            "娱乐", "电影", "游戏", "KTV", "唱歌", "旅游", "景点", "门票",
-            "猫眼", "淘票票", "万达影城", "CGV", "金逸",
-            "腾讯游戏", "网易游戏", "王者荣耀", "和平精英", "原神",
-            "爱奇艺", "腾讯视频", "优酷", "B站", "芒果TV", "Netflix", "会员", "VIP",
-            "Keep", "健身", "瑜伽", "游泳", "运动",
-            "演唱会", "演出", "话剧", "音乐会", "展览",
-            "迪士尼", "环球影城", "欢乐谷", "方特",
+            "娱乐",
+            "电影",
+            "游戏",
+            "KTV",
+            "唱歌",
+            "旅游",
+            "景点",
+            "门票",
+            "猫眼",
+            "淘票票",
+            "万达影城",
+            "CGV",
+            "金逸",
+            "腾讯游戏",
+            "网易游戏",
+            "王者荣耀",
+            "和平精英",
+            "原神",
+            "爱奇艺",
+            "腾讯视频",
+            "优酷",
+            "B站",
+            "芒果TV",
+            "Netflix",
+            "会员",
+            "VIP",
+            "Keep",
+            "健身",
+            "瑜伽",
+            "游泳",
+            "运动",
+            "演唱会",
+            "演出",
+            "话剧",
+            "音乐会",
+            "展览",
+            "迪士尼",
+            "环球影城",
+            "欢乐谷",
+            "方特",
         ],
         "housing": [
-            "房", "租", "水电", "物业", "装修", "家具", "家电",
-            "房租", "租金", "押金", "中介费",
-            "水费", "电费", "燃气", "煤气", "暖气",
-            "物业费", "管理费", "停车位",
-            "宽带", "网费", "中国移动", "中国联通", "中国电信",
-            "装修", "建材", "红星美凯龙", "居然之家",
-            "宜家", "顾家", "全友", "索菲亚",
+            "房",
+            "租",
+            "水电",
+            "物业",
+            "装修",
+            "家具",
+            "家电",
+            "房租",
+            "租金",
+            "押金",
+            "中介费",
+            "水费",
+            "电费",
+            "燃气",
+            "煤气",
+            "暖气",
+            "物业费",
+            "管理费",
+            "停车位",
+            "宽带",
+            "网费",
+            "中国移动",
+            "中国联通",
+            "中国电信",
+            "装修",
+            "建材",
+            "红星美凯龙",
+            "居然之家",
+            "宜家",
+            "顾家",
+            "全友",
+            "索菲亚",
         ],
         "medical": [
-            "医", "药", "病", "健康", "体检", "牙",
-            "医院", "诊所", "门诊", "挂号", "住院",
-            "药店", "大参林", "益丰", "老百姓", "海王星辰", "一心堂",
-            "美年大健康", "爱康国宾", "慈铭",
-            "牙科", "口腔", "眼科", "皮肤科",
-            "保健品", "维生素", "钙片",
+            "医",
+            "药",
+            "病",
+            "健康",
+            "体检",
+            "牙",
+            "医院",
+            "诊所",
+            "门诊",
+            "挂号",
+            "住院",
+            "药店",
+            "大参林",
+            "益丰",
+            "老百姓",
+            "海王星辰",
+            "一心堂",
+            "美年大健康",
+            "爱康国宾",
+            "慈铭",
+            "牙科",
+            "口腔",
+            "眼科",
+            "皮肤科",
+            "保健品",
+            "维生素",
+            "钙片",
         ],
         "education": [
-            "教育", "学", "书", "课", "培训", "考试",
-            "学费", "培训费", "补习", "辅导",
-            "新东方", "好未来", "学而思", "猿辅导", "作业帮",
-            "得到", "知乎", "网课", "慕课", "Coursera",
-            "书店", "当当", "京东图书", "亚马逊图书",
-            "文具", "笔记本", "打印",
+            "教育",
+            "学",
+            "书",
+            "课",
+            "培训",
+            "考试",
+            "学费",
+            "培训费",
+            "补习",
+            "辅导",
+            "新东方",
+            "好未来",
+            "学而思",
+            "猿辅导",
+            "作业帮",
+            "得到",
+            "知乎",
+            "网课",
+            "慕课",
+            "Coursera",
+            "书店",
+            "当当",
+            "京东图书",
+            "亚马逊图书",
+            "文具",
+            "笔记本",
+            "打印",
         ],
         "salary": ["工资", "薪", "月薪", "底薪", "基本工资"],
         "bonus": ["奖金", "奖", "年终", "提成", "绩效", "分红"],
@@ -163,6 +393,7 @@ class CategoryMapping(BaseModel):
 
 class FeatureFlags(BaseModel):
     """Feature flags for A/B testing and gradual rollout."""
+
     enable_voice_recognition: bool = True
     enable_image_recognition: bool = True
     enable_ai_categorization: bool = True
@@ -172,13 +403,14 @@ class FeatureFlags(BaseModel):
 
 class AppSettingsConfig(BaseModel):
     """Complete app settings configuration."""
+
     # 版本信息
     config_version: str = "1.0.0"
     min_app_version: str = "1.1.0"  # 最低支持的客户端版本
 
     # API 配置
-    api_base_url: str = "https://160.202.238.29/api/v1"
-    skip_certificate_verification: bool = False  # 生产环境应为 False
+    api_base_url: str = "https://39.105.12.124/api/v1"
+    skip_certificate_verification: bool = True  # 服务器使用 IP + 自签名证书
 
     # AI 配置
     ai_models: AIModelConfig = AIModelConfig()
@@ -198,11 +430,13 @@ class AppSettingsConfig(BaseModel):
 
 class AppConfig(BaseModel):
     """Application configuration for client (legacy support)."""
+
     ai: AIConfig
     version: str = "1.0.0"
 
 
 # ============== API 端点 ==============
+
 
 @router.get("/ai", response_model=AIConfig)
 async def get_ai_config(
@@ -241,7 +475,7 @@ async def get_app_config(
 
 @router.get("/app-settings", response_model=AppSettingsConfig)
 async def get_app_settings(
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
     """Get complete app settings configuration.
 
@@ -255,13 +489,11 @@ async def get_app_settings(
     Does not require authentication (for initial app setup).
     Sensitive data (API keys) requires authentication via /config/ai endpoint.
     """
-    settings = get_settings()
-
     return AppSettingsConfig(
         config_version="1.0.0",
         min_app_version="1.1.0",
-        api_base_url="https://160.202.238.29/api/v1",
-        skip_certificate_verification=settings.SKIP_SSL_VERIFICATION,
+        api_base_url="https://39.105.12.124/api/v1",
+        skip_certificate_verification=True,  # 服务器使用 IP + 自签名证书
         ai_models=AIModelConfig(),
         network=NetworkConfig(),
         duplicate_detection=DuplicateDetectionConfig(),
