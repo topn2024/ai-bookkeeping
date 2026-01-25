@@ -14,6 +14,7 @@ import 'reports/expense_heatmap_page.dart';
 
 // 分类分析相关
 import 'reports/category_pie_drill_page.dart';
+import 'reports/drill_navigation_page.dart';
 import 'tag_statistics_page.dart';
 import 'wants_needs_insight_page.dart';
 import 'category_detail_page.dart';
@@ -248,6 +249,12 @@ class _TrendAnalysisTab extends ConsumerWidget {
           end: now,
         );
     }
+  }
+
+  /// 获取周期标签
+  String _getPeriodLabel() {
+    const periods = ['本月', '上月', '近3月', '今年'];
+    return periods[selectedPeriod];
   }
 
   @override
@@ -589,7 +596,13 @@ class _TrendAnalysisTab extends ConsumerWidget {
               total: expenses.fold<double>(0, (sum, t) => sum + t.amount),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => CategoryDetailPage(categoryId: e.key)),
+                MaterialPageRoute(
+                  builder: (_) => DrillDownNavigationPage(
+                    categoryId: e.key,
+                    dateRange: _getDateRange(),
+                    timeRangeLabel: _getPeriodLabel(),
+                  ),
+                ),
               ),
             )),
             if (top5.isEmpty)
@@ -642,6 +655,12 @@ class _CategoryAnalysisTab extends ConsumerWidget {
           end: now,
         );
     }
+  }
+
+  /// 获取周期标签
+  String _getPeriodLabel() {
+    const periods = ['本月', '上月', '近3月', '今年'];
+    return periods[selectedPeriod];
   }
 
   @override
@@ -934,7 +953,13 @@ class _CategoryAnalysisTab extends ConsumerWidget {
               showPercentage: true,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => CategoryDetailPage(categoryId: e.key)),
+                MaterialPageRoute(
+                  builder: (_) => DrillDownNavigationPage(
+                    categoryId: e.key,
+                    dateRange: _getDateRange(),
+                    timeRangeLabel: _getPeriodLabel(),
+                  ),
+                ),
               ),
             )),
             if (sorted.isEmpty)

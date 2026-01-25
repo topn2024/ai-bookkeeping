@@ -9,6 +9,7 @@ import '../models/category.dart';
 import '../extensions/category_extensions.dart';
 import 'category_detail_page.dart';
 import 'reports/trend_drill_page.dart';
+import 'reports/drill_navigation_page.dart';
 
 /// 趋势分析页面
 /// 原型设计 1.02：趋势分析 Trends
@@ -72,6 +73,12 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
           end: now,
         );
     }
+  }
+
+  /// 获取周期标签
+  String _getPeriodLabel() {
+    const periods = ['本月', '上月', '近3月', '今年'];
+    return periods[_selectedPeriod];
   }
 
   /// 过滤指定周期的交易
@@ -565,9 +572,10 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => CategoryDetailPage(
+                builder: (context) => DrillDownNavigationPage(
                   categoryId: entry.key,
-                  isExpense: true,
+                  dateRange: _getDateRange(),
+                  timeRangeLabel: _getPeriodLabel(),
                 ),
               ),
             ),

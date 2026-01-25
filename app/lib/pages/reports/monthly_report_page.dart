@@ -383,7 +383,11 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => CategoryDetailPage(categoryId: categoryId),
+          builder: (_) => CategoryDetailPage(
+            categoryId: categoryId,
+            selectedMonth: _selectedMonth,
+            isExpense: true,
+          ),
         ),
       ),
       borderRadius: BorderRadius.circular(8),
