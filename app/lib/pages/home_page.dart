@@ -577,11 +577,13 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
             const SizedBox(height: 4),
             Text(
-              '您花的钱平均是$moneyAge天前赚的',
+              moneyAgeData.description,
               style: TextStyle(
                 fontSize: 13,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 8),
             Row(

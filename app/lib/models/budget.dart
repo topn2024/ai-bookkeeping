@@ -339,7 +339,11 @@ class MoneyAge {
   }
 
   String get description {
-    if (days >= 30) {
+    if (days == 0 && totalBalance <= 0) {
+      return '当前已经入不敷出，需要尽快改善财务状况';
+    } else if (days == 0 && totalBalance > 0) {
+      return '最近30天没有支出记录，暂无法计算钱龄';
+    } else if (days >= 30) {
       return '您的资金周转非常健康，可以应对一个月的开支';
     } else if (days >= 14) {
       return '您的资金周转较好，可以应对两周的开支';
