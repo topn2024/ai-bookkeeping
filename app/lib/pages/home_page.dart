@@ -5,6 +5,7 @@ import '../l10n/l10n.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/budget_provider.dart';
+import '../providers/budget_vault_provider.dart';
 import '../providers/gamification_provider.dart';
 import '../providers/home_page_text_provider.dart';
 import '../models/transaction.dart';
@@ -675,22 +676,23 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// 原型设计：预算类目进度条列表
   /// 数据来源：budgetProvider（预算设置）+ monthlyExpenseByCategoryProvider（本月分类支出）
   Widget _buildBudgetOverview(BuildContext context, ThemeData theme) {
-    final budgets = ref.watch(budgetProvider);
-    final categorySpending = ref.watch(monthlyExpenseByCategoryProvider);
+    final vaultState = ref.watch(budgetVaultProvider);
+    final vaults = vaultState.vaults;
 
-    // 过滤出已启用的分类预算，并按已花费百分比排序（高的在前）
-    final activeBudgets = budgets
-        .where((b) => b.isEnabled && b.amount > 0 && b.categoryId != null)
-        .map((b) {
-          final spent = categorySpending[b.categoryId!] ?? 0.0;
-          final percent = (spent / b.amount * 100).clamp(0, 999).toInt();
-          return (budget: b, spent: spent, percent: percent);
+    // 过滤出已启用的小金库，并按使用率排序（高的在前）
+    final activeVaults = vaults
+        .where((v) => v.isEnabled && v.allocatedAmount > 0)
+        .map((v) {
+          final spent = v.spentAmount;
+          final allocated = v.allocatedAmount;
+          final percent = (spent / allocated * 100).clamp(0, 999).toInt();
+          return (vault: v, spent: spent, allocated: allocated, percent: percent);
         })
         .toList()
       ..sort((a, b) => b.percent.compareTo(a.percent));
 
-    // 最多显示3个预算
-    final displayBudgets = activeBudgets.take(3).toList();
+    // 最多显示3个小金库
+    final displayVaults = activeVaults.take(3).toList();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
@@ -701,7 +703,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '预算概览',
+                '小金库概览',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -718,7 +720,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
           const SizedBox(height: 8),
-          if (displayBudgets.isEmpty)
+          if (displayVaults.isEmpty)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -727,41 +729,32 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
               child: Center(
                 child: Text(
-                  '暂无预算设置',
+                  '暂无小金库设置',
                   style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),
             )
           else
-            ...displayBudgets.asMap().entries.map((entry) {
+            ...displayVaults.asMap().entries.map((entry) {
               final index = entry.key;
               final item = entry.value;
-              final categoryId = item.budget.categoryId!;
-              final category = DefaultCategories.findById(categoryId);
-              final categoryName = category?.localizedName ?? categoryId;
+              final vault = item.vault;
 
               return Padding(
                 padding: EdgeInsets.only(top: index > 0 ? 12 : 0),
                 child: GestureDetector(
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CategoryDetailPage(
-                          categoryId: categoryId,
-                          isExpense: true,
-                        ),
-                      ),
-                    );
+                    // 跳转到小金库详情页面
+                    // TODO: 实现小金库详情页面导航
                   },
                   child: _buildBudgetItem(
                     context,
                     theme,
-                    name: categoryName,
-                    icon: category?.icon ?? Icons.category,
-                    iconColor: category?.color ?? Colors.grey,
+                    name: vault.name,
+                    icon: vault.icon,
+                    iconColor: vault.color,
                     spent: item.spent,
-                    budget: item.budget.amount,
+                    budget: item.allocated,
                     percent: item.percent,
                   ),
                 ),

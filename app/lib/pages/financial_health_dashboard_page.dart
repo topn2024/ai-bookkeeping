@@ -2,11 +2,26 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'money_age_page.dart';
-import 'budget_center_page.dart';
-import '../providers/budget_provider.dart';
-import '../providers/budget_vault_provider.dart';
-import '../providers/transaction_provider.dart';
+import 'money_age_score_page.dart';
+import 'budget_control_score_page.dart';
+import 'emergency_fund_score_page.dart';
+import 'spending_structure_score_page.dart';
+import 'recording_habit_score_page.dart';
+import '../services/financial_health_score_service.dart';
+import '../core/di/service_locator.dart';
+import '../core/contracts/i_database_service.dart';
+
+// Provider for FinancialHealthScoreService
+final healthScoreServiceProvider = Provider<FinancialHealthScoreService>((ref) {
+  final dbService = sl<IDatabaseService>();
+  return FinancialHealthScoreService(dbService);
+});
+
+// Provider for health score (async)
+final healthScoreProvider = FutureProvider<FinancialHealthScore>((ref) async {
+  final service = ref.watch(healthScoreServiceProvider);
+  return await service.calculateScore();
+});
 
 /// 财务健康仪表盘页面
 ///
@@ -17,42 +32,33 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 获取真实数据
-    final moneyAge = ref.watch(moneyAgeProvider);
-    final vaultState = ref.watch(budgetVaultProvider);
-    final transactions = ref.watch(transactionProvider);
+    final healthScoreAsync = ref.watch(healthScoreProvider);
 
-    // 计算钱龄得分 (0-20分)
-    final moneyAgeScore = _calculateMoneyAgeScore(moneyAge);
-    final moneyAgeStatus = _getMoneyAgeStatus(moneyAge);
-    final moneyAgeColor = moneyAge >= 30 ? Colors.green : (moneyAge >= 15 ? Colors.orange : Colors.red);
+    return healthScoreAsync.when(
+      data: (healthScore) => _buildContent(context, healthScore),
+      loading: () => Scaffold(
+        appBar: AppBar(
+          title: const Text('财务健康'),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        appBar: AppBar(
+          title: const Text('财务健康'),
+        ),
+        body: Center(
+          child: Text('加载失败: $error'),
+        ),
+      ),
+    );
+  }
 
-    // 计算预算控制得分
-    final budgetScore = _calculateBudgetScore(vaultState);
-    final budgetStatus = _getBudgetStatus(vaultState);
-    final budgetColor = budgetScore >= 15 ? Colors.green : (budgetScore >= 10 ? Colors.orange : Colors.red);
-
-    // 计算应急金得分（暂时给固定分数，未来可以实现应急金功能）
-    final emergencyScore = 12;
-    final emergencyStatus = '建议建立应急金储备';
-    final emergencyColor = Colors.orange;
-
-    // 计算消费结构得分（暂时给固定分数）
-    final structureScore = 15;
-    final structureStatus = '消费结构合理';
-    final structureColor = Colors.green;
-
-    // 计算记账习惯得分
-    final habitScore = _calculateHabitScore(transactions);
-    final habitStatus = _getHabitStatus(transactions);
-    final habitColor = habitScore >= 15 ? Colors.green : (habitScore >= 10 ? Colors.orange : Colors.red);
-
-    // 计算总分
-    final totalScore = moneyAgeScore + budgetScore + emergencyScore + structureScore + habitScore;
-    final healthStatus = totalScore >= 80 ? '财务优秀' : (totalScore >= 60 ? '财务良好' : '需要改进');
-
-    // 生成改进建议
-    final suggestion = _generateSuggestion(moneyAgeScore, budgetScore, habitScore);
+  Widget _buildContent(BuildContext context, FinancialHealthScore healthScore) {
+    final moneyAgeComponent = healthScore.components['moneyAge']!;
+    final budgetComponent = healthScore.components['budget']!;
+    final emergencyComponent = healthScore.components['emergency']!;
+    final structureComponent = healthScore.components['structure']!;
+    final habitComponent = healthScore.components['habit']!;
 
     return Scaffold(
       appBar: AppBar(
@@ -68,9 +74,9 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
         children: [
           // 总分展示
           _HealthScoreCard(
-            score: totalScore,
-            status: healthStatus,
-            change: 0,
+            score: healthScore.totalScore,
+            status: healthScore.level.displayName,
+            change: healthScore.comparisonToLastMonth,
           ),
 
           // 5维度得分
@@ -89,17 +95,17 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
           GestureDetector(
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const MoneyAgePage()),
+              MaterialPageRoute(builder: (_) => const MoneyAgeScorePage()),
             ),
             child: _DimensionCard(
               icon: Icons.schedule,
               iconColor: AppTheme.primaryColor,
               iconBgColor: const Color(0xFFEBF3FF),
               title: '钱龄',
-              score: moneyAgeScore,
-              maxScore: 20,
-              status: moneyAgeStatus,
-              statusColor: moneyAgeColor,
+              score: moneyAgeComponent.score,
+              maxScore: moneyAgeComponent.maxScore,
+              status: moneyAgeComponent.status,
+              statusColor: _getColorFromScore(moneyAgeComponent.score, moneyAgeComponent.maxScore),
             ),
           ),
 
@@ -107,61 +113,80 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
           GestureDetector(
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const BudgetCenterPage()),
+              MaterialPageRoute(builder: (_) => const BudgetControlScorePage()),
             ),
             child: _DimensionCard(
               icon: Icons.account_balance_wallet,
               iconColor: const Color(0xFFFFB74D),
               iconBgColor: const Color(0xFFFFF3E0),
               title: '预算控制',
-              score: budgetScore,
-              maxScore: 20,
-              status: budgetStatus,
-              statusColor: budgetColor,
+              score: budgetComponent.score,
+              maxScore: budgetComponent.maxScore,
+              status: budgetComponent.status,
+              statusColor: _getColorFromScore(budgetComponent.score, budgetComponent.maxScore),
             ),
           ),
 
           // 应急金
-          _DimensionCard(
-            icon: Icons.shield,
-            iconColor: const Color(0xFF66BB6A),
-            iconBgColor: const Color(0xFFE8F5E9),
-            title: '应急金',
-            score: emergencyScore,
-            maxScore: 20,
-            status: emergencyStatus,
-            statusColor: emergencyColor,
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const EmergencyFundScorePage()),
+            ),
+            child: _DimensionCard(
+              icon: Icons.shield,
+              iconColor: const Color(0xFF66BB6A),
+              iconBgColor: const Color(0xFFE8F5E9),
+              title: '应急金',
+              score: emergencyComponent.score,
+              maxScore: emergencyComponent.maxScore,
+              status: emergencyComponent.status,
+              statusColor: _getColorFromScore(emergencyComponent.score, emergencyComponent.maxScore),
+            ),
           ),
 
           // 消费结构
-          _DimensionCard(
-            icon: Icons.pie_chart,
-            iconColor: const Color(0xFF7B1FA2),
-            iconBgColor: const Color(0xFFF3E5F5),
-            title: '消费结构',
-            score: structureScore,
-            maxScore: 20,
-            status: structureStatus,
-            statusColor: structureColor,
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SpendingStructureScorePage()),
+            ),
+            child: _DimensionCard(
+              icon: Icons.pie_chart,
+              iconColor: const Color(0xFF7B1FA2),
+              iconBgColor: const Color(0xFFF3E5F5),
+              title: '消费结构',
+              score: structureComponent.score,
+              maxScore: structureComponent.maxScore,
+              status: structureComponent.status,
+              statusColor: _getColorFromScore(structureComponent.score, structureComponent.maxScore),
+            ),
           ),
 
           // 记账习惯
-          _DimensionCard(
-            icon: Icons.local_fire_department,
-            iconColor: const Color(0xFFEF5350),
-            iconBgColor: const Color(0xFFFFEBEE),
-            title: '记账习惯',
-            score: habitScore,
-            maxScore: 20,
-            status: habitStatus,
-            statusColor: habitColor,
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RecordingHabitScorePage()),
+            ),
+            child: _DimensionCard(
+              icon: Icons.edit_note,
+              iconColor: const Color(0xFF26A69A),
+              iconBgColor: const Color(0xFFE0F2F1),
+              title: '记账习惯',
+              score: habitComponent.score,
+              maxScore: habitComponent.maxScore,
+              status: habitComponent.status,
+              statusColor: _getColorFromScore(habitComponent.score, habitComponent.maxScore),
+            ),
           ),
 
           // 改进建议
-          _ImprovementSuggestionCard(
-            title: '本月改进重点',
-            suggestion: suggestion,
-          ),
+          if (healthScore.primaryImprovementArea != null)
+            _ImprovementSuggestion(
+              area: healthScore.primaryImprovementArea!.name,
+              suggestion: healthScore.primaryImprovementArea!.tip ?? '继续保持良好的财务习惯',
+            ),
 
           const SizedBox(height: 24),
         ],
@@ -169,139 +194,11 @@ class FinancialHealthDashboardPage extends ConsumerWidget {
     );
   }
 
-  // 计算钱龄得分 (0-20分)
-  int _calculateMoneyAgeScore(int moneyAge) {
-    if (moneyAge >= 60) return 20;
-    if (moneyAge >= 45) return 18;
-    if (moneyAge >= 30) return 16;
-    if (moneyAge >= 20) return 14;
-    if (moneyAge >= 10) return 10;
-    if (moneyAge >= 5) return 6;
-    if (moneyAge < 0) return 0; // 负钱龄0分
-    return 3;
-  }
-
-  String _getMoneyAgeStatus(int moneyAge) {
-    if (moneyAge < 0) return '透支：已超支${-moneyAge}天';
-    if (moneyAge >= 60) return '当前${moneyAge}天，优秀状态';
-    if (moneyAge >= 30) return '当前${moneyAge}天，良好状态';
-    if (moneyAge >= 15) return '当前${moneyAge}天，尚可状态';
-    return '当前${moneyAge}天，需要改进';
-  }
-
-  // 计算预算控制得分
-  int _calculateBudgetScore(BudgetVaultState vaultState) {
-    final vaults = vaultState.vaults.where((v) => v.isEnabled).toList();
-    if (vaults.isEmpty) return 15; // 没有设置预算给默认分
-
-    int overspentCount = 0;
-    int almostEmptyCount = 0;
-
-    for (final vault in vaults) {
-      final remaining = vault.targetAmount - vault.allocatedAmount;
-      final remainingPercent = vault.targetAmount > 0
-          ? ((remaining / vault.targetAmount) * 100).round()
-          : 100;
-
-      if (remaining < 0) {
-        overspentCount++;
-      } else if (remainingPercent <= 20 && remainingPercent > 0) {
-        almostEmptyCount++;
-      }
-    }
-
-    // 根据问题数量扣分
-    int score = 20;
-    score -= overspentCount * 3; // 每个超支扣3分
-    score -= almostEmptyCount * 1; // 每个即将用完扣1分
-    return score.clamp(0, 20);
-  }
-
-  String _getBudgetStatus(BudgetVaultState vaultState) {
-    final vaults = vaultState.vaults.where((v) => v.isEnabled).toList();
-    if (vaults.isEmpty) return '未设置预算';
-
-    for (final vault in vaults) {
-      final remaining = vault.targetAmount - vault.allocatedAmount;
-      if (remaining < 0) {
-        return '${vault.name}预算超支';
-      }
-    }
-
-    for (final vault in vaults) {
-      final remaining = vault.targetAmount - vault.allocatedAmount;
-      final remainingPercent = vault.targetAmount > 0
-          ? ((remaining / vault.targetAmount) * 100).round()
-          : 100;
-      if (remainingPercent <= 20 && remainingPercent > 0) {
-        return '${vault.name}预算即将用完';
-      }
-    }
-
-    return '预算执行良好';
-  }
-
-  // 计算记账习惯得分
-  int _calculateHabitScore(List transactions) {
-    if (transactions.isEmpty) return 0;
-
-    final now = DateTime.now();
-    final last30Days = now.subtract(const Duration(days: 30));
-    final recentTransactions = transactions.where((t) => t.date.isAfter(last30Days)).toList();
-
-    // 按日期分组
-    final dayGroups = <String, int>{};
-    for (final t in recentTransactions) {
-      final dateKey = '${t.date.year}-${t.date.month}-${t.date.day}';
-      dayGroups[dateKey] = (dayGroups[dateKey] ?? 0) + 1;
-    }
-
-    final recordedDays = dayGroups.length;
-
-    // 根据记账天数打分
-    if (recordedDays >= 25) return 20;
-    if (recordedDays >= 20) return 18;
-    if (recordedDays >= 15) return 15;
-    if (recordedDays >= 10) return 12;
-    if (recordedDays >= 5) return 8;
-    return 5;
-  }
-
-  String _getHabitStatus(List transactions) {
-    final now = DateTime.now();
-    final last30Days = now.subtract(const Duration(days: 30));
-    final recentTransactions = transactions.where((t) => t.date.isAfter(last30Days)).toList();
-
-    final dayGroups = <String, int>{};
-    for (final t in recentTransactions) {
-      final dateKey = '${t.date.year}-${t.date.month}-${t.date.day}';
-      dayGroups[dateKey] = (dayGroups[dateKey] ?? 0) + 1;
-    }
-
-    final recordedDays = dayGroups.length;
-    return '近30天记账${recordedDays}天';
-  }
-
-  String _generateSuggestion(int moneyAgeScore, int budgetScore, int habitScore) {
-    // 找出得分最低的维度给出建议
-    final scores = {
-      'moneyAge': moneyAgeScore,
-      'budget': budgetScore,
-      'habit': habitScore,
-    };
-
-    final lowestDimension = scores.entries.reduce((a, b) => a.value < b.value ? a : b).key;
-
-    switch (lowestDimension) {
-      case 'moneyAge':
-        return '钱龄是提升空间最大的维度，建议延迟非必要消费，让资金在账户中停留更长时间';
-      case 'budget':
-        return '预算控制是提升空间最大的维度，建议设置每周预算上限，及时调整超支分类';
-      case 'habit':
-        return '记账习惯是提升空间最大的维度，建议每天记录消费，养成良好的记账习惯';
-      default:
-        return '继续保持良好的财务习惯，您的财务状况正在稳步改善';
-    }
+  Color _getColorFromScore(int score, int maxScore) {
+    final percentage = score / maxScore;
+    if (percentage >= 0.75) return Colors.green;
+    if (percentage >= 0.5) return Colors.orange;
+    return Colors.red;
   }
 
   void _showHelpDialog(BuildContext context) {
@@ -349,67 +246,101 @@ class _HealthScoreCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color bgColor;
-    if (score >= 80) {
-      bgColor = Colors.green;
-    } else if (score >= 60) {
-      bgColor = Colors.orange;
-    } else {
-      bgColor = Colors.red;
-    }
-
     return Container(
-      margin: const EdgeInsets.all(12),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [bgColor, bgColor.withValues(alpha: 0.7)],
+          colors: [
+            AppTheme.primaryColor,
+            AppTheme.primaryColor.withValues(alpha: 0.8),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryColor.withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
           const Text(
-            '财务健康指数',
+            '财务健康综合分',
             style: TextStyle(
-              color: Colors.white70,
-              fontSize: 13,
+              color: Colors.white,
+              fontSize: 14,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            '$score',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 56,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            status,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                score.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 56,
+                  fontWeight: FontWeight.bold,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Text(
+                '/100',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 24,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                change >= 0 ? Icons.trending_up : Icons.trending_down,
-                color: Colors.white,
-                size: 16,
-              ),
-              const SizedBox(width: 4),
               Text(
-                '较上月 ${change >= 0 ? '+' : ''}$change分',
+                status,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 13,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
+              if (change != 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        change > 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${change.abs()}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ],
@@ -418,7 +349,7 @@ class _HealthScoreCard extends StatelessWidget {
   }
 }
 
-/// 维度得分卡片
+/// 维度分数卡片
 class _DimensionCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -442,127 +373,144 @@ class _DimensionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = score / maxScore;
+    final percentage = score / maxScore;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: iconBgColor,
-                  borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 24),
                 ),
-                child: Icon(icon, color: iconColor, size: 18),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        status,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Spacer(),
-              Text(
-                '$score/$maxScore',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: statusColor,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      score.toString(),
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '/$maxScore',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-              minHeight: 6,
+              ],
             ),
-          ),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              status,
-              style: TextStyle(
-                fontSize: 11,
-                color: statusColor == Colors.green
-                    ? Colors.grey[600]
-                    : statusColor,
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: percentage,
+                minHeight: 8,
+                backgroundColor: Colors.grey[200],
+                valueColor: AlwaysStoppedAnimation<Color>(statusColor),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 /// 改进建议卡片
-class _ImprovementSuggestionCard extends StatelessWidget {
-  final String title;
+class _ImprovementSuggestion extends StatelessWidget {
+  final String area;
   final String suggestion;
 
-  const _ImprovementSuggestionCard({
-    required this.title,
+  const _ImprovementSuggestion({
+    required this.area,
     required this.suggestion,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E1),
+        color: const Color(0xFFFFF3E0),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFB74D)),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.lightbulb, color: Colors.orange, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
+          Row(
+            children: [
+              Icon(
+                Icons.lightbulb_outline,
+                color: Colors.orange[700],
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '改进建议',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange[900],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  suggestion,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[700],
-                    height: 1.5,
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '$area：$suggestion',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.orange[900],
             ),
           ),
         ],
