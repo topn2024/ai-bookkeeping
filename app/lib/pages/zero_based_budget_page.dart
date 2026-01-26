@@ -26,6 +26,28 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
   @override
   void initState() {
     super.initState();
+    // 延迟加载，等待 Provider 初始化完成
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadExistingAllocations();
+    });
+  }
+
+  /// 从现有小金库中加载已分配的金额
+  void _loadExistingAllocations() {
+    final vaultState = ref.read(budgetVaultProvider);
+    setState(() {
+      _vaultAllocations.clear();
+      for (final vault in vaultState.vaults.where((v) => v.isEnabled)) {
+        // 优先使用 allocatedAmount，如果为0则使用 targetAmount
+        final amount = vault.allocatedAmount > 0
+            ? vault.allocatedAmount
+            : vault.targetAmount;
+        if (amount > 0) {
+          _vaultAllocations[vault.id] = amount;
+        }
+      }
+    });
+    print('🔍 [零基预算] 已加载现有分配: ${_vaultAllocations.length} 个小金库');
   }
 
   /// 计算本月实际收入
@@ -376,14 +398,7 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
           }
         }
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✅ 已同步 ${result.length} 个智能分类，删除 ${vaultsToDelete.length} 个多余分类'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+        // 智能分配完成提示已移除，避免遮挡底部按钮
       } catch (e, stack) {
         print('🔍 智能分配应用失败: $e');
         print('🔍 错误堆栈: $stack');
