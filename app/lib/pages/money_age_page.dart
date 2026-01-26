@@ -1433,6 +1433,10 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
         ? ref.watch(moneyAgeDashboardProvider(bookId))
         : const AsyncValue<MoneyAgeDashboard?>.data(null);
 
+    // 本地历史数据作为备用
+    final localMoneyAge = ref.watch(moneyAgeProvider);
+    final moneyAgeHistory = ref.watch(moneyAgeHistoryProvider);
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -1446,7 +1450,12 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, _) => Center(child: Text('加载失败: $error')),
                 data: (dashboard) {
-                  final trendData = _getTrendData(dashboard);
+                  // 如果 API 返回的 trendData 为空，使用本地历史数据
+                  final effectiveDashboard = (dashboard != null && dashboard.trendData.isNotEmpty)
+                      ? dashboard
+                      : _createDashboardFromLocal(localMoneyAge, moneyAgeHistory);
+
+                  final trendData = _getTrendData(effectiveDashboard);
                   return SingleChildScrollView(
                     child: Column(
                       children: [
@@ -1465,6 +1474,36 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
           ],
         ),
       ),
+    );
+  }
+
+  /// 从本地数据创建 Dashboard（与 MoneyAgePage 保持一致）
+  MoneyAgeDashboard _createDashboardFromLocal(
+    budget_model.MoneyAge localMoneyAge,
+    List<MapEntry<DateTime, int>> historyData,
+  ) {
+    final days = localMoneyAge.days;
+    final healthLevel = days >= 30 ? 'good' : (days >= 14 ? 'normal' : (days >= 7 ? 'warning' : 'danger'));
+
+    // 从历史数据生成 trendData
+    final trendData = historyData.map((entry) {
+      return {
+        'date': entry.key.toIso8601String(),
+        'avg_age': entry.value,
+      };
+    }).toList();
+
+    return MoneyAgeDashboard(
+      avgMoneyAge: days.toDouble(),
+      medianMoneyAge: days,
+      currentHealthLevel: healthLevel,
+      healthCount: days >= 14 ? 1 : 0,
+      warningCount: days >= 7 && days < 14 ? 1 : 0,
+      dangerCount: days < 7 ? 1 : 0,
+      totalResourcePools: 1,
+      activeResourcePools: 1,
+      totalRemainingAmount: localMoneyAge.totalBalance,
+      trendData: trendData,
     );
   }
 
