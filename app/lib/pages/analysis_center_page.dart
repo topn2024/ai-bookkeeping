@@ -51,6 +51,7 @@ import 'asset_overview_page.dart';
 import 'ai/ai_learning_report_page.dart';
 import 'ai_learning_curve_page.dart';
 import 'family_leaderboard_page.dart';
+import 'user_profile_visualization_page.dart';
 
 /// 数据分析中心页面
 ///
@@ -1345,6 +1346,7 @@ class _SpecialAnalysisTab extends StatelessWidget {
 
         // 其他专项
         _buildAnalysisSection(context, theme, '更多分析', Icons.analytics, Colors.indigo, [
+          _AnalysisItem(title: '我的画像', page: const UserProfileVisualizationPage()),
           _AnalysisItem(title: '位置分析', page: const LocationAnalysisPage()),
           _AnalysisItem(title: '资产概览', page: const AssetOverviewPage()),
           _AnalysisItem(title: 'AI学习报告', page: const AILearningReportPage()),

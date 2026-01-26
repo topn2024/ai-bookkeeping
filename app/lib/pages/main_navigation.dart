@@ -14,7 +14,7 @@ import '../l10n/l10n.dart';
 import '../providers/ledger_context_provider.dart';
 import 'home_page.dart';
 import 'analysis_center_page.dart';
-import 'profile_page.dart';
+import 'settings_page.dart';
 import 'enhanced_voice_assistant_page.dart';
 import 'add_transaction_page.dart';
 
@@ -75,7 +75,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
       const HomePage(),
       const AnalysisCenterPage(),
       EnhancedVoiceAssistantPage(onBack: _goToHome),  // 小记宠物助手
-      const ProfilePage(),
+      const SettingsPage(),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowUpdate();
