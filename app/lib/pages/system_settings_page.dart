@@ -14,7 +14,7 @@ import 'ai_language_settings_page.dart';
 import 'notification_settings_page.dart';
 import 'security_settings_page.dart';
 import 'location_service_settings_page.dart';
-import 'membership_page.dart';
+// import 'membership_page.dart'; // 暂时隐藏会员功能
 import 'accessibility_settings_page.dart';
 import 'ai_learning_curve_page.dart';
 import 'voice_assistant_settings_page.dart';
@@ -232,25 +232,26 @@ class SystemSettingsPage extends ConsumerWidget {
                 ),
               ],
             ),
-            _buildSectionHeader('会员与服务'),
-            _buildSettingsCard(
-              context,
-              ref,
-              children: [
-                _buildMenuItem(
-                  icon: Icons.card_membership,
-                  iconColor: const Color(0xFFFFD700),
-                  title: '会员中心',
-                  subtitle: '管理订阅和权益',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const MembershipPage()),
-                    );
-                  },
-                ),
-              ],
-            ),
+            // 暂时隐藏会员功能
+            // _buildSectionHeader('会员与服务'),
+            // _buildSettingsCard(
+            //   context,
+            //   ref,
+            //   children: [
+            //     _buildMenuItem(
+            //       icon: Icons.card_membership,
+            //       iconColor: const Color(0xFFFFD700),
+            //       title: '会员中心',
+            //       subtitle: '管理订阅和权益',
+            //       onTap: () {
+            //         Navigator.push(
+            //           context,
+            //           MaterialPageRoute(builder: (context) => const MembershipPage()),
+            //         );
+            //       },
+            //     ),
+            //   ],
+            // ),
             _buildSectionHeader('其他'),
             _buildSettingsCard(
               context,
