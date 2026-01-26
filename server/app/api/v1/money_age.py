@@ -298,6 +298,58 @@ async def get_dashboard(
     else:
         current_level = "health"
 
+    # Get trend data from snapshots (last 30 days)
+    from datetime import timedelta
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=30)
+
+    snapshot_result = await db.execute(
+        select(MoneyAgeSnapshot).where(
+            and_(
+                MoneyAgeSnapshot.user_id == current_user.id,
+                MoneyAgeSnapshot.book_id == book_id,
+                MoneyAgeSnapshot.snapshot_type == 'daily',
+                MoneyAgeSnapshot.snapshot_date >= start_date,
+                MoneyAgeSnapshot.snapshot_date <= end_date,
+            )
+        ).order_by(MoneyAgeSnapshot.snapshot_date.asc())
+    )
+    snapshots = snapshot_result.scalars().all()
+
+    trend_data = [
+        {
+            "date": snapshot.snapshot_date.isoformat(),
+            "avg_age": float(snapshot.avg_money_age),
+        }
+        for snapshot in snapshots
+    ]
+
+    # If no snapshots, calculate from transactions grouped by date
+    if not trend_data:
+        tx_trend_result = await db.execute(
+            select(
+                func.date(Transaction.transaction_date).label('tx_date'),
+                func.avg(Transaction.money_age).label('avg_age'),
+            ).where(
+                and_(
+                    Transaction.user_id == current_user.id,
+                    Transaction.book_id == book_id,
+                    Transaction.transaction_type == 1,  # Expenses only
+                    Transaction.money_age.isnot(None),
+                    Transaction.transaction_date >= start_date,
+                )
+            ).group_by(func.date(Transaction.transaction_date))
+            .order_by(func.date(Transaction.transaction_date).asc())
+        )
+        tx_trends = tx_trend_result.all()
+        trend_data = [
+            {
+                "date": row.tx_date.isoformat(),
+                "avg_age": float(row.avg_age) if row.avg_age else 0.0,
+            }
+            for row in tx_trends
+        ]
+
     return MoneyAgeDashboardResponse(
         user_id=current_user.id,
         book_id=book_id,
@@ -311,7 +363,7 @@ async def get_dashboard(
         active_resource_pools=active_pools,
         total_remaining_amount=pool_stats[1] or Decimal(0),
         recent_transactions=[],
-        trend_data=[],
+        trend_data=trend_data,
     )
 
 
