@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/resource_pool.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 
 /// 钱龄影响因素分析组件
 ///
@@ -145,7 +146,7 @@ class MoneyAgeInfluenceAnalysisCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  DefaultCategories.findById(factor.categoryId)?.localizedName ?? factor.categoryName,
+                  DefaultCategories.findById(factor.categoryId)?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(factor.categoryName),
                   style: const TextStyle(
                     fontWeight: FontWeight.w500,
                   ),
@@ -348,7 +349,7 @@ class MoneyAgeInfluenceChart extends StatelessWidget {
                     height: 16,
                     child: Text(
                       () {
-                        final name = DefaultCategories.findById(factor.categoryId)?.localizedName ?? factor.categoryName;
+                        final name = DefaultCategories.findById(factor.categoryId)?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(factor.categoryName);
                         return name.length > 4 ? '${name.substring(0, 3)}...' : name;
                       }(),
                       style: TextStyle(

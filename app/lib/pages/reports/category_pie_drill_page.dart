@@ -7,6 +7,7 @@ import '../../models/category.dart';
 import '../../providers/transaction_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../extensions/category_extensions.dart';
+import '../../services/category_localization_service.dart';
 import 'drill_navigation_page.dart';
 
 /// 分类饼图下钻页面
@@ -437,7 +438,7 @@ class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        category?.localizedName ?? entry.key,
+                        category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(entry.key),
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
                           color: theme.colorScheme.onSurface,

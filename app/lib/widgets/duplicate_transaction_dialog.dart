@@ -4,6 +4,7 @@ import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
 import '../services/duplicate_detection_service.dart';
+import '../services/category_localization_service.dart';
 import '../theme/app_theme.dart';
 
 /// 重复交易确认对话框
@@ -223,7 +224,7 @@ class DuplicateTransactionDialog extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      category?.localizedName ?? transaction.category,
+                      category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(transaction.category),
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,

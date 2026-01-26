@@ -7,6 +7,7 @@ import '../providers/transaction_provider.dart';
 import '../providers/account_provider.dart';
 import '../models/category.dart';
 import '../extensions/extensions.dart';
+import '../services/category_localization_service.dart';
 
 /// 报表维度
 enum ReportDimension {
@@ -363,7 +364,7 @@ class _CustomReportPageState extends ConsumerState<CustomReportPage> {
         return _buildReportItem(
           icon: category?.icon ?? Icons.help_outline,
           color: category?.color ?? Colors.grey,
-          title: category?.localizedName ?? entry.key,
+          title: category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(entry.key),
           amount: entry.value,
           percentage: percentage,
         );

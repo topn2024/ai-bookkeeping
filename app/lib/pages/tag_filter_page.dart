@@ -6,6 +6,7 @@ import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 import 'transaction_detail_page.dart';
 
 /// 标签筛选页面
@@ -551,7 +552,7 @@ class _TagFilterPageState extends ConsumerState<TagFilterPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    transaction.note ?? category?.localizedName ?? transaction.category,
+                    transaction.note ?? category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(transaction.category),
                     style: const TextStyle(fontWeight: FontWeight.w500),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -560,7 +561,7 @@ class _TagFilterPageState extends ConsumerState<TagFilterPage> {
                   Row(
                     children: [
                       Text(
-                        category?.localizedName ?? transaction.category,
+                        category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(transaction.category),
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 12,

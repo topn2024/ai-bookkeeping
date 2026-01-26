@@ -4,6 +4,7 @@ import '../providers/peer_comparison_provider.dart';
 import '../services/social_comparison_service.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 
 /// 同类用户对比页面
 ///
@@ -159,7 +160,7 @@ class PeerComparisonPage extends ConsumerWidget {
       if (myAmount > 0 || peerAmount > 0) {
         final category = DefaultCategories.findById(categoryId);
         cards.add(_CategoryComparisonCard(
-          category: category?.localizedName ?? categoryId,
+          category: category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId),
           emoji: _getCategoryEmoji(categoryId),
           myAmount: myAmount,
           peerAmount: peerAmount,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../services/financial_health_score_service.dart';
+import '../services/category_localization_service.dart';
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
 import '../providers/transaction_provider.dart';
@@ -233,7 +234,7 @@ class SpendingStructureScorePage extends ConsumerWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            category?.localizedName ?? entry.key,
+                            category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(entry.key),
                             style: const TextStyle(fontSize: 13),
                           ),
                         ),
@@ -387,7 +388,7 @@ class SpendingStructureScorePage extends ConsumerWidget {
       
       if (maxPercent > 0.5) {
         final category = DefaultCategories.findById(maxCategory.key);
-        suggestions.add('${category?.localizedName ?? maxCategory.key}占比过高(${(maxPercent * 100).toStringAsFixed(0)}%)，建议优化消费结构');
+        suggestions.add('${category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(maxCategory.key)}占比过高(${(maxPercent * 100).toStringAsFixed(0)}%)，建议优化消费结构');
       } else if (maxPercent > 0.4) {
         suggestions.add('注意控制主要支出分类的占比，避免过度集中');
       }

@@ -6,6 +6,7 @@ import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 import 'category_detail_page.dart';
 
 /// 对比模式
@@ -719,7 +720,7 @@ class _PeriodComparisonPageState extends ConsumerState<PeriodComparisonPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    category?.localizedName ?? categoryId,
+                    category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId),
                     style: const TextStyle(
                       fontWeight: FontWeight.w500,
                     ),

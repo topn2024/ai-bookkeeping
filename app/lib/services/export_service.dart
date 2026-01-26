@@ -6,6 +6,7 @@ import '../models/transaction.dart';
 import '../models/category.dart';
 import '../models/account.dart';
 import '../extensions/category_extensions.dart';
+import 'category_localization_service.dart';
 
 /// 导出格式
 enum ExportFormat {
@@ -180,7 +181,7 @@ class ExportService {
         : DefaultCategories.incomeCategories;
 
     final category = categories.where((c) => c.id == categoryId).firstOrNull;
-    return category?.localizedName ?? categoryId;
+    return category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId);
   }
 
   String _getAccountName(String accountId) {

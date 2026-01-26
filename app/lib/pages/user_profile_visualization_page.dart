@@ -7,6 +7,7 @@ import '../providers/budget_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 
 /// 用户画像可视化页面
 ///
@@ -80,7 +81,7 @@ class _UserProfileVisualizationPageState
       final category = DefaultCategories.findById(entry.key);
       final frequency = _getFrequencyLabel(entry.value);
       behaviors.add(BehaviorItem(
-        name: category?.localizedName ?? entry.key,
+        name: category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(entry.key),
         frequency: frequency,
         icon: category?.icon ?? Icons.category,
       ));
@@ -131,7 +132,7 @@ class _UserProfileVisualizationPageState
     }
     if (sortedCategories.isNotEmpty) {
       final topCategory = DefaultCategories.findById(sortedCategories.first.key);
-      recommendations.add('您在${topCategory?.localizedName ?? sortedCategories.first.key}类目消费较多，可关注相关优惠');
+      recommendations.add('您在${topCategory?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(sortedCategories.first.key)}类目消费较多，可关注相关优惠');
     }
     if (recommendations.isEmpty) {
       recommendations.add('继续保持良好的记账习惯');

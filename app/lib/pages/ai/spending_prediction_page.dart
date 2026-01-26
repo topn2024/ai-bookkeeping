@@ -6,6 +6,7 @@ import '../../models/category.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/budget_provider.dart';
 import '../../extensions/category_extensions.dart';
+import '../../services/category_localization_service.dart';
 import '../budget_management_page.dart';
 
 /// 消费趋势预测页面
@@ -305,7 +306,7 @@ class _CategoryPredictionSection extends ConsumerWidget {
 
       predictions.add(_PredictionData(
         emoji: emoji,
-        category: category?.localizedName ?? categoryId,
+        category: category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId),
         predicted: predicted,
         spent: spent,
         budget: budget > 0 ? budget : predicted * 1.2, // 无预算时用预测值的120%

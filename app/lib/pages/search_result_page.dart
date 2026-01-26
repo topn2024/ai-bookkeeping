@@ -6,6 +6,7 @@ import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 import 'transaction_detail_page.dart';
 import 'advanced_filter_page.dart';
 
@@ -399,7 +400,7 @@ class _SearchResultPageState extends ConsumerState<SearchResultPage> {
                 children: [
                   // 标题（高亮搜索词）
                   _buildHighlightedText(
-                    transaction.note ?? category?.localizedName ?? transaction.category,
+                    transaction.note ?? category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(transaction.category),
                     style: const TextStyle(
                       fontWeight: FontWeight.w500,
                       fontSize: 15,
@@ -411,7 +412,7 @@ class _SearchResultPageState extends ConsumerState<SearchResultPage> {
                     children: [
                       if (transaction.note != null && transaction.note!.isNotEmpty) ...[
                         _buildHighlightedText(
-                          category?.localizedName ?? transaction.category,
+                          category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(transaction.category),
                           style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 12,

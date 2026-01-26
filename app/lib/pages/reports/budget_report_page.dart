@@ -6,6 +6,7 @@ import '../../providers/transaction_provider.dart';
 import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../extensions/category_extensions.dart';
+import '../../services/category_localization_service.dart';
 import '../budget_management_page.dart';
 import '../category_detail_page.dart';
 
@@ -112,13 +113,15 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
         final spent = categoryExpenses[categoryId] ?? 0;
         final budget = usage.budget.amount;
 
-        // 获取分类颜色
+        // 获取分类颜色和名称
         final category = DefaultCategories.findById(categoryId);
         final color = category?.color ?? Colors.grey;
+        final name = category?.localizedName ??
+                     CategoryLocalizationService.instance.getCategoryName(categoryId);
 
         categories.add(_BudgetCategoryData(
           categoryId: categoryId,
-          name: category?.localizedName ?? categoryId,
+          name: name,
           budget: budget,
           used: spent,
           color: color,
@@ -134,10 +137,12 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
       for (final entry in categoryExpenses.entries) {
         final category = DefaultCategories.findById(entry.key);
         final color = category?.color ?? Colors.grey;
+        final name = category?.localizedName ??
+                     CategoryLocalizationService.instance.getCategoryName(entry.key);
 
         categories.add(_BudgetCategoryData(
           categoryId: entry.key,
-          name: category?.localizedName ?? entry.key,
+          name: name,
           budget: 0, // 无预算
           used: entry.value,
           color: color,

@@ -5,6 +5,7 @@ import '../models/transaction.dart';
 import '../models/budget.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import 'category_localization_service.dart';
 
 /// 家庭报表服务
 class FamilyReportService {
@@ -160,7 +161,7 @@ class FamilyReportService {
 
       analysis.add(CategoryAnalysis(
         categoryId: categoryId,
-        categoryName: category?.localizedName ?? categoryId,
+        categoryName: category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId),
         icon: category?.icon ?? Icons.category,
         color: category?.color ?? Colors.grey,
         amount: amount,
@@ -300,7 +301,7 @@ class FamilyReportService {
       final category = DefaultCategories.findById(categoryId);
 
       budgetExecutions.add(BudgetExecution(
-        name: category?.localizedName ?? categoryId,
+        name: category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId),
         budget: budget.amount,
         used: spent,
         usageRate: usageRate,

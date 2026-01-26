@@ -6,6 +6,7 @@ import '../models/category.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/budget_provider.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 import '../theme/app_theme.dart';
 import 'category_detail_page.dart';
 import 'money_age_page.dart';
@@ -277,7 +278,7 @@ class MoneyAgeBudgetPage extends ConsumerWidget {
           context,
           theme,
           emoji: emoji,
-          name: '${category?.localizedName ?? categoryId}预算',
+          name: '${category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId)}预算',
           current: spent,
           budget: budget.amount,
           impact: impact,
@@ -469,7 +470,7 @@ class MoneyAgeBudgetPage extends ConsumerWidget {
 
       if (targetCategoryId != null) {
         final category = DefaultCategories.findById(targetCategoryId);
-        final categoryName = category?.localizedName ?? targetCategoryId;
+        final categoryName = category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(targetCategoryId);
         final reducedBudget = (targetBudget * 0.8).round();
         final savings = (targetBudget - reducedBudget).round();
 

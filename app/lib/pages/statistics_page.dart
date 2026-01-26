@@ -7,6 +7,7 @@ import '../providers/transaction_provider.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 import 'category_detail_page.dart';
 import 'period_comparison_page.dart';
 
@@ -967,7 +968,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
                 ),
               Text(
                 _expandedCategory != null
-                    ? '${expandedCategoryInfo?.localizedName ?? _expandedCategory} 明细'
+                    ? '${expandedCategoryInfo?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(_expandedCategory!)} 明细'
                     : '分类占比',
                 style: const TextStyle(
                   fontSize: 16,
@@ -1117,7 +1118,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
                   ),
                 Text(
                   _expandedCategory != null
-                      ? '${expandedCategoryInfo?.localizedName ?? _expandedCategory} 明细'
+                      ? '${expandedCategoryInfo?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(_expandedCategory!)} 明细'
                       : '分类明细',
                   style: const TextStyle(
                     fontSize: 16,
@@ -1174,7 +1175,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage>
                 children: [
                   Expanded(
                     child: Text(
-                      category?.localizedName ?? entry.key,
+                      category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(entry.key),
                       style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                   ),

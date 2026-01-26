@@ -5,6 +5,7 @@ import '../models/transaction.dart';
 import '../models/budget.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
 
@@ -426,7 +427,7 @@ class FamilyDashboardService {
         final category = DefaultCategories.findById(categoryId);
 
         statuses.add(BudgetStatus(
-          name: category?.localizedName ?? budget.name,
+          name: category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(budget.name),
           type: 'category',
           budgetAmount: budget.amount,
           usedAmount: spent,
@@ -476,7 +477,7 @@ class FamilyDashboardService {
       for (var row in results) {
         final transaction = Transaction.fromMap(row);
         final category = DefaultCategories.findById(transaction.category);
-        final categoryName = category?.localizedName ?? transaction.category;
+        final categoryName = category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(transaction.category);
 
         final description = transaction.type == TransactionType.expense
             ? '记录了一笔$categoryName支出'

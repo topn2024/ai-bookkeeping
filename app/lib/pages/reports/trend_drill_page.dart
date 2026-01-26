@@ -7,6 +7,7 @@ import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../providers/transaction_provider.dart';
 import '../../extensions/category_extensions.dart';
+import '../../services/category_localization_service.dart';
 import '../transaction_detail_page.dart';
 
 /// 趋势图下钻页面
@@ -509,14 +510,14 @@ class _TrendDrillPageState extends ConsumerState<TrendDrillPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  t.note ?? category?.localizedName ?? t.category,
+                  t.note ?? category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(t.category),
                   style: TextStyle(
                     fontWeight: FontWeight.w500,
                     color: theme.colorScheme.onSurface,
                   ),
                 ),
                 Text(
-                  '${category?.localizedName ?? t.category} · ${DateFormat('HH:mm').format(t.date)}',
+                  '${category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(t.category)} · ${DateFormat('HH:mm').format(t.date)}',
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.colorScheme.onSurfaceVariant,

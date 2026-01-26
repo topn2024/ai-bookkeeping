@@ -10,6 +10,7 @@ import '../models/account.dart';
 import '../extensions/extensions.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/account_provider.dart';
+import '../services/category_localization_service.dart';
 import 'add_transaction_page.dart';
 
 /// 交易详情页面
@@ -117,7 +118,7 @@ class TransactionDetailPage extends ConsumerWidget {
           const SizedBox(height: 8),
           // 备注或分类名
           Text(
-            transaction.note ?? category?.localizedName ?? transaction.category,
+            transaction.note ?? category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(transaction.category),
             style: TextStyle(
               fontSize: 16,
               color: theme.colorScheme.onSurfaceVariant,
@@ -159,7 +160,7 @@ class TransactionDetailPage extends ConsumerWidget {
             context,
             theme,
             label: context.l10n.category,
-            value: category?.localizedName ?? transaction.category,
+            value: category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(transaction.category),
           ),
           _buildDivider(theme),
           _buildDetailRow(

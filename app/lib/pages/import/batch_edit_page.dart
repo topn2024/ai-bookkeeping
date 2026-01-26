@@ -5,6 +5,7 @@ import '../../theme/app_theme.dart';
 import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../extensions/category_extensions.dart';
+import '../../services/category_localization_service.dart';
 
 /// 批量编辑页面
 /// 原型设计 5.07：批量编辑
@@ -160,7 +161,7 @@ class _BatchEditPageState extends ConsumerState<BatchEditPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    transaction.note ?? category?.localizedName ?? transaction.category,
+                    transaction.note ?? category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(transaction.category),
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,

@@ -7,6 +7,7 @@ import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 import 'add_transaction_page.dart';
 import 'transaction_detail_page.dart';
 
@@ -149,7 +150,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_category?.localizedName ?? widget.categoryId),
+        title: Text(_category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(widget.categoryId)),
         backgroundColor: categoryColor,
         foregroundColor: Colors.white,
         actions: [
@@ -547,7 +548,7 @@ class _CategoryDetailPageState extends ConsumerState<CategoryDetailPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    transaction.note ?? category?.localizedName ?? transaction.category,
+                    transaction.note ?? category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(transaction.category),
                     style: const TextStyle(
                       fontWeight: FontWeight.w500,
                     ),

@@ -6,6 +6,7 @@ import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../providers/transaction_provider.dart';
 import '../../extensions/category_extensions.dart';
+import '../../services/category_localization_service.dart';
 import '../transaction_detail_page.dart';
 
 /// 下钻导航页面
@@ -86,8 +87,8 @@ class DrillDownNavigationPage extends ConsumerWidget {
     Category? subCategory,
   ) {
     final title = subCategory != null
-        ? '${category?.localizedName ?? categoryId} - ${subCategory.localizedName}'
-        : category?.localizedName ?? categoryId;
+        ? '${category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId)} - ${subCategory.localizedName}'
+        : category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -167,7 +168,7 @@ class DrillDownNavigationPage extends ConsumerWidget {
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Text(
-                  category?.localizedName ?? categoryId,
+                  category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId),
                   style: TextStyle(
                     fontSize: 13,
                     color: theme.colorScheme.primary,
@@ -185,7 +186,7 @@ class DrillDownNavigationPage extends ConsumerWidget {
               ),
             ] else
               Text(
-                category?.localizedName ?? categoryId,
+                category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId),
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -218,9 +219,9 @@ class DrillDownNavigationPage extends ConsumerWidget {
         runSpacing: 8,
         children: [
           if (timeRangeLabel != null) _buildFilterTag(theme, timeRangeLabel!),
-          _buildFilterTag(theme, DefaultCategories.findById(categoryId)?.localizedName ?? categoryId),
+          _buildFilterTag(theme, DefaultCategories.findById(categoryId)?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId)),
           if (subCategoryId != null)
-            _buildFilterTag(theme, DefaultCategories.findById(subCategoryId!)?.localizedName ?? subCategoryId!),
+            _buildFilterTag(theme, DefaultCategories.findById(subCategoryId!)?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(subCategoryId!)),
         ],
       ),
     );
@@ -438,7 +439,7 @@ class DrillDownNavigationPage extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  t.note ?? category?.localizedName ?? t.category,
+                  t.note ?? category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(t.category),
                   style: TextStyle(
                     fontWeight: FontWeight.w500,
                     color: theme.colorScheme.onSurface,

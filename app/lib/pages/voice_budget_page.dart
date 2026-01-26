@@ -7,6 +7,7 @@ import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 
 /// 6.14 语音预算查询页面
 class VoiceBudgetPage extends ConsumerStatefulWidget {
@@ -163,7 +164,7 @@ class _VoiceBudgetPageState extends ConsumerState<VoiceBudgetPage> {
 
       final category = DefaultCategories.findById(categoryId);
       final emoji = _getCategoryEmoji(categoryId);
-      final name = category?.localizedName ?? categoryId;
+      final name = category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId);
 
       Color color;
       if (percent > 0.8) {

@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 
 /// PDF导出预览页面
 /// 原型设计 5.05：PDF导出预览
@@ -278,7 +279,7 @@ class _PdfPreviewPageState extends ConsumerState<PdfPreviewPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            category?.localizedName ?? entry.key,
+                            category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(entry.key),
                             style: TextStyle(
                               fontSize: 13,
                               color: theme.colorScheme.onSurface,
@@ -363,7 +364,7 @@ class _PdfPreviewPageState extends ConsumerState<PdfPreviewPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            t.note ?? category?.localizedName ?? t.category,
+                            t.note ?? category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(t.category),
                             style: TextStyle(
                               fontSize: 14,
                               color: theme.colorScheme.onSurface,
@@ -486,7 +487,7 @@ class _PdfPreviewPageState extends ConsumerState<PdfPreviewPage> {
           ..sort((a, b) => b.value.compareTo(a.value));
         for (final entry in sortedCategories) {
           final category = DefaultCategories.findById(entry.key);
-          buffer.writeln('  ${category?.localizedName ?? entry.key}: ¥${entry.value.toStringAsFixed(2)}');
+          buffer.writeln('  ${category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(entry.key)}: ¥${entry.value.toStringAsFixed(2)}');
         }
       }
 

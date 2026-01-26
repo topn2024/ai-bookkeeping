@@ -7,6 +7,7 @@ import '../providers/budget_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 import '../services/voice/query/query_models.dart';
 import '../services/voice/query/query_executor.dart';
 import '../services/voice/query/query_result_router.dart';
@@ -761,7 +762,7 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
     final categoryDetails = topCategories.map((entry) {
       final category = DefaultCategories.findById(entry.key);
       final emoji = _getCategoryEmoji(entry.key);
-      final name = category?.localizedName ?? entry.key;
+      final name = category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(entry.key);
       return '$emoji $name ¥${entry.value.toStringAsFixed(2)}';
     }).join('\n');
 
@@ -840,7 +841,7 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
     final categoryDetails = topCategories.map((entry) {
       final category = DefaultCategories.findById(entry.key);
       final emoji = _getCategoryEmoji(entry.key);
-      final name = category?.localizedName ?? entry.key;
+      final name = category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(entry.key);
       final percent = totalExpense > 0 ? (entry.value / totalExpense * 100).round() : 0;
       return '$emoji $name $percent%';
     }).join('\n');
@@ -884,7 +885,7 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
     if (sortedCategories.isNotEmpty) {
       final topCategory = sortedCategories.first;
       final category = DefaultCategories.findById(topCategory.key);
-      final name = category?.localizedName ?? topCategory.key;
+      final name = category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(topCategory.key);
       suggestions.add('$name支出较高（¥${topCategory.value.toStringAsFixed(0)}），可以关注一下');
     }
 
@@ -897,7 +898,7 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
       final percent = budget.amount > 0 ? spent / budget.amount : 0;
       if (percent > 0.8) {
         final category = DefaultCategories.findById(categoryId);
-        final name = category?.localizedName ?? categoryId;
+        final name = category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(categoryId);
         suggestions.add('$name预算已用${(percent * 100).round()}%，建议控制');
       }
     }

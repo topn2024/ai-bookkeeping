@@ -7,6 +7,7 @@ import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../providers/transaction_provider.dart';
 import '../../extensions/category_extensions.dart';
+import '../../services/category_localization_service.dart';
 import '../category_detail_page.dart';
 
 /// 月度报告页面
@@ -359,7 +360,7 @@ class _MonthlyReportPageState extends ConsumerState<MonthlyReportPage> {
               entry.key,
               category?.icon ?? Icons.help_outline,
               category?.color ?? Colors.grey,
-              category?.localizedName ?? entry.key,
+              category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(entry.key),
               entry.value,
               percentage,
             );

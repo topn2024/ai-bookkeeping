@@ -7,6 +7,7 @@ import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import '../services/category_localization_service.dart';
 import 'category_detail_page.dart';
 import 'reports/trend_drill_page.dart';
 import 'reports/drill_navigation_page.dart';
@@ -584,7 +585,7 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
               theme,
               icon: category?.icon ?? Icons.help_outline,
               iconColor: category?.color ?? Colors.grey,
-              name: category?.localizedName ?? entry.key,
+              name: category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(entry.key),
               count: count,
               amount: entry.value,
             ),

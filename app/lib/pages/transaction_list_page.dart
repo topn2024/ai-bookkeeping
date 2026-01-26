@@ -8,6 +8,7 @@ import '../models/transaction.dart';
 import '../models/category.dart';
 import '../models/account.dart';
 import '../extensions/extensions.dart';
+import '../services/category_localization_service.dart';
 import '../widgets/source_image_viewer.dart';
 import '../widgets/source_audio_player.dart';
 import '../widgets/swipeable_transaction_item.dart';
@@ -728,7 +729,7 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
 
       // 获取交易名称用于撤销提示
       final category = DefaultCategories.findById(transaction.category);
-      final transactionName = transaction.note ?? category?.localizedName ?? transaction.category;
+      final transactionName = transaction.note ?? category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(transaction.category);
 
       // 显示带撤销功能的 SnackBar
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1042,7 +1043,7 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
                               Row(
                                 children: [
                                   Text(
-                                    category?.localizedName ?? transaction.category,
+                                    category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(transaction.category),
                                     style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
