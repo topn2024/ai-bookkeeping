@@ -16,8 +16,8 @@ class AchievementSharePage extends ConsumerWidget {
 
   const AchievementSharePage({
     super.key,
-    this.achievementTitle = '连续记账30天',
-    this.achievementDescription = '坚持记账一个月，您已超越90%的用户！',
+    this.achievementTitle = '成就分享',
+    this.achievementDescription = '成就系统开发中，敬请期待！',
     this.achievementIcon = Icons.emoji_events,
   });
 

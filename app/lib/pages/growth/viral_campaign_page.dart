@@ -67,18 +67,18 @@ class ViralCampaignPage extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.expense.withValues(alpha: 0.15),
+              color: AppColors.primary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.timer, size: 14, color: AppColors.expense),
+                Icon(Icons.info_outline, size: 14, color: AppColors.primary),
                 const SizedBox(width: 4),
                 Text(
-                  '剩余7天',
+                  '开发中',
                   style: TextStyle(
-                    color: AppColors.expense,
+                    color: AppColors.primary,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -124,7 +124,7 @@ class ViralCampaignPage extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '邀请好友参与，瓜分10万元现金红包',
+            '活动功能开发中',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.9),
               fontSize: 14,
@@ -138,7 +138,7 @@ class ViralCampaignPage extends ConsumerWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Text(
-              '已有 12,345 人参与',
+              '敬请期待',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 12,
@@ -151,7 +151,8 @@ class ViralCampaignPage extends ConsumerWidget {
   }
 
   Widget _buildProgressSection(BuildContext context, ThemeData theme) {
-    const currentInvites = 3;
+    // TODO: 从后端获取真实的邀请进度
+    const currentInvites = 0;
     const targetInvites = 5;
     final progress = currentInvites / targetInvites;
 
