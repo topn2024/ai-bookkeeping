@@ -1,6 +1,8 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
+import '../../utils/amount_validator.dart';
 import 'bill_format_detector.dart';
 import 'category_learning_helper.dart';
 
@@ -599,6 +601,8 @@ abstract class BillParser {
   }
 
   /// Parse amount string to double
+  ///
+  /// 添加金额范围验证，防止导入异常大的数值
   double parseAmount(String amountStr) {
     // Remove currency symbols and whitespace
     final cleaned = amountStr
@@ -608,14 +612,23 @@ abstract class BillParser {
         .trim();
 
     // Handle negative amounts
+    double amount = 0.0;
     if (cleaned.startsWith('-') || cleaned.startsWith('−')) {
-      return double.tryParse(cleaned.substring(1)) ?? 0.0;
-    }
-    if (cleaned.startsWith('+')) {
-      return double.tryParse(cleaned.substring(1)) ?? 0.0;
+      amount = double.tryParse(cleaned.substring(1)) ?? 0.0;
+    } else if (cleaned.startsWith('+')) {
+      amount = double.tryParse(cleaned.substring(1)) ?? 0.0;
+    } else {
+      amount = double.tryParse(cleaned) ?? 0.0;
     }
 
-    return double.tryParse(cleaned) ?? 0.0;
+    // 使用 AmountValidator 限制范围，防止异常值
+    // 如果超出范围，返回0表示无效（调用方会跳过这条记录）
+    if (amount > AmountValidator.maxAmount) {
+      debugPrint('[BillParser] Amount $amount exceeds max limit ${AmountValidator.maxAmount}, skipping');
+      return 0.0;
+    }
+
+    return amount;
   }
 
   /// Parse date string to DateTime

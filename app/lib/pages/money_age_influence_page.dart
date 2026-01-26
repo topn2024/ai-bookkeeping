@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../providers/transaction_provider.dart';
 import '../models/transaction.dart';
+import '../services/category_localization_service.dart';
 
 /// 钱龄影响因素分析页面
 /// 原型设计 2.04：影响因素分析
@@ -233,7 +234,7 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
                 child: _buildFactorItem(
                   theme,
                   emoji: '💰',
-                  title: t.category,
+                  title: CategoryLocalizationService.instance.getCategoryName(t.category),
                   subtitle: '$dateStr ¥${t.amount.toStringAsFixed(0)}',
                   effect: effect,
                   isPositive: true,
@@ -292,7 +293,7 @@ class MoneyAgeInfluencePage extends ConsumerWidget {
                 child: _buildFactorItem(
                   theme,
                   emoji: _getCategoryEmoji(t.category),
-                  title: t.category,
+                  title: CategoryLocalizationService.instance.getCategoryName(t.category),
                   subtitle: '$dateStr ¥${t.amount.toStringAsFixed(0)}',
                   effect: effect,
                   isPositive: false,

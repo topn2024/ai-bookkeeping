@@ -7,6 +7,7 @@ import '../providers/budget_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/ledger_provider.dart';
 import '../extensions/category_extensions.dart';
+import '../utils/amount_validator.dart';
 
 class BudgetManagementPage extends ConsumerStatefulWidget {
   const BudgetManagementPage({super.key});
@@ -856,13 +857,16 @@ class _BudgetDialogState extends ConsumerState<_BudgetDialog> {
       return;
     }
 
-    final amount = double.tryParse(amountText);
-    if (amount == null || amount <= 0) {
+    // 使用统一的金额验证器
+    final validationError = AmountValidator.validateText(amountText);
+    if (validationError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.pleaseEnterValidAmount)),
+        SnackBar(content: Text(validationError)),
       );
       return;
     }
+
+    final amount = double.parse(amountText);
 
     final currentLedgerId = ref.read(ledgerProvider.notifier).currentLedgerId;
 

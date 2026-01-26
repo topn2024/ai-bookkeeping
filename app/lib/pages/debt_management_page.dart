@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/debt.dart';
 import '../providers/debt_provider.dart';
+import '../utils/amount_validator.dart';
 import 'debt_simulator_page.dart';
 
 class DebtManagementPage extends ConsumerWidget {
@@ -761,8 +762,7 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
                       ),
                       validator: (value) {
                         if (value?.isEmpty == true) return '请输入金额';
-                        if (double.tryParse(value!) == null) return '请输入有效数字';
-                        return null;
+                        return AmountValidator.validateText(value!);
                       },
                       onChanged: (value) {
                         if (_balanceController.text.isEmpty && value.isNotEmpty) {
@@ -783,8 +783,7 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
                       ),
                       validator: (value) {
                         if (value?.isEmpty == true) return '请输入余额';
-                        if (double.tryParse(value!) == null) return '请输入有效数字';
-                        return null;
+                        return AmountValidator.validateText(value!);
                       },
                     ),
                   ),
@@ -806,7 +805,10 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
                       ),
                       validator: (value) {
                         if (value?.isEmpty == true) return '请输入利率';
-                        if (double.tryParse(value!) == null) return '请输入有效数字';
+                        final rate = double.tryParse(value!);
+                        if (rate == null || rate < 0 || rate > 100) {
+                          return '请输入0-100之间的利率';
+                        }
                         return null;
                       },
                     ),
@@ -823,8 +825,7 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
                       ),
                       validator: (value) {
                         if (value?.isEmpty == true) return '请输入还款额';
-                        if (double.tryParse(value!) == null) return '请输入有效数字';
-                        return null;
+                        return AmountValidator.validateText(value!, allowZero: true);
                       },
                     ),
                   ),
@@ -1291,13 +1292,14 @@ class _DebtDetailPageState extends ConsumerState<DebtDetailPage> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final amount = double.tryParse(amountController.text);
-              if (amount == null || amount <= 0) {
+              final validationError = AmountValidator.validateText(amountController.text);
+              if (validationError != null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('请输入有效金额')),
+                  SnackBar(content: Text(validationError)),
                 );
                 return;
               }
+              final amount = double.parse(amountController.text);
               await ref.read(debtProvider.notifier).makePayment(
                     debt.id,
                     amount,

@@ -139,9 +139,16 @@ class _HomePageState extends ConsumerState<HomePage> {
     // 计算数据并更新文案上下文
     final lastMonthBalance = ref.watch(lastMonthBalanceProvider);
     // 修复：只要上月结余不为0就计算增长率，允许负数结余的对比
-    final growth = lastMonthBalance != 0
+    // 同时限制增长率在合理范围内（-999% 到 999%），避免异常显示
+    double growth = lastMonthBalance != 0
         ? ((balance - lastMonthBalance) / lastMonthBalance * 100)
         : 0.0;
+    // 处理NaN和Infinity，并限制范围
+    if (growth.isNaN || growth.isInfinite) {
+      growth = 0.0;
+    } else {
+      growth = growth.clamp(-999.0, 999.0);
+    }
     final streakStats = ref.watch(gamificationProvider);
     final moneyAgeData = ref.watch(moneyAgeProvider);
     final trendDays = moneyAgeData.trend == 'up' ? 5 : (moneyAgeData.trend == 'down' ? -5 : 0);
@@ -204,9 +211,14 @@ class _HomePageState extends ConsumerState<HomePage> {
     // 计算同比增长（仅用于图标显示）
     final lastMonthBalance = ref.watch(lastMonthBalanceProvider);
     // 修复：只要上月结余不为0就计算增长率，允许负数结余的对比
-    final growth = lastMonthBalance != 0
+    // 同时限制增长率在合理范围内，避免异常显示
+    double growth = lastMonthBalance != 0
         ? ((balance - lastMonthBalance) / lastMonthBalance * 100)
         : 0.0;
+    // 处理NaN和Infinity
+    if (growth.isNaN || growth.isInfinite) {
+      growth = 0.0;
+    }
     final isPositiveGrowth = growth >= 0;
 
     return Container(
@@ -576,7 +588,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                   style: TextStyle(
                     fontSize: 40,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.success,
+                    // 负值显示红色，正值显示绿色
+                    color: moneyAge < 0 ? AppColors.expense : AppColors.success,
                   ),
                 ),
                 const SizedBox(width: 4),

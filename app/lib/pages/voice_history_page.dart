@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
 import '../models/transaction.dart';
+import '../services/category_localization_service.dart';
 
 /// 语音识别类型
 enum VoiceRecordType {
@@ -76,7 +77,7 @@ class _VoiceHistoryPageState extends ConsumerState<VoiceHistoryPage> {
               type: transaction.source == TransactionSource.voice
                   ? VoiceRecordType.voice
                   : VoiceRecordType.image,
-              content: transaction.note ?? '${transaction.category} ${transaction.amount}',
+              content: transaction.note ?? '${CategoryLocalizationService.instance.getCategoryName(transaction.category)} ${transaction.amount}',
               timestamp: transaction.date,
               amount: transaction.amount,
               category: transaction.category,

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/budget.dart';
 import '../models/transaction.dart';
@@ -349,25 +350,58 @@ final moneyAgeProvider = Provider<MoneyAge>((ref) {
 
   final totalBalance = totalIncome - totalExpense;
 
-  // 计算最近30天的平均日支出
-  final thirtyDaysAgo = now.subtract(const Duration(days: 30));
-  final recentExpenses = transactions
+  // 计算最近90天的支出（排除异常值后的平均日支出）
+  final ninetyDaysAgo = now.subtract(const Duration(days: 90));
+  final recentExpenseList = transactions
       .where((t) =>
           t.type == TransactionType.expense &&
-          t.date.isAfter(thirtyDaysAgo))
-      .fold<double>(0, (sum, t) => sum + t.amount);
+          t.date.isAfter(ninetyDaysAgo))
+      .map((t) => t.amount)
+      .toList();
 
-  final avgDailyExpense = recentExpenses / 30;
+  // 计算平均日支出时排除异常值（超过3倍标准差的值）
+  double avgDailyExpense = 0;
+  if (recentExpenseList.isNotEmpty) {
+    // 计算中位数作为基准（更稳健）
+    recentExpenseList.sort();
+    final median = recentExpenseList[recentExpenseList.length ~/ 2];
+
+    // 过滤掉超过中位数100倍的异常值
+    final normalExpenses = recentExpenseList
+        .where((e) => e <= median * 100)
+        .toList();
+
+    if (normalExpenses.isNotEmpty) {
+      final totalNormalExpense = normalExpenses.fold<double>(0, (sum, e) => sum + e);
+      avgDailyExpense = totalNormalExpense / 90;
+    } else {
+      // 如果全部被过滤，使用中位数
+      avgDailyExpense = median;
+    }
+  }
 
   // 钱龄 = 当前余额 / 平均日支出
   // 允许负值：负钱龄表示已透支多少天的收入
+  // 限制范围在 -9999 到 9999 天，避免溢出和显示问题
   int moneyAgeDays = 0;
   if (avgDailyExpense > 0) {
-    moneyAgeDays = (totalBalance / avgDailyExpense).round();
+    final rawDays = totalBalance / avgDailyExpense;
+    // 处理NaN、Infinity和超大值
+    if (rawDays.isNaN || rawDays.isInfinite) {
+      moneyAgeDays = totalBalance >= 0 ? 9999 : -9999;
+    } else {
+      moneyAgeDays = rawDays.clamp(-9999.0, 9999.0).round();
+    }
   }
+
+  // 调试日志
+  debugPrint('[MoneyAge] 总收入: $totalIncome, 总支出: $totalExpense, 总余额: $totalBalance');
+  debugPrint('[MoneyAge] 正常平均日支出: $avgDailyExpense');
+  debugPrint('[MoneyAge] 钱龄天数: $moneyAgeDays');
 
   // 计算趋势（对比上月钱龄）
   String? trend;
+  final thirtyDaysAgo = now.subtract(const Duration(days: 30));
   final sixtyDaysAgo = now.subtract(const Duration(days: 60));
   final previousPeriodExpenses = transactions
       .where((t) =>

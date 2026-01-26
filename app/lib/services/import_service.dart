@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../models/account.dart';
+import '../utils/amount_validator.dart';
 
 /// @deprecated Use [BatchImportService] from 'import/batch_import_service.dart' instead.
 /// This service is kept for backward compatibility but will be removed in a future version.
@@ -270,7 +271,15 @@ class ImportService {
         .replaceAll('\$', '')
         .replaceAll(' ', '');
 
-    return double.tryParse(cleanValue);
+    final amount = double.tryParse(cleanValue);
+    if (amount == null) return null;
+
+    // 验证金额范围，防止导入异常值
+    if (amount > AmountValidator.maxAmount) {
+      return null; // 超出范围的金额视为无效
+    }
+
+    return amount;
   }
 
   /// 将预览项转换为交易记录

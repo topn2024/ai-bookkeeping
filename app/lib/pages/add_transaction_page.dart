@@ -13,6 +13,7 @@ import '../providers/category_provider.dart';
 import '../providers/ai_provider.dart';
 import '../services/ai_service.dart';
 import '../widgets/duplicate_transaction_dialog.dart';
+import '../utils/amount_validator.dart';
 import 'image_recognition_page.dart';
 import 'voice_recognition_page.dart';
 import 'split_transaction_page.dart';
@@ -903,13 +904,16 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
       return;
     }
 
-    final amount = double.tryParse(amountText) ?? 0;
-    if (amount <= 0) {
+    // 使用统一的金额验证器
+    final validationError = AmountValidator.validateText(amountText);
+    if (validationError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.pleaseEnterValidAmount)),
+        SnackBar(content: Text(validationError)),
       );
       return;
     }
+
+    final amount = double.parse(amountText);
 
     final transaction = Transaction(
       id: _isEditing ? widget.transaction!.id : DateTime.now().millisecondsSinceEpoch.toString(),

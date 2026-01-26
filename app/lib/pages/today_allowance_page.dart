@@ -8,6 +8,7 @@ import '../widgets/glass_components.dart';
 import '../widgets/antigravity_animations.dart';
 import '../models/transaction.dart';
 import '../providers/transaction_provider.dart';
+import '../services/category_localization_service.dart';
 import 'budget_center_page.dart';
 
 /// 今日可支出页面
@@ -354,7 +355,7 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
                     ),
                   ),
                   title: Text(
-                    expense.note ?? expense.category,
+                    expense.note ?? CategoryLocalizationService.instance.getCategoryName(expense.category),
                     style: theme.textTheme.bodyMedium,
                   ),
                   subtitle: Text(

@@ -613,13 +613,14 @@ class _ExpenseTargetPageState extends ConsumerState<ExpenseTargetPage> {
                     return;
                   }
 
-                  final amount = double.tryParse(amountText);
-                  if (amount == null || amount <= 0) {
+                  final validationError = AmountValidator.validateText(amountText);
+                  if (validationError != null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('请输入有效的额度')),
+                      SnackBar(content: Text(validationError)),
                     );
                     return;
                   }
+                  final amount = double.parse(amountText);
 
                   final notifier = ref.read(expenseTargetProvider.notifier);
                   final currentLedger = ref.read(currentLedgerProvider);

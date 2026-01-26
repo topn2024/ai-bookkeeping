@@ -7,6 +7,7 @@ import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
 import '../providers/ledger_context_provider.dart';
 import '../providers/budget_vault_provider.dart';
+import '../utils/amount_validator.dart';
 import 'package:uuid/uuid.dart';
 
 /// 创建/编辑小金库页面
@@ -511,28 +512,38 @@ class _VaultCreatePageState extends ConsumerState<VaultCreatePage> {
     final monthlyText = _monthlyController.text.replaceAll(',', '').trim();
     final targetText = _targetController.text.replaceAll(',', '').trim();
 
+    // 验证月度金额（允许为空和为0）
     double monthlyAmount = 0;
     if (monthlyText.isNotEmpty) {
-      final parsed = double.tryParse(monthlyText);
-      if (parsed == null || parsed < 0) {
+      final validationError = AmountValidator.validateText(
+        monthlyText,
+        allowZero: true,
+        allowEmpty: false,
+      );
+      if (validationError != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请输入有效的月度金额')),
+          SnackBar(content: Text('月度金额：$validationError')),
         );
         return;
       }
-      monthlyAmount = parsed;
+      monthlyAmount = double.parse(monthlyText);
     }
 
+    // 验证目标金额（允许为空和为0）
     double targetAmount = 0;
     if (targetText.isNotEmpty) {
-      final parsed = double.tryParse(targetText);
-      if (parsed == null || parsed < 0) {
+      final validationError = AmountValidator.validateText(
+        targetText,
+        allowZero: true,
+        allowEmpty: false,
+      );
+      if (validationError != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请输入有效的目标金额')),
+          SnackBar(content: Text('目标金额：$validationError')),
         );
         return;
       }
-      targetAmount = parsed;
+      targetAmount = double.parse(targetText);
     }
 
     final vaultType = VaultType.values[_selectedTypeIndex];

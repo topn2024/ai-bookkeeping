@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/credit_card.dart';
 import '../providers/credit_card_provider.dart';
+import '../utils/amount_validator.dart';
 
 class CreditCardPage extends ConsumerWidget {
   const CreditCardPage({super.key});
@@ -492,14 +493,19 @@ class CreditCardPage extends ConsumerWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              final amount = double.tryParse(amountController.text);
-              if (amount != null && amount > 0) {
-                ref.read(creditCardProvider.notifier).makePayment(card.id, amount);
-                Navigator.pop(context);
+              final validationError = AmountValidator.validateText(amountController.text);
+              if (validationError != null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('成功还款 ¥${amount.toStringAsFixed(2)}')),
+                  SnackBar(content: Text(validationError)),
                 );
+                return;
               }
+              final amount = double.parse(amountController.text);
+              ref.read(creditCardProvider.notifier).makePayment(card.id, amount);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('成功还款 ¥${amount.toStringAsFixed(2)}')),
+              );
             },
             child: const Text('确认还款'),
           ),
@@ -867,10 +873,7 @@ class _CreditCardFormPageState extends ConsumerState<CreditCardFormPage> {
                 if (value == null || value.isEmpty) {
                   return '请输入信用额度';
                 }
-                if (double.tryParse(value) == null) {
-                  return '请输入有效金额';
-                }
-                return null;
+                return AmountValidator.validateText(value);
               },
             ),
             const SizedBox(height: 16),
@@ -1065,7 +1068,8 @@ class _CreditCardFormPageState extends ConsumerState<CreditCardFormPage> {
     if (!_formKey.currentState!.validate()) return;
 
     final creditLimit = double.parse(_limitController.text);
-    final usedAmount = double.tryParse(_usedController.text) ?? 0;
+    final usedText = _usedController.text.trim();
+    final usedAmount = usedText.isEmpty ? 0.0 : double.parse(usedText);
 
     final card = CreditCard(
       id: widget.card?.id ?? const Uuid().v4(),

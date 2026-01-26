@@ -33,11 +33,37 @@ class HomePageTextService {
   /// [growthPercent] 同比增长百分比，正数表示提升，负数表示下降
   /// [userId] 用户ID，用于千人千面
   static String getBalanceGrowthText(double growthPercent, {String? userId}) {
-    final absGrowth = growthPercent.abs().toStringAsFixed(1);
+    // 处理NaN和Infinity
+    if (growthPercent.isNaN || growthPercent.isInfinite) {
+      return getNoGrowthDataText(userId: userId);
+    }
+
+    // 限制显示范围，超出范围时不显示具体数字
+    final clampedGrowth = growthPercent.clamp(-500.0, 500.0);
+    final absGrowth = clampedGrowth.abs().toStringAsFixed(1);
+    final isExtreme = growthPercent.abs() > 500;
 
     List<String> candidates;
 
-    if (growthPercent >= 20) {
+    // 处理极端值情况
+    if (isExtreme) {
+      if (growthPercent > 0) {
+        candidates = [
+          '本月结余大幅提升，做得非常好！💪',
+          '本月收支表现出色，继续保持！🎉',
+          '本月财务状况明显改善！✨',
+        ];
+      } else {
+        candidates = [
+          '本月有较大支出，建议查看明细',
+          '本月花销较多，一起分析一下？',
+          '本月支出增加明显，需要关注一下',
+        ];
+      }
+      return _pickForUser(candidates, userId: userId, category: 'balance_extreme');
+    }
+
+    if (clampedGrowth >= 20) {
       // 大幅提升 - 热烈庆祝
       candidates = [
         '太厉害了！较上月提升$absGrowth%，理财达人就是你！💪',
@@ -48,7 +74,7 @@ class HomePageTextService {
         '完美！较上月大涨$absGrowth%，继续这个势头！🚀',
         '太赞了！$absGrowth%的提升，你的努力有回报了！🌟',
       ];
-    } else if (growthPercent >= 5) {
+    } else if (clampedGrowth >= 5) {
       // 小幅提升 - 肯定鼓励
       candidates = [
         '不错！较上月提升$absGrowth%，继续加油！💪',
@@ -59,7 +85,7 @@ class HomePageTextService {
         '进步$absGrowth%，稳扎稳打，继续前进！',
         '小有成就！提升$absGrowth%，积少成多～',
       ];
-    } else if (growthPercent >= -5) {
+    } else if (clampedGrowth >= -5) {
       // 基本持平 - 平和描述
       candidates = [
         '本月结余与上月基本持平，保持稳定也是一种进步～',
@@ -69,7 +95,7 @@ class HomePageTextService {
         '收支平衡，稳中求进～',
         '保持平稳，这是财务健康的表现！',
       ];
-    } else if (growthPercent >= -20) {
+    } else if (clampedGrowth >= -20) {
       // 小幅下降 - 理解支持
       candidates = [
         '较上月下降$absGrowth%，可能有些计划外支出？没关系～',
@@ -93,7 +119,7 @@ class HomePageTextService {
       ];
     }
 
-    return _pickForUser(candidates, userId: userId, category: 'balance_$growthPercent');
+    return _pickForUser(candidates, userId: userId, category: 'balance_${clampedGrowth.toInt()}');
   }
 
   /// 获取连续记账庆祝文案

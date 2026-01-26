@@ -339,7 +339,21 @@ class MoneyAge {
   }
 
   String get description {
-    if (days == 0 && totalBalance <= 0) {
+    // 处理负数钱龄（已透支状态）
+    if (days < 0) {
+      final absDays = days.abs();
+      if (absDays >= 9999) {
+        return '严重透支！存在异常大额支出，建议检查并删除错误记录';
+      } else if (absDays >= 365) {
+        return '已严重透支超过一年的收入，财务状况需要立即改善';
+      } else if (absDays >= 30) {
+        return '已严重透支，相当于提前消费了${absDays}天的收入，需要立即改善';
+      } else if (absDays >= 14) {
+        return '已透支${absDays}天的收入，建议减少支出并增加收入';
+      } else {
+        return '已透支${absDays}天的收入，需要关注财务状况';
+      }
+    } else if (days == 0 && totalBalance <= 0) {
       return '当前已经入不敷出，需要尽快改善财务状况';
     } else if (days == 0 && totalBalance > 0) {
       return '最近30天没有支出记录，暂无法计算钱龄';

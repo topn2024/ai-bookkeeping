@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import '../../models/sms_message.dart';
 import '../../models/parsed_transaction.dart';
 import '../../models/import_candidate.dart';
+import '../../utils/amount_validator.dart';
 import '../ai_service.dart';
 import 'wechat_bill_parser.dart';
 import 'import_exceptions.dart';
@@ -181,6 +183,16 @@ $smsListText
   ) {
     // 分类推断：AI直接分类 + 规则兜底
     String category = transaction.category ?? '';
+
+    // 验证金额范围，防止AI解析出异常值
+    if (transaction.amount > AmountValidator.maxAmount) {
+      debugPrint('[SmsParser] Amount ${transaction.amount} exceeds max limit, skipping SMS');
+      throw AIParseException(
+        message: '金额超出有效范围（最大${AmountValidator.maxAmount}元）',
+        parsedCount: 0,
+        failedCount: 1,
+      );
+    }
 
     // 如果AI未返回分类或分类无效，使用规则引擎兜底
     if (category.isEmpty || !_isValidCategory(category)) {
