@@ -44,7 +44,8 @@ class SettingsPage extends ConsumerWidget {
         child: Column(
           children: [
             _buildUserHeader(context, ref),
-            _buildMemberCard(context),
+            // 暂时隐藏会员卡片
+            // _buildMemberCard(context),
             _buildMenuSection(context),
             _buildDataSyncToggle(context, ref),
             const SizedBox(height: 32),

@@ -79,14 +79,15 @@ class CustomThemePage extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '会员专属功能',
+              '自定义主题功能',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Theme.of(context).colorScheme.primary,
                   ),
             ),
             const SizedBox(height: 16),
             Text(
-              '升级为会员后，您可以：\n\n'
+              '当前版本免费开放所有功能！\n\n'
+              '您可以：\n'
               '- 完全自定义应用配色\n'
               '- 创建多个个性化主题\n'
               '- 自定义收入/支出/转账颜色\n'
@@ -100,16 +101,16 @@ class CustomThemePage extends ConsumerWidget {
             const SizedBox(height: 32),
             FilledButton.icon(
               onPressed: () {
-                // 跳转到会员订阅页面（这里暂时用开发模式激活）
+                // 自动激活所有功能（当前版本免费）
                 ref.read(themeProvider.notifier).setMemberStatus(true);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('会员已激活！现在可以使用自定义主题了'),
+                    content: Text('已激活！现在可以使用自定义主题了'),
                   ),
                 );
               },
-              icon: const Icon(Icons.workspace_premium),
-              label: const Text('升级会员'),
+              icon: const Icon(Icons.check_circle),
+              label: const Text('激活自定义主题'),
             ),
             const SizedBox(height: 16),
             // 预览预设主题
