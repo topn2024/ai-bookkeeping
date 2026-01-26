@@ -7,6 +7,7 @@ import '../core/contracts/i_database_service.dart';
 import 'base/crud_notifier.dart';
 import 'transaction_provider.dart';
 import 'ledger_provider.dart';
+import '../services/local_money_age_calculator.dart';
 
 /// 预算管理 Notifier
 ///
@@ -430,6 +431,24 @@ final moneyAgeProvider = Provider<MoneyAge>((ref) {
 });
 
 /// 钱龄历史记录（用于显示趋势图表）
+/// 每日钱龄历史Provider（使用FIFO算法计算）
+/// 自动监听交易变化并重新计算
+final dailyMoneyAgeHistoryProvider = Provider<List<MapEntry<DateTime, int>>>((ref) {
+  final transactions = ref.watch(transactionProvider);
+
+  if (transactions.isEmpty) return [];
+
+  // 使用本地钱龄计算器
+  final calculator = LocalMoneyAgeCalculator();
+
+  // 计算最近365天的每日钱龄
+  final dailyData = calculator.getRecentDailyMoneyAge(transactions, 365);
+
+  return dailyData;
+});
+
+/// 月度钱龄历史Provider（保留用于向后兼容）
+@Deprecated('Use dailyMoneyAgeHistoryProvider for more accurate daily calculations')
 final moneyAgeHistoryProvider = Provider<List<MapEntry<DateTime, int>>>((ref) {
   final transactions = ref.watch(transactionProvider);
 

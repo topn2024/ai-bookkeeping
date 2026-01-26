@@ -41,9 +41,9 @@ class MoneyAgePage extends ConsumerWidget {
     }
 
     final dashboardAsync = ref.watch(moneyAgeDashboardProvider(bookId));
-    // 本地钱龄数据作为备用
+    // 本地钱龄数据作为备用（使用每日钱龄计算）
     final localMoneyAge = ref.watch(moneyAgeProvider);
-    final moneyAgeHistory = ref.watch(moneyAgeHistoryProvider);
+    final moneyAgeHistory = ref.watch(dailyMoneyAgeHistoryProvider);
 
     return dashboardAsync.when(
       data: (dashboard) {
@@ -1443,9 +1443,9 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
         ? ref.watch(moneyAgeDashboardProvider(bookId))
         : const AsyncValue<MoneyAgeDashboard?>.data(null);
 
-    // 本地历史数据作为备用
+    // 本地历史数据作为备用（使用每日钱龄计算）
     final localMoneyAge = ref.watch(moneyAgeProvider);
-    final moneyAgeHistory = ref.watch(moneyAgeHistoryProvider);
+    final moneyAgeHistory = ref.watch(dailyMoneyAgeHistoryProvider);
 
     return Scaffold(
       body: SafeArea(
