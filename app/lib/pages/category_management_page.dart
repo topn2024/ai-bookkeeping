@@ -137,7 +137,7 @@ class _CategoryManagementPageState
                 color: category.color.withValues(alpha:0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(category.icon, color: category.color),
+              child: Icon(category.icon, color: category.color, size: item.isChild ? 20 : 24),
             ),
             title: Row(
               children: [
@@ -158,7 +158,11 @@ class _CategoryManagementPageState
                 Flexible(
                   child: Text(
                     category.localizedName,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      fontWeight: item.isChild ? FontWeight.w400 : FontWeight.w600,
+                      fontSize: item.isChild ? 14 : 16,
+                      color: item.isChild ? AppColors.textSecondary : AppColors.textPrimary,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
