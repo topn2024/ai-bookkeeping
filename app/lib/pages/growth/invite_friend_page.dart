@@ -71,10 +71,11 @@ class InviteFriendPage extends ConsumerWidget {
                 builder: (context) => AlertDialog(
                   title: const Text('邀请规则'),
                   content: const Text(
+                    '邀请功能正在开发中，敬请期待！\n\n'
+                    '功能上线后：\n'
                     '1. 邀请好友注册并完成首次记账\n'
-                    '2. 双方各获得30天会员奖励\n'
-                    '3. 邀请越多，奖励越丰厚\n'
-                    '4. 奖励将在好友完成首次记账后发放',
+                    '2. 邀请越多，奖励越丰厚\n'
+                    '3. 奖励将在好友完成首次记账后发放',
                   ),
                   actions: [
                     TextButton(
@@ -93,7 +94,8 @@ class InviteFriendPage extends ConsumerWidget {
   }
 
   Widget _buildInviteCard(BuildContext context, ThemeData theme) {
-    const inviteCode = 'AIBOOK2026';
+    // TODO: 从后端获取用户专属邀请码
+    const inviteCode = '功能开发中';
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -121,7 +123,7 @@ class InviteFriendPage extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            '双方各得30天会员',
+            '邀请功能开发中',
             style: TextStyle(
               color: Colors.white,
               fontSize: 24,
@@ -215,11 +217,12 @@ class InviteFriendPage extends ConsumerWidget {
   }
 
   Widget _buildRewardSection(BuildContext context, ThemeData theme) {
+    // TODO: 从后端获取真实的奖励规则，当前版本无会员功能
     final rewards = [
-      _RewardItem('邀请1人', '30天会员', Icons.person_add),
-      _RewardItem('邀请3人', '90天会员', Icons.group_add),
-      _RewardItem('邀请5人', '180天会员', Icons.groups),
-      _RewardItem('邀请10人', '永久会员', Icons.diamond),
+      _RewardItem('邀请1人', '待定', Icons.person_add),
+      _RewardItem('邀请3人', '待定', Icons.group_add),
+      _RewardItem('邀请5人', '待定', Icons.groups),
+      _RewardItem('邀请10人', '待定', Icons.diamond),
     ];
 
     return Container(
@@ -292,11 +295,8 @@ class InviteFriendPage extends ConsumerWidget {
   }
 
   Widget _buildInviteHistory(BuildContext context, ThemeData theme) {
-    final invites = [
-      _InviteRecord('张**', '2026-01-05', true),
-      _InviteRecord('李**', '2026-01-03', true),
-      _InviteRecord('王**', '2026-01-01', false),
-    ];
+    // TODO: 从后端获取真实的邀请记录
+    final invites = <_InviteRecord>[];
 
     return Container(
       margin: const EdgeInsets.all(16),

@@ -219,9 +219,10 @@ class ViralCampaignPage extends ConsumerWidget {
   }
 
   Widget _buildRewardList(BuildContext context, ThemeData theme) {
+    // TODO: 从后端获取真实的活动数据和用户进度
     final rewards = [
-      _CampaignReward('邀请1人', '￥5红包', true, true),
-      _CampaignReward('邀请3人', '￥15红包', true, false),
+      _CampaignReward('邀请1人', '￥5红包', false, false),
+      _CampaignReward('邀请3人', '￥15红包', false, false),
       _CampaignReward('邀请5人', '￥30红包', false, false),
       _CampaignReward('邀请10人', '￥88红包', false, false),
     ];
