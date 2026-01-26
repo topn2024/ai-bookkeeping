@@ -1403,7 +1403,11 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
     final levelService = MoneyAgeLevelService();
     final result = <DailyMoneyAge>[];
 
-    for (final item in dashboard.trendData.take(days)) {
+    // 计算日期范围
+    final now = DateTime.now();
+    final startDate = now.subtract(Duration(days: days));
+
+    for (final item in dashboard.trendData) {
       final dateStr = item['date'] as String?;
       final avgAge = (item['avg_age'] as num?)?.toInt() ?? 0;
 
@@ -1411,13 +1415,19 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
       if (dateStr != null) {
         try {
           final date = DateTime.parse(dateStr);
-          final level = levelService.determineLevel(avgAge);
-          result.add(DailyMoneyAge(date: date, averageAge: avgAge, level: level));
+          // 根据日期范围过滤数据
+          if (date.isAfter(startDate) || date.isAtSameMomentAs(startDate)) {
+            final level = levelService.determineLevel(avgAge);
+            result.add(DailyMoneyAge(date: date, averageAge: avgAge, level: level));
+          }
         } catch (_) {
           // 跳过无效日期
         }
       }
     }
+
+    // 按日期排序（从旧到新）
+    result.sort((a, b) => a.date.compareTo(b.date));
 
     return result;
   }
