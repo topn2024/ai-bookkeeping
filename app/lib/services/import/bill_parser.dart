@@ -67,9 +67,10 @@ abstract class BillParser {
 
     // Transportation - 加油站和加油卡充值（优先识别，避免被游戏充值误判）
     if (text.contains('中石油') || text.contains('中石化') || text.contains('壳牌') ||
+        text.contains('中国石油') || text.contains('中国石化') ||
         text.contains('加油站') || text.contains('加油') || text.contains('油费') ||
         text.contains('gas') || text.contains('fuel') || text.contains('petro') ||
-        text.contains('昆仑e卡') || text.contains('加油卡') || text.contains('油卡充值')) {
+        text.contains('昆仑e卡') || text.contains('昆仑e享') || text.contains('加油卡') || text.contains('油卡充值')) {
       return 'transport_fuel';
     }
 
@@ -104,7 +105,12 @@ abstract class BillParser {
     if (text.contains('烧烤') || text.contains('bbq') || text.contains('烤肉')) {
       return 'food';
     }
-    if (text.contains('面馆') || text.contains('面条') || text.contains('拉面') || text.contains('noodle')) {
+    if (text.contains('面馆') || text.contains('面条') || text.contains('拉面') || text.contains('noodle') ||
+        text.contains('牛肉面') || text.contains('兰州') || text.contains('刀削面') || text.contains('炸酱面')) {
+      return 'food';
+    }
+    // 大排档、夜市等
+    if (text.contains('大排档') || text.contains('排档') || text.contains('夜市') || text.contains('烧烤档')) {
       return 'food';
     }
     if (text.contains('粥') || text.contains('包子') || text.contains('饺子') || text.contains('馄饨')) {
@@ -137,7 +143,8 @@ abstract class BillParser {
     }
     if (text.contains('咖啡') || text.contains('星巴克') || text.contains('瑞幸') || text.contains('coffee') ||
         text.contains('奶茶') || text.contains('喜茶') || text.contains('茶百道') || text.contains('coco') ||
-        text.contains('一点点') || text.contains('茶颜悦色')) {
+        text.contains('一点点') || text.contains('茶颜悦色') || text.contains('蜜雪冰城') || text.contains('蜜雪') ||
+        text.contains('奈雪') || text.contains('书亦烧仙草') || text.contains('古茗') || text.contains('沪上阿姨')) {
       return 'food_drink';
     }
     if (text.contains('水果') || text.contains('fruit') || text.contains('果园') || text.contains('水果店')) {
@@ -147,6 +154,11 @@ abstract class BillParser {
       return 'food_snack';
     }
 
+    // Food & Dining - 便利店食品（优先于购物分类，便利店消费多为食品饮料）
+    if (text.contains('罗森') || text.contains('lawson') || text.contains('7-11') || text.contains('711') ||
+        text.contains('全家') || text.contains('familymart') || text.contains('便利蜂') || text.contains('便利店')) {
+      return 'food';
+    }
     // Food & Dining - 餐饮品牌和通用关键词
     if (text.contains('麦当劳') || text.contains('肯德基') || text.contains('必胜客') ||
         text.contains('汉堡王') || text.contains('德克士') || text.contains('subway')) {
@@ -178,20 +190,35 @@ abstract class BillParser {
         text.contains('航空') || text.contains('airport')) {
       return 'transport_flight';
     }
+    // 通行费 - 高速/桥梁/隧道
+    if (text.contains('通行费') || text.contains('高速费') || text.contains('过路费') ||
+        text.contains('过桥费') || text.contains('隧道费') || text.contains('etc')) {
+      return 'transport';
+    }
     if (text.contains('交通') || text.contains('transport')) {
       return 'transport';
     }
 
-    // Shopping - 电商平台
-    if (text.contains('淘宝') || text.contains('天猫') || text.contains('京东') || text.contains('拼多多') ||
-        text.contains('电商') || text.contains('网购') || text.contains('唯品会') || text.contains('苏宁')) {
-      return 'shopping_digital';
+    // Communication - 话费充值（优先于电商，避免被误判）
+    if (text.contains('宽带') || text.contains('网费') || text.contains('internet') || text.contains('broadband')) {
+      return 'communication_internet';
+    }
+    if (text.contains('话费') || text.contains('手机充值') || text.contains('流量充值') ||
+        text.contains('流量') || text.contains('联通') || text.contains('移动') || text.contains('电信')) {
+      return 'communication_phone';
     }
 
-    // Shopping - 超市便利店
-    if (text.contains('超市') || text.contains('便利店') || text.contains('7-11') || text.contains('全家') ||
-        text.contains('罗森') || text.contains('沃尔玛') || text.contains('永辉') || text.contains('家乐福') ||
-        text.contains('大润发') || text.contains('华联') || text.contains('物美')) {
+    // Shopping - 电商平台（不含话费充值等）
+    if ((text.contains('淘宝') || text.contains('天猫') || text.contains('京东') || text.contains('拼多多') ||
+        text.contains('电商') || text.contains('网购') || text.contains('唯品会') || text.contains('苏宁')) &&
+        !text.contains('话费') && !text.contains('充值话费')) {
+      return 'shopping';
+    }
+
+    // Shopping - 超市（便利店已在上面归类为食品）
+    if (text.contains('超市') || text.contains('沃尔玛') || text.contains('永辉') || text.contains('家乐福') ||
+        text.contains('大润发') || text.contains('华联') || text.contains('物美') || text.contains('盒马') ||
+        text.contains('山姆') || text.contains('costco')) {
       return 'shopping_daily';
     }
 
@@ -258,7 +285,8 @@ abstract class BillParser {
 
     // Entertainment - 旅游休闲
     if (text.contains('旅游') || text.contains('景区') || text.contains('门票') || text.contains('travel') ||
-        text.contains('旅行社') || text.contains('导游') || text.contains('观光')) {
+        text.contains('旅行社') || text.contains('导游') || text.contains('观光') ||
+        text.contains('旅发') || text.contains('文旅') || text.contains('景点') || text.contains('游乐园')) {
       return 'entertainment_travel';
     }
     if (text.contains('ktv') || text.contains('唱歌') || text.contains('卡拉ok')) {
@@ -395,7 +423,8 @@ abstract class BillParser {
 
     // Subscription - 会员订阅（细分类别）
     if (text.contains('网盘') || text.contains('cloud storage') || text.contains('百度网盘') ||
-        text.contains('阿里云盘') || text.contains('icloud')) {
+        text.contains('阿里云盘') || text.contains('icloud') || text.contains('米家云存储') ||
+        text.contains('云存储') || text.contains('onedrive') || text.contains('dropbox')) {
       return 'subscription_cloud';
     }
     if (text.contains('办公软件') || text.contains('office') || text.contains('wps') || text.contains('microsoft 365')) {
@@ -428,7 +457,9 @@ abstract class BillParser {
     if (text.contains('请客') || text.contains('treat') || text.contains('请吃饭')) {
       return 'social_treat';
     }
-    if (text.contains('红包支出') || text.contains('发红包') || text.contains('send red packet')) {
+    // 微信红包（单发）- 包含"微信红包"或同时包含"红包"和"单发"
+    if (text.contains('微信红包') || (text.contains('红包') && text.contains('单发')) ||
+        text.contains('红包支出') || text.contains('发红包') || text.contains('send red packet')) {
       return 'social_redpacket';
     }
     if (text.contains('探病') || text.contains('慰问') || text.contains('visit')) {
@@ -451,7 +482,8 @@ abstract class BillParser {
     if (text.contains('人寿保险') || text.contains('life insurance') || text.contains('寿险')) {
       return 'finance_life_insurance';
     }
-    if (text.contains('医疗保险') || text.contains('medical insurance') || text.contains('医保')) {
+    if (text.contains('医疗保险') || text.contains('medical insurance') || text.contains('医保') ||
+        text.contains('城乡医疗') || text.contains('医疗缴费') || text.contains('社保医疗')) {
       return 'finance_medical_insurance';
     }
     if (text.contains('车险') || text.contains('car insurance') || text.contains('交强险')) {
@@ -489,6 +521,12 @@ abstract class BillParser {
     }
     if (text.contains('保险') || text.contains('insurance')) {
       return 'finance';
+    }
+
+    // Investment - 定投理财
+    if (text.contains('定投') || text.contains('基金') || text.contains('理财') ||
+        text.contains('余额宝') || text.contains('零钱通') || text.contains('货币基金')) {
+      return 'investment';
     }
 
     // Transfer - not expense

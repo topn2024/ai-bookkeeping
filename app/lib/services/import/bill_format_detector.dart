@@ -27,6 +27,7 @@ enum BillSourceType {
   bocBank,
   otherBank,
   generic,
+  sms,      // 短信导入
   unknown,
 }
 
@@ -116,6 +117,8 @@ class BillFormatResult {
         return ExternalSource.otherBank;
       case BillSourceType.generic:
         return ExternalSource.generic;
+      case BillSourceType.sms:
+        return ExternalSource.sms;
       case BillSourceType.unknown:
         return null;
     }
@@ -142,6 +145,8 @@ class BillFormatResult {
         return '银行流水';
       case BillSourceType.generic:
         return '通用表格';
+      case BillSourceType.sms:
+        return '短信导入';
       case BillSourceType.unknown:
         return '未知格式';
     }
@@ -168,6 +173,8 @@ class BillFormatResult {
         return 'other_bank';
       case BillSourceType.generic:
         return 'generic';
+      case BillSourceType.sms:
+        return 'sms';
       case BillSourceType.unknown:
         return 'unknown';
     }

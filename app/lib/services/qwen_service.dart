@@ -733,6 +733,9 @@ $_categoryPrompt
   }
 
   /// 智能分类建议
+  ///
+  /// 使用完整的分类提示词，支持60+细粒度分类
+  /// 返回最精确的分类ID（优先二级分类如 food_lunch）
   Future<String?> suggestCategory(String description) async {
     _ensureInitialized();
     _logger.debug('Suggesting category for: $description');
@@ -746,9 +749,15 @@ $_categoryPrompt
             'messages': [
               {
                 'role': 'system',
-                'content': '''你是一个消费分类助手。根据用户描述的消费内容，返回最合适的分类。
-可选分类：餐饮、交通、购物、娱乐、住房、医疗、教育、其他
-只返回分类名称，不要其他文字。'''
+                'content': '''你是一个智能记账分类助手。根据用户描述的消费或收入内容，返回最精确的分类ID。
+
+$_categoryPrompt
+
+重要规则：
+1. 优先返回二级分类ID（如 food_lunch 而不是 food）
+2. 只有在无法确定具体类型时才返回一级分类ID
+3. 只返回分类ID，不要返回中文名称，不要其他文字
+4. 分类ID必须是上述列表中的一个'''
               },
               {
                 'role': 'user',
@@ -767,7 +776,7 @@ $_categoryPrompt
         final choices = result['output']['choices'] as List;
         if (choices.isNotEmpty) {
           final content = choices[0]['message']['content'] as String;
-          final category = content.trim();
+          final category = content.trim().toLowerCase();
           _logger.debug('Suggested category: $category');
           return category;
         }

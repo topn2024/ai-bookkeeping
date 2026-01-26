@@ -465,10 +465,10 @@ class _SmsImportProgressPageState extends State<SmsImportProgressPage> {
     // 将candidates设置到BatchImportService中
     _batchImportService.setCandidates(_candidates!, fileName: '短信导入');
 
-    // 创建一个虚拟的格式检测结果（短信导入不需要格式检测）
+    // 创建一个虚拟的格式检测结果（短信导入使用sms类型）
     final dummyFormatResult = BillFormatResult(
       format: BillFileFormat.unknown,
-      sourceType: BillSourceType.generic,
+      sourceType: BillSourceType.sms,
       estimatedRecordCount: _candidates!.length,
     );
 

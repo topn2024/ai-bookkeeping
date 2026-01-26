@@ -122,42 +122,242 @@ class AIRecognitionResult {
   /// 使用 DefaultCategories.allCategoryIds 作为唯一来源
   static Set<String> get validCategoryIds => DefaultCategories.allCategoryIds;
 
-  /// 分类映射表 - 精确匹配
+  /// 分类映射表 - 精确匹配（包含所有细粒度分类）
   static const Map<String, String> categoryMap = {
-    // 支出分类
+    // ========== 餐饮分类 ==========
     '餐饮': 'food',
     '食品': 'food',
     '饮食': 'food',
     '吃饭': 'food',
     '美食': 'food',
+    '早餐': 'food_breakfast',
+    '早饭': 'food_breakfast',
+    '早点': 'food_breakfast',
+    '午餐': 'food_lunch',
+    '午饭': 'food_lunch',
+    '中餐': 'food_lunch',
+    '工作餐': 'food_lunch',
+    '晚餐': 'food_dinner',
+    '晚饭': 'food_dinner',
+    '夜宵': 'food_dinner',
+    '宵夜': 'food_dinner',
+    '零食': 'food_snack',
+    '小吃': 'food_snack',
+    '饮料': 'food_drink',
+    '饮品': 'food_drink',
+    '咖啡': 'food_drink',
+    '奶茶': 'food_drink',
+    '外卖': 'food_delivery',
+    '水果': 'food_fruit',
+
+    // ========== 交通分类 ==========
     '交通': 'transport',
     '出行': 'transport',
-    '打车': 'transport',
+    '打车': 'transport_taxi',
+    '出租车': 'transport_taxi',
+    '网约车': 'transport_taxi',
+    '公共交通': 'transport_public',
+    '地铁': 'transport_public',
+    '公交': 'transport_public',
+    '加油': 'transport_fuel',
+    '汽油': 'transport_fuel',
+    '停车': 'transport_parking',
+    '停车费': 'transport_parking',
+    '火车': 'transport_train',
+    '高铁': 'transport_train',
+    '动车': 'transport_train',
+    '火车高铁': 'transport_train',
+    '飞机': 'transport_flight',
+    '机票': 'transport_flight',
+    '航班': 'transport_flight',
+    '轮船': 'transport_ship',
+    '船票': 'transport_ship',
+
+    // ========== 购物分类 ==========
     '购物': 'shopping',
     '网购': 'shopping',
+    '日用品': 'shopping_daily',
+    '生活用品': 'shopping_daily',
+    '数码产品': 'shopping_digital',
+    '数码': 'shopping_digital',
+    '电子产品': 'shopping_digital',
+    '家电': 'shopping_appliance',
+    '家具': 'shopping_furniture',
+    '家居': 'shopping_furniture',
+    '礼物': 'shopping_gift',
+    '礼品': 'shopping_gift',
+
+    // ========== 娱乐分类 ==========
     '娱乐': 'entertainment',
     '休闲': 'entertainment',
+    '电影': 'entertainment_movie',
+    '看电影': 'entertainment_movie',
+    '游戏': 'entertainment_game',
+    '游戏充值': 'entertainment_game',
+    '旅游': 'entertainment_travel',
+    '景点': 'entertainment_travel',
+    '门票': 'entertainment_travel',
+    '运动': 'entertainment_sport',
+    'KTV': 'entertainment_ktv',
+    '唱歌': 'entertainment_ktv',
+    '聚会': 'entertainment_party',
+    '健身': 'entertainment_fitness',
+    '健身房': 'entertainment_fitness',
+
+    // ========== 居住分类 ==========
     '住房': 'housing',
-    '房租': 'housing',
     '居住': 'housing',
+    '房租': 'housing_rent',
+    '租金': 'housing_rent',
+    '房贷': 'housing_mortgage',
+    '按揭': 'housing_mortgage',
+    '物业': 'housing_property',
+    '物业费': 'housing_property',
+    '维修': 'housing_repair',
+    '装修': 'housing_repair',
+
+    // ========== 水电燃气 ==========
+    '水电燃气': 'utilities',
+    '电费': 'utilities_electric',
+    '水费': 'utilities_water',
+    '燃气费': 'utilities_gas',
+    '燃气': 'utilities_gas',
+    '天然气': 'utilities_gas',
+    '暖气费': 'utilities_heating',
+    '暖气': 'utilities_heating',
+    '供暖': 'utilities_heating',
+
+    // ========== 医疗分类 ==========
     '医疗': 'medical',
     '健康': 'medical',
     '看病': 'medical',
+    '门诊': 'medical_clinic',
+    '挂号': 'medical_clinic',
+    '药品': 'medical_medicine',
+    '买药': 'medical_medicine',
+    '住院': 'medical_hospital',
+    '体检': 'medical_checkup',
+    '健康检查': 'medical_checkup',
+    '保健品': 'medical_supplement',
+
+    // ========== 教育分类 ==========
     '教育': 'education',
     '学习': 'education',
-    '培训': 'education',
-    '其他': 'other_expense',  // 默认映射为支出的其他，收入的其他会在_mapCategory中处理
-    // 收入分类
+    '学费': 'education_tuition',
+    '报名费': 'education_tuition',
+    '书籍': 'education_books',
+    '图书': 'education_books',
+    '买书': 'education_books',
+    '培训': 'education_training',
+    '课程': 'education_training',
+    '网课': 'education_training',
+    '考试': 'education_exam',
+
+    // ========== 通讯分类 ==========
+    '通讯': 'communication',
+    '话费': 'communication_phone',
+    '手机费': 'communication_phone',
+    '充值': 'communication_phone',
+    '网费': 'communication_internet',
+    '宽带': 'communication_internet',
+
+    // ========== 服饰分类 ==========
+    '服饰': 'clothing',
+    '衣服': 'clothing_clothes',
+    '服装': 'clothing_clothes',
+    '鞋子': 'clothing_shoes',
+    '鞋': 'clothing_shoes',
+    '配饰': 'clothing_accessories',
+    '包': 'clothing_accessories',
+    '手表': 'clothing_accessories',
+
+    // ========== 美容分类 ==========
+    '美容': 'beauty',
+    '护肤': 'beauty_skincare',
+    '护肤品': 'beauty_skincare',
+    '化妆品': 'beauty_cosmetics',
+    '口红': 'beauty_cosmetics',
+    '理发': 'beauty_haircut',
+    '美发': 'beauty_haircut',
+    '剪头发': 'beauty_haircut',
+    '美甲': 'beauty_nails',
+
+    // ========== 会员订阅 ==========
+    '会员订阅': 'subscription',
+    '会员': 'subscription',
+    '视频会员': 'subscription_video',
+    '音乐会员': 'subscription_music',
+    '网盘会员': 'subscription_cloud',
+    '购物会员': 'subscription_shopping',
+
+    // ========== 人情往来 ==========
+    '人情往来': 'social',
+    '份子钱': 'social_gift_money',
+    '随份子': 'social_gift_money',
+    '节日送礼': 'social_festival',
+    '送礼': 'social_festival',
+    '请客吃饭': 'social_treat',
+    '请客': 'social_treat',
+    '红包支出': 'social_redpacket',
+    '发红包': 'social_redpacket',
+    '孝敬长辈': 'social_elder',
+    '给父母': 'social_elder',
+
+    // ========== 金融保险 ==========
+    '金融保险': 'finance',
+    '人寿保险': 'finance_life_insurance',
+    '医疗保险': 'finance_medical_insurance',
+    '车险': 'finance_car_insurance',
+    '手续费': 'finance_fee',
+    '转账费': 'finance_fee',
+    '贷款利息': 'finance_loan_interest',
+
+    // ========== 宠物 ==========
+    '宠物': 'pet',
+    '宠物食品': 'pet_food',
+    '猫粮': 'pet_food',
+    '狗粮': 'pet_food',
+    '宠物用品': 'pet_supplies',
+    '宠物医疗': 'pet_medical',
+
+    // ========== 其他支出 ==========
+    '其他': 'other_expense',
+    '其他支出': 'other_expense',
+
+    // ========== 收入分类 ==========
     '工资': 'salary',
     '薪水': 'salary',
     '薪资': 'salary',
+    '月薪': 'salary',
+    '基本工资': 'salary_base',
+    '底薪': 'salary_base',
+    '绩效奖金': 'salary_performance',
+    '绩效': 'salary_performance',
+    '加班费': 'salary_overtime',
+    '年终奖': 'salary_annual',
+    '十三薪': 'salary_annual',
     '奖金': 'bonus',
-    '年终奖': 'bonus',
+    '提成': 'bonus',
+    '项目奖金': 'bonus_project',
+    '季度奖': 'bonus_quarterly',
     '兼职': 'parttime',
     '副业': 'parttime',
+    '外快': 'parttime',
+    '投资收益': 'investment',
     '理财': 'investment',
     '投资': 'investment',
     '收益': 'investment',
+    '利息': 'investment',
+    '分红': 'investment',
+    '红包': 'redpacket',
+    '收红包': 'redpacket',
+    '微信红包': 'redpacket',
+    '报销': 'reimburse',
+    '公司报销': 'reimburse',
+    '经营所得': 'business',
+    '生意': 'business',
+    '营业收入': 'business',
+    '其他收入': 'other_income',
   };
 
   /// 分类关键词映射 - 用于模糊匹配（包含常见商户名称）
@@ -428,21 +628,184 @@ class AIService {
 
   /// 智能分类建议
   /// 根据交易描述推荐最可能的分类，使用千问模型
+  /// 如果 AI 返回粗粒度分类，会尝试用本地规则细化
   Future<String?> suggestCategory(String description) async {
     try {
       final category = await _qwenService.suggestCategory(description);
       if (category != null) {
-        final mapped = AIRecognitionResult.categoryMap[category] ?? category.toLowerCase();
+        // AI 现在直接返回分类ID（如 food_lunch），先尝试直接使用
+        String mapped = category.toLowerCase().trim();
+
+        // 如果返回的是中文，尝试映射
+        if (AIRecognitionResult.categoryMap.containsKey(category)) {
+          mapped = AIRecognitionResult.categoryMap[category]!;
+        }
+
         // 处理 'other' 分类，根据描述判断是收入还是支出
         if (mapped == 'other') {
           return isIncomeType(description) ? 'other_income' : 'other_expense';
         }
+
+        // 如果 AI 返回粗粒度分类（一级分类），尝试用本地规则细化
+        if (_isCoarseCategory(mapped)) {
+          final refined = _refineWithLocal(mapped, description);
+          if (refined != null) {
+            return refined;
+          }
+        }
+
         return mapped;
       }
       return localSuggestCategory(description);
     } catch (e) {
       // 如果API失败，回退到本地分类
       return localSuggestCategory(description);
+    }
+  }
+
+  /// 判断是否是粗粒度的一级分类
+  bool _isCoarseCategory(String category) {
+    const coarseCategories = {
+      'food', 'transport', 'shopping', 'entertainment', 'housing',
+      'utilities', 'medical', 'education', 'communication', 'clothing',
+      'beauty', 'subscription', 'social', 'finance', 'pet',
+      'salary', 'bonus',
+    };
+    return coarseCategories.contains(category);
+  }
+
+  /// 用本地规则将粗粒度分类细化为二级分类
+  String? _refineWithLocal(String coarseCategory, String description) {
+    final text = description.toLowerCase();
+
+    switch (coarseCategory) {
+      case 'food':
+        if (_containsAny(text, ['早餐', '早饭', '早点', '包子', '豆浆', '油条'])) return 'food_breakfast';
+        if (_containsAny(text, ['午餐', '午饭', '中餐', '工作餐', '午间'])) return 'food_lunch';
+        if (_containsAny(text, ['晚餐', '晚饭', '夜宵', '宵夜'])) return 'food_dinner';
+        if (_containsAny(text, ['咖啡', '星巴克', '瑞幸', '奶茶', '喜茶', '奈雪', '蜜雪', '茶百道', '饮料', '茶'])) return 'food_drink';
+        if (_containsAny(text, ['外卖', '美团外卖', '饿了么'])) return 'food_delivery';
+        if (_containsAny(text, ['水果', '苹果', '香蕉', '橙子', '果汁'])) return 'food_fruit';
+        if (_containsAny(text, ['零食', '小吃', '糖果', '薯片', '饼干'])) return 'food_snack';
+        return 'food';
+
+      case 'transport':
+        if (_containsAny(text, ['打车', '滴滴', '出租车', '高德打车', 'T3', '曹操', '首汽', '网约车', '快车', '专车'])) return 'transport_taxi';
+        if (_containsAny(text, ['地铁', '公交', '公交卡', '地铁卡', '公共交通'])) return 'transport_public';
+        if (_containsAny(text, ['高铁', '火车', '12306', '铁路', '动车'])) return 'transport_train';
+        if (_containsAny(text, ['飞机', '机票', '航班', '航空'])) return 'transport_flight';
+        if (_containsAny(text, ['加油', '中国石化', '中国石油', '壳牌', '加油站', '汽油'])) return 'transport_fuel';
+        if (_containsAny(text, ['停车', '停车费', '停车场'])) return 'transport_parking';
+        return 'transport';
+
+      case 'shopping':
+        if (_containsAny(text, ['日用品', '牙膏', '洗发水', '纸巾', '生活用品'])) return 'shopping_daily';
+        if (_containsAny(text, ['手机', '电脑', '数码', '电子产品', '耳机'])) return 'shopping_digital';
+        if (_containsAny(text, ['冰箱', '洗衣机', '空调', '电视', '家电'])) return 'shopping_appliance';
+        if (_containsAny(text, ['家具', '床', '沙发', '桌子', '椅子', '宜家'])) return 'shopping_furniture';
+        if (_containsAny(text, ['礼物', '礼品', '送人'])) return 'shopping_gift';
+        return 'shopping';
+
+      case 'entertainment':
+        if (_containsAny(text, ['电影', '猫眼', '淘票票', '影院'])) return 'entertainment_movie';
+        if (_containsAny(text, ['游戏', '王者荣耀', '和平精英', '原神'])) return 'entertainment_game';
+        if (_containsAny(text, ['旅游', '景点', '门票', '酒店'])) return 'entertainment_travel';
+        if (_containsAny(text, ['健身', '健身房', '游泳', '瑜伽', 'Keep'])) return 'entertainment_fitness';
+        if (_containsAny(text, ['KTV', 'ktv', '唱歌'])) return 'entertainment_ktv';
+        if (_containsAny(text, ['运动', '球场', '球馆'])) return 'entertainment_sport';
+        if (_containsAny(text, ['聚会', '派对'])) return 'entertainment_party';
+        return 'entertainment';
+
+      case 'housing':
+        if (_containsAny(text, ['房租', '租金', '月租'])) return 'housing_rent';
+        if (_containsAny(text, ['房贷', '按揭', '还贷'])) return 'housing_mortgage';
+        if (_containsAny(text, ['物业', '物业费'])) return 'housing_property';
+        if (_containsAny(text, ['维修', '修理', '装修'])) return 'housing_repair';
+        return 'housing';
+
+      case 'utilities':
+        if (_containsAny(text, ['电费', '充电'])) return 'utilities_electric';
+        if (_containsAny(text, ['水费'])) return 'utilities_water';
+        if (_containsAny(text, ['燃气', '天然气', '煤气'])) return 'utilities_gas';
+        if (_containsAny(text, ['暖气', '供暖'])) return 'utilities_heating';
+        return 'utilities';
+
+      case 'medical':
+        if (_containsAny(text, ['挂号', '看病', '门诊'])) return 'medical_clinic';
+        if (_containsAny(text, ['买药', '药店', '药品'])) return 'medical_medicine';
+        if (_containsAny(text, ['体检', '健康检查'])) return 'medical_checkup';
+        if (_containsAny(text, ['住院'])) return 'medical_hospital';
+        if (_containsAny(text, ['保健品', '维生素'])) return 'medical_supplement';
+        return 'medical';
+
+      case 'education':
+        if (_containsAny(text, ['学费', '报名费'])) return 'education_tuition';
+        if (_containsAny(text, ['买书', '书籍', '图书'])) return 'education_books';
+        if (_containsAny(text, ['培训', '课程', '网课'])) return 'education_training';
+        if (_containsAny(text, ['考试', '报名'])) return 'education_exam';
+        return 'education';
+
+      case 'communication':
+        if (_containsAny(text, ['话费', '充值', '手机费'])) return 'communication_phone';
+        if (_containsAny(text, ['网费', '宽带'])) return 'communication_internet';
+        return 'communication';
+
+      case 'clothing':
+        if (_containsAny(text, ['衣服', '上衣', '裤子', '外套'])) return 'clothing_clothes';
+        if (_containsAny(text, ['鞋子', '运动鞋', '皮鞋'])) return 'clothing_shoes';
+        if (_containsAny(text, ['配饰', '手表', '项链', '包'])) return 'clothing_accessories';
+        return 'clothing';
+
+      case 'beauty':
+        if (_containsAny(text, ['护肤', '面膜', '水乳'])) return 'beauty_skincare';
+        if (_containsAny(text, ['化妆品', '口红', '粉底'])) return 'beauty_cosmetics';
+        if (_containsAny(text, ['理发', '美发', '剪头发'])) return 'beauty_haircut';
+        if (_containsAny(text, ['美甲', '指甲'])) return 'beauty_nails';
+        return 'beauty';
+
+      case 'subscription':
+        if (_containsAny(text, ['爱奇艺', '腾讯视频', '优酷', 'B站', 'Netflix', '视频会员'])) return 'subscription_video';
+        if (_containsAny(text, ['网易云', 'QQ音乐', 'Spotify', '音乐会员'])) return 'subscription_music';
+        if (_containsAny(text, ['百度网盘', 'iCloud', '网盘'])) return 'subscription_cloud';
+        if (_containsAny(text, ['88VIP', '京东Plus', '购物会员'])) return 'subscription_shopping';
+        return 'subscription';
+
+      case 'social':
+        if (_containsAny(text, ['份子钱', '随份子', '红包钱'])) return 'social_gift_money';
+        if (_containsAny(text, ['送礼', '过节'])) return 'social_festival';
+        if (_containsAny(text, ['请客', '请吃饭'])) return 'social_treat';
+        if (_containsAny(text, ['发红包'])) return 'social_redpacket';
+        if (_containsAny(text, ['给父母', '孝敬'])) return 'social_elder';
+        return 'social';
+
+      case 'finance':
+        if (_containsAny(text, ['人寿', '寿险'])) return 'finance_life_insurance';
+        if (_containsAny(text, ['医保', '医疗险'])) return 'finance_medical_insurance';
+        if (_containsAny(text, ['车险', '交强险'])) return 'finance_car_insurance';
+        if (_containsAny(text, ['手续费', '转账费'])) return 'finance_fee';
+        if (_containsAny(text, ['利息', '贷款利息'])) return 'finance_loan_interest';
+        return 'finance';
+
+      case 'pet':
+        if (_containsAny(text, ['猫粮', '狗粮', '宠物食品'])) return 'pet_food';
+        if (_containsAny(text, ['猫砂', '宠物玩具', '宠物用品'])) return 'pet_supplies';
+        if (_containsAny(text, ['宠物医院', '宠物看病'])) return 'pet_medical';
+        return 'pet';
+
+      case 'salary':
+        if (_containsAny(text, ['基本工资', '底薪'])) return 'salary_base';
+        if (_containsAny(text, ['绩效', '绩效奖'])) return 'salary_performance';
+        if (_containsAny(text, ['加班费', '加班工资'])) return 'salary_overtime';
+        if (_containsAny(text, ['年终奖', '十三薪'])) return 'salary_annual';
+        return 'salary';
+
+      case 'bonus':
+        if (_containsAny(text, ['项目奖', '完成奖'])) return 'bonus_project';
+        if (_containsAny(text, ['季度奖'])) return 'bonus_quarterly';
+        return 'bonus';
+
+      default:
+        return null;
     }
   }
 
