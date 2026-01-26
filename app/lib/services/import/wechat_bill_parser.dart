@@ -394,13 +394,18 @@ class WechatBillParser extends BillParser {
 
     // Get other fields
     final merchant = getValue('merchant');
-    final note = getValue('note') ?? getValue('remark') ?? merchant;
+    final note = getValue('note');
+    final remark = getValue('remark');
     final externalId = getValue('externalId');
     final paymentMethod = getValue('paymentMethod');
     final transactionType = getValue('transactionType');
 
-    // Infer category
-    final category = inferCategory(merchant, note, type);
+    // Infer category - 组合所有字段（商户、商品、备注、交易类型）以便更准确匹配
+    final classificationText = _buildClassificationText(merchant, note, remark, transactionType);
+    final category = inferCategory(merchant, classificationText, type);
+
+    // 显示用的备注：优先使用商品，其次备注，最后商户
+    final displayNote = note ?? remark ?? merchant;
 
     return ImportCandidate(
       index: index,
@@ -409,13 +414,14 @@ class WechatBillParser extends BillParser {
       type: type,
       externalId: externalId,
       rawMerchant: merchant,
-      note: _buildNote(note, transactionType),
+      note: _buildDisplayNote(displayNote, transactionType),
       rawPaymentMethod: paymentMethod,
       rawStatus: status,
       category: category,
       rawData: {
         'merchant': merchant,
         'note': note,
+        'remark': remark,
         'transactionType': transactionType,
         'paymentMethod': paymentMethod,
         'status': status,
@@ -423,7 +429,27 @@ class WechatBillParser extends BillParser {
     );
   }
 
-  String? _buildNote(String? note, String? transactionType) {
+  /// 组合所有字段用于分类匹配
+  /// 包含：商户、商品、备注、交易类型
+  String? _buildClassificationText(String? merchant, String? note, String? remark, String? transactionType) {
+    final parts = <String>[];
+    if (merchant != null && merchant.isNotEmpty && merchant != '/') {
+      parts.add(merchant);
+    }
+    if (note != null && note.isNotEmpty && note != '/') {
+      parts.add(note);
+    }
+    if (remark != null && remark.isNotEmpty && remark != '/' && remark != note) {
+      parts.add(remark);
+    }
+    if (transactionType != null && transactionType.isNotEmpty && transactionType != '/' && transactionType != note) {
+      parts.add(transactionType);
+    }
+    return parts.isEmpty ? null : parts.join(' ');
+  }
+
+  /// 构建显示用的备注
+  String? _buildDisplayNote(String? note, String? transactionType) {
     if (note == null && transactionType == null) return null;
     if (note == transactionType) return note;
     if (note != null && transactionType != null) {

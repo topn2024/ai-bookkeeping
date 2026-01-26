@@ -120,12 +120,17 @@ $smsListText
 - 返回格式必须是JSON数组：[{...}, {...}, null, ...]
 - 数组长度必须与短信数量一致
 - 分类ID参考：
-  - 餐饮美食: food_drink
-  - 交通出行: transport_taxi, transport_metro, transport_bus
-  - 购物消费: shopping_clothing, shopping_electronics, shopping_daily
-  - 生活服务: life_utilities, life_rent, life_medical
-  - 娱乐休闲: entertainment_movie, entertainment_game
-  - 其他: other
+  - 餐饮美食: food, food_drink, food_delivery
+  - 交通出行: transport_taxi, transport_public, transport_fuel, transport_parking
+  - 购物消费: shopping, shopping_daily, shopping_digital
+  - 生活服务: utilities_electric, utilities_water, utilities_gas, housing_rent, housing_property
+  - 娱乐休闲: entertainment_movie, entertainment_game, entertainment_travel
+  - 医疗健康: medical_medicine, medical_clinic, medical_hospital
+  - 教育培训: education, education_training, education_tuition
+  - 投资理财: investment（定投、基金、理财）
+  - 金融服务: finance（信用卡还款、贷款还款、手续费）
+  - 人情往来: social_charity（捐款、公益）, social_gift_money（礼金）
+  - 其他: other_expense
 
 请直接返回JSON数组，不要包含任何其他文字说明。
 ''';

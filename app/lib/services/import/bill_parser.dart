@@ -65,9 +65,15 @@ abstract class BillParser {
     // Expense categories - 使用标准分类ID
     // 优先级：具体规则 > 一般规则
 
+    // 微信红包（单发）- 最优先识别，避免被其他规则误匹配
+    if (text.contains('微信红包') || (text.contains('红包') && text.contains('单发')) ||
+        text.contains('红包支出') || text.contains('发红包')) {
+      return 'social_redpacket';
+    }
+
     // Transportation - 加油站和加油卡充值（优先识别，避免被游戏充值误判）
     if (text.contains('中石油') || text.contains('中石化') || text.contains('壳牌') ||
-        text.contains('中国石油') || text.contains('中国石化') ||
+        text.contains('中国石油') || text.contains('中国石化') || text.contains('海油') ||
         text.contains('加油站') || text.contains('加油') || text.contains('油费') ||
         text.contains('gas') || text.contains('fuel') || text.contains('petro') ||
         text.contains('昆仑e卡') || text.contains('昆仑e享') || text.contains('加油卡') || text.contains('油卡充值')) {
@@ -90,12 +96,46 @@ abstract class BillParser {
     // Entertainment - 住宿（优先识别，避免被其他分类）
     if (text.contains('酒店') || text.contains('hotel') || text.contains('宾馆') ||
         text.contains('民宿') || text.contains('airbnb') || text.contains('客栈') ||
-        text.contains('大床房') || text.contains('标准间') || text.contains('套房') ||
+        text.contains('大床房') || text.contains('双床房') || text.contains('单床房') ||
+        text.contains('标准间') || text.contains('套房') || text.contains('客房') ||
         text.contains('住宿') || text.contains('入住') || text.contains('booking')) {
       return 'entertainment_travel';
     }
 
+    // Investment - 定投理财（优先识别，避免被其他规则误判）
+    if (text.contains('定投') || text.contains('基金') || text.contains('理财') ||
+        text.contains('余额宝') || text.contains('零钱通') || text.contains('货币基金')) {
+      return 'investment';
+    }
+
+    // Finance - 信用卡还款、贷款还款（优先识别）
+    if (text.contains('信用卡') && (text.contains('还款') || text.contains('还信用卡'))) {
+      return 'finance';
+    }
+    if (text.contains('贷款还款') || text.contains('还贷') || text.contains('房贷还款') ||
+        text.contains('车贷还款') || text.contains('e贷')) {
+      return 'finance';
+    }
+
+    // Social - 捐款捐赠（优先识别）
+    if (text.contains('捐款') || text.contains('捐赠') || text.contains('公益') ||
+        text.contains('壹基金') || text.contains('月捐') || text.contains('慈善')) {
+      return 'social_charity';
+    }
+
+    // Shopping - 大米等粮食（优先于食品规则，买米是日用品采购不是餐饮）
+    if (text.contains('大米') || text.contains('香米') || text.contains('东北米') ||
+        text.contains('珍珠米') || text.contains('泰国米') || text.contains('糯米') ||
+        (text.contains('米') && text.contains('kg'))) {
+      return 'shopping_daily';
+    }
+
     // Food & Dining - 具体餐饮类型（优先识别）
+    // 螺蛳粉、米粉等地方特色
+    if (text.contains('螺蛳粉') || text.contains('螺狮粉') || text.contains('米粉') || text.contains('粉店') ||
+        text.contains('桂林米粉') || text.contains('湖南米粉') || text.contains('汤粉') || text.contains('蒸饭')) {
+      return 'food';
+    }
     if (text.contains('寿司') || text.contains('sushi') || text.contains('日料') || text.contains('日本料理')) {
       return 'food';
     }
@@ -122,7 +162,16 @@ abstract class BillParser {
     if (text.contains('韩餐') || text.contains('韩国料理') || text.contains('石锅拌饭') || text.contains('烤肉')) {
       return 'food';
     }
-    if (text.contains('川菜') || text.contains('湘菜') || text.contains('粤菜') || text.contains('东北菜')) {
+    if (text.contains('川菜') || text.contains('湘菜') || text.contains('粤菜') || text.contains('东北菜') ||
+        text.contains('福建菜') || text.contains('私房菜') || text.contains('江浙菜') || text.contains('本帮菜') ||
+        text.contains('客家菜') || text.contains('潮汕菜') || text.contains('鲁菜') || text.contains('徽菜')) {
+      return 'food';
+    }
+    // 汤馆、汤店、鱼馆等餐饮场所
+    if (text.contains('汤馆') || text.contains('汤店') || text.contains('汤粉') ||
+        text.contains('鱼馆') || text.contains('鱼店') || text.contains('水库鱼') ||
+        text.contains('牛肉店') || text.contains('牛肉馆') || text.contains('羊肉馆') ||
+        text.contains('尝香') || text.contains('品鲜') || text.contains('鲜味')) {
       return 'food';
     }
 
@@ -154,8 +203,13 @@ abstract class BillParser {
       return 'food_snack';
     }
 
-    // Food & Dining - 便利店食品（优先于购物分类，便利店消费多为食品饮料）
+    // Shopping - 美宜佳等便利店（主要销售日用品，优先于食品便利店规则）
+    if (text.contains('美宜佳') || text.contains('天福') || text.contains('易站') || text.contains('十足')) {
+      return 'shopping_daily';
+    }
+    // Food & Dining - 便利店食品（罗森、全家等主要为食品饮料）
     if (text.contains('罗森') || text.contains('lawson') || text.contains('7-11') || text.contains('711') ||
+        text.contains('7-eleven') || text.contains('eleven') ||
         text.contains('全家') || text.contains('familymart') || text.contains('便利蜂') || text.contains('便利店')) {
       return 'food';
     }
@@ -164,9 +218,14 @@ abstract class BillParser {
         text.contains('汉堡王') || text.contains('德克士') || text.contains('subway')) {
       return 'food';
     }
+    // 打包、堂食等就餐方式
+    if (text.contains('打包') || text.contains('堂食') || text.contains('外带')) {
+      return 'food';
+    }
     if (text.contains('餐厅') || text.contains('饭店') || text.contains('酒楼') || text.contains('食府') ||
         text.contains('餐') || text.contains('饭') || text.contains('食') || text.contains('吃') ||
-        text.contains('restaurant') || text.contains('食堂') || text.contains('美食')) {
+        text.contains('restaurant') || text.contains('食堂') || text.contains('美食') ||
+        text.contains('茶轩') || text.contains('茶馆') || text.contains('茶楼') || text.contains('茶餐厅')) {
       return 'food';
     }
 
@@ -215,10 +274,11 @@ abstract class BillParser {
       return 'shopping';
     }
 
-    // Shopping - 超市（便利店已在上面归类为食品）
+    // Shopping - 超市和粮油店（日常消费）
     if (text.contains('超市') || text.contains('沃尔玛') || text.contains('永辉') || text.contains('家乐福') ||
         text.contains('大润发') || text.contains('华联') || text.contains('物美') || text.contains('盒马') ||
-        text.contains('山姆') || text.contains('costco')) {
+        text.contains('山姆') || text.contains('costco') || text.contains('粮油') || text.contains('米面') ||
+        text.contains('大米') || text.contains('香米') || text.contains('东北米')) {
       return 'shopping_daily';
     }
 
@@ -240,7 +300,8 @@ abstract class BillParser {
         text.contains('nike') || text.contains('adidas') || text.contains('new balance')) {
       return 'clothing_shoes';
     }
-    if (text.contains('手表') || text.contains('watch') || text.contains('包') || text.contains('bag') ||
+    if (text.contains('手表') || text.contains('watch') || text.contains('挎包') || text.contains('手提包') ||
+        text.contains('背包') || text.contains('钱包') || text.contains('bag') ||
         text.contains('配饰') || text.contains('accessories') || text.contains('首饰') || text.contains('jewelry')) {
       return 'clothing_accessories';
     }
@@ -257,7 +318,7 @@ abstract class BillParser {
 
     // Shopping - 通用购物
     if (text.contains('购物') || text.contains('shopping') || text.contains('商城') || text.contains('百货') ||
-        text.contains('商场') || text.contains('mall')) {
+        text.contains('商场') || text.contains('mall') || text.contains('广场') || text.contains('购物中心')) {
       return 'shopping';
     }
 
@@ -315,10 +376,11 @@ abstract class BillParser {
       return 'medical_supplement';
     }
     if (text.contains('医院') || text.contains('诊所') || text.contains('看病') || text.contains('挂号') ||
-        text.contains('hospital') || text.contains('medical')) {
+        text.contains('hospital') || text.contains('medical') || text.contains('医疗')) {
       return 'medical_clinic';
     }
-    if (text.contains('药') || text.contains('药店') || text.contains('pharmacy') || text.contains('药房')) {
+    if (text.contains('药') || text.contains('药店') || text.contains('pharmacy') || text.contains('药房') ||
+        text.contains('海王星辰') || text.contains('大参林') || text.contains('老百姓大药房') || text.contains('益丰')) {
       return 'medical_medicine';
     }
 
@@ -326,7 +388,8 @@ abstract class BillParser {
     if (text.contains('学费') || text.contains('tuition')) {
       return 'education_tuition';
     }
-    if (text.contains('培训') || text.contains('training') || text.contains('辅导班')) {
+    if (text.contains('培训') || text.contains('training') || text.contains('辅导班') ||
+        text.contains('竞赛') || text.contains('集训') || text.contains('进阶') || text.contains('补习')) {
       return 'education_training';
     }
     if (text.contains('考试') || text.contains('exam') || text.contains('报名费')) {
@@ -457,11 +520,6 @@ abstract class BillParser {
     if (text.contains('请客') || text.contains('treat') || text.contains('请吃饭')) {
       return 'social_treat';
     }
-    // 微信红包（单发）- 包含"微信红包"或同时包含"红包"和"单发"
-    if (text.contains('微信红包') || (text.contains('红包') && text.contains('单发')) ||
-        text.contains('红包支出') || text.contains('发红包') || text.contains('send red packet')) {
-      return 'social_redpacket';
-    }
     if (text.contains('探病') || text.contains('慰问') || text.contains('visit')) {
       return 'social_visit';
     }
@@ -521,12 +579,6 @@ abstract class BillParser {
     }
     if (text.contains('保险') || text.contains('insurance')) {
       return 'finance';
-    }
-
-    // Investment - 定投理财
-    if (text.contains('定投') || text.contains('基金') || text.contains('理财') ||
-        text.contains('余额宝') || text.contains('零钱通') || text.contains('货币基金')) {
-      return 'investment';
     }
 
     // Transfer - not expense

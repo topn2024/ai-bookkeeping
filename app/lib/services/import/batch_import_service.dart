@@ -192,6 +192,9 @@ class BatchImportService {
         return GenericBankParser(sourceType: sourceType);
       case BillSourceType.generic:
         return GenericBankParser(sourceType: BillSourceType.generic);
+      case BillSourceType.sms:
+        // 短信导入使用 SmsImportService 单独处理，不需要解析器
+        return null;
       case BillSourceType.unknown:
         return null;
     }
