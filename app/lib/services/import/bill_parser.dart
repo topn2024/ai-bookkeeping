@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
 import 'bill_format_detector.dart';
+import 'category_learning_helper.dart';
 
 /// Result of bill parsing
 class BillParseResult {
@@ -39,7 +40,15 @@ abstract class BillParser {
   ExternalSource get externalSource;
 
   /// Infer category from merchant name and note
+  /// 优先使用自学习数据，其次使用规则匹配
   String inferCategory(String? merchant, String? note, TransactionType type) {
+    // 1. 优先查询自学习数据
+    final learnedCategory = CategoryLearningHelper.instance.getLearnedCategory(merchant, note);
+    if (learnedCategory != null) {
+      return learnedCategory;
+    }
+
+    // 2. 规则匹配
     final text = '${merchant ?? ''} ${note ?? ''}'.toLowerCase();
 
     if (type == TransactionType.income) {

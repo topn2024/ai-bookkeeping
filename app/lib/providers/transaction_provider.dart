@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/transaction.dart';
 import '../models/account.dart';
 import '../utils/aggregations.dart';
 import '../utils/date_utils.dart';
 import '../services/duplicate_detection_service.dart';
+import '../services/learning/anomaly_learning_service.dart';
+import '../core/di/service_locator.dart';
 import 'base/crud_notifier.dart';
 import 'account_provider.dart';
 import 'credit_card_provider.dart';
@@ -117,6 +120,30 @@ class TransactionNotifier extends SimpleCrudNotifier<Transaction, String> {
     state = [transaction, ...state.where((t) => t.id != transaction.id)];
     // 更新账户余额
     await _updateAccountBalance(transaction);
+    // 记录交易数据用于异常学习（仅支出类型）
+    if (transaction.type == TransactionType.expense) {
+      _recordForAnomalyLearning(transaction);
+    }
+  }
+
+  /// 记录交易数据用于异常学习
+  void _recordForAnomalyLearning(Transaction transaction) {
+    try {
+      final anomalyService = sl<AnomalyLearningService>();
+      anomalyService.learn(AnomalyLearningData(
+        transactionId: transaction.id,
+        amount: transaction.amount,
+        category: transaction.category,
+        date: transaction.date,
+        anomalyType: AnomalyType.unusualAmount, // 初始标记为金额类型
+        transactionContext: {
+          'note': transaction.note,
+          'accountId': transaction.accountId,
+        },
+      ));
+    } catch (e) {
+      debugPrint('[TransactionProvider] 异常学习记录失败: $e');
+    }
   }
 
   /// 更新交易（保持原有方法名兼容）

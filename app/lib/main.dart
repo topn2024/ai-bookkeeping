@@ -31,6 +31,8 @@ import 'providers/transaction_provider.dart';
 import 'widgets/global_floating_ball.dart';
 import 'models/ledger.dart';
 import 'services/voice_navigation_executor.dart';
+import 'services/import/category_learning_helper.dart';
+import 'services/learning/database_data_stores.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -126,6 +128,23 @@ void main() async {
     logger.info('Default ledger initialized', tag: 'App');
   } catch (e) {
     logger.warning('Failed to initialize default ledger: $e', tag: 'App');
+  }
+
+  // Initialize learning services (category, intent, anomaly learning)
+  try {
+    // 1. 初始化分类学习
+    await CategoryLearningHelper.instance.initialize();
+    logger.info('Category learning helper initialized', tag: 'App');
+
+    // 2. 初始化数据库数据存储表
+    await sl<DatabaseIntentDataStore>().ensureTableExists();
+    await sl<DatabaseAnomalyDataStore>().ensureTableExists();
+    logger.info('Learning data stores initialized', tag: 'App');
+
+    // 3. 意图学习和异常学习服务已通过 service_locator 懒加载注册
+    logger.info('Learning services registered', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize learning services: $e', tag: 'App');
   }
 
   // Initialize global voice assistant

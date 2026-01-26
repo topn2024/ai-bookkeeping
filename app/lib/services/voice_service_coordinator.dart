@@ -34,6 +34,7 @@ import 'nl_search_service.dart';
 import 'voice_budget_query_service.dart';
 import 'vault_repository.dart';
 import 'casual_chat_service.dart';
+import 'learning/voice_intent_learning_service.dart';
 
 /// 语音服务协调器
 ///
@@ -249,6 +250,24 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       notifyListeners();
 
       if (result.success) {
+        // 记录意图学习（成功处理的命令）
+        try {
+          final intent = result.data?['intent'] as String? ?? 'unknown';
+          final learningService = sl<VoiceIntentLearningService>();
+          await learningService.learn(IntentLearningData(
+            userId: 'default',
+            input: voiceInput,
+            recognizedIntent: intent,
+            confidence: 1.0,
+            context: IntentContext(
+              hour: DateTime.now().hour,
+              dayOfWeek: DateTime.now().weekday,
+            ),
+          ));
+        } catch (e) {
+          debugPrint('[VoiceCoordinator] 意图学习记录失败: $e');
+        }
+
         return VoiceSessionResult.success(responseText, {
           'intelligenceEngine': true,
           ...?result.data, // 传递 IntelligenceEngine 返回的所有数据（包括 operationId）

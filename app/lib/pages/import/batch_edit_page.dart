@@ -6,6 +6,7 @@ import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../extensions/category_extensions.dart';
 import '../../services/category_localization_service.dart';
+import '../../services/import/category_learning_helper.dart';
 
 /// 批量编辑页面
 /// 原型设计 5.07：批量编辑
@@ -348,6 +349,24 @@ class _BatchEditPageState extends ConsumerState<BatchEditPage> {
   }
 
   void _applyCategory(Category category) {
+    // 记录用户的分类修正用于自学习
+    final selectedTransactions = widget.transactions
+        .where((t) => _selectedIds.contains(t.id))
+        .toList();
+
+    for (final transaction in selectedTransactions) {
+      // 只有分类发生变化时才记录
+      if (transaction.category != category.id) {
+        CategoryLearningHelper.instance.recordCorrection(
+          merchant: transaction.rawMerchant,
+          note: transaction.note,
+          originalCategory: transaction.category,
+          correctedCategory: category.id,
+          source: 'batch_edit',
+        );
+      }
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('已将 ${_selectedIds.length} 笔交易分类修改为「${category.localizedName}」'),

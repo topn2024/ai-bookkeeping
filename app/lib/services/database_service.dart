@@ -30,7 +30,7 @@ class DatabaseService implements IDatabaseService {
   final Logger _logger = Logger();
 
   // 当前数据库版本
-  static const int currentVersion = 19;
+  static const int currentVersion = 20;
 
   factory DatabaseService() => _instance;
 
@@ -759,6 +759,54 @@ class DatabaseService implements IDatabaseService {
       CREATE VIEW active_budgets AS
       SELECT * FROM budgets WHERE isDeleted = 0
     ''');
+
+    // ==================== 自学习分类系统表 ====================
+
+    // 分类学习记录表 - 记录关键词到分类的映射
+    await db.execute('''
+      CREATE TABLE category_learning_records (
+        id TEXT PRIMARY KEY,
+        keyword TEXT NOT NULL,
+        category TEXT NOT NULL,
+        confidence REAL NOT NULL DEFAULT 0.5,
+        learnCount INTEGER NOT NULL DEFAULT 1,
+        source TEXT,
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL
+      )
+    ''');
+
+    // 商户学习记录表 - 记录商户名到分类的映射
+    await db.execute('''
+      CREATE TABLE merchant_learning_records (
+        id TEXT PRIMARY KEY,
+        merchant TEXT NOT NULL,
+        category TEXT NOT NULL,
+        confidence REAL NOT NULL DEFAULT 0.5,
+        learnCount INTEGER NOT NULL DEFAULT 1,
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL
+      )
+    ''');
+
+    // 用户修正记录表 - 记录用户的分类修正历史
+    await db.execute('''
+      CREATE TABLE user_corrections (
+        id TEXT PRIMARY KEY,
+        originalCategory TEXT NOT NULL,
+        correctedCategory TEXT NOT NULL,
+        context TEXT,
+        source TEXT,
+        correctedAt INTEGER NOT NULL
+      )
+    ''');
+
+    // 创建学习表索引
+    await db.execute('CREATE INDEX idx_category_learning_keyword ON category_learning_records(keyword)');
+    await db.execute('CREATE INDEX idx_category_learning_confidence ON category_learning_records(confidence)');
+    await db.execute('CREATE INDEX idx_merchant_learning_merchant ON merchant_learning_records(merchant)');
+    await db.execute('CREATE INDEX idx_merchant_learning_confidence ON merchant_learning_records(confidence)');
+    await db.execute('CREATE INDEX idx_user_corrections_categories ON user_corrections(originalCategory, correctedCategory)');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -1412,6 +1460,62 @@ class DatabaseService implements IDatabaseService {
       }
 
       _logger.info('Version 19 migration completed', tag: 'DB');
+    }
+
+    if (oldVersion < 20) {
+      _logger.info('Starting version 20 migration: Adding self-learning tables...', tag: 'DB');
+
+      // 分类学习记录表
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS category_learning_records (
+          id TEXT PRIMARY KEY,
+          keyword TEXT NOT NULL,
+          category TEXT NOT NULL,
+          confidence REAL NOT NULL DEFAULT 0.5,
+          learnCount INTEGER NOT NULL DEFAULT 1,
+          source TEXT,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL
+        )
+      ''');
+
+      // 商户学习记录表
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS merchant_learning_records (
+          id TEXT PRIMARY KEY,
+          merchant TEXT NOT NULL,
+          category TEXT NOT NULL,
+          confidence REAL NOT NULL DEFAULT 0.5,
+          learnCount INTEGER NOT NULL DEFAULT 1,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL
+        )
+      ''');
+
+      // 用户修正记录表
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS user_corrections (
+          id TEXT PRIMARY KEY,
+          originalCategory TEXT NOT NULL,
+          correctedCategory TEXT NOT NULL,
+          context TEXT,
+          source TEXT,
+          correctedAt INTEGER NOT NULL
+        )
+      ''');
+
+      // 创建索引
+      try {
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_category_learning_keyword ON category_learning_records(keyword)');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_category_learning_confidence ON category_learning_records(confidence)');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_merchant_learning_merchant ON merchant_learning_records(merchant)');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_merchant_learning_confidence ON merchant_learning_records(confidence)');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_user_corrections_categories ON user_corrections(originalCategory, correctedCategory)');
+      } catch (e) {
+        _logger.debug('Index creation skipped: $e', tag: 'DB');
+      }
+
+      _logger.info('Version 20 migration completed: Self-learning tables created', tag: 'DB');
     }
   }
 

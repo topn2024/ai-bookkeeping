@@ -213,26 +213,32 @@ class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
             totalSpent += amount;
             matchedCategories.add(category);
           }
-          // 交通类：匹配"交通"、"打车"、"公交"、"地铁"、"停车"等
+          // 交通类：匹配"交通"、"打车"、"公交"、"地铁"、"停车"、"加油"等
           else if (vault.name == '交通' &&
                    (category.contains('交通') || category.contains('打车') ||
                     category.contains('公交') || category.contains('地铁') ||
-                    category.contains('停车') || category.contains('出行'))) {
+                    category.contains('停车') || category.contains('出行') ||
+                    category.contains('加油') || category.contains('油费') ||
+                    category.contains('高速') || category.contains('过路'))) {
             totalSpent += amount;
             matchedCategories.add(category);
           }
-          // 购物类：匹配"购物"、"网购"、"数码"等
+          // 购物类：匹配"购物"、"网购"、"数码"、"日用品"等
           else if (vault.name == '购物' &&
                    (category.contains('购物') || category.contains('数码') ||
-                    category.contains('服饰') || category.contains('日用'))) {
+                    category.contains('服饰') || category.contains('日用') ||
+                    category.contains('超市') || category.contains('商场') ||
+                    category.contains('网购') || category.contains('电器'))) {
             totalSpent += amount;
             matchedCategories.add(category);
           }
-          // 娱乐类：匹配"娱乐"、"电影"、"游戏"、"订阅"、"会员"等
+          // 娱乐类：匹配"娱乐"、"电影"、"游戏"、"订阅"、"会员"、"旅游"等
           else if (vault.name == '娱乐' &&
                    (category.contains('娱乐') || category.contains('电影') ||
                     category.contains('游戏') || category.contains('订阅') ||
-                    category.contains('会员') || category.contains('视频'))) {
+                    category.contains('会员') || category.contains('视频') ||
+                    category.contains('旅游') || category.contains('旅行') ||
+                    category.contains('景点') || category.contains('酒店'))) {
             totalSpent += amount;
             matchedCategories.add(category);
           }

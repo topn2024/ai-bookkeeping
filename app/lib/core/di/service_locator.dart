@@ -24,6 +24,12 @@ import '../../services/privacy/differential_privacy/differential_privacy_engine.
 import '../../services/privacy/anomaly_detection/malicious_user_tracker.dart';
 import '../../services/privacy/anomaly_detection/anomaly_detector.dart';
 
+// 学习服务
+import '../../services/learning/voice_intent_learning_service.dart';
+import '../../services/learning/anomaly_learning_service.dart';
+import '../../services/learning/database_data_stores.dart';
+import '../../services/import/category_learning_helper.dart';
+
 /// 全局服务定位器实例
 final sl = GetIt.instance;
 
@@ -59,6 +65,9 @@ Future<void> initServiceLocator() async {
 
   // 注册隐私服务
   _registerPrivacyServices();
+
+  // 注册学习服务
+  _registerLearningServices();
 
   _isInitialized = true;
 }
@@ -128,6 +137,37 @@ void _registerPrivacyServices() {
     () => AnomalyDetector(
       userTracker: sl<MaliciousUserTracker>(),
     ),
+  );
+}
+
+/// 注册学习服务
+void _registerLearningServices() {
+  // 数据库数据存储
+  sl.registerLazySingleton<DatabaseIntentDataStore>(
+    () => DatabaseIntentDataStore(),
+  );
+
+  sl.registerLazySingleton<DatabaseAnomalyDataStore>(
+    () => DatabaseAnomalyDataStore(),
+  );
+
+  // 意图学习服务
+  sl.registerLazySingleton<VoiceIntentLearningService>(
+    () => VoiceIntentLearningService(
+      dataStore: sl<DatabaseIntentDataStore>(),
+    ),
+  );
+
+  // 异常学习服务
+  sl.registerLazySingleton<AnomalyLearningService>(
+    () => AnomalyLearningService(
+      dataStore: sl<DatabaseAnomalyDataStore>(),
+    ),
+  );
+
+  // 分类学习辅助（单例，已有实现）
+  sl.registerLazySingleton<CategoryLearningHelper>(
+    () => CategoryLearningHelper.instance,
   );
 }
 
