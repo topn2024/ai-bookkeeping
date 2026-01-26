@@ -8,7 +8,6 @@ import '../models/transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
 import '../services/category_localization_service.dart';
-import 'category_detail_page.dart';
 import 'reports/trend_drill_page.dart';
 import 'reports/drill_navigation_page.dart';
 

@@ -226,7 +226,7 @@ class _OnboardingFirstTransactionPageState
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
-                                        category.localizedName,
+                                        category.name,
                                         style: TextStyle(
                                           fontSize: 13,
                                           color: isSelected

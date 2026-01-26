@@ -17,7 +17,6 @@ import 'reports/category_pie_drill_page.dart';
 import 'reports/drill_navigation_page.dart';
 import 'tag_statistics_page.dart';
 import 'wants_needs_insight_page.dart';
-import 'category_detail_page.dart';
 
 // 统计对比相关
 import 'period_comparison_page.dart';
