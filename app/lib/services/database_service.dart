@@ -3779,6 +3779,13 @@ class DatabaseService implements IDatabaseService {
     return await db.rawDelete(sql, arguments);
   }
 
+  /// 执行原始SQL语句（用于DDL语句如CREATE TABLE）
+  @override
+  Future<void> rawExecute(String sql, [List<Object?>? arguments]) async {
+    final db = await database;
+    await db.execute(sql, arguments);
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // 备份/导出服务使用的别名方法
   // ═══════════════════════════════════════════════════════════════

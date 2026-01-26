@@ -132,18 +132,25 @@ void main() async {
 
   // Initialize learning services (category, intent, anomaly learning)
   try {
+    debugPrint('[App] 开始初始化自学习服务...');
+
     // 1. 初始化分类学习
     await CategoryLearningHelper.instance.initialize();
+    debugPrint('[App] 分类学习服务初始化完成');
     logger.info('Category learning helper initialized', tag: 'App');
 
     // 2. 初始化数据库数据存储表
     await sl<DatabaseIntentDataStore>().ensureTableExists();
     await sl<DatabaseAnomalyDataStore>().ensureTableExists();
+    debugPrint('[App] 学习数据存储表初始化完成');
     logger.info('Learning data stores initialized', tag: 'App');
 
     // 3. 意图学习和异常学习服务已通过 service_locator 懒加载注册
+    debugPrint('[App] 自学习服务初始化全部完成');
     logger.info('Learning services registered', tag: 'App');
-  } catch (e) {
+  } catch (e, stackTrace) {
+    debugPrint('[App] 自学习服务初始化失败: $e');
+    debugPrint('[App] 堆栈: $stackTrace');
     logger.warning('Failed to initialize learning services: $e', tag: 'App');
   }
 

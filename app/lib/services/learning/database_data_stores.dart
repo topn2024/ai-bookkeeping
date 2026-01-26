@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/contracts/i_database_service.dart';
 import 'voice_intent_learning_service.dart';
@@ -16,7 +17,8 @@ class DatabaseIntentDataStore implements IntentDataStore {
 
   /// 确保表存在
   Future<void> ensureTableExists() async {
-    await db.rawQuery('''
+    debugPrint('[DatabaseIntentDataStore] 开始创建意图学习表...');
+    await db.rawExecute('''
       CREATE TABLE IF NOT EXISTS intent_learning_data (
         id TEXT PRIMARY KEY,
         userId TEXT NOT NULL,
@@ -28,12 +30,13 @@ class DatabaseIntentDataStore implements IntentDataStore {
         timestamp INTEGER NOT NULL
       )
     ''');
-    await db.rawQuery(
+    await db.rawExecute(
       'CREATE INDEX IF NOT EXISTS idx_intent_learning_user ON intent_learning_data(userId)',
     );
-    await db.rawQuery(
+    await db.rawExecute(
       'CREATE INDEX IF NOT EXISTS idx_intent_learning_timestamp ON intent_learning_data(timestamp)',
     );
+    debugPrint('[DatabaseIntentDataStore] 意图学习表创建完成');
   }
 
   @override
@@ -129,7 +132,8 @@ class DatabaseAnomalyDataStore implements AnomalyDataStore {
 
   /// 确保表存在
   Future<void> ensureTableExists() async {
-    await db.rawQuery('''
+    debugPrint('[DatabaseAnomalyDataStore] 开始创建异常学习表...');
+    await db.rawExecute('''
       CREATE TABLE IF NOT EXISTS anomaly_learning_data (
         id TEXT PRIMARY KEY,
         transactionId TEXT NOT NULL,
@@ -142,12 +146,13 @@ class DatabaseAnomalyDataStore implements AnomalyDataStore {
         createdAt INTEGER NOT NULL
       )
     ''');
-    await db.rawQuery(
+    await db.rawExecute(
       'CREATE INDEX IF NOT EXISTS idx_anomaly_learning_txn ON anomaly_learning_data(transactionId)',
     );
-    await db.rawQuery(
+    await db.rawExecute(
       'CREATE INDEX IF NOT EXISTS idx_anomaly_learning_date ON anomaly_learning_data(date)',
     );
+    debugPrint('[DatabaseAnomalyDataStore] 异常学习表创建完成');
   }
 
   @override

@@ -374,6 +374,7 @@ abstract class IDatabaseService {
   Future<int> rawInsert(String sql, [List<Object?>? arguments]);
   Future<int> rawUpdate(String sql, [List<Object?>? arguments]);
   Future<int> rawDelete(String sql, [List<Object?>? arguments]);
+  Future<void> rawExecute(String sql, [List<Object?>? arguments]);
 
   // ==================== 其他 ====================
 
