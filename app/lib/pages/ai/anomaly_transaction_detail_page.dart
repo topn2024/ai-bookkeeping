@@ -79,7 +79,7 @@ class _AnomalyWarningCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '检测���金额异常',
+            '检测到金额异常',
             style: TextStyle(
               fontSize: 14,
               color: Colors.red[800],

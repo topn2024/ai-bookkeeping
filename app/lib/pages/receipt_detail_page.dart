@@ -129,7 +129,7 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      
       appBar: AppBar(
         title: Text(l10n.receiptDetail),
         actions: [

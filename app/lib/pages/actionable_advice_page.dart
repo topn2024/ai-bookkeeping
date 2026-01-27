@@ -60,7 +60,7 @@ class _ActionableAdvicePageState extends ConsumerState<ActionableAdvicePage> {
     final adviceAsync = ref.watch(actionableAdviceProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(

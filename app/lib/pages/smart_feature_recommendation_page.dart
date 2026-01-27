@@ -43,7 +43,7 @@ class SmartFeatureRecommendationPage extends ConsumerWidget {
     final recommendationsAsync = ref.watch(featureRecommendationProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(

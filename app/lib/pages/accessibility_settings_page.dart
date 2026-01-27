@@ -27,7 +27,7 @@ class _AccessibilitySettingsPageState
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(

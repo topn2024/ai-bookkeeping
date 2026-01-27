@@ -3,7 +3,7 @@
     <div class="page-header">
       <h2 class="page-title">交易管理</h2>
       <el-button type="primary" @click="handleExport">
-        <el-icon><Download /></el-icon>导出数据
+        <font-awesome-icon icon="download" class="el-icon" />导出数据
       </el-button>
     </div>
 
@@ -36,7 +36,7 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">
-            <el-icon><Search /></el-icon>搜索
+            <font-awesome-icon icon="search" class="el-icon" />搜索
           </el-button>
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>

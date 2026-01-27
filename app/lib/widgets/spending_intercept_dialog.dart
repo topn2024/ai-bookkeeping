@@ -1,9 +1,3 @@
-import 'package:flutter/material.dart';
-
-/// 消费拦截弹窗
-///
-/// 对应原型设计 3.08 消费拦截
-/// 当消费超出小金库余额时显示的警告弹窗
 class SpendingInterceptDialog extends StatelessWidget {
   final String categoryName;
   final String merchantName;
@@ -38,7 +32,7 @@ class SpendingInterceptDialog extends StatelessWidget {
     return showModalBottomSheet<SpendingInterceptResult>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.transparent, // Always transparent for modal sheet
       builder: (context) => SpendingInterceptDialog(
         categoryName: categoryName,
         merchantName: merchantName,
@@ -55,10 +49,11 @@ class SpendingInterceptDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -69,7 +64,7 @@ class SpendingInterceptDialog extends StatelessWidget {
             height: 4,
             margin: const EdgeInsets.only(top: 12),
             decoration: BoxDecoration(
-              color: Colors.grey[300],
+              color: theme.colorScheme.outlineVariant,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -77,21 +72,20 @@ class SpendingInterceptDialog extends StatelessWidget {
           // 头部警告
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.red[50],
+            color: AppColors.error.withOpacity(0.1), // Adjusted for theme
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.close, color: Colors.red[400]),
+                  icon: Icon(Icons.close, color: AppColors.error),
                   onPressed: onCancel,
                 ),
                 Expanded(
                   child: Text(
                     '预算提醒',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 17,
+                    style: theme.textTheme.titleMedium?.copyWith( // Using theme typography
+                      color: AppColors.error,
                       fontWeight: FontWeight.w600,
-                      color: Colors.red[600],
                     ),
                   ),
                 ),
@@ -106,7 +100,7 @@ class SpendingInterceptDialog extends StatelessWidget {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.red[50]!, Colors.red[100]!],
+                colors: [AppColors.error.withOpacity(0.1), AppColors.error.withOpacity(0.2)], // Adjusted for theme
               ),
               borderRadius: BorderRadius.circular(16),
             ),
@@ -115,31 +109,29 @@ class SpendingInterceptDialog extends StatelessWidget {
                 Container(
                   width: 64,
                   height: 64,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.warning,
                     size: 36,
-                    color: Colors.red[400],
+                    color: AppColors.error,
                   ),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   '预算余额不足',
-                  style: TextStyle(
-                    fontSize: 20,
+                  style: theme.textTheme.headlineSmall?.copyWith( // Using theme typography
+                    color: AppColors.error,
                     fontWeight: FontWeight.bold,
-                    color: Colors.red[600],
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '"$categoryName"小金库可用余额不足',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.red[400],
+                  style: theme.textTheme.bodyMedium?.copyWith( // Using theme typography
+                    color: AppColors.error,
                   ),
                 ),
               ],
@@ -155,7 +147,7 @@ class SpendingInterceptDialog extends StatelessWidget {
                   child: _AmountCard(
                     label: '本次消费',
                     amount: spendingAmount,
-                    color: Colors.red,
+                    color: AppColors.error,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -163,7 +155,7 @@ class SpendingInterceptDialog extends StatelessWidget {
                   child: _AmountCard(
                     label: '可用余额',
                     amount: availableBalance,
-                    color: Colors.grey[800]!,
+                    color: theme.colorScheme.onSurface, // Adjusted for theme
                   ),
                 ),
               ],
@@ -177,7 +169,7 @@ class SpendingInterceptDialog extends StatelessWidget {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: theme.colorScheme.surfaceVariant, // Adjusted for theme
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -186,7 +178,7 @@ class SpendingInterceptDialog extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Center(
@@ -200,16 +192,14 @@ class SpendingInterceptDialog extends StatelessWidget {
                     children: [
                       Text(
                         merchantName,
-                        style: const TextStyle(
-                          fontSize: 15,
+                        style: theme.textTheme.bodyLarge?.copyWith( // Using theme typography
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       Text(
                         '$categoryName · 刚刚',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
+                        style: theme.textTheme.bodySmall?.copyWith( // Using theme typography
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -217,8 +207,7 @@ class SpendingInterceptDialog extends StatelessWidget {
                 ),
                 Text(
                   '¥${spendingAmount.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 17,
+                  style: theme.textTheme.titleMedium?.copyWith( // Using theme typography
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -236,30 +225,29 @@ class SpendingInterceptDialog extends StatelessWidget {
               children: [
                 Text(
                   '解决方案',
-                  style: TextStyle(
-                    fontSize: 14,
+                  style: theme.textTheme.bodyMedium?.copyWith( // Using theme typography
                     fontWeight: FontWeight.w500,
-                    color: Colors.grey[600],
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 12),
                 _SolutionOption(
                   icon: Icons.swap_horiz,
-                  iconColor: Colors.blue,
+                  iconColor: AppColors.info,
                   title: '从其他小金库调拨',
                   subtitle: '交通剩余¥280可用',
                   onTap: onTransfer,
                 ),
                 _SolutionOption(
                   icon: Icons.edit,
-                  iconColor: Colors.orange,
+                  iconColor: AppColors.warning,
                   title: '修改消费金额',
                   subtitle: '调整为¥${availableBalance.toStringAsFixed(0)}以内',
                   onTap: onModify,
                 ),
                 _SolutionOption(
                   icon: Icons.report,
-                  iconColor: Colors.red,
+                  iconColor: AppColors.error,
                   title: '标记为计划外支出',
                   subtitle: '不计入预算统计',
                   onTap: onMarkUnplanned,
@@ -318,27 +306,26 @@ class _AmountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Column(
         children: [
           Text(
             label,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[600],
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             '¥${amount.toStringAsFixed(0)}',
-            style: TextStyle(
-              fontSize: 24,
+            style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -366,19 +353,25 @@ class _SolutionOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      color: theme.colorScheme.surface, // Ensure card also uses theme surface
       child: ListTile(
         leading: Icon(icon, color: iconColor),
         title: Text(
           title,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w500,
+          ),
         ),
         subtitle: Text(
           subtitle,
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
-        trailing: Icon(Icons.chevron_right, color: Colors.grey[400]),
+        trailing: Icon(Icons.chevron_right, color: theme.colorScheme.outline), // Use outline for chevron
         onTap: onTap,
       ),
     );

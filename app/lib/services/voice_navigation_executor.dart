@@ -11,6 +11,25 @@ import '../pages/voice_assistant_settings_page.dart';
 import '../pages/quick_entry_page.dart';
 import '../pages/transaction_list_page.dart';
 import '../pages/category_detail_page.dart';
+import '../pages/statistics_page.dart';
+import '../pages/trends_page.dart';
+import '../pages/search_result_page.dart';
+import '../pages/about_page.dart';
+import '../pages/backup_page.dart';
+import '../pages/export_page.dart';
+import '../pages/import_page.dart';
+import '../pages/help_page.dart';
+import '../pages/bill_reminder_page.dart';
+import '../pages/recurring_management_page.dart';
+import '../pages/reimbursement_page.dart';
+import '../pages/tag_statistics_page.dart';
+import '../pages/period_comparison_page.dart';
+import '../pages/reports/monthly_report_page.dart';
+import '../pages/annual_report_page.dart';
+import '../pages/latte_factor_page.dart';
+import '../pages/zero_based_budget_page.dart';
+import '../pages/custom_report_page.dart';
+import '../pages/financial_health_dashboard_page.dart';
 import 'voice_navigation_service.dart';
 
 /// 语音导航执行器
@@ -171,43 +190,130 @@ class VoiceNavigationExecutor {
           );
         }
         return const AnalysisCenterPage();
+
+      // 支出/收入统计页面
+      case '/statistics/expense':
+      case '/expense-statistics':
+      case '/expense-analysis':
+        return const StatisticsPage(); // TabController index 0 是支出
+
+      case '/statistics/income':
+      case '/income-statistics':
+      case '/income-analysis':
+        return const StatisticsPage(); // 收入分析也用同一个页面
+
+      // 趋势分析
+      case '/statistics/trend':
+      case '/trends':
+      case '/trend-analysis':
+        return const TrendsPage();
     }
 
     // 主要页面路由映射（无参数版本）
     final pageMap = <String, Widget Function()>{
+      // ═══════════════════════════════════════════════════════════════
       // 快速记账
+      // ═══════════════════════════════════════════════════════════════
       '/quick-add': () => const QuickEntryPage(),
       '/quick-entry': () => const QuickEntryPage(),
 
+      // ═══════════════════════════════════════════════════════════════
       // 设置相关
+      // ═══════════════════════════════════════════════════════════════
       '/settings': () => const SettingsPage(),
       '/settings/general': () => const SettingsPage(),
+      '/settings/about': () => const AboutPage(),
+      '/about': () => const AboutPage(),
 
+      // ═══════════════════════════════════════════════════════════════
       // 预算
+      // ═══════════════════════════════════════════════════════════════
       '/budget': () => const BudgetCenterPage(),
+      '/budget/zero-based': () => const ZeroBasedBudgetPage(),
+      '/zero-based-budget': () => const ZeroBasedBudgetPage(),
 
+      // ═══════════════════════════════════════════════════════════════
       // 储蓄目标
+      // ═══════════════════════════════════════════════════════════════
       '/savings': () => const SavingsGoalPage(),
       '/savings-goal': () => const SavingsGoalPage(),
 
+      // ═══════════════════════════════════════════════════════════════
       // 钱龄分析
+      // ═══════════════════════════════════════════════════════════════
       '/money-age': () => const MoneyAgePage(),
 
+      // ═══════════════════════════════════════════════════════════════
       // 账户管理
+      // ═══════════════════════════════════════════════════════════════
       '/accounts': () => const AccountListPage(),
       '/account': () => const AccountListPage(),
+      '/account-list': () => const AccountListPage(),
 
-      // AI学习报告
+      // ═══════════════════════════════════════════════════════════════
+      // AI和语音
+      // ═══════════════════════════════════════════════════════════════
       '/ai/learning-report': () => const AILearningReportPage(),
       '/ai-learning-report': () => const AILearningReportPage(),
-
-      // 语音学习报告
       '/voice/learning-report': () => const VoiceLearningReportPage(),
       '/voice-learning-report': () => const VoiceLearningReportPage(),
-
-      // 语音助手设置
       '/voice-assistant-settings': () => const VoiceAssistantSettingsPage(),
       '/settings/voice': () => const VoiceAssistantSettingsPage(),
+
+      // ═══════════════════════════════════════════════════════════════
+      // 搜索（需要关键词参数，在 switch 中处理）
+      // ═══════════════════════════════════════════════════════════════
+
+      // ═══════════════════════════════════════════════════════════════
+      // 数据备份导入导出
+      // ═══════════════════════════════════════════════════════════════
+      '/backup': () => const BackupPage(),
+      '/settings/backup': () => const BackupPage(),
+      '/export': () => const ExportPage(),
+      '/data/export': () => const ExportPage(),
+      '/import': () => const ImportPage(),
+      '/data/import': () => const ImportPage(),
+
+      // ═══════════════════════════════════════════════════════════════
+      // 帮助
+      // ═══════════════════════════════════════════════════════════════
+      '/help': () => const HelpPage(),
+      '/help/center': () => const HelpPage(),
+
+      // ═══════════════════════════════════════════════════════════════
+      // 账单和定期
+      // ═══════════════════════════════════════════════════════════════
+      '/bill-reminder': () => const BillReminderPage(),
+      '/bills': () => const BillReminderPage(),
+      '/recurring': () => const RecurringManagementPage(),
+      '/recurring-transactions': () => const RecurringManagementPage(),
+
+      // ═══════════════════════════════════════════════════════════════
+      // 报销
+      // ═══════════════════════════════════════════════════════════════
+      '/reimbursement': () => const ReimbursementPage(),
+
+      // ═══════════════════════════════════════════════════════════════
+      // 统计报表
+      // ═══════════════════════════════════════════════════════════════
+      '/tag-statistics': () => const TagStatisticsPage(),
+      '/statistics/tag': () => const TagStatisticsPage(),
+      '/statistics/comparison': () => const PeriodComparisonPage(),
+      '/period-comparison': () => const PeriodComparisonPage(),
+      '/statistics/monthly': () => const MonthlyReportPage(),
+      '/monthly-report': () => const MonthlyReportPage(),
+      '/statistics/annual': () => const AnnualReportPage(),
+      '/annual-report': () => const AnnualReportPage(),
+      '/latte-factor': () => const LatteFactorPage(),
+      '/statistics/latte': () => const LatteFactorPage(),
+      '/custom-report': () => const CustomReportPage(),
+      '/statistics/custom': () => const CustomReportPage(),
+
+      // ═══════════════════════════════════════════════════════════════
+      // 财务健康
+      // ═══════════════════════════════════════════════════════════════
+      '/financial-health': () => const FinancialHealthDashboardPage(),
+      '/health-dashboard': () => const FinancialHealthDashboardPage(),
     };
 
     final builder = pageMap[route];

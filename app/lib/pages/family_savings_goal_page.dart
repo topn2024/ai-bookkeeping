@@ -52,7 +52,7 @@ class _FamilySavingsGoalPageState extends ConsumerState<FamilySavingsGoalPage> {
     final mainGoal = goals.isNotEmpty ? (goalState.pinnedGoals.isNotEmpty ? goalState.pinnedGoals.first : goals.first) : null;
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(

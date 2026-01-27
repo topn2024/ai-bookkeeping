@@ -223,7 +223,7 @@ class VoiceDrillDownService extends ChangeNotifier {
 
     // 切换视图
     CommandPattern(
-      pattern: RegExp(r'(切换|显示|换成)(?:到)?(饼图|柱状图|趋���图|列表|热力图)'),
+      pattern: RegExp(r'(切换|显示|换成)(?:到)?(饼图|柱状图|趋势图|列表|热力图)'),
       type: VoiceDrillDownCommandType.switchView,
       targetExtractor: (match) => match.group(2),
     ),

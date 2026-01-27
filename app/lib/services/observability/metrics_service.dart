@@ -305,7 +305,7 @@ class MetricsService {
     return _histograms[key];
   }
 
-  // ==================== ���要 ====================
+  // ==================== 摘要 ====================
 
   /// 观察摘要值
   void observeSummary(

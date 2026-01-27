@@ -405,14 +405,14 @@ class VoiceNavigationService extends ChangeNotifier {
       route: '/statistics/expense',
       name: '支出统计',
       module: '统计报表',
-      aliases: ['支出统计', '消费统计', '花了多少'],
+      aliases: ['支出统计', '消费统计', '花了多少', '支出分析', '消费分析', '看支出', '查看支出'],
       voiceAdaptation: VoiceAdaptation.high,
     ),
     '/statistics/income': PageConfig(
       route: '/statistics/income',
       name: '收入统计',
       module: '统计报表',
-      aliases: ['收入统计', '赚了多少'],
+      aliases: ['收入统计', '赚了多少', '收入分析', '看收入', '查看收入'],
       voiceAdaptation: VoiceAdaptation.high,
     ),
     '/statistics/category': PageConfig(
@@ -1621,7 +1621,7 @@ class VoiceNavigationService extends ChangeNotifier {
       route: '/stories',
       name: '用户故事',
       module: '增长与分享',
-      aliases: ['用户故事', '故事'],
+      aliases: ['用户故事', '用户分享', '成功案例'],  // 移除"故事"避免与"讲个故事"聊天意图冲突
       voiceAdaptation: VoiceAdaptation.medium,
     ),
     '/review': PageConfig(

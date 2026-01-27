@@ -87,6 +87,7 @@ class SmartIntentRecognizer {
   Future<SmartIntentResult> recognize(
     String input, {
     String? pageContext,
+    List<Map<String, String>>? conversationHistory,
   }) async {
     if (input.trim().isEmpty) {
       return SmartIntentResult.error('输入为空');
@@ -94,6 +95,21 @@ class SmartIntentRecognizer {
 
     final normalizedInput = _normalize(input);
     debugPrint('[SmartIntent] 开始识别: $input');
+
+    // ═══════════════════════════════════════════════════════════════
+    // 检测无意义输入（ASR乱码）
+    // 如果输入看起来像ASR识别错误的乱码，直接返回chat意图
+    // ═══════════════════════════════════════════════════════════════
+    if (_isNonsensicalInput(normalizedInput)) {
+      debugPrint('[SmartIntent] 检测到无意义输入（可能是ASR乱码），返回chat意图');
+      return SmartIntentResult(
+        intentType: SmartIntentType.chat,
+        confidence: 0.5,
+        entities: {},
+        source: RecognitionSource.exactRule,
+        originalInput: input,
+      );
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // 检查网络状态，决定是否使用LLM
@@ -119,7 +135,7 @@ class SmartIntentRecognizer {
         onProgressiveFeedback?.call('正在思考...');
       });
 
-      final llmResult = await _tryLLMWithTimeout(normalizedInput, pageContext);
+      final llmResult = await _tryLLMWithTimeout(normalizedInput, pageContext, conversationHistory);
       if (llmResult != null && llmResult.isSuccess && llmResult.confidence >= 0.7) {
         debugPrint('[SmartIntent] LLM识别成功: ${llmResult.intentType}, 置信度: ${llmResult.confidence}');
         // 反向学习：将LLM结果加入缓存，加速后续相似请求
@@ -144,9 +160,10 @@ class SmartIntentRecognizer {
   Future<SmartIntentResult?> _tryLLMWithTimeout(
     String input,
     String? pageContext,
+    List<Map<String, String>>? conversationHistory,
   ) async {
     try {
-      return await _layer5LLMFallback(input, pageContext)
+      return await _layer5LLMFallback(input, pageContext, conversationHistory)
           .timeout(Duration(milliseconds: _llmTimeoutMs));
     } catch (e) {
       debugPrint('[SmartIntent] LLM调用超时或失败: $e');
@@ -165,6 +182,22 @@ class SmartIntentRecognizer {
 
     final normalizedInput = _normalize(input);
     debugPrint('[SmartIntent] 开始多操作识别: $input');
+
+    // ═══════════════════════════════════════════════════════════════
+    // 检测无意义输入（ASR乱码）
+    // 如果输入看起来像ASR识别错误的乱码，直接返回chat意图
+    // ═══════════════════════════════════════════════════════════════
+    if (_isNonsensicalInput(normalizedInput)) {
+      debugPrint('[SmartIntent] 检测到无意义输入（可能是ASR乱码），返回chat意图');
+      return MultiOperationResult(
+        resultType: RecognitionResultType.chat,
+        operations: [],
+        chatContent: input,
+        confidence: 0.5,
+        source: RecognitionSource.exactRule,
+        originalInput: input,
+      );
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // 检查网络状态，决定是否使用LLM
@@ -296,34 +329,60 @@ class SmartIntentRecognizer {
 
 【核心规则 - 必须严格遵守】
 1. 记账(add_transaction)必须同时满足两个条件：
-   ✅ 有明确的数字金额（如"35"、"五十"、"三块五"）
-   ✅ 有分类或用途说明（如"餐饮"、"打车"、"买东西"）
+   ✅ 有明确的数字金额（如"35"、"五十"、"三块五"、"2万"）
+   ✅ 有分类或用途说明（如"餐饮"、"打车"、"还钱"、"工资"）
    ❌ 只有金额没有分类 → clarify
    ❌ 只有分类没有金额 → clarify
    ❌ 两者都没有 → clarify
 
-2. 【重要】单独的分类名称不是有效记账指令：
-   - 用户只说"餐饮"、"交通"、"购物"、"娱乐"、"居住"、"医疗"、"其他"等分类名称
-   - 没有金额，不能生成add_transaction
+2. 【重要】支出分类关键词映射（type="expense"，默认）：
+   - 餐饮：吃饭、早餐、午餐、晚餐、夜宵、外卖、点餐、食堂、餐厅、火锅、烧烤、奶茶、咖啡、饮料、零食、水果、蛋糕、甜品
+   - 交通：打车、滴滴、出租车、地铁、公交、高铁、火车、飞机、机票、油费、加油、停车、过路费、通勤
+   - 购物：买东西、逛街、超市、商场、淘宝、京东、拼多多、网购、日用品、生活用品
+   - 娱乐：电影、KTV、唱歌、游戏、旅游、酒店、门票、景点、演出、健身、运动、聚会
+   - 居住：房租、租金、物业费、房贷、装修、家具、搬家
+   - 水电燃气：水费、电费、燃气费、暖气费、煤气
+   - 医疗：看病、挂号、门诊、药费、体检、住院、手术、保健品
+   - 教育：学费、书本、培训、课程、考试、教材、补习
+   - 通讯：话费、流量、网费、宽带、手机费
+   - 服饰：衣服、裤子、鞋子、包包、帽子、配饰、内衣
+   - 美容：护肤品、化妆品、理发、美发、美甲、美容院
+   - 会员订阅：会员费、视频会员、音乐会员、网盘、订阅
+   - 人情往来：份子钱、红包支出、送礼、请客、孝敬父母、给长辈
+   - 金融保险：保险费、保费、手续费、利息支出、还贷、信用卡还款
+   - 宠物：猫粮、狗粮、宠物用品、宠物医院、宠物美容
+   - 其他：无法归类的支出
+
+3. 【重要】收入分类关键词映射（type="income"）：
+   - 工资：发工资、工资到账、底薪、基本工资、绩效、加班费
+   - 奖金：年终奖、季度奖、项目奖、全勤奖、奖励
+   - 投资收益：股票赚了、基金收益、理财利息、银行利息、存款利息、利息收入、分红、房租收入、租金收入、中奖、彩票
+   - 兼职：兼职、外快、副业、私活、零工
+   - 红包：收红包、微信红包、支付宝红包、礼金收入、压岁钱
+   - 报销：报销、差旅报销、交通报销、餐饮报销、医疗报销
+   - 经营所得：卖东西、生意收入、营业额、佣金、提成、代购、闲鱼卖货
+   - 其他：还钱、还款、借款归还、退款、返现、捡到
+
+4. 【重要】单独的分类名称不是有效记账指令：
+   - 用户只说"餐饮"、"交通"等分类名称，没有金额
    - result_type为"clarify"
-   - 澄清话术：请说完整的记账指令，比如"{分类}50元"或"{分类}消费100"
+   - 澄清话术：请说完整的记账指令，比如"{分类}50元"
 
-3. 【重要】单独的金额不是有效记账指令：
-   - 用户只说"30元"、"五十块"、"100"等金额
-   - 没有分类或用途，不能生成add_transaction
+5. 【重要】单独的金额不是有效记账指令：
+   - 用户只说"30元"、"五十块"等金额，没有分类或用途
    - result_type为"clarify"
-   - 澄清话术：请说明这笔{金额}是什么类型的消费，比如"餐饮"或"交通"
+   - 澄清话术：请说明这笔{金额}是什么类型的消费
 
-4. 闲聊、提问、询问功能等不包含操作意图的内容，result_type为"chat"
+6. 闲聊、提问、询问功能等不包含操作意图的内容，result_type为"chat"
 
-5. 用户表达模糊、信息不足时，主动反问澄清而不是猜测
+7. 用户表达模糊、信息不足时，主动反问澄清而不是猜测
 
-6. 【重要】疑问句优先判断为查询：
+8. 【重要】疑问句优先判断为查询：
    - "花了多少钱"、"多少钱"、"花了多少"等疑问句 → query（查询统计）
    - "花了35块"等陈述句+金额 → add_transaction（记账）
    - 区分方法：有"？"或"多少"且无具体金额 = 查询；有具体金额 = 记账
 
-7. 【重要】跨句子语义关联：
+9. 【重要】跨句子语义关联：
    - 用户可能先说金额后补充用途，或先说用途后补充金额，这都属于同一笔交易
    - 模式A - 先金额后用途：
      - "花了15块钱吃了肠粉" → 15元餐饮（肠粉）
@@ -337,7 +396,7 @@ class SmartIntentRecognizer {
    - 关键：识别"早餐/午餐/晚餐/打车/买菜"等用途词，并与后面的金额关联
    - 忽略停顿词：用户口语中的"呃"、"嗯"、"是"、"大概是"等不影响语义理解
 
-8. 【重要】多笔交易完整性检查：
+10. 【重要】多笔交易完整性检查：
    - 用户可能一次说多笔交易，如"早餐7块午餐18晚餐25"
    - 必须逐一检查每个金额，确保都生成对应的add_transaction
    - 连接词"然后"、"还有"、"另外"表示新的一笔交易
@@ -383,8 +442,9 @@ class SmartIntentRecognizer {
 【记账参数说明】
 - amount: 金额（必填）
 - category: 分类（必填）
-- merchant: 商户名称（可选，如"深圳地铁"、"美团外卖"、"星巴克"等）
-- note: 用途说明（可选，简洁描述，如"去程"、"返程"、"午餐"等）
+- type: 类型（income=收入，expense=支出，默认expense）
+- merchant: 商户名称（可选）
+- note: 用途说明（可选，如"还款"、"工资"、"午餐"等）
 
 【商户和备注提取规则】
 - 用户所在城市：$_cachedCityName（用于推断本地商户名称）
@@ -411,7 +471,8 @@ class SmartIntentRecognizer {
 - groupBy: 分组维度（可选，month/date/category）
 - limit: 结果数量限制（可选，当用户问"最多的一项"、"最少的一项"、"前N项"时使用）
 
-【分类】餐饮、交通、购物、娱乐、居住、医疗、其他
+【支出分类】餐饮、交通、购物、娱乐、居住、水电燃气、医疗、教育、通讯、服饰、美容、会员订阅、人情往来、金融保险、宠物、其他
+【收入分类】工资、奖金、投资收益、兼职、红包、报销、经营所得、其他
 【常用页面】$pageList
 
 【导航操作参数】
@@ -489,11 +550,41 @@ class SmartIntentRecognizer {
 输入："淘宝买了件衣服199"
 输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":199,"category":"购物","note":"淘宝买衣服"}}],"chat_content":null,"clarify_question":null}
 
+输入："有人还给我2万块钱"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":20000,"category":"其他","type":"income","note":"还款"}}],"chat_content":null,"clarify_question":null}
+
+输入："收到工资8000"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":8000,"category":"工资","type":"income","note":"工资"}}],"chat_content":null,"clarify_question":null}
+
+输入："老王还了我500"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":500,"category":"其他","type":"income","note":"老王还款"}}],"chat_content":null,"clarify_question":null}
+
+输入："收到红包200"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":200,"category":"红包","type":"income","note":"红包"}}],"chat_content":null,"clarify_question":null}
+
+输入："卖了个二手手机1500"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":1500,"category":"经营所得","type":"income","note":"卖二手手机"}}],"chat_content":null,"clarify_question":null}
+
+输入："兼职赚了300"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":300,"category":"兼职","type":"income","note":"兼职"}}],"chat_content":null,"clarify_question":null}
+
+输入："报销了500块差旅费"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":500,"category":"报销","type":"income","note":"差旅报销"}}],"chat_content":null,"clarify_question":null}
+
+输入："股票赚了2000"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":2000,"category":"投资收益","type":"income","note":"股票收益"}}],"chat_content":null,"clarify_question":null}
+
+输入："银行利息15.8元"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":15.8,"category":"投资收益","type":"income","note":"银行利息"}}],"chat_content":null,"clarify_question":null}
+
+输入："收到利息20块"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":20,"category":"投资收益","type":"income","note":"利息"}}],"chat_content":null,"clarify_question":null}
+
 输入："为什么要记账"
-输出：{"result_type":"chat","operations":[],"chat_content":"为什么要记账","clarify_question":null}
+输出：{"result_type":"chat","operations":[],"chat_content":"记账能帮你了解钱都花哪儿了，还能发现省钱的机会呢~坚持记账的人往往能存下更多钱哦！","clarify_question":null}
 
 输入："你会记账吗"
-输出：{"result_type":"chat","operations":[],"chat_content":"你会记账吗","clarify_question":null}
+输出：{"result_type":"chat","operations":[],"chat_content":"当然会呀~我可以帮你记账、查账、分析消费趋势，还能设置预算提醒呢！","clarify_question":null}
 
 输入："帮我记笔账"
 输出：{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"好的，请告诉我金额和用途，比如：午餐花了35块"}
@@ -536,7 +627,16 @@ class SmartIntentRecognizer {
 输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"statistics","time":"本周"}}],"chat_content":null,"clarify_question":null}
 
 输入："你好"
-输出：{"result_type":"chat","operations":[],"chat_content":"你好","clarify_question":null}
+输出：{"result_type":"chat","operations":[],"chat_content":"你好呀~有什么需要帮忙的吗？","clarify_question":null}
+
+输入："讲个故事"
+输出：{"result_type":"chat","operations":[],"chat_content":"好的~从前有个人坚持记账，一年后他发现省下的钱够买一台新手机啦！记账真的很有用哦~","clarify_question":null}
+
+输入："讲个笑话"
+输出：{"result_type":"chat","operations":[],"chat_content":"钱包对主人说：你总是把我掏空，我很伤心。主人说：别担心，下个月工资会填满你的！","clarify_question":null}
+
+输入："讲个冷笑话"
+输出：{"result_type":"chat","operations":[],"chat_content":"为什么程序员分不清万圣节和圣诞节？因为Oct 31等于Dec 25！","clarify_question":null}
 
 输入："查看餐饮类的账单"
 输出：{"result_type":"operation","operations":[{"type":"navigate","priority":"immediate","params":{"targetPage":"交易列表","route":"/transaction-list","category":"餐饮"}}],"chat_content":null,"clarify_question":null}
@@ -561,6 +661,15 @@ class SmartIntentRecognizer {
 
 输入："这个月花钱最多的是哪一项"
 输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"distribution","time":"本月","groupBy":"category","limit":1}}],"chat_content":null,"clarify_question":null}
+
+输入："上个月花钱最多的几项"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"distribution","time":"上月","groupBy":"category","limit":5}}],"chat_content":null,"clarify_question":null}
+
+输入："花钱最多的是哪几项"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"distribution","time":"本月","groupBy":"category","limit":5}}],"chat_content":null,"clarify_question":null}
+
+输入："消费前三名是什么"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"distribution","time":"本月","groupBy":"category","limit":3}}],"chat_content":null,"clarify_question":null}
 
 输入："餐饮这个月花了多少"
 输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"distribution","time":"本月","category":"餐饮"}}],"chat_content":null,"clarify_question":null}
@@ -825,7 +934,7 @@ class SmartIntentRecognizer {
   /// 记账动词同义词组
   static const _addSynonyms = {
     '花了': ['花了', '花', '消费', '支出', '付了', '付', '买了', '买', '用了', '支付'],
-    '收入': ['收入', '赚了', '进账', '收到', '工资', '奖金', '入账', '捡到', '捡了', '找到钱', '中奖', '返现', '退款'],
+    '收入': ['收入', '赚了', '进账', '收到', '工资', '奖金', '入账', '捡到', '捡了', '找到钱', '中奖', '返现', '退款', '还款', '还钱', '还我', '借的钱还了', '收款'],
   };
 
   Future<SmartIntentResult?> _layer2SynonymExpansion(String input) async {
@@ -1352,9 +1461,28 @@ class SmartIntentRecognizer {
   Future<SmartIntentResult?> _layer4LearnedCache(String input) async {
     await _ensureCacheLoaded();
 
+    // 检查是否是被错误缓存的闲聊模式
+    bool isWronglyCachedChat(String key, LearnedPattern pattern) {
+      if (pattern.intentType != SmartIntentType.navigate) return false;
+      for (final keyword in _chatKeywords) {
+        if (key.contains(keyword)) {
+          debugPrint('[SmartIntent] 跳过错误缓存的闲聊模式: $key');
+          // 从缓存中移除错误的模式
+          _learnedCache.remove(key);
+          _saveCache();
+          return true;
+        }
+      }
+      return false;
+    }
+
     // 精确匹配
     if (_learnedCache.containsKey(input)) {
       final pattern = _learnedCache[input]!;
+      // 跳过被错误缓存的闲聊模式
+      if (isWronglyCachedChat(input, pattern)) {
+        return null;
+      }
       return SmartIntentResult(
         intentType: pattern.intentType,
         confidence: 0.9,
@@ -1371,6 +1499,10 @@ class SmartIntentRecognizer {
 
       if (similarity >= 0.85) {
         final pattern = entry.value;
+        // 跳过被错误缓存的闲聊模式
+        if (isWronglyCachedChat(entry.key, pattern)) {
+          continue;
+        }
         return SmartIntentResult(
           intentType: pattern.intentType,
           confidence: similarity * 0.95,
@@ -1391,9 +1523,10 @@ class SmartIntentRecognizer {
   Future<SmartIntentResult?> _layer5LLMFallback(
     String input,
     String? pageContext,
+    List<Map<String, String>>? conversationHistory,
   ) async {
     try {
-      final prompt = _buildLLMPrompt(input, pageContext);
+      final prompt = _buildLLMPrompt(input, pageContext, conversationHistory);
       final response = await _qwenService.chat(prompt);
 
       if (response == null || response.isEmpty) {
@@ -1407,7 +1540,7 @@ class SmartIntentRecognizer {
     }
   }
 
-  String _buildLLMPrompt(String input, String? pageContext) {
+  String _buildLLMPrompt(String input, String? pageContext, List<Map<String, String>>? conversationHistory) {
     // 获取高适配语音导航的页面列表
     final highAdaptPages = _navigationService.highAdaptationPages;
     final pageList = highAdaptPages
@@ -1415,16 +1548,32 @@ class SmartIntentRecognizer {
         .map((p) => '${p.name}(${p.route})')
         .join('、');
 
+    // 构建对话历史上下文（只取最近3轮）
+    String historyContext = '';
+    if (conversationHistory != null && conversationHistory.isNotEmpty) {
+      final recentHistory = conversationHistory.length > 6
+          ? conversationHistory.sublist(conversationHistory.length - 6)
+          : conversationHistory;
+      final historyLines = recentHistory.map((h) {
+        final role = h['role'] == 'user' ? '用户' : '助手';
+        return '$role: ${h['content']}';
+      }).join('\n');
+      historyContext = '''
+【对话历史（用于理解上下文）】
+$historyLines
+''';
+    }
+
     return '''
 你是一个记账助手，请理解用户输入并返回JSON。
-
-【用户输入】$input
+$historyContext
+【当前用户输入】$input
 【页面上下文】${pageContext ?? '首页'}
 
 【意图类型】
-- add_transaction: 记账（需要金额）
+- add_transaction: 记账（明确要求记录一笔支出/收入，必须同时有金额AND分类/用途）
 - navigate: 导航（打开某页面）
-- query: 查询统计
+- query: 查询统计（查看账单、统计数据）
 - modify: 修改记录
 - delete: 删除记录
 - confirm: 确认
@@ -1436,16 +1585,68 @@ class SmartIntentRecognizer {
 - data: 数据操作（备份、导出、同步）
 - share: 分享操作（分享报告、邀请好友）
 - system: 系统操作（检查更新、清理缓存）
+- clarify: 需要澄清（信息不完整，需要反问用户）
+- chat: 闲聊对话（见下方详细说明）
+
+【重要：上下文理解规则 - 最高优先级】
+如果提供了对话历史，必须结合上下文理解当前输入：
+1. 用户说"交通费用"、"餐饮呢"、"那交通呢"等，如果前一轮是查询消费，则当前也是query（查询该分类的消费）
+2. 用户说"那上个月呢"、"昨天呢"，如果前一轮是查询，则继续查询不同时间段
+3. 省略主语的表达需要从上下文补全理解
+示例：
+- 前一轮："今天餐饮花了多少钱" → 回答"149元"
+- 当前输入："交通费用" → 应理解为"今天交通费用花了多少钱" → query意图
+
+【重要：query意图的判断规则 - 优先级高于clarify】
+以下情况必须返回query意图（查询统计）：
+1. 询问消费金额："今天花了多少钱"、"这周花了多少"、"本月消费多少" → query
+2. 询问统计数据："最近花了多少"、"上个月开销多少"、"今年总共花了多少" → query
+3. 包含时间词+花费询问：只要同时包含时间词（今天、昨天、本周、这周、本月、这个月、上个月、今年等）和花费询问词（花了、消费、开销、支出等），就是query意图
+4. 上下文延续查询：如果对话历史中刚刚进行了消费查询，用户说分类名称（如"交通"、"餐饮"）则是继续查询该分类 → query
+
+【重要：clarify意图的判断规则】
+注意：clarify仅用于不完整的【记账】指令，不适用于查询！
+以下情况必须返回clarify意图：
+1. 单独的金额没有说明用途："50元"、"三十块"、"花了100" → clarify，entities.clarify_question="请说明这笔钱是什么消费"
+2. 单独的分类没有金额："餐饮"、"交通" → clarify，entities.clarify_question="请说金额"
+3. 不完整的记账指令："帮我记一下"、"记账" → clarify，entities.clarify_question="请告诉我金额和用途"
+【clarify不适用的情况】：
+- "今天花了多少钱" → 这是query，不是clarify！
+- "花了多少" → 这是query，不是clarify！
+
+【重要：chat意图的判断规则】
+以下情况必须返回chat意图：
+1. 询问助手能力："你会记账吗"、"你能帮我做什么"、"你有什么功能"
+2. 问候语："你好"、"早上好"、"在吗"
+3. 闲聊请求："讲个故事"、"讲个笑话"、"陪我聊天"
+4. 提问求助："怎么记账"、"如何使用"、"什么是XX"
+5. 表达感谢/告别："谢谢"、"再见"、"拜拜"
+6. 无法理解的内容或乱码
+7. 任何不包含明确操作指令的对话
+
+【关键区分】
+- "你会记账吗" → chat（询问能力，不是记账指令）
+- "帮我记一笔30元" → add_transaction（明确的记账指令）
+- "记账怎么用" → chat（询问使用方法）
+- "记30块早餐" → add_transaction（明确的记账指令）
+- "今天花了多少钱" → query（查询统计，不是clarify！）
+- "这个月花了多少" → query（查询统计）
+- "50元" → clarify（单独金额，需要问用途）
+- "花了100块吃饭" → add_transaction（有金额有用途）
 
 【返回格式】
-{"intent":"意图类型","confidence":0.9,"entities":{"amount":金额,"category":"分类","note":"具体物品或用途","targetPage":"页面名","route":"路由","operation":"操作类型","configId":"配置项ID","vaultName":"小金库名称"}}
+{"intent":"意图类型","confidence":0.9,"entities":{"amount":金额,"category":"分类","type":"income或expense","note":"具体物品或用途","targetPage":"页面名","route":"路由","operation":"操作类型","configId":"配置项ID","vaultName":"小金库名称"}}
 
 【记账参数说明】
 - amount: 金额（必填）
 - category: 分类（必填）
+- type: 类型（必填），只能是 "income"（收入）或 "expense"（支出）
+  - 收入类：工资、奖金、投资收益、兼职、红包、报销、经营所得、利息、股息、租金收入等 → type="income"
+  - 支出类：餐饮、交通、购物、娱乐、居住等 → type="expense"
 - note: 物品/用途说明（可选，用户说了具体物品时必须提取，如"闹钟"、"衣服"、"打车"等）
 
-【分类】餐饮、交通、购物、娱乐、居住、医疗、其他
+【支出分类】餐饮、交通、购物、娱乐、居住、水电燃气、医疗、教育、通讯、服饰、美容、会员订阅、人情往来、金融保险、宠物、其他
+【收入分类】工资、奖金、投资收益、兼职、红包、报销、经营所得、其他
 【常用页面】$pageList
 
 只返回JSON，不要其他内容：''';
@@ -1479,8 +1680,38 @@ class SmartIntentRecognizer {
   // 学习功能
   // ═══════════════════════════════════════════════════════════════
 
+  /// 闲聊关键词（不应被学习为操作意图）
+  static const _chatKeywords = [
+    // 讲故事/笑话
+    '故事', '笑话', '冷笑话', '段子',
+    // 问候语
+    '你好', '谢谢', '再见', '拜拜', '早上好', '晚上好', '下午好',
+    // 询问能力的问题（如"你会记账吗"不是记账指令）
+    '你会', '你能', '能不能', '可以吗', '会不会', '是不是',
+    // 询问类问题
+    '是什么', '怎么样', '怎么办', '为什么', '什么是',
+  ];
+
   /// 学习新模式
   Future<void> _learnPattern(String input, SmartIntentResult result) async {
+    // 防止无意义输入（ASR乱码）被学习
+    if (_isNonsensicalInput(input)) {
+      debugPrint('[SmartIntent] 跳过学习无意义输入: $input');
+      return;
+    }
+
+    // 防止闲聊类输入被错误学习为操作意图
+    if (result.intentType == SmartIntentType.navigate ||
+        result.intentType == SmartIntentType.addTransaction ||
+        result.intentType == SmartIntentType.query) {
+      for (final keyword in _chatKeywords) {
+        if (input.contains(keyword)) {
+          debugPrint('[SmartIntent] 跳过学习闲聊模式为${result.intentType}: $input');
+          return;
+        }
+      }
+    }
+
     final pattern = LearnedPattern(
       intentType: result.intentType,
       entities: result.entities,
@@ -1504,8 +1735,18 @@ class SmartIntentRecognizer {
 
       if (cacheJson != null) {
         final cacheMap = jsonDecode(cacheJson) as Map<String, dynamic>;
+        int cleanedCount = 0;
         for (final entry in cacheMap.entries) {
+          // 清理之前学习的无意义模式
+          if (_isNonsensicalInput(entry.key)) {
+            cleanedCount++;
+            continue;
+          }
           _learnedCache[entry.key] = LearnedPattern.fromJson(entry.value);
+        }
+        if (cleanedCount > 0) {
+          debugPrint('[SmartIntent] 清理了$cleanedCount个无意义模式');
+          await _saveCache();
         }
         debugPrint('[SmartIntent] 加载了${_learnedCache.length}个学习模式');
       }
@@ -1556,6 +1797,101 @@ class SmartIntentRecognizer {
         .trim()
         .replaceAll(RegExp(r'\s+'), '')
         .replaceAll(RegExp(r'[。！？，、；：]'), '');
+  }
+
+  /// 检测输入是否为无意义内容（ASR乱码）
+  ///
+  /// 检测以下情况：
+  /// 1. 高度重复的字符模式（如"赵赵小赵月赵小赵月"）
+  /// 2. 字符多样性过低（同一个字符重复太多次）
+  /// 3. 没有有意义的词汇
+  bool _isNonsensicalInput(String input) {
+    if (input.isEmpty) return true;
+
+    // 太短的输入（1-2个字）不算乱码，可能是简短指令
+    if (input.length <= 2) return false;
+
+    // 1. 检测字符重复率
+    // 如果某个字符出现次数超过输入长度的40%，可能是乱码
+    final charCounts = <String, int>{};
+    for (int i = 0; i < input.length; i++) {
+      final char = input[i];
+      charCounts[char] = (charCounts[char] ?? 0) + 1;
+    }
+
+    final maxCount = charCounts.values.fold<int>(0, (a, b) => a > b ? a : b);
+    final repetitionRate = maxCount / input.length;
+
+    // 如果重复率超过40%且不是有意义的重复词
+    if (repetitionRate > 0.4 && input.length > 4) {
+      // 检查是否包含有意义的词汇
+      if (!_containsMeaningfulWords(input)) {
+        debugPrint('[SmartIntent] 高重复率输入: $input, 重复率: ${(repetitionRate * 100).toStringAsFixed(1)}%');
+        return true;
+      }
+    }
+
+    // 2. 检测连续重复模式
+    // 如 "小赵月小赵月" 或 "赵赵赵赵"
+    if (_hasRepetitivePattern(input)) {
+      if (!_containsMeaningfulWords(input)) {
+        debugPrint('[SmartIntent] 检测到重复模式: $input');
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// 检测是否有连续重复的模式
+  bool _hasRepetitivePattern(String input) {
+    // 检测2-4个字符的重复模式
+    for (int patternLen = 2; patternLen <= 4; patternLen++) {
+      if (input.length < patternLen * 2) continue;
+
+      int consecutiveRepeats = 0;
+      for (int i = 0; i <= input.length - patternLen * 2; i++) {
+        final pattern = input.substring(i, i + patternLen);
+        final next = input.substring(i + patternLen, i + patternLen * 2);
+        if (pattern == next) {
+          consecutiveRepeats++;
+          if (consecutiveRepeats >= 2) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /// 检查输入是否包含有意义的词汇
+  bool _containsMeaningfulWords(String input) {
+    // 有意义的关键词列表
+    const meaningfulWords = [
+      // 记账相关
+      '记账', '支出', '收入', '消费', '花费', '买', '卖', '付', '收',
+      '钱', '元', '块', '毛', '角', '分',
+      // 类别相关
+      '餐饮', '交通', '购物', '娱乐', '住房', '医疗', '教育',
+      // 时间相关
+      '今天', '昨天', '明天', '上周', '上月', '这个月', '本周',
+      // 查询相关
+      '查', '看', '统计', '报表', '报告', '分析', '趋势',
+      // 操作相关
+      '删除', '修改', '编辑', '添加', '取消', '确认', '保存',
+      // 导航相关
+      '打开', '跳转', '去', '返回', '首页', '设置',
+      // 闲聊相关
+      '你好', '谢谢', '再见', '故事', '笑话', '冷笑话', '段子',
+      '帮助', '怎么', '什么', '为什么', '如何',
+    ];
+
+    for (final word in meaningfulWords) {
+      if (input.contains(word)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   String? _extractJson(String response) {
@@ -1720,6 +2056,10 @@ class SmartIntentRecognizer {
         return SmartIntentType.share;
       case 'system':
         return SmartIntentType.systemOp;
+      case 'clarify':
+        return SmartIntentType.clarify;
+      case 'chat':
+        return SmartIntentType.chat;
       default:
         return SmartIntentType.unknown;
     }
@@ -1813,6 +2153,8 @@ enum SmartIntentType {
   dataOp,        // 数据操作
   share,         // 分享操作
   systemOp,      // 系统操作
+  clarify,       // 需要澄清（信息不完整）
+  chat,          // 闲聊（讲故事、讲笑话、问候等）
   unknown,
 }
 

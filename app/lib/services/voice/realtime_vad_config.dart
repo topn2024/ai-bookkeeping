@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'client_vad_service.dart';
 
 /// 实时对话VAD配置
 ///
@@ -175,13 +176,20 @@ class VADEvent {
 /// 实时VAD服务
 ///
 /// 提供实时语音活动检测，支持：
-/// - 自动检测用户开始/结束说话
+/// - Silero VAD神经网络检测（首选）
+/// - 自动降级到能量检测
 /// - 自适应噪音阈值
 /// - 轮次结束停顿检测
 /// - 用户沉默超时检测
 class RealtimeVADService {
   /// 配置
   final RealtimeVADConfig config;
+
+  /// Silero VAD服务（优先使用）
+  ClientVADService? _sileroVAD;
+
+  /// 是否使用Silero VAD
+  bool _usingSileroVAD = false;
 
   /// 当前状态
   VADState _state = VADState.silence;
@@ -226,6 +234,71 @@ class RealtimeVADService {
       : config = config ?? RealtimeVADConfig.defaultConfig(),
         _currentThreshold = config?.energyThreshold ?? 0.02;
 
+  /// 是否正在使用Silero VAD
+  bool get isUsingSileroVAD => _usingSileroVAD;
+
+  /// 初始化Silero VAD（异步，可选）
+  ///
+  /// 建议在服务启动时调用此方法初始化Silero VAD
+  /// 如果初始化失败，将自动降级到能量检测
+  Future<void> initializeSileroVAD() async {
+    try {
+      debugPrint('[RealtimeVAD] 正在初始化Silero VAD...');
+      _sileroVAD = ClientVADService(
+        config: ClientVADConfig(
+          vadThreshold: 0.5,
+          minSpeechFrames: 3,
+          minSilenceFrames: 10,
+        ),
+      );
+      await _sileroVAD!.initialize();
+
+      if (_sileroVAD!.isInitialized && !_sileroVAD!.isUsingFallback) {
+        _usingSileroVAD = true;
+
+        // 设置Silero VAD回调
+        _sileroVAD!.onSpeechStart = _handleSileroSpeechStart;
+        _sileroVAD!.onSpeechEnd = _handleSileroSpeechEnd;
+
+        await _sileroVAD!.start();
+        debugPrint('[RealtimeVAD] ✓ Silero VAD初始化成功，已启用神经网络检测');
+      } else {
+        debugPrint('[RealtimeVAD] Silero VAD降级模式，继续使用能量检测');
+        _usingSileroVAD = false;
+      }
+    } catch (e) {
+      debugPrint('[RealtimeVAD] Silero VAD初始化失败: $e，使用能量检测');
+      _usingSileroVAD = false;
+    }
+  }
+
+  /// Silero VAD语音开始回调
+  void _handleSileroSpeechStart() {
+    if (_state != VADState.speaking) {
+      _transitionTo(VADState.speaking);
+      _speechStartTime = DateTime.now();
+      _emitEvent(VADEventType.speechStart);
+      _cancelSilenceTimeoutTimer();
+      debugPrint('[RealtimeVAD] [Silero] 检测到语音开始');
+    }
+  }
+
+  /// Silero VAD语音结束回调
+  void _handleSileroSpeechEnd() {
+    if (_state == VADState.speaking || _state == VADState.possibleSilence) {
+      _transitionTo(VADState.silence);
+      final speechDuration = _speechStartTime != null
+          ? DateTime.now().difference(_speechStartTime!)
+          : null;
+      _emitEvent(VADEventType.speechEnd, speechDuration: speechDuration);
+      _speechStartTime = null;
+      _speechFrameCount = 0;
+      _silenceFrameCount = 0;
+      startSilenceTimeoutDetection();
+      debugPrint('[RealtimeVAD] [Silero] 检测到语音结束');
+    }
+  }
+
   /// 当前状态
   VADState get state => _state;
 
@@ -239,6 +312,14 @@ class RealtimeVADService {
   ///
   /// 输入：16kHz单声道16bit PCM音频数据
   void processAudioFrame(Uint8List audioFrame) {
+    // 如果使用Silero VAD，将音频传递给它处理
+    // Silero VAD通过回调通知语音开始/结束
+    if (_usingSileroVAD && _sileroVAD != null) {
+      _sileroVAD!.processAudio(audioFrame);
+      return;  // Silero VAD通过回调处理状态转换
+    }
+
+    // 降级到能量检测
     final energy = _calculateFrameEnergy(audioFrame);
     final isSpeech = energy > _currentThreshold;
 
@@ -381,11 +462,15 @@ class RealtimeVADService {
     _silenceStartTime = null;
     _cancelTurnEndPauseTimer();
     _cancelSilenceTimeoutTimer();
-    debugPrint('[RealtimeVAD] 状态已重置');
+    _sileroVAD?.reset();
+    debugPrint('[RealtimeVAD] 状态已重置${_usingSileroVAD ? " (Silero VAD)" : ""}');
   }
 
   /// 释放资源
   void dispose() {
+    _sileroVAD?.dispose();
+    _sileroVAD = null;
+    _usingSileroVAD = false;
     _eventController.close();
     _cancelTurnEndPauseTimer();
     _cancelSilenceTimeoutTimer();

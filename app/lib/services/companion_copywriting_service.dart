@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 /// 伙伴化文案生成服务
 ///
 /// 功能：
-/// 1. 场景识别与情感���析
+/// 1. 场景识别与情感分析
 /// 2. 动态文案生成与缓存
 /// 3. 预生成文案库（离线支持）
 /// 4. 个性化文案风格
@@ -716,7 +716,7 @@ class PreGeneratedCopyLibrary {
       EmotionType.encouraging: [
         '记录成功！每一笔都是对财务的用心管理～',
         '又完成一笔记录！积少成多，你的理财习惯正在养成中～',
-        '太棒了！坚持记账的你，一定能���现财务目标！',
+        '太棒了！坚持记账的你，一定能实现财务目标！',
         '记账完成！你离财务自由又近了一步～',
         '好的！这笔消费已经记下了，继续保持这个好习惯！',
       ],
@@ -834,7 +834,7 @@ class PreGeneratedCopyLibrary {
     // 长时间未见
     SceneType.longTimeNoSee: {
       EmotionType.welcoming: [
-        '哇，{daysSinceLastActive}天没见了！欢迎回来���让我们重新开始吧～',
+        '哇，{daysSinceLastActive}天没见了！欢迎回来！让我们重新开始吧～',
         '好久不见！不管离开多久，重新开始永远不晚～',
         '终于回来了！我一直在这里等你，准备好继续了吗？',
       ],
@@ -881,7 +881,7 @@ class PreGeneratedCopyLibrary {
     // 储蓄进度更新（新增）
     SceneType.savingsGoalProgress: {
       EmotionType.encouraging: [
-        '「{goalName}」又���了一步！当前进度{progress}%，继续加油！',
+        '「{goalName}」又进了一步！当前进度{progress}%，继续加油！',
         '储蓄目标稳步推进中，你做得很好！',
       ],
     },

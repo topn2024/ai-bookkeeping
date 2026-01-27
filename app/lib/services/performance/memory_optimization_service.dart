@@ -664,7 +664,7 @@ class MemoryOptimizationConfig {
 /// 全局内存优化实例
 final memoryOptimizer = MemoryOptimizationService();
 
-/// 全局���片缓存管理器
+/// 全局图片缓存管理器
 final imageCache = SmartCacheManager<dynamic>(
   config: const SmartCacheConfig(
     maxCount: 50,

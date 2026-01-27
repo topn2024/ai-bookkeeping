@@ -35,7 +35,7 @@ class GeofenceBackgroundService {
   /// 获取所有活跃围栏
   List<Geofence> get activeGeofences => _activeGeofences.values.toList();
 
-  /// 初始���服务
+  /// 初始化服务
   Future<void> initialize() async {
     if (_isInitialized) return;
 
@@ -93,7 +93,7 @@ class GeofenceBackgroundService {
       if (_activeGeofences.length >= 100) {
         return GeofenceRegistrationResult(
           success: false,
-          error: '围栏数量已达���限(100个)',
+          error: '围栏数量已达上限(100个)',
         );
       }
 

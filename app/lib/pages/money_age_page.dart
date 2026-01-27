@@ -23,7 +23,7 @@ import '../models/budget.dart' as budget_model;
 /// - 统计数据行：本月最高/最低/较上月
 /// - 等级进度条（紧凑版）
 /// - 趋势迷你图
-/// - ���金区：行动按钮
+/// - 操作区：行动按钮
 class MoneyAgePage extends ConsumerWidget {
   const MoneyAgePage({super.key});
 
@@ -69,10 +69,22 @@ class MoneyAgePage extends ConsumerWidget {
     final levelDetails = levelService.getLevelDetails(averageAge);
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('钱龄分析'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: () => _showHelpDialog(context),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            _buildPageHeader(context, theme),
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
@@ -92,53 +104,52 @@ class MoneyAgePage extends ConsumerWidget {
     );
   }
 
-  /// 页面头部
-  Widget _buildPageHeader(BuildContext context, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.arrow_back,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-          ),
-          const Expanded(
-            child: Text(
-              '钱龄分析',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => _showHelpDialog(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.help_outline,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // /// 页面头部 - Replaced by AppBar
+  // Widget _buildPageHeader(BuildContext context, ThemeData theme) {
+  //   return Container(
+  //     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  //     child: Row(
+  //       children: [
+  //         GestureDetector(
+  //           onTap: () => Navigator.pop(context),
+  //           child: Container(
+  //             width: 40,
+  //             height: 40,
+  //             decoration: BoxDecoration(
+  //               color: theme.colorScheme.surfaceContainerHighest,
+  //               borderRadius: BorderRadius.circular(12),
+  //             ),
+  //             child: Icon(
+  //               Icons.arrow_back,
+  //               color: theme.colorScheme.onSurface,
+  //             ),
+  //           ),
+  //         ),
+  //         const Expanded(
+  //           child: Text(
+  //             '钱龄分析',
+  //             textAlign: TextAlign.center,
+  //             style: TextStyle(
+  //               fontSize: 18,
+  //               fontWeight: FontWeight.w600,
+  //             ),
+  //           ),
+  //         ),
+  //         GestureDetector(
+  //           onTap: () => _showHelpDialog(context),
+  //           child: Container(
+  //             width: 40,
+  //             height: 40,
+  //             alignment: Alignment.center,
+  //             child: Icon(
+  //               Icons.help_outline,
+  //               color: theme.colorScheme.onSurfaceVariant,
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
 
   /// 核心数据区：钱龄数字
   Widget _buildCoreDataSection(BuildContext context, ThemeData theme, int averageAge, LevelDetails levelDetails) {
@@ -978,11 +989,21 @@ class _MoneyAgeUpgradePageState extends ConsumerState<MoneyAgeUpgradePage> {
     final daysNeeded = targetAge - widget.currentAge;
 
     return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          nextLevel != null ? '升级到 Lv.${nextLevel.index + 1}' : '保持当前等级',
+        ),
+        centerTitle: true, // AppBar's title is centered by default with the global theme
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // 页面头部
-            _buildPageHeader(context, theme, nextLevel),
+            // 页面头部 - Replaced by AppBar
+            // _buildPageHeader(context, theme, nextLevel),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -1064,30 +1085,30 @@ class _MoneyAgeUpgradePageState extends ConsumerState<MoneyAgeUpgradePage> {
     );
   }
 
-  Widget _buildPageHeader(BuildContext context, ThemeData theme, MoneyAgeLevel? nextLevel) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: const Icon(Icons.arrow_back),
-          ),
-          Expanded(
-            child: Text(
-              nextLevel != null ? '升级到 Lv.${nextLevel.index + 1}' : '保持当前等级',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(width: 40),
-        ],
-      ),
-    );
-  }
+  // Widget _buildPageHeader(BuildContext context, ThemeData theme, MoneyAgeLevel? nextLevel) {
+  //   return Container(
+  //     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  //     child: Row(
+  //       children: [
+  //         GestureDetector(
+  //           onTap: () => Navigator.pop(context),
+  //           child: const Icon(Icons.arrow_back),
+  //         ),
+  //         Expanded(
+  //           child: Text(
+  //             nextLevel != null ? '升级到 Lv.${nextLevel.index + 1}' : '保持当前等级',
+  //             textAlign: TextAlign.center,
+  //             style: const TextStyle(
+  //               fontSize: 18,
+  //               fontWeight: FontWeight.w600,
+  //             ),
+  //           ),
+  //         ),
+  //         const SizedBox(width: 40),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildTargetDisplay(BuildContext context, ThemeData theme, int targetAge, int daysNeeded) {
     return Column(
@@ -1432,6 +1453,37 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
     return result;
   }
 
+  /// 从本地 MoneyAge 创建 MoneyAgeDashboard
+  /// 用于 API 返回 null 时的降级方案
+  MoneyAgeDashboard _createDashboardFromLocal(
+    budget_model.MoneyAge localMoneyAge,
+    List<MapEntry<DateTime, int>> historyData,
+  ) {
+    final days = localMoneyAge.days;
+    final healthLevel = days >= 30 ? 'good' : (days >= 14 ? 'normal' : (days >= 7 ? 'warning' : 'danger'));
+
+    // 从历史数据生成 trendData
+    final trendData = historyData.map((entry) {
+      return {
+        'date': entry.key.toIso8601String(),
+        'avg_age': entry.value,
+      };
+    }).toList();
+
+    return MoneyAgeDashboard(
+      avgMoneyAge: days.toDouble(),
+      medianMoneyAge: days,
+      currentHealthLevel: healthLevel,
+      healthCount: days >= 14 ? 1 : 0,
+      warningCount: days >= 7 && days < 14 ? 1 : 0,
+      dangerCount: days < 7 ? 1 : 0,
+      totalResourcePools: 1,
+      activeResourcePools: 1,
+      totalRemainingAmount: localMoneyAge.totalBalance,
+      trendData: trendData,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1448,11 +1500,17 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
     final moneyAgeHistory = ref.watch(dailyMoneyAgeHistoryProvider);
 
     return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('钱龄历史'),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // 页面头部
-            _buildPageHeader(context, theme),
             // 周期选择器
             _buildPeriodSelector(context, theme),
             Expanded(
@@ -1487,57 +1545,27 @@ class _MoneyAgeHistoryPageState extends ConsumerState<MoneyAgeHistoryPage> {
     );
   }
 
-  /// 从本地数据创建 Dashboard（与 MoneyAgePage 保持一致）
-  MoneyAgeDashboard _createDashboardFromLocal(
-    budget_model.MoneyAge localMoneyAge,
-    List<MapEntry<DateTime, int>> historyData,
-  ) {
-    final days = localMoneyAge.days;
-    final healthLevel = days >= 30 ? 'good' : (days >= 14 ? 'normal' : (days >= 7 ? 'warning' : 'danger'));
-
-    // 从历史数据生成 trendData
-    final trendData = historyData.map((entry) {
-      return {
-        'date': entry.key.toIso8601String(),
-        'avg_age': entry.value,
-      };
-    }).toList();
-
-    return MoneyAgeDashboard(
-      avgMoneyAge: days.toDouble(),
-      medianMoneyAge: days,
-      currentHealthLevel: healthLevel,
-      healthCount: days >= 14 ? 1 : 0,
-      warningCount: days >= 7 && days < 14 ? 1 : 0,
-      dangerCount: days < 7 ? 1 : 0,
-      totalResourcePools: 1,
-      activeResourcePools: 1,
-      totalRemainingAmount: localMoneyAge.totalBalance,
-      trendData: trendData,
-    );
-  }
-
-  Widget _buildPageHeader(BuildContext context, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: const Icon(Icons.arrow_back),
-          ),
-          const Expanded(
-            child: Text(
-              '钱龄历史',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-          ),
-          const SizedBox(width: 40),
-        ],
-      ),
-    );
-  }
+  // Widget _buildPageHeader(BuildContext context, ThemeData theme) {
+  //   return Container(
+  //     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  //     child: Row(
+  //       children: [
+  //         GestureDetector(
+  //           onTap: () => Navigator.pop(context),
+  //           child: const Icon(Icons.arrow_back),
+  //         ),
+  //         const Expanded(
+  //           child: Text(
+  //             '钱龄历史',
+  //             textAlign: TextAlign.center,
+  //             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+  //           ),
+  //         ),
+  //         const SizedBox(width: 40),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildPeriodSelector(BuildContext context, ThemeData theme) {
     return SingleChildScrollView(
@@ -1989,11 +2017,17 @@ class MoneyAgeStagePage extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('钱龄阶段进度'),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // 页面头部
-            _buildPageHeader(context, theme),
             // 当前阶段展示
             _buildCurrentStageDisplay(context, theme),
             // 6级阶段进度

@@ -188,7 +188,7 @@ typedef TrendChartTapCallback = void Function(
 /// )
 /// ```
 class InteractiveTrendChart extends StatefulWidget {
-  /// 数���系列
+  /// 数据系列
   final List<TrendSeries> series;
 
   /// 图表配置

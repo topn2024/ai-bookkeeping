@@ -803,6 +803,8 @@ class VoiceIntentRouter {
         return '分享操作';
       case VoiceIntentType.systemOperation:
         return '系统操作';
+      case VoiceIntentType.chatOperation:
+        return '闲聊';
       case VoiceIntentType.unknown:
         return '未知意图';
     }

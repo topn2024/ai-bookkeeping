@@ -35,7 +35,7 @@ class CircuitBreakerOpenException implements Exception {
 /// 熔断器实现
 ///
 /// 熔断器模式用于防止系统持续调用一个可能失败的服务，
-/// 给予服务恢复时���，同时快速失败以提升用户体验。
+/// 给予服务恢复时间，同时快速失败以提升用户体验。
 class CircuitBreaker {
   final String serviceName;
   final int failureThreshold;

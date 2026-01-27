@@ -266,14 +266,44 @@ class ChatEngine {
       throw Exception('LLM响应为空');
     }
 
+    // 清理LLM响应（移除换行符和常见前缀）
+    final cleanedResponse = _cleanLLMResponse(response);
+
     // 检测是否包含引导内容
-    final hasGuidance = _containsGuidance(response);
+    final hasGuidance = _containsGuidance(cleanedResponse);
 
     return ChatResponse(
-      text: response,
+      text: cleanedResponse,
       hasGuidance: hasGuidance,
       emotion: emotion,
     );
+  }
+
+  /// 清理LLM响应
+  ///
+  /// 移除换行符、多余空白和常见的LLM前缀，防止被TTS错误分割
+  String _cleanLLMResponse(String response) {
+    var cleaned = response.trim();
+
+    // 移除换行符，用空格替换
+    cleaned = cleaned.replaceAll('\n', ' ').replaceAll('\r', ' ');
+    // 合并多个空格为一个
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ');
+
+    // 移除常见的LLM前缀
+    final prefixPatterns = [
+      RegExp(r'^(好的|OK|ok)[\s,，:：]*'),
+      RegExp(r'^让我(来)?[\s,，]*'),
+      RegExp(r'^我来[\s,，]*'),
+      RegExp(r'^(下面是|以下是)[\s,，:：]*'),
+      RegExp(r'^回复[\s,，:：]*'),
+      RegExp(r'^(小记说|${_persona.name}说)[\s,，:：]*'),
+    ];
+    for (final pattern in prefixPatterns) {
+      cleaned = cleaned.replaceFirst(pattern, '');
+    }
+
+    return cleaned.trim();
   }
 
   /// 构建聊天提示词

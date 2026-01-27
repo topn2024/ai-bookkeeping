@@ -49,7 +49,6 @@ class _AASplitPageState extends ConsumerState<AASplitPage> {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
-        backgroundColor: AppTheme.surfaceColor,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),

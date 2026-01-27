@@ -323,7 +323,7 @@ class NaturalLanguageSearchService {
           );
           if (transaction != null) {
             return SearchResult(
-              answer: '���大一笔消费是¥${transaction.amount.toStringAsFixed(2)}',
+              answer: '最大一笔消费是¥${transaction.amount.toStringAsFixed(2)}',
               type: ResultType.single,
               data: {'transaction': transaction},
               intent: intent,

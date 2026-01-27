@@ -131,7 +131,8 @@ ${chatIntent != null ? '（检测到的意图：$chatIntent）' : ''}
 
       final response = await _qwenService.chat(prompt).timeout(const Duration(seconds: 5));
       if (response != null && response.isNotEmpty) {
-        final cleaned = _cleanResponse(response);
+        // 闲聊回复（包括故事、笑话）允许更长的内容，最多300字符
+        final cleaned = _cleanResponse(response, maxLength: 300);
         if (cleaned.isNotEmpty) {
           debugPrint('[LLMResponse] 闲聊回复: $cleaned');
           return cleaned;
@@ -178,6 +179,21 @@ ${chatIntent != null ? '（检测到的意图：$chatIntent）' : ''}
     // 询问能力
     if (lowerInput.contains('你能') || lowerInput.contains('你会') || lowerInput.contains('你是谁')) {
       return '我是小记呀~帮你记账、查账、管预算，这些我都行！';
+    }
+
+    // 讲笑话/讲故事
+    if (lowerInput.contains('笑话') || lowerInput.contains('讲个')) {
+      const jokes = [
+        '为什么程序员总是分不清万圣节和圣诞节？因为Oct 31等于Dec 25！',
+        '有一天小明问老师：为什么预算总是不够？老师说：因为你花得太快啦~',
+        '钱包对主人说：你总是把我掏空，我很伤心。主人说：别担心，下个月工资会填满你的！',
+      ];
+      return jokes[DateTime.now().millisecond % jokes.length];
+    }
+
+    // 讲故事
+    if (lowerInput.contains('故事')) {
+      return '从前有个人坚持记账，后来他发现省下的钱够买一台新手机啦~记账真的有用哦！';
     }
 
     // 默认
@@ -318,7 +334,7 @@ ${userInput != null ? '用户说的是：$userInput' : ''}
   }
 
   /// 清理LLM响应
-  String _cleanResponse(String response) {
+  String _cleanResponse(String response, {int maxLength = 50}) {
     // 移除引号、多余空白
     var cleaned = response.trim();
     if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
@@ -327,9 +343,29 @@ ${userInput != null ? '用户说的是：$userInput' : ''}
     if (cleaned.startsWith("'") && cleaned.endsWith("'")) {
       cleaned = cleaned.substring(1, cleaned.length - 1);
     }
+
+    // 移除换行符，用空格替换（防止被SentenceBuffer分割成多个句子）
+    cleaned = cleaned.replaceAll('\n', ' ').replaceAll('\r', ' ');
+    // 合并多个空格为一个
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ');
+
+    // 移除常见的LLM前缀（如"好的，让我来回复："等）
+    final prefixPatterns = [
+      RegExp(r'^(好的|OK|ok)[\s,，:：]*'),
+      RegExp(r'^让我(来)?[\s,，]*'),
+      RegExp(r'^我来[\s,，]*'),
+      RegExp(r'^(下面是|以下是)[\s,，:：]*'),
+      RegExp(r'^回复[\s,，:：]*'),
+      RegExp(r'^(生成|输出)[\s,，:：]*'),
+    ];
+    for (final pattern in prefixPatterns) {
+      cleaned = cleaned.replaceFirst(pattern, '');
+    }
+
     // 限制长度
-    if (cleaned.length > 50) {
-      cleaned = cleaned.substring(0, 50);
+    cleaned = cleaned.trim();
+    if (cleaned.length > maxLength) {
+      cleaned = cleaned.substring(0, maxLength);
     }
     return cleaned.trim();
   }

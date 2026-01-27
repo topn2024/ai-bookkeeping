@@ -32,7 +32,7 @@ class _FamilyLeaderboardPageState extends ConsumerState<FamilyLeaderboardPage> {
     final rankings = ref.watch(memberSpendingRankProvider(ledgerId));
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(

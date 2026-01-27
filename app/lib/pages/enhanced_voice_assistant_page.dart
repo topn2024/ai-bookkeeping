@@ -93,7 +93,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     }
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      
       appBar: _buildAppBar(context, l10n, coordinator),
       body: Column(
         children: [

@@ -61,7 +61,7 @@ class CompanionEventBus {
     _eventHandlers[trigger]?.remove(handler);
   }
 
-  /// ���理事件队列
+  /// 处理事件队列
   Future<void> _processEvents() async {
     if (_isProcessing) return;
     _isProcessing = true;

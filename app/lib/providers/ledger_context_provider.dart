@@ -93,7 +93,7 @@ class LedgerContextNotifier extends Notifier<LedgerContextState> {
     return const LedgerContextState();
   }
 
-  /// 初始化上���文
+  /// 初始化上下文
   Future<void> initialize(String userId) async {
     state = state.copyWith(isLoading: true, currentUserId: userId);
 

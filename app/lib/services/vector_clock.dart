@@ -47,7 +47,7 @@ class VectorClock {
 
   /// 判断当前时钟是否发生在另一个时钟之前
   ///
-  /// ���果对于所有节点，当前时钟的时间戳都小于等于other的时间戳，
+  /// 如果对于所有节点，当前时钟的时间戳都小于等于other的时间戳，
   /// 且至少有一个节点的时间戳严格小于other的时间戳，则返回true
   bool happensBefore(VectorClock other) {
     // 获取所有节点

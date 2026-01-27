@@ -208,7 +208,7 @@ class I18nGoalDetectionService {
   }
 }
 
-/// ���际化目标定义
+/// 国际化目标定义
 class I18nGoal {
   final String id;
   final String name;

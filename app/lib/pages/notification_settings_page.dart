@@ -4,7 +4,7 @@ import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
 
 /// 8.07 通知设置页面
-/// 推送���知、记账提醒、账单提醒、预算超支提醒
+/// 推送通知、记账提醒、账单提醒、预算超支提醒
 class NotificationSettingsPage extends ConsumerStatefulWidget {
   const NotificationSettingsPage({super.key});
 
@@ -27,7 +27,7 @@ class _NotificationSettingsPageState
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(

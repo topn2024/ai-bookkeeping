@@ -457,6 +457,10 @@ class VoicePipelineController {
       '[VoicePipelineController] 收到ASR句子: "$text", VAD说话中=$_isUserSpeaking',
     );
 
+    // 收到ASR最终结果说明用户刚说完一句话
+    // 重置主动对话计时器，确保用户不会在说话过程中被打断
+    // 这是VAD检测的补充机制（VAD可能没有正确检测到用户在说话）
+    _proactiveManager.resetTimer(isUserInitiated: true);
 
     // 将句子加入缓冲区
     _sentenceBuffer.add(text);

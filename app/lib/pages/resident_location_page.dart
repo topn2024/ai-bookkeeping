@@ -4,7 +4,7 @@ import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
 
 /// 8.15 常驻地点设置页面
-/// 设置家庭、公���等常驻位置
+/// 设置家庭、公司等常驻位置
 class ResidentLocationPage extends ConsumerStatefulWidget {
   const ResidentLocationPage({super.key});
 

@@ -73,7 +73,7 @@ class _UpgradeVotePageState extends ConsumerState<UpgradeVotePage> {
     final totalCount = _members.length;
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(

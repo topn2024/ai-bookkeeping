@@ -148,7 +148,7 @@ class _BudgetCarryoverSettingsPageState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('月底时，未用完的预算有三种处理方式���'),
+            Text('月底时，未用完的预算有三种处理方式：'),
             SizedBox(height: 12),
             Text('• 全额结转：剩余金额全部转入下月'),
             Text('• 部分结转：最多结转50%到下月'),

@@ -223,7 +223,8 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   // 对话历史
   final List<ChatMessage> _conversationHistory = [];
-  static const int _maxHistorySize = 100;
+  // 减少历史记录大小以降低内存压力，避免潜在的崩溃问题
+  static const int _maxHistorySize = 50;
 
   // 录音相关
   DateTime? _recordingStartTime;
@@ -612,12 +613,20 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       debugPrint('[GlobalVoiceAssistant] [预加载] 7/7 初始化 VAD 和识别引擎...');
       _recognitionEngine ??= VoiceRecognitionEngine();
       if (_vadService == null) {
+        // 创建VAD服务，能量阈值作为降级方案的配置
         _vadService = RealtimeVADService(
           config: RealtimeVADConfig.defaultConfig().copyWith(
             speechEndThresholdMs: 1200,
             silenceTimeoutMs: 30000,
+            // 降级时使用的能量阈值配置
+            energyThreshold: 0.001,
+            minEnergyThreshold: 0.0003,
+            maxEnergyThreshold: 0.01,
           ),
         );
+        // 初始化Silero VAD（优先使用神经网络检测，失败时自动降级到能量检测）
+        await _vadService!.initializeSileroVAD();
+        debugPrint('[GlobalVoiceAssistant] VAD模式: ${_vadService!.isUsingSileroVAD ? "Silero神经网络" : "能量检测"}');
         _vadSubscription = _vadService!.eventStream.listen(_handleVADEvent);
       }
       debugPrint('[GlobalVoiceAssistant] [预加载] 7/7 VAD 和识别引擎已初始化');
@@ -720,12 +729,20 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // speechEndThresholdMs权衡：太短会截断用户思考，太长会响应迟钝
     // 800ms: 反应快但易截断 | 1200ms: 折中 | 1500ms: 安全但迟钝
     if (_vadService == null) {
+      // 创建VAD服务，能量阈值作为降级方案的配置
       _vadService = RealtimeVADService(
         config: RealtimeVADConfig.defaultConfig().copyWith(
           speechEndThresholdMs: 1200,  // 静音1.2秒判定说完（折中方案）
           silenceTimeoutMs: 30000,     // 30秒无声音自动结束对话
+          // 降级时使用的能量阈值配置
+          energyThreshold: 0.001,
+          minEnergyThreshold: 0.0003,
+          maxEnergyThreshold: 0.01,
         ),
       );
+      // 初始化Silero VAD（优先使用神经网络检测，失败时自动降级到能量检测）
+      await _vadService!.initializeSileroVAD();
+      debugPrint('[GlobalVoiceAssistant] VAD模式: ${_vadService!.isUsingSileroVAD ? "Silero神经网络" : "能量检测"}');
       // 订阅VAD事件
       _vadSubscription = _vadService!.eventStream.listen(_handleVADEvent);
     } else {

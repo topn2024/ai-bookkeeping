@@ -18,7 +18,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      
       body: CustomScrollView(
         slivers: [
           _buildAppBar(l10n),

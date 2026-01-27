@@ -66,7 +66,7 @@ class ChartScreenshotConfig {
   /// 是否添加边框
   final bool addBorder;
 
-  /// 边框���色
+  /// 边框颜色
   final Color borderColor;
 
   /// 边框宽度

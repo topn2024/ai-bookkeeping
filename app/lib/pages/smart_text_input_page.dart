@@ -48,7 +48,7 @@ class _SmartTextInputPageState extends ConsumerState<SmartTextInputPage> {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
-        backgroundColor: AppTheme.surfaceColor,
+
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close),

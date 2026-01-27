@@ -1,10 +1,10 @@
 // Variables
 $primary-color: #6495ED;
-$success-color: #52c41a;
-$warning-color: #faad14;
-$error-color: #ff4d4f;
+$success-color: #4CAF50;
+$warning-color: #FF9800;
+$error-color: #F44336;
 $font-size-base: 14px;
-$border-radius-base: 4px;
+$border-radius-base: 8px;
 
 // Reset
 * {
@@ -20,7 +20,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: $font-size-base;
   color: #333;
-  background-color: #f0f2f5;
+  background-color: #F8FAFF;
 }
 
 #app {
@@ -70,7 +70,7 @@ body {
 }
 
 .el-card {
-  border-radius: 8px;
+  border-radius: 12px;
 
   &.is-always-shadow {
     box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
@@ -89,7 +89,6 @@ body {
 .text-center {
   text-align: center;
 }
-
 .text-right {
   text-align: right;
 }
@@ -152,8 +151,7 @@ body {
   gap: 16px;
 
   .page-title {
-    font-size: 22px;
-    font-weight: 600;
+    @extend .text-h3;
     color: #1f2937;
     margin: 0;
     line-height: 1.4;
@@ -172,6 +170,19 @@ body {
     flex-shrink: 0;
   }
 }
+
+// Typography Scale
+.text-h1 { font-size: 48px; font-weight: 300; }
+.text-h2 { font-size: 34px; font-weight: 300; }
+.text-h3 { font-size: 24px; font-weight: 400; }
+.text-h4 { font-size: 20px; font-weight: 500; }
+.text-h5 { font-size: 18px; font-weight: 500; }
+.text-body1 { font-size: 16px; font-weight: 400; }
+.text-body2 { font-size: 14px; font-weight: 400; }
+.text-button { font-size: 14px; font-weight: 500; text-transform: uppercase; }
+.text-caption { font-size: 12px; font-weight: 400; }
+.text-overline { font-size: 10px; font-weight: 400; text-transform: uppercase; }
+
 
 // Card grid
 .card-grid {
@@ -242,7 +253,7 @@ body {
 .filter-form {
   background: #fff;
   padding: 20px 24px;
-  border-radius: 8px;
+  border-radius: 12px;
   margin-bottom: 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: hidden; // 防止内容溢出
@@ -334,12 +345,12 @@ body {
 .table-container {
   background: #fff;
   padding: 0;
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: hidden; // 防止表格溢出容器
 
   .el-table {
-    border-radius: 8px 8px 0 0;
+    border-radius: 12px 12px 0 0;
 
     // 表头样式
     .el-table__header-wrapper th {
@@ -460,7 +471,7 @@ body {
 
 // Dialog customization
 .el-dialog {
-  border-radius: 8px;
+  border-radius: 12px;
 
   .el-dialog__header {
     border-bottom: 1px solid #f0f0f0;

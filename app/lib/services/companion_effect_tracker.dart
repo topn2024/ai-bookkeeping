@@ -6,7 +6,7 @@ import 'companion_copywriting_service.dart';
 ///
 /// 功能：
 /// 1. 消息展示与交互追踪
-/// 2. 用户反馈收���
+/// 2. 用户反馈收集
 /// 3. 效果指标计算
 /// 4. A/B测试支持
 class CompanionEffectTracker {

@@ -640,6 +640,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       case VoiceIntentType.systemOperation:
         return await _handleSystemIntent(intentResult, originalInput);
 
+      case VoiceIntentType.chatOperation:
+        return await _handleChatIntent(intentResult, originalInput);
+
       case VoiceIntentType.unknown:
         return await _handleUnknownIntent(intentResult, originalInput);
     }
@@ -695,10 +698,13 @@ class VoiceServiceCoordinator extends ChangeNotifier {
             final category = op.params['category'] as String? ?? '其他';
             final merchant = op.params['merchant'] as String?;
             final note = op.params['note'] as String?;
+            // 检查LLM返回的type参数，判断是收入还是支出
+            final typeStr = op.params['type'] as String?;
+            final isIncome = typeStr == 'income';
 
             if (amount != null && amount > 0) {
               completeIntents.add(CompleteIntent(
-                type: TransactionIntentType.expense,
+                type: isIncome ? TransactionIntentType.income : TransactionIntentType.expense,
                 originalText: op.originalText,
                 confidence: llmResult.confidence,
                 amount: amount.toDouble(),
@@ -1239,6 +1245,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       case VoiceIntentType.dataOperation:
       case VoiceIntentType.shareOperation:
       case VoiceIntentType.systemOperation:
+      case VoiceIntentType.chatOperation:
         // No specific cleanup needed for these types
         break;
 
@@ -1319,7 +1326,17 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       final amount = (entities['amount'] as num?)?.toDouble();
       final category = entities['category'] as String?;
       final merchant = entities['merchant'] as String?;
-      debugPrint('[VoiceCoordinator] 解析结果: amount=$amount, category=$category, merchant=$merchant');
+      // 检查type参数，判断是收入还是支出
+      final typeStr = entities['type'] as String?;
+      // 已知的收入分类关键词（作为兜底判断）
+      const incomeCategories = [
+        '工资', '薪资', '奖金', '投资收益', '利息', '股息', '分红',
+        '兼职', '红包', '报销', '经营所得', '租金收入', '退款', '其他收入',
+      ];
+      // 先检查type参数，如果没有则根据分类判断
+      final isIncome = typeStr == 'income' ||
+          (typeStr == null && category != null && incomeCategories.any((c) => category.contains(c)));
+      debugPrint('[VoiceCoordinator] 解析结果: amount=$amount, category=$category, merchant=$merchant, type=$typeStr, isIncome=$isIncome');
 
       if (amount == null || amount <= 0) {
         debugPrint('[VoiceCoordinator] 金额无效，返回错误');
@@ -1331,10 +1348,10 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       // 创建交易记录
       final transaction = model.Transaction(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        type: model.TransactionType.expense,
+        type: isIncome ? model.TransactionType.income : model.TransactionType.expense,
         amount: amount,
-        category: category ?? 'other_expense',
-        note: merchant != null ? '在$merchant消费' : originalInput,
+        category: category ?? (isIncome ? 'other_income' : 'other_expense'),
+        note: merchant != null ? (isIncome ? merchant : '在$merchant消费') : originalInput,
         date: DateTime.now(),
         accountId: 'default',
         rawMerchant: merchant,
@@ -2296,6 +2313,31 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     }
   }
 
+  /// 处理闲聊意图（讲故事、讲笑话、问候等）
+  Future<VoiceSessionResult> _handleChatIntent(
+    IntentAnalysisResult intentResult,
+    String originalInput,
+  ) async {
+    try {
+      debugPrint('[VoiceCoordinator] 处理闲聊意图: $originalInput');
+
+      // 使用LLM生成闲聊回复
+      final llmGenerator = LLMResponseGenerator.instance;
+      final response = await llmGenerator.generateCasualChatResponse(
+        userInput: originalInput,
+      );
+
+      debugPrint('[VoiceCoordinator] 闲聊回复: $response');
+      await _speakWithSkipCheck(response);
+      return VoiceSessionResult.success(response);
+    } catch (e) {
+      debugPrint('[VoiceCoordinator] 闲聊处理失败: $e');
+      const fallback = '我来陪你聊聊天吧~有什么想说的？';
+      await _speakWithSkipCheck(fallback);
+      return VoiceSessionResult.success(fallback);
+    }
+  }
+
   /// 处理未知意图
   ///
   /// 当规则匹配无法识别意图时，尝试使用AI大模型进行兜底处理
@@ -2510,13 +2552,33 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
     // 使用智能意图识别器分析
     final pageContext = _currentSession?.intentType.name ?? 'home';
+
+    // 获取对话历史用于上下文理解
+    final conversationHistory = GlobalVoiceAssistantManager.instance.conversationHistory
+        .where((m) => m.type == ChatMessageType.user || m.type == ChatMessageType.assistant)
+        .map((m) => {
+          'role': m.type == ChatMessageType.user ? 'user' : 'assistant',
+          'content': m.content,
+        })
+        .toList();
+
     final smartResult = await _smartRecognizer.recognize(
       input,
       pageContext: pageContext,
+      conversationHistory: conversationHistory.isNotEmpty ? conversationHistory : null,
     );
 
     debugPrint('[VoiceCoordinator] SmartIntent结果: ${smartResult.intentType}, '
         '来源: ${smartResult.source}, 置信度: ${smartResult.confidence}');
+
+    // 特殊处理：clarify 意图（信息不完整，需要反问用户）
+    if (smartResult.intentType == SmartIntentType.clarify) {
+      final clarifyQuestion = smartResult.entities['clarify_question'] as String?
+          ?? '请提供更多信息';
+      debugPrint('[VoiceCoordinator] 需要澄清: $clarifyQuestion');
+      await _speakWithSkipCheck(clarifyQuestion);
+      return VoiceSessionResult.waitingForClarification(clarifyQuestion);
+    }
 
     // 转换为IntentAnalysisResult
     final intentResult = _convertSmartIntentResult(smartResult);
@@ -3018,6 +3080,10 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         return VoiceIntentType.shareOperation;
       case SmartIntentType.systemOp:
         return VoiceIntentType.systemOperation;
+      case SmartIntentType.clarify:
+        return VoiceIntentType.clarifySelection;
+      case SmartIntentType.chat:
+        return VoiceIntentType.chatOperation;
       case SmartIntentType.unknown:
         return VoiceIntentType.unknown;
     }
@@ -3118,6 +3184,7 @@ enum VoiceIntentType {
   dataOperation,             // 数据操作
   shareOperation,            // 分享操作
   systemOperation,           // 系统操作
+  chatOperation,             // 闲聊操作（讲故事、讲笑话等）
 }
 
 /// 语音会话结果状态

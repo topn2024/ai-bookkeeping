@@ -235,6 +235,9 @@ class VoiceFeedbackSystem extends ChangeNotifier {
         return '已为您取消操作';
       case VoiceIntentType.clarifySelection:
         return '请选择您要操作的项目';
+      case VoiceIntentType.chatOperation:
+        // 闲聊模式不需要中间反馈，直接等待LLM生成回复
+        return '';
       default:
         return '我正在处理您的请求...';
     }
@@ -449,24 +452,10 @@ class VoiceFeedbackSystem extends ChangeNotifier {
 
   /// 增强TTS消息
   String _enhanceMessageForTts(VoiceFeedback feedback) {
-    var message = feedback.message;
-
-    // 根据类型添加语调提示
-    switch (feedback.type) {
-      case VoiceFeedbackType.error:
-        message = '<emphasis level="strong">$message</emphasis>';
-        break;
-      case VoiceFeedbackType.success:
-        message = '<prosody rate="medium">$message</prosody>';
-        break;
-      case VoiceFeedbackType.confirmation:
-        message = '<prosody pitch="high">$message</prosody>';
-        break;
-      default:
-        break;
-    }
-
-    return message;
+    // 直接返回消息文本，不添加 SSML 标签
+    // 注意：SSML 标签（如 <prosody>、<emphasis>）在某些 TTS 引擎中不支持
+    // 会被当作普通文本朗读出来，所以这里不使用 SSML 格式化
+    return feedback.message;
   }
 
   /// 安排视觉反馈清除

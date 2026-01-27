@@ -395,7 +395,7 @@ class CompanionIntegrationService {
     );
   }
 
-  // ==================== 情感化交���反馈 ====================
+  // ==================== 情感化交互反馈 ====================
 
   /// 用户点击消息
   void onMessageClicked(CompanionMessage message) {
