@@ -1,0 +1,40 @@
+{
+  "module": "import_export",
+  "moduleName": "导入导出",
+  "moduleDescription": "导入其他应用的数据或导出本应用数据",
+  "contents": [
+    {
+      "pageId": "/import",
+      "title": "数据导入",
+      "module": "import_export",
+      "description": "从其他应用或文件导入记账数据",
+      "useCases": ["从其他记账应用迁移数据", "导入银行账单", "批量导入交易记录"],
+      "steps": [
+        {"title": "选择导入方式", "description": "选择从文件导入或从其他应用导入"},
+        {"title": "选择文件", "description": "选择要导入的CSV或Excel文件"},
+        {"title": "映射字段", "description": "将文件中的字段映射到应用的字段"},
+        {"title": "预览数据", "description": "预览导入的数据是否正确"},
+        {"title": "确认导入", "description": "确认后开始导入数据"}
+      ],
+      "tips": ["支持CSV和Excel格式", "导入前建议先备份数据", "可以下载导入模板"],
+      "relatedPages": ["/export", "/settings/backup"],
+      "keywords": ["导入", "迁移", "批量", "文件"]
+    },
+    {
+      "pageId": "/export",
+      "title": "数据导出",
+      "module": "import_export",
+      "description": "导出记账数据到文件",
+      "useCases": ["备份数据", "在电脑上分析数据", "迁移到其他应用"],
+      "steps": [
+        {"title": "选择导出格式", "description": "选择CSV、Excel或PDF格式"},
+        {"title": "选择时间范围", "description": "选择要导出的数据时间范围"},
+        {"title": "选择导出内容", "description": "选择要导出的数据类型"},
+        {"title": "导出文件", "description": "点击导出按钮生成文件"}
+      ],
+      "tips": ["CSV格式兼容性最好", "Excel格式支持多个工作表", "PDF格式适合打印"],
+      "relatedPages": ["/import", "/statistics/export"],
+      "keywords": ["导出", "备份", "保存", "文件"]
+    }
+  ]
+}

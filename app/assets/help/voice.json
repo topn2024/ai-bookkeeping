@@ -1,0 +1,52 @@
+{
+  "module": "voice",
+  "moduleName": "语音交互",
+  "moduleDescription": "智能语音助手，通过对话完成记账、查询和分析等操作",
+  "contents": [
+    {
+      "pageId": "/voice-assistant",
+      "title": "语音助手",
+      "module": "voice",
+      "description": "智能语音助手，您的贴身财务管家",
+      "useCases": [
+        "语音记账",
+        "查询账户余额",
+        "了解支出情况",
+        "获取财务建议"
+      ],
+      "steps": [
+        {
+          "title": "唤醒助手",
+          "description": "说出唤醒词或点击麦克风按钮"
+        },
+        {
+          "title": "说出需求",
+          "description": "清晰地说出您的需求"
+        },
+        {
+          "title": "确认操作",
+          "description": "助手会确认理解的内容"
+        },
+        {
+          "title": "完成任务",
+          "description": "确认后助手会执行相应操作"
+        }
+      ],
+      "tips": [
+        "支持连续对话",
+        "可以打断助手的回答",
+        "支持多轮对话"
+      ],
+      "relatedPages": [
+        "/voice-chat",
+        "/voice-settings"
+      ],
+      "keywords": [
+        "语音",
+        "助手",
+        "对话",
+        "AI"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "module": "bill_reminders",
+  "moduleName": "账单提醒",
+  "moduleDescription": "设置和管理各类账单提醒",
+  "contents": [
+    {
+      "pageId": "/bill-reminders",
+      "title": "账单提醒",
+      "module": "bill_reminders",
+      "description": "管理定期账单和还款提醒",
+      "useCases": ["设置房租提醒", "信用卡还款提醒", "水电费缴纳提醒"],
+      "steps": [
+        {"title": "添加账单", "description": "点击添加按钮创建新的账单提醒"},
+        {"title": "设置周期", "description": "设置账单的重复周期，如每月1号"},
+        {"title": "设置提醒", "description": "设置提前几天提醒"},
+        {"title": "完成缴费", "description": "缴费后标记为已完成"}
+      ],
+      "tips": ["可以设置多个提醒时间", "支持自动记账", "可以查看历史账单"],
+      "relatedPages": ["/settings/reminder", "/quick-add"],
+      "keywords": ["账单", "提醒", "还款", "缴费"]
+    }
+  ]
+}

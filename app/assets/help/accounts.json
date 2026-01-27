@@ -1,0 +1,52 @@
+{
+  "module": "accounts",
+  "moduleName": "账户管理",
+  "moduleDescription": "管理您的各类账户，包括现金、银行卡、信用卡、电子钱包等",
+  "contents": [
+    {
+      "pageId": "/accounts",
+      "title": "账户列表",
+      "module": "accounts",
+      "description": "查看和管理所有账户，一目了然地掌握各账户余额",
+      "useCases": [
+        "查看所有账户的余额",
+        "快速切换不同账户",
+        "管理账户信息"
+      ],
+      "steps": [
+        {
+          "title": "查看账户列表",
+          "description": "页面显示所有账户及其当前余额"
+        },
+        {
+          "title": "查看账户详情",
+          "description": "点击任意账户可查看该账户的详细信息和交易记录"
+        },
+        {
+          "title": "添加新账户",
+          "description": "点击右上角的加号按钮可添加新账户"
+        },
+        {
+          "title": "编辑账户",
+          "description": "长按账户可进行编辑、归档或删除操作"
+        }
+      ],
+      "tips": [
+        "可以设置常用账户置顶",
+        "支持隐藏不常用的账户",
+        "账户余额会实时更新"
+      ],
+      "relatedPages": [
+        "/account/detail",
+        "/account/create",
+        "/account/transfer"
+      ],
+      "keywords": [
+        "账户",
+        "余额",
+        "列表",
+        "管理"
+      ]
+    }
+  ]
+}

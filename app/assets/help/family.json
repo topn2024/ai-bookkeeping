@@ -1,0 +1,23 @@
+{
+  "module": "family",
+  "moduleName": "家庭账本",
+  "moduleDescription": "与家人共同管理家庭财务",
+  "contents": [
+    {
+      "pageId": "/family",
+      "title": "家庭账本",
+      "module": "family",
+      "description": "创建和管理家庭共享账本",
+      "useCases": ["与家人共同记账", "管理家庭支出", "查看家庭财务状况"],
+      "steps": [
+        {"title": "创建家庭账本", "description": "创建一个新的家庭账本"},
+        {"title": "邀请家人", "description": "通过邀请码邀请家人加入"},
+        {"title": "设置权限", "description": "为家人设置不同的权限"},
+        {"title": "共同记账", "description": "家人可以共同记录和查看账目"}
+      ],
+      "tips": ["可以设置成员的记账权限", "支持查看每个成员的记账情况", "可以设置家庭预算"],
+      "relatedPages": ["/budget", "/accounts"],
+      "keywords": ["家庭", "共享", "成员", "协作"]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "module": "impulse_control",
+  "moduleName": "冲动防护",
+  "moduleDescription": "帮助您控制冲动消费，理性购物",
+  "contents": [
+    {
+      "pageId": "/impulse-control",
+      "title": "冲动防护",
+      "module": "impulse_control",
+      "description": "设置消费冷静期，避免冲动消费",
+      "useCases": ["控制冲动购物", "设置消费限额", "延迟消费决策"],
+      "steps": [
+        {"title": "开启冲动防护", "description": "在设置中开启冲动防护功能"},
+        {"title": "设置冷静期", "description": "设置大额消费的冷静期时长"},
+        {"title": "添加愿望清单", "description": "将想买的东西加入愿望清单"},
+        {"title": "冷静期后决策", "description": "冷静期后再决定是否购买"}
+      ],
+      "tips": ["建议设置24-48小时冷静期", "可以设置金额阈值", "愿望清单可以帮助理性消费"],
+      "relatedPages": ["/budget", "/habits"],
+      "keywords": ["冲动", "控制", "理性", "消费"]
+    }
+  ]
+}

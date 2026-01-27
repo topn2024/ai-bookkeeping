@@ -1,0 +1,199 @@
+{
+  "module": "statistics",
+  "moduleName": "统计报表",
+  "moduleDescription": "多维度的财务数据分析和可视化报表，帮助您深入了解收支情况和消费习惯",
+  "contents": [
+    {
+      "pageId": "/statistics",
+      "title": "统计总览",
+      "module": "statistics",
+      "description": "汇总展示各类财务统计数据，一页掌握全部财务状况",
+      "useCases": ["每周或每月查看整体财务状况", "快速了解收支趋势", "发现异常支出或收入"],
+      "steps": [
+        {"title": "查看时间范围", "description": "顶部可以选择查看的时间范围：今日、本周、本月、本年或自定义时间段"},
+        {"title": "查看收支概况", "description": "页面上方显示总收入、总支出和结余金额"},
+        {"title": "查看图表分析", "description": "向下滚动查看各类图表，包括趋势图、分类占比、账户分布等"},
+        {"title": "进入详细报表", "description": "点击任意图表可进入对应的详细报表页面"}
+      ],
+      "tips": ["可以左右滑动切换不同的时间范围", "点击图表中的数据可查看详细信息", "支持导出报表为图片或PDF"],
+      "relatedPages": ["/statistics/expense", "/statistics/income", "/statistics/trend"],
+      "keywords": ["统计", "报表", "总览", "分析", "图表"]
+    },
+    {
+      "pageId": "/statistics/expense",
+      "title": "支出统计",
+      "module": "statistics",
+      "description": "详细分析支出情况，了解钱都花在哪里了",
+      "useCases": ["分析每月支出构成", "找出最大的支出类别", "控制不必要的开支"],
+      "steps": [
+        {"title": "查看支出总额", "description": "页面顶部显示选定时间范围内的支出总额"},
+        {"title": "查看分类占比", "description": "饼图展示各支出分类的占比，一目了然地看出主要支出方向"},
+        {"title": "查看分类排行", "description": "列表展示各分类的支出金额和占比，按金额从高到低排序"},
+        {"title": "查看详细记录", "description": "点击任意分类可查看该分类下的所有交易记录"}
+      ],
+      "tips": ["可以设置支出预算，超支时会有提醒", "长按分类可查看该分类的历史趋势", "支持按账户筛选支出"],
+      "relatedPages": ["/statistics/category", "/budget", "/statistics/trend"],
+      "keywords": ["支出", "花费", "消费", "开支", "分类"]
+    },
+    {
+      "pageId": "/statistics/income",
+      "title": "收入统计",
+      "module": "statistics",
+      "description": "分析收入来源和构成，了解收入情况",
+      "useCases": ["查看各项收入来源", "分析收入稳定性", "规划未来收入"],
+      "steps": [
+        {"title": "查看收入总额", "description": "页面顶部显示选定时间范围内的收入总额"},
+        {"title": "查看收入分类", "description": "饼图展示各收入分类的占比，如工资、奖金、投资收益等"},
+        {"title": "查看收入趋势", "description": "折线图展示收入随时间的变化趋势"},
+        {"title": "查看详细记录", "description": "点击任意分类可查看该分类下的所有收入记录"}
+      ],
+      "tips": ["可以设置收入目标，激励自己增加收入", "支持按账户筛选收入", "可以对比不同时间段的收入变化"],
+      "relatedPages": ["/statistics/category", "/statistics/trend", "/statistics/comparison"],
+      "keywords": ["收入", "工资", "奖金", "来源"]
+    },
+    {
+      "pageId": "/statistics/category",
+      "title": "分类统计",
+      "module": "statistics",
+      "description": "按分类查看收支详情，深入了解每个分类的消费情况",
+      "useCases": ["分析某个分类的支出趋势", "对比不同分类的支出", "发现可以节省的分类"],
+      "steps": [
+        {"title": "选择分类", "description": "从分类列表中选择要查看的分类"},
+        {"title": "查看分类概况", "description": "显示该分类的总金额、交易笔数、平均金额等"},
+        {"title": "查看趋势图", "description": "折线图展示该分类随时间的变化趋势"},
+        {"title": "查看交易列表", "description": "列表展示该分类下的所有交易记录"}
+      ],
+      "tips": ["可以为每个分类设置预算", "支持对比多个分类", "可以查看分类的同比和环比变化"],
+      "relatedPages": ["/statistics/expense", "/categories", "/budget"],
+      "keywords": ["分类", "类别", "细分", "详情"]
+    },
+    {
+      "pageId": "/statistics/trend",
+      "title": "趋势分析",
+      "module": "statistics",
+      "description": "查看收支随时间的变化趋势，发现财务规律",
+      "useCases": ["了解收支的季节性变化", "预测未来的收支情况", "发现异常的收支波动"],
+      "steps": [
+        {"title": "选择时间粒度", "description": "可以选择按日、周、月或年查看趋势"},
+        {"title": "查看趋势图", "description": "折线图展示收入、支出和结余的变化趋势"},
+        {"title": "查看关键指标", "description": "显示平均值、最高值、最低值等关键指标"},
+        {"title": "分析趋势", "description": "系统会自动分析趋势，给出财务建议"}
+      ],
+      "tips": ["可以添加多条趋势线进行对比", "支持预测未来趋势", "可以标记重要事件，分析事件对财务的影响"],
+      "relatedPages": ["/statistics/comparison", "/statistics/expense", "/statistics/income"],
+      "keywords": ["趋势", "变化", "走势", "预测"]
+    },
+    {
+      "pageId": "/statistics/comparison",
+      "title": "对比分析",
+      "module": "statistics",
+      "description": "对比不同时间段的收支情况，发现变化和规律",
+      "useCases": ["对比本月和上月的支出", "对比今年和去年同期的收入", "分析财务状况的改善或恶化"],
+      "steps": [
+        {"title": "选择对比时间段", "description": "选择要对比的两个或多个时间段"},
+        {"title": "查看对比图表", "description": "柱状图或折线图展示不同时间段的收支对比"},
+        {"title": "查看变化幅度", "description": "显示各项指标的增长或下降幅度"},
+        {"title": "分析差异原因", "description": "系统会分析差异的主要原因，如某个分类的大幅变化"}
+      ],
+      "tips": ["可以对比多个时间段", "支持同比和环比对比", "可以导出对比报告"],
+      "relatedPages": ["/statistics/trend", "/statistics/expense", "/statistics/income"],
+      "keywords": ["对比", "比较", "同比", "环比"]
+    },
+    {
+      "pageId": "/statistics/heatmap",
+      "title": "消费热力图",
+      "module": "statistics",
+      "description": "以热力图形式展示消费的时间和地点分布",
+      "useCases": ["了解哪些时间段消费最多", "发现消费的地理分布", "优化消费时间和地点"],
+      "steps": [
+        {"title": "查看时间热力图", "description": "日历热力图展示每天的消费金额，颜色越深表示消费越多"},
+        {"title": "查看时段分布", "description": "24小时热力图展示一天中不同时段的消费情况"},
+        {"title": "查看地点热力图", "description": "地图展示消费的地理分布，可以看出常去的消费地点"},
+        {"title": "点击查看详情", "description": "点击热力图中的任意区域可查看该时间或地点的详细交易"}
+      ],
+      "tips": ["可以筛选特定分类的热力图", "支持导出热力图为图片", "可以设置消费提醒，避免在高消费时段过度支出"],
+      "relatedPages": ["/statistics/calendar", "/statistics/expense"],
+      "keywords": ["热力图", "时间", "地点", "分布"]
+    },
+    {
+      "pageId": "/statistics/calendar",
+      "title": "日历视图",
+      "module": "statistics",
+      "description": "以日历形式展示每天的收支情况",
+      "useCases": ["查看某一天的收支", "回顾过去的财务记录", "规划未来的收支"],
+      "steps": [
+        {"title": "选择月份", "description": "左右滑动切换不同月份的日历"},
+        {"title": "查看每日收支", "description": "日历上每一天显示当天的收支金额和结余"},
+        {"title": "点击查看详情", "description": "点击任意日期可查看当天的所有交易记录"},
+        {"title": "标记重要日期", "description": "可以标记重要日期，如发工资日、还款日等"}
+      ],
+      "tips": ["不同颜色表示不同的收支状态", "可以快速跳转到今天", "支持添加未来的计划交易"],
+      "relatedPages": ["/statistics/heatmap", "/bill-reminders"],
+      "keywords": ["日历", "日期", "每日", "月历"]
+    },
+    {
+      "pageId": "/statistics/weekly",
+      "title": "周报",
+      "module": "statistics",
+      "description": "每周财务总结报告，回顾一周的收支情况",
+      "useCases": ["每周日查看本周财务状况", "总结一周的消费习惯", "规划下周的支出"],
+      "steps": [
+        {"title": "查看周报概况", "description": "显示本周的总收入、总支出、结余和与上周的对比"},
+        {"title": "查看每日趋势", "description": "柱状图展示本周每天的收支情况"},
+        {"title": "查看分类排行", "description": "列表展示本周支出最多的分类"},
+        {"title": "查看财务建议", "description": "系统根据本周数据给出财务建议"}
+      ],
+      "tips": ["可以设置每周自动生成周报", "支持分享周报到社交媒体", "可以对比多周的数据"],
+      "relatedPages": ["/statistics/monthly", "/statistics/trend"],
+      "keywords": ["周报", "每周", "总结", "回顾"]
+    },
+    {
+      "pageId": "/statistics/monthly",
+      "title": "月报",
+      "module": "statistics",
+      "description": "每月财务总结报告，全面分析一个月的财务状况",
+      "useCases": ["每月底查看本月财务状况", "分析月度消费习惯", "规划下月预算"],
+      "steps": [
+        {"title": "查看月报概况", "description": "显示本月的总收入、总支出、结余和与上月的对比"},
+        {"title": "查看分类分析", "description": "饼图和列表展示各分类的支出占比和金额"},
+        {"title": "查看预算执行", "description": "显示各分类预算的执行情况，是否超支"},
+        {"title": "查看财务评分", "description": "系统根据本月数据给出财务健康评分和改进建议"}
+      ],
+      "tips": ["可以设置每月自动生成月报", "支持导出月报为PDF", "可以对比多个月份的数据"],
+      "relatedPages": ["/statistics/annual", "/budget", "/statistics/comparison"],
+      "keywords": ["月报", "每月", "总结", "月度"]
+    },
+    {
+      "pageId": "/statistics/annual",
+      "title": "年报",
+      "module": "statistics",
+      "description": "年度财务总结报告，回顾一整年的财务历程",
+      "useCases": ["年底查看全年财务状况", "总结一年的收支变化", "规划下一年的财务目标"],
+      "steps": [
+        {"title": "查看年报概况", "description": "显示全年的总收入、总支出、结余和储蓄率"},
+        {"title": "查看月度趋势", "description": "折线图展示全年12个月的收支变化趋势"},
+        {"title": "查看年度排行", "description": "列表展示全年支出最多的分类、最大单笔支出等"},
+        {"title": "查看财务成就", "description": "展示全年的财务成就，如储蓄目标达成、预算控制等"}
+      ],
+      "tips": ["可以生成精美的年度账单分享", "支持对比多年的数据", "可以设置下一年的财务目标"],
+      "relatedPages": ["/statistics/monthly", "/statistics/trend", "/goals"],
+      "keywords": ["年报", "年度", "全年", "总结"]
+    },
+    {
+      "pageId": "/statistics/export",
+      "title": "导出报表",
+      "module": "statistics",
+      "description": "将统计报表导出为各种格式，便于保存和分享",
+      "useCases": ["导出报表用于报销", "保存财务记录", "分享给家人或财务顾问"],
+      "steps": [
+        {"title": "选择导出内容", "description": "选择要导出的报表类型，如月报、年报、分类统计等"},
+        {"title": "选择导出格式", "description": "选择导出格式：PDF、Excel、CSV或图片"},
+        {"title": "设置导出选项", "description": "设置时间范围、是否包含图表、是否包含详细交易等"},
+        {"title": "导出和分享", "description": "点击导出按钮，可以保存到本地或直接分享"}
+      ],
+      "tips": ["PDF格式适合打印和存档", "Excel格式适合进一步分析", "CSV格式适合导入其他软件", "图片格式适合社交媒体分享"],
+      "relatedPages": ["/data-export", "/statistics"],
+      "keywords": ["导出", "保存", "分享", "PDF", "Excel"]
+    }
+  ]
+}

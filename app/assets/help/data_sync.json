@@ -1,0 +1,23 @@
+{
+  "module": "data_sync",
+  "moduleName": "数据联动",
+  "moduleDescription": "与其他应用和服务联动，自动同步数据",
+  "contents": [
+    {
+      "pageId": "/data-sync",
+      "title": "数据联动",
+      "module": "data_sync",
+      "description": "连接银行、支付宝等服务自动同步交易",
+      "useCases": ["自动同步银行交易", "导入支付宝账单", "连接信用卡账单"],
+      "steps": [
+        {"title": "选择服务", "description": "选择要连接的服务，如银行、支付宝"},
+        {"title": "授权连接", "description": "按照提示完成授权"},
+        {"title": "配置同步", "description": "设置同步频率和规则"},
+        {"title": "自动同步", "description": "系统会自动同步交易数据"}
+      ],
+      "tips": ["需要授权才能同步", "可以设置同步时间", "支持手动触发同步"],
+      "relatedPages": ["/import", "/settings/sync"],
+      "keywords": ["联动", "同步", "自动", "连接"]
+    }
+  ]
+}

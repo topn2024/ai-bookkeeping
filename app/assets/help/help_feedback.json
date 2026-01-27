@@ -1,0 +1,39 @@
+{
+  "module": "help_feedback",
+  "moduleName": "帮助与反馈",
+  "moduleDescription": "获取帮助信息和向我们反馈问题或建议",
+  "contents": [
+    {
+      "pageId": "/help",
+      "title": "帮助中心",
+      "module": "help_feedback",
+      "description": "查看应用的使用帮助和常见问题",
+      "useCases": ["学习如何使用功能", "查找常见问题解答", "了解应用特性"],
+      "steps": [
+        {"title": "浏览帮助分类", "description": "按模块浏览帮助内容"},
+        {"title": "搜索帮助", "description": "使用搜索功能快速找到需要的帮助"},
+        {"title": "查看详情", "description": "点击帮助项查看详细说明"},
+        {"title": "相关帮助", "description": "查看相关的帮助内容"}
+      ],
+      "tips": ["可以收藏常用的帮助", "支持分享帮助内容", "帮助内容会持续更新"],
+      "relatedPages": ["/feedback", "/settings/about"],
+      "keywords": ["帮助", "教程", "指南", "说明"]
+    },
+    {
+      "pageId": "/feedback",
+      "title": "问题反馈",
+      "module": "help_feedback",
+      "description": "向我们反馈问题或提出建议",
+      "useCases": ["报告应用问题", "提出功能建议", "反馈使用体验"],
+      "steps": [
+        {"title": "选择反馈类型", "description": "选择问题反馈或功能建议"},
+        {"title": "描述问题", "description": "详细描述遇到的问题或建议"},
+        {"title": "添加截图", "description": "可以添加截图帮助说明"},
+        {"title": "提交反馈", "description": "提交后我们会尽快处理"}
+      ],
+      "tips": ["详细的描述有助于我们快速定位问题", "可以查看反馈处理进度", "感谢您的反馈"],
+      "relatedPages": ["/help", "/settings/about"],
+      "keywords": ["反馈", "建议", "问题", "报告"]
+    }
+  ]
+}

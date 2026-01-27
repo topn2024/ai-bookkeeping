@@ -1,0 +1,23 @@
+{
+  "module": "growth",
+  "moduleName": "增长与分享",
+  "moduleDescription": "分享您的记账成就，邀请好友一起使用",
+  "contents": [
+    {
+      "pageId": "/growth",
+      "title": "增长中心",
+      "module": "growth",
+      "description": "邀请好友和分享成就",
+      "useCases": ["邀请好友使用", "分享记账成就", "获取邀请奖励"],
+      "steps": [
+        {"title": "生成邀请码", "description": "生成您的专属邀请码"},
+        {"title": "分享邀请", "description": "将邀请码分享给好友"},
+        {"title": "查看邀请记录", "description": "查看好友注册情况"},
+        {"title": "领取奖励", "description": "好友注册后可领取奖励"}
+      ],
+      "tips": ["邀请越多奖励越多", "可以分享到社交媒体", "支持生成邀请海报"],
+      "relatedPages": ["/settings/about"],
+      "keywords": ["邀请", "分享", "奖励", "推荐"]
+    }
+  ]
+}

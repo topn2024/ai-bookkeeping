@@ -1,0 +1,23 @@
+{
+  "module": "errors",
+  "moduleName": "异常处理",
+  "moduleDescription": "处理应用异常和错误",
+  "contents": [
+    {
+      "pageId": "/errors",
+      "title": "异常处理",
+      "module": "errors",
+      "description": "查看和处理应用异常",
+      "useCases": ["查看错误日志", "处理同步失败", "恢复异常数据"],
+      "steps": [
+        {"title": "查看异常列表", "description": "显示所有未处理的异常"},
+        {"title": "查看详情", "description": "点击异常查看详细信息"},
+        {"title": "处理异常", "description": "根据提示处理异常"},
+        {"title": "反馈问题", "description": "如无法解决可反馈给我们"}
+      ],
+      "tips": ["大部分异常可以自动恢复", "重要异常会有通知提醒", "可以导出错误日志"],
+      "relatedPages": ["/feedback", "/settings"],
+      "keywords": ["异常", "错误", "问题", "故障"]
+    }
+  ]
+}

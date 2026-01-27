@@ -1,0 +1,23 @@
+{
+  "module": "categories",
+  "moduleName": "智能分类",
+  "moduleDescription": "管理收支分类，支持自定义分类和智能分类建议",
+  "contents": [
+    {
+      "pageId": "/categories",
+      "title": "分类管理",
+      "module": "categories",
+      "description": "查看和管理所有收支分类",
+      "useCases": ["查看所有分类", "添加自定义分类", "编辑分类信息"],
+      "steps": [
+        {"title": "查看分类列表", "description": "显示所有支出和收入分类"},
+        {"title": "添加分类", "description": "点击加号按钮添加新分类"},
+        {"title": "编辑分类", "description": "点击分类可编辑名称、图标和颜色"},
+        {"title": "删除分类", "description": "长按分类可删除（已使用的分类不可删除）"}
+      ],
+      "tips": ["可以为分类设置预算", "支持分类排序", "可以隐藏不常用的分类"],
+      "relatedPages": ["/statistics/category", "/budget"],
+      "keywords": ["分类", "类别", "管理", "自定义"]
+    }
+  ]
+}

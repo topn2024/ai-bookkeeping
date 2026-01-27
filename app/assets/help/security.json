@@ -1,0 +1,23 @@
+{
+  "module": "security",
+  "moduleName": "安全与隐私",
+  "moduleDescription": "保护您的财务数据安全和个人隐私",
+  "contents": [
+    {
+      "pageId": "/security",
+      "title": "安全中心",
+      "module": "security",
+      "description": "管理应用的安全设置",
+      "useCases": ["设置应用锁", "管理登录设备", "查看安全日志"],
+      "steps": [
+        {"title": "查看安全状态", "description": "查看当前的安全设置状态"},
+        {"title": "设置应用锁", "description": "开启密码、指纹或面容解锁"},
+        {"title": "管理设备", "description": "查看和管理已登录的设备"},
+        {"title": "查看日志", "description": "查看应用的访问和操作日志"}
+      ],
+      "tips": ["建议开启应用锁", "定期检查登录设备", "可以设置自动锁定时间"],
+      "relatedPages": ["/settings/security", "/settings/privacy"],
+      "keywords": ["安全", "保护", "锁定", "隐私"]
+    }
+  ]
+}

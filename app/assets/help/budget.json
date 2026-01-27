@@ -1,0 +1,137 @@
+{
+  "module": "budget",
+  "moduleName": "零基预算",
+  "moduleDescription": "科学的预算管理系统，帮助您合理规划支出，实现财务目标",
+  "contents": [
+    {
+      "pageId": "/budget",
+      "title": "预算中心",
+      "module": "budget",
+      "description": "预算管理的主界面，查看所有预算的执行情况",
+      "useCases": ["查看本月预算执行情况", "了解各分类的预算使用率", "发现超支风险"],
+      "steps": [
+        {"title": "查看总预算", "description": "页面顶部显示本月总预算和已使用金额"},
+        {"title": "查看分类预算", "description": "列表展示各分类的预算设置和使用情况"},
+        {"title": "查看预算进度", "description": "进度条直观显示每个预算的使用比例"},
+        {"title": "调整预算", "description": "点击任意预算可进行调整"}
+      ],
+      "tips": ["超支的预算会用红色标注", "可以设置预算预警阈值", "支持查看历史月份的预算执行"],
+      "relatedPages": ["/budget/allocation", "/budget/health", "/statistics/expense"],
+      "keywords": ["预算", "计划", "控制", "支出"]
+    },
+    {
+      "pageId": "/budget/vault-list",
+      "title": "小金库列表",
+      "module": "budget",
+      "description": "查看和管理所有小金库，为不同目标分配资金",
+      "useCases": ["查看各个储蓄目标的进度", "管理专项资金", "规划未来支出"],
+      "steps": [
+        {"title": "查看小金库列表", "description": "显示所有小金库及其当前金额和目标"},
+        {"title": "查看进度", "description": "进度条显示每个小金库的完成度"},
+        {"title": "添加小金库", "description": "点击右上角加号可创建新的小金库"},
+        {"title": "查看详情", "description": "点击小金库可查看详细信息和存取记录"}
+      ],
+      "tips": ["可以为小金库设置自动存款规则", "支持设置目标完成提醒", "可以给小金库添加图片"],
+      "relatedPages": ["/budget/vault-detail", "/budget/vault-create"],
+      "keywords": ["小金库", "储蓄", "目标", "存钱"]
+    },
+    {
+      "pageId": "/budget/vault-detail",
+      "title": "小金库详情",
+      "module": "budget",
+      "description": "查看单个小金库的详细信息和存取记录",
+      "useCases": ["查看储蓄进度", "了解存取历史", "调整储蓄目标"],
+      "steps": [
+        {"title": "查看基本信息", "description": "显示小金库名称、目标金额、当前金额等"},
+        {"title": "查看进度图表", "description": "图表展示储蓄进度和预计完成时间"},
+        {"title": "存入或取出", "description": "可以向小金库存入资金或从中取出"},
+        {"title": "查看记录", "description": "列表显示所有存取记录"}
+      ],
+      "tips": ["可以设置每月自动存入金额", "支持分享储蓄进度", "可以调整目标金额和期限"],
+      "relatedPages": ["/budget/vault-list", "/budget/vault-create"],
+      "keywords": ["详情", "进度", "存取", "记录"]
+    },
+    {
+      "pageId": "/budget/vault-create",
+      "title": "创建小金库",
+      "module": "budget",
+      "description": "创建新的小金库，为特定目标储蓄",
+      "useCases": ["为旅行存钱", "准备购买大件商品", "建立应急基金"],
+      "steps": [
+        {"title": "输入名称", "description": "为小金库起一个有意义的名称，如\"日本旅行基金\""},
+        {"title": "设置目标金额", "description": "输入要储蓄的目标金额"},
+        {"title": "设置期限", "description": "选择希望达成目标的日期"},
+        {"title": "选择图标", "description": "为小金库选择一个图标或上传图片"},
+        {"title": "创建小金库", "description": "点击创建按钮完成"}
+      ],
+      "tips": ["可以设置每月建议存款金额", "支持添加小金库描述", "可以邀请家人共同储蓄"],
+      "relatedPages": ["/budget/vault-list", "/budget/vault-detail"],
+      "keywords": ["创建", "新建", "目标", "储蓄"]
+    },
+    {
+      "pageId": "/budget/allocation",
+      "title": "预算分配",
+      "module": "budget",
+      "description": "智能分配预算到各个分类，实现零基预算",
+      "useCases": ["每月初分配预算", "调整预算分配方案", "优化支出结构"],
+      "steps": [
+        {"title": "输入总预算", "description": "输入本月可支配的总金额"},
+        {"title": "查看建议分配", "description": "系统根据历史数据给出预算分配建议"},
+        {"title": "调整分配", "description": "可以手动调整各分类的预算金额"},
+        {"title": "保存分配", "description": "确认后保存本月的预算分配"}
+      ],
+      "tips": ["建议预留10%作为弹性预算", "可以参考上月实际支出", "支持保存分配模板"],
+      "relatedPages": ["/budget", "/budget/smart-suggest"],
+      "keywords": ["分配", "规划", "零基", "预算"]
+    },
+    {
+      "pageId": "/budget/smart-suggest",
+      "title": "智能建议",
+      "module": "budget",
+      "description": "基于历史数据和财务目标，提供智能预算建议",
+      "useCases": ["获取预算分配建议", "优化支出结构", "实现储蓄目标"],
+      "steps": [
+        {"title": "查看分析报告", "description": "系统分析您的历史支出数据"},
+        {"title": "查看建议方案", "description": "显示推荐的预算分配方案"},
+        {"title": "了解建议理由", "description": "查看每项建议的依据和预期效果"},
+        {"title": "应用建议", "description": "可以一键应用建议方案或部分采纳"}
+      ],
+      "tips": ["建议会考虑您的储蓄目标", "可以设置优先级", "支持自定义调整"],
+      "relatedPages": ["/budget/allocation", "/budget/health"],
+      "keywords": ["智能", "建议", "推荐", "优化"]
+    },
+    {
+      "pageId": "/budget/zero-based",
+      "title": "零基预算",
+      "module": "budget",
+      "description": "零基预算方法，让每一分钱都有明确用途",
+      "useCases": ["实施零基预算法", "精细化管理支出", "提高储蓄率"],
+      "steps": [
+        {"title": "计算可支配收入", "description": "输入本月预期收入"},
+        {"title": "分配固定支出", "description": "先分配房租、水电等固定支出"},
+        {"title": "分配变动支出", "description": "为餐饮、交通等分类分配预算"},
+        {"title": "分配储蓄", "description": "将剩余金额分配到储蓄和投资"},
+        {"title": "确保归零", "description": "确保所有收入都有明确用途"}
+      ],
+      "tips": ["零基预算的核心是让收入-支出-储蓄=0", "建议先分配储蓄", "可以设置缓冲预算"],
+      "relatedPages": ["/budget/allocation", "/budget"],
+      "keywords": ["零基", "方法", "精细", "管理"]
+    },
+    {
+      "pageId": "/budget/health",
+      "title": "预算健康度",
+      "module": "budget",
+      "description": "评估预算执行情况和财务健康状况",
+      "useCases": ["了解预算执行质量", "发现财务问题", "改进预算方案"],
+      "steps": [
+        {"title": "查看健康评分", "description": "系统给出0-100分的预算健康评分"},
+        {"title": "查看评分详情", "description": "了解评分的各项指标，如执行率、超支率等"},
+        {"title": "查看问题分析", "description": "系统指出存在的问题和风险"},
+        {"title": "查看改进建议", "description": "获取提升预算健康度的具体建议"}
+      ],
+      "tips": ["健康度会影响财务目标的达成", "可以查看历史健康度趋势", "支持设置健康度提醒"],
+      "relatedPages": ["/budget", "/statistics/monthly"],
+      "keywords": ["健康", "评分", "评估", "质量"]
+    }
+  ]
+}

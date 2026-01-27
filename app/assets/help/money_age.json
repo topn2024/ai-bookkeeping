@@ -1,0 +1,23 @@
+{
+  "module": "money_age",
+  "moduleName": "钱龄分析",
+  "moduleDescription": "分析您的资金使用效率和资金周转情况",
+  "contents": [
+    {
+      "pageId": "/money-age",
+      "title": "钱龄分析",
+      "module": "money_age",
+      "description": "了解您的资金平均停留时间和使用效率",
+      "useCases": ["查看资金周转速度", "分析资金使用效率", "优化资金配置"],
+      "steps": [
+        {"title": "查看钱龄指标", "description": "显示平均钱龄、资金周转率等指标"},
+        {"title": "查看趋势图", "description": "查看钱龄随时间的变化趋势"},
+        {"title": "查看分析建议", "description": "系统给出资金使用优化建议"},
+        {"title": "查看详细数据", "description": "查看各账户的钱龄详情"}
+      ],
+      "tips": ["钱龄越短说明资金周转越快", "可以设置钱龄目标", "定期查看有助于优化资金使用"],
+      "relatedPages": ["/accounts", "/statistics"],
+      "keywords": ["钱龄", "资金", "周转", "效率"]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "module": "ai",
+  "moduleName": "AI智能中心",
+  "moduleDescription": "AI驱动的智能功能，包括智能识别、分析和建议",
+  "contents": [
+    {
+      "pageId": "/ai",
+      "title": "AI智能中心",
+      "module": "ai",
+      "description": "查看和使用各种AI智能功能",
+      "useCases": ["使用AI识别功能", "获取智能建议", "查看AI分析报告"],
+      "steps": [
+        {"title": "选择AI功能", "description": "从功能列表中选择要使用的AI功能"},
+        {"title": "使用功能", "description": "按照提示使用相应的AI功能"},
+        {"title": "查看结果", "description": "查看AI处理的结果"},
+        {"title": "确认或调整", "description": "确认结果或手动调整"}
+      ],
+      "tips": ["AI功能需要网络连接", "使用越多，AI越智能", "可以对AI结果提供反馈"],
+      "relatedPages": ["/voice-assistant", "/camera-input"],
+      "keywords": ["AI", "智能", "识别", "分析"]
+    }
+  ]
+}

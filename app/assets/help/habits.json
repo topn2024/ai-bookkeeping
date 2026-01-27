@@ -1,0 +1,23 @@
+{
+  "module": "habits",
+  "moduleName": "习惯培养",
+  "moduleDescription": "培养良好的记账和理财习惯",
+  "contents": [
+    {
+      "pageId": "/habits",
+      "title": "习惯培养",
+      "module": "habits",
+      "description": "通过打卡和挑战培养记账习惯",
+      "useCases": ["养成每日记账习惯", "参与理财挑战", "追踪习惯进度"],
+      "steps": [
+        {"title": "选择习惯", "description": "选择要培养的习惯，如每日记账"},
+        {"title": "设置目标", "description": "设置习惯的目标和频率"},
+        {"title": "每日打卡", "description": "完成习惯后进行打卡"},
+        {"title": "查看进度", "description": "查看习惯培养的进度和统计"}
+      ],
+      "tips": ["坚持21天可以养成习惯", "可以设置打卡提醒", "支持分享习惯成就"],
+      "relatedPages": ["/settings/reminder", "/growth"],
+      "keywords": ["习惯", "打卡", "培养", "坚持"]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "module": "monitoring",
+  "moduleName": "系统监控",
+  "moduleDescription": "监控应用性能和数据状态",
+  "contents": [
+    {
+      "pageId": "/monitoring",
+      "title": "系统监控",
+      "module": "monitoring",
+      "description": "查看应用的运行状态和性能",
+      "useCases": ["查看应用性能", "监控数据同步", "检查存储空间"],
+      "steps": [
+        {"title": "查看状态概览", "description": "显示应用的整体运行状态"},
+        {"title": "查看性能指标", "description": "查看CPU、内存、网络等性能指标"},
+        {"title": "查看存储使用", "description": "查看数据存储空间使用情况"},
+        {"title": "优化建议", "description": "系统给出性能优化建议"}
+      ],
+      "tips": ["定期清理缓存可以提升性能", "可以查看历史性能数据", "支持导出监控报告"],
+      "relatedPages": ["/settings", "/errors"],
+      "keywords": ["监控", "性能", "状态", "优化"]
+    }
+  ]
+}
