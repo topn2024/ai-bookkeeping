@@ -82,6 +82,7 @@ class SmartIntentRecognizer {
 
     // ═══════════════════════════════════════════════════════════════
     // 主路径: LLM识别（优先）
+    // 使用标准化输入，移除ASR产生的多余标点符号
     // ═══════════════════════════════════════════════════════════════
     if (_qwenService.isAvailable) {
       debugPrint('[SmartIntent] 尝试LLM识别...');
@@ -91,7 +92,7 @@ class SmartIntentRecognizer {
         onProgressiveFeedback?.call('正在思考...');
       });
 
-      final llmResult = await _tryLLMWithTimeout(input, pageContext);
+      final llmResult = await _tryLLMWithTimeout(normalizedInput, pageContext);
       if (llmResult != null && llmResult.isSuccess && llmResult.confidence >= 0.7) {
         debugPrint('[SmartIntent] LLM识别成功: ${llmResult.intentType}, 置信度: ${llmResult.confidence}');
         // 反向学习：将LLM结果加入缓存，加速后续相似请求
@@ -160,9 +161,10 @@ class SmartIntentRecognizer {
 
     // ═══════════════════════════════════════════════════════════════
     // 主路径: LLM识别（优先）
+    // 使用标准化输入，移除ASR产生的多余标点符号
     // ═══════════════════════════════════════════════════════════════
     debugPrint('[SmartIntent] 尝试LLM多操作识别...');
-    final llmResult = await _tryMultiOperationLLMWithTimeout(input, pageContext);
+    final llmResult = await _tryMultiOperationLLMWithTimeout(normalizedInput, pageContext);
     if (llmResult != null && llmResult.isSuccess) {
       // LLM成功识别（包括 operation、chat、clarify 三种情况）
       debugPrint('[SmartIntent] LLM识别成功: resultType=${llmResult.resultType}, '
