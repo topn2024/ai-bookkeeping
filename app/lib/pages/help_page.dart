@@ -88,6 +88,7 @@ class _HelpPageState extends ConsumerState<HelpPage>
     try {
       await _helpService.preload();
       await _helpService.loadSearchHistory();
+      await _helpService.loadViewStats();
       if (mounted) {
         setState(() {});
       }

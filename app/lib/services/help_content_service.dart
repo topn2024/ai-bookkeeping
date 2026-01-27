@@ -28,6 +28,10 @@ class HelpContentService {
 
   /// SharedPreferences key
   static const String _searchHistoryKey = 'help_search_history';
+  static const String _viewStatsKey = 'help_view_stats';
+
+  /// 帮助内容查看统计 (pageId -> 查看次数)
+  final Map<String, int> _viewStats = {};
 
   /// 模块文件映射
   static const Map<String, String> _moduleFiles = {
@@ -214,6 +218,68 @@ class HelpContentService {
   /// 获取搜索历史
   List<String> getSearchHistory() {
     return List.from(_searchHistory);
+  }
+
+  /// 加载查看统计
+  Future<void> loadViewStats() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final statsJson = prefs.getString(_viewStatsKey);
+      if (statsJson != null) {
+        final stats = json.decode(statsJson) as Map<String, dynamic>;
+        _viewStats.clear();
+        stats.forEach((key, value) {
+          _viewStats[key] = value as int;
+        });
+      }
+    } catch (e) {
+      print('加载查看统计失败: $e');
+    }
+  }
+
+  /// 记录帮助内容查看
+  Future<void> recordView(String pageId) async {
+    try {
+      _viewStats[pageId] = (_viewStats[pageId] ?? 0) + 1;
+
+      // 保存到本地
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_viewStatsKey, json.encode(_viewStats));
+    } catch (e) {
+      print('保存查看统计失败: $e');
+    }
+  }
+
+  /// 获取查看次数
+  int getViewCount(String pageId) {
+    return _viewStats[pageId] ?? 0;
+  }
+
+  /// 获取热门帮助内容（按查看次数排序）
+  List<HelpContent> getPopularContents({int limit = 10}) {
+    final sortedEntries = _viewStats.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final popularContents = <HelpContent>[];
+    for (final entry in sortedEntries.take(limit)) {
+      final content = _cache[entry.key];
+      if (content != null) {
+        popularContents.add(content);
+      }
+    }
+
+    return popularContents;
+  }
+
+  /// 清除查看统计
+  Future<void> clearViewStats() async {
+    try {
+      _viewStats.clear();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_viewStatsKey);
+    } catch (e) {
+      print('清除查看统计失败: $e');
+    }
   }
 
   /// 清除缓存

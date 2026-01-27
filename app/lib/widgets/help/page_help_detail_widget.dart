@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/help_content.dart';
+import '../../services/help_content_service.dart';
 import '../../theme/app_theme.dart';
 
 /// 页面帮助详情组件
-class PageHelpDetailWidget extends StatelessWidget {
+class PageHelpDetailWidget extends StatefulWidget {
   final HelpContent content;
 
   const PageHelpDetailWidget({
@@ -12,10 +14,61 @@ class PageHelpDetailWidget extends StatelessWidget {
   });
 
   @override
+  State<PageHelpDetailWidget> createState() => _PageHelpDetailWidgetState();
+}
+
+class _PageHelpDetailWidgetState extends State<PageHelpDetailWidget> {
+  final HelpContentService _helpService = HelpContentService();
+  bool? _isHelpful;
+
+  @override
+  void initState() {
+    super.initState();
+    // 记录查看
+    _helpService.recordView(widget.content.pageId);
+    // 加载反馈状态
+    _loadFeedback();
+  }
+
+  Future<void> _loadFeedback() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final feedback = prefs.getBool('help_feedback_${widget.content.pageId}');
+      if (mounted) {
+        setState(() {
+          _isHelpful = feedback;
+        });
+      }
+    } catch (e) {
+      print('加载反馈失败: $e');
+    }
+  }
+
+  Future<void> _saveFeedback(bool isHelpful) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('help_feedback_${widget.content.pageId}', isHelpful);
+      if (mounted) {
+        setState(() {
+          _isHelpful = isHelpful;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('感谢您的反馈'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('保存反馈失败: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(content.title),
+        title: Text(widget.content.title),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -79,21 +132,86 @@ class PageHelpDetailWidget extends StatelessWidget {
             ],
 
             // 相关功能
-            if (content.relatedPages.isNotEmpty) ...[
+            if (widget.content.relatedPages.isNotEmpty) ...[
               const SizedBox(height: 24),
               _buildSection(
                 '相关功能',
                 Icons.link,
                 Colors.blue,
-                content.relatedPages
+                widget.content.relatedPages
                     .map((page) => _buildRelatedPageItem(page))
                     .toList(),
               ),
             ],
 
+            // 反馈按钮
+            const SizedBox(height: 32),
+            _buildFeedbackSection(),
+
             const SizedBox(height: 32),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFeedbackSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '这个帮助内容对您有用吗？',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isHelpful == true ? null : () => _saveFeedback(true),
+                  icon: Icon(
+                    _isHelpful == true ? Icons.thumb_up : Icons.thumb_up_outlined,
+                    size: 20,
+                  ),
+                  label: const Text('有帮助'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _isHelpful == true ? Colors.green : Colors.grey.shade700,
+                    side: BorderSide(
+                      color: _isHelpful == true ? Colors.green : Colors.grey.shade300,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isHelpful == false ? null : () => _saveFeedback(false),
+                  icon: Icon(
+                    _isHelpful == false ? Icons.thumb_down : Icons.thumb_down_outlined,
+                    size: 20,
+                  ),
+                  label: const Text('无帮助'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _isHelpful == false ? Colors.red : Colors.grey.shade700,
+                    side: BorderSide(
+                      color: _isHelpful == false ? Colors.red : Colors.grey.shade300,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
