@@ -748,19 +748,31 @@ class VoicePipelineController {
 
   /// 更新主动对话监听状态
   ///
-  /// 静默计时器现在基于声音状态自动管理：
-  /// - 有声音（用户说话 OR TTS播放）→ 自动停止
-  /// - 没有声音 → 自动启动
-  /// 这里只需要在状态变化时尝试启动/停止，具体是否执行由 ProactiveConversationManager 判断
+  /// 关键设计：30秒会话超时从"用户沉默"开始计算，而不是"用户说完话"开始计算
+  /// - TTS播放期间：暂停计时器（用户在听系统回复，不算沉默）
+  /// - TTS播放完成：重新启动计时器（从0开始计时）
+  /// 这样即使系统回复很长（如28秒），用户在听完后仍有完整30秒时间回应
   void _updateProactiveMonitoring(
     VoicePipelineState oldState,
     VoicePipelineState newState,
   ) {
-    // 进入 listening 状态：尝试启动静默监听
-    // 如果有声音在播放，startSilenceMonitoring会自动跳过
+    // 进入 speaking 状态：暂停静默监听
+    // TTS播放期间不应计入用户沉默时间
+    if (newState == VoicePipelineState.speaking) {
+      debugPrint('[VoicePipelineController] 进入speaking，暂停主动对话监听（TTS播放中）');
+      _proactiveManager.stopMonitoring();
+    }
+    // 进入 listening 状态：重新启动静默监听
+    // TTS播放完成后，从0开始计时30秒
     if (newState == VoicePipelineState.listening) {
-      debugPrint('[VoicePipelineController] 进入listening，尝试启动主动对话监听');
+      debugPrint('[VoicePipelineController] 进入listening，重新启动主动对话监听');
       _proactiveManager.startSilenceMonitoring();
+    }
+    // 进入 processing 状态：暂停静默监听
+    // LLM处理期间也不应计入用户沉默时间
+    if (newState == VoicePipelineState.processing) {
+      debugPrint('[VoicePipelineController] 进入processing，暂停主动对话监听（处理中）');
+      _proactiveManager.stopMonitoring();
     }
     // 进入 idle 状态：重置会话
     if (newState == VoicePipelineState.idle) {

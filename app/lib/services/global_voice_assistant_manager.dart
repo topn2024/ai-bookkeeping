@@ -886,9 +886,67 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       _addAssistantMessage(message);
       notifyListeners();
     };
+
+    // 会话超时回调（ProactiveConversationManager 触发）
+    // 统一的会话超时处理：连续3次无回应 或 30秒总计无响应
+    _pipelineController!.onSessionTimeout = () {
+      debugPrint('[GlobalVoiceAssistant] 收到会话超时通知（ProactiveConversationManager）');
+      _handleProactiveSessionTimeout();
+    };
+  }
+
+  /// 处理主动对话会话超时
+  ///
+  /// 由 ProactiveConversationManager 触发，统一管理会话超时：
+  /// - 连续3次主动话题无回应
+  /// - 或30秒总计无响应
+  Future<void> _handleProactiveSessionTimeout() async {
+    debugPrint('[GlobalVoiceAssistant] 处理主动对话会话超时');
+
+    // 添加告别消息到对话历史
+    _addAssistantMessage('好的，有需要随时叫我~');
+
+    // 重置状态
+    _isProcessingCommand = false;
+    _consecutiveNoResponseCount = 0;
+
+    // 停止音频录制和清理资源
+    // 注意：VoicePipelineController.stop() 已经在 _handleSessionTimeout 中被调用
+    // 但这里还需要停止 GlobalVoiceAssistantManager 层面的音频录制
+    await _cleanupAudioRecording();
+
+    notifyListeners();
+  }
+
+  /// 清理音频录制资源（不调用 VoicePipelineController.stop()）
+  ///
+  /// 用于会话超时时的清理，此时 VoicePipelineController.stop() 已经被调用
+  Future<void> _cleanupAudioRecording() async {
+    debugPrint('[GlobalVoiceAssistant] 清理音频录制资源');
+
+    // 关闭音频流控制器
+    await _audioStreamController?.close();
+    _audioStreamController = null;
+
+    // 停止音频流订阅
+    await _audioStreamSubscription?.cancel();
+    _audioStreamSubscription = null;
+
+    // 停止录音器
+    await _audioRecorder?.stop();
+
+    // 重置状态
+    _partialText = '';
+    _amplitude = 0.0;
+
+    setBallState(FloatingBallState.idle);
+    debugPrint('[GlobalVoiceAssistant] 音频录制资源已清理');
   }
 
   /// 处理流水线状态变化
+  ///
+  /// 注意：会话超时管理已统一由 VoicePipelineController 中的 ProactiveConversationManager 处理
+  /// 这里不再管理 VAD 的 silenceTimeout 计时器
   void _handlePipelineStateChanged(VoicePipelineState pipelineState) {
     switch (pipelineState) {
       case VoicePipelineState.idle:
@@ -898,11 +956,10 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         break;
       case VoicePipelineState.listening:
         setBallState(FloatingBallState.recording);
-        // TTS播放完成后（speaking→listening）重启沉默超时检测
-        // 确保从TTS结束后开始新的30秒计时
-        _vadService?.startSilenceTimeoutDetection();
         // 通知 WebRTC APM TTS 停止
         AudioProcessorService.instance.setTTSPlaying(false);
+        // 注意：会话超时由 ProactiveConversationManager 在 VoicePipelineController 中管理
+        // 不再在这里调用 _vadService?.startSilenceTimeoutDetection()
         break;
       case VoicePipelineState.processing:
         setBallState(FloatingBallState.processing);
@@ -1283,15 +1340,13 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         break;
 
       case VADEventType.silenceTimeout:
-        debugPrint('[GlobalVoiceAssistant] VAD: 用户沉默30秒超时 (ballState=$_ballState, isProcessing=$_isProcessingUtterance, partialText=$_partialText, isProcessingCommand=$_isProcessingCommand)');
-        // 30秒无声音，自动结束对话
-        // 条件：正在录音状态，且不在命令处理中
-        if (_ballState == FloatingBallState.recording && !_isProcessingCommand) {
-          debugPrint('[GlobalVoiceAssistant] 30秒无语音输入，自动结束对话');
-          _handleSilenceTimeoutEnd();
-        } else {
-          debugPrint('[GlobalVoiceAssistant] 条件不满足，跳过自动结束');
-        }
+        // 【已废弃】VAD 的 silenceTimeout 不再使用
+        // 会话超时统一由 VoicePipelineController 中的 ProactiveConversationManager 管理
+        // 这样可以：
+        // 1. 在 TTS 播放期间正确暂停计时器
+        // 2. 支持智能主动对话（5秒追问，最多3次）
+        // 3. 避免两套计时器系统冲突
+        debugPrint('[GlobalVoiceAssistant] VAD: silenceTimeout 事件已忽略（由 ProactiveConversationManager 统一管理）');
         break;
 
       default:

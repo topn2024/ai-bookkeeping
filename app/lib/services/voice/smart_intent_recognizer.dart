@@ -337,6 +337,14 @@ class SmartIntentRecognizer {
    - 关键：识别"早餐/午餐/晚餐/打车/买菜"等用途词，并与后面的金额关联
    - 忽略停顿词：用户口语中的"呃"、"嗯"、"是"、"大概是"等不影响语义理解
 
+8. 【重要】多笔交易完整性检查：
+   - 用户可能一次说多笔交易，如"早餐7块午餐18晚餐25"
+   - 必须逐一检查每个金额，确保都生成对应的add_transaction
+   - 连接词"然后"、"还有"、"另外"表示新的一笔交易
+   - 时间词"早上/中午/晚上"、"早餐/午餐/晚餐"表示不同的交易
+   - 检查方法：统计输入中的金额数量，输出的operations数量应该匹配
+   - 例如："早餐7块然后午餐18然后晚上25" → 3笔交易（7元、18元、25元）
+
 【用户输入】$input
 【页面上下文】${pageContext ?? '首页'}
 
@@ -435,6 +443,12 @@ class SmartIntentRecognizer {
 
 输入："早上花了10块买了包子晚上又花了25吃了米粉"
 输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":10,"category":"餐饮","note":"包子"}},{"type":"add_transaction","priority":"deferred","params":{"amount":25,"category":"餐饮","note":"米粉"}}],"chat_content":null,"clarify_question":null}
+
+输入："今天早餐花了7块吃了肠粉然后午餐花了18块吃了蛋包饭然后晚上吃云吞面嗯25"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":7,"category":"餐饮","note":"肠粉"}},{"type":"add_transaction","priority":"deferred","params":{"amount":18,"category":"餐饮","note":"蛋包饭"}},{"type":"add_transaction","priority":"deferred","params":{"amount":25,"category":"餐饮","note":"云吞面"}}],"chat_content":null,"clarify_question":null}
+
+输入："早餐7块午餐18块晚餐25"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":7,"category":"餐饮","note":"早餐"}},{"type":"add_transaction","priority":"deferred","params":{"amount":18,"category":"餐饮","note":"午餐"}},{"type":"add_transaction","priority":"deferred","params":{"amount":25,"category":"餐饮","note":"晚餐"}}],"chat_content":null,"clarify_question":null}
 
 输入："今天的午餐呃是大概25块钱"
 输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":25,"category":"餐饮","note":"午餐"}}],"chat_content":null,"clarify_question":null}
