@@ -47,6 +47,235 @@
         "列表",
         "管理"
       ]
+    },
+    {
+      "pageId": "/account/detail",
+      "title": "账户详情",
+      "module": "accounts",
+      "description": "查看单个账户的详细信息和交易历史",
+      "useCases": [
+        "查看账户的所有交易记录",
+        "分析账户的收支情况",
+        "核对账户余额"
+      ],
+      "steps": [
+        {
+          "title": "查看账户信息",
+          "description": "页面顶部显示账户名称、类型、余额等基本信息"
+        },
+        {
+          "title": "查看交易记录",
+          "description": "列表展示该账户的所有交易记录，按时间倒序排列"
+        },
+        {
+          "title": "筛选交易",
+          "description": "可以按时间范围、交易类型、分类等条件筛选交易"
+        },
+        {
+          "title": "查看统计",
+          "description": "查看该账户的收支统计和趋势图"
+        }
+      ],
+      "tips": [
+        "可以导出账户交易记录",
+        "支持搜索特定交易",
+        "可以查看账户余额变化曲线"
+      ],
+      "relatedPages": [
+        "/accounts",
+        "/account/reconcile",
+        "/statistics"
+      ],
+      "keywords": [
+        "详情",
+        "交易",
+        "记录",
+        "历史"
+      ]
+    },
+    {
+      "pageId": "/account/create",
+      "title": "创建账户",
+      "module": "accounts",
+      "description": "添加新的账户，如银行卡、信用卡、电子钱包等",
+      "useCases": [
+        "添加新办理的银行卡",
+        "添加电子钱包账户",
+        "创建虚拟账户用于特定用途"
+      ],
+      "steps": [
+        {
+          "title": "选择账户类型",
+          "description": "选择账户类型：现金、储蓄卡、信用卡、支付宝、微信等"
+        },
+        {
+          "title": "输入账户名称",
+          "description": "为账户起一个容易识别的名称"
+        },
+        {
+          "title": "设置初始余额",
+          "description": "输入账户的当前余额"
+        },
+        {
+          "": "选择货币",
+          "description": "选择账户使用的货币类型"
+        },
+        {
+          "title": "保存账户",
+          "description": "点击保存按钮完成账户创建"
+        }
+      ],
+      "tips": [
+        "可以为账户设置图标和颜色",
+        "支持添加账户备注",
+        "可以设置账户是否参与统计"
+      ],
+      "relatedPages": [
+        "/accounts",
+        "/account/detail"
+      ],
+      "keywords": [
+        "创建",
+        "添加",
+        "新建",
+        "账户"
+      ]
+    },
+    {
+      "pageId": "/account/transfer",
+      "title": "账户转账",
+      "module": "accounts",
+      "description": "在不同账户之间转移资金",
+      "useCases": [
+        "从银行卡取现金",
+        "给信用卡还款",
+        "在不同账户间调拨资金"
+      ],
+      "steps": [
+        {
+          "title": "选择转出账户",
+          "description": "选择资金户"
+        },
+        {
+          "title": "选择转入账户",
+          "description": "选择资金转入的账户"
+        },
+        {
+          "title": "输入转账金额",
+          "description": "输入要转账的金额"
+        },
+        {
+          "title": "添加备注",
+          "description": "可以添加转账说明"
+        },
+        {
+          "title": "确认转账",
+          "description": "点击确认按钮完成转账"
+        }
+      ],
+      "tips": [
+        "转账会同时在两个账户中记录",
+        "可以设置转账手续费",
+        "支持定期自动转账"
+      ],
+      "relatedPages": [
+        "/accounts",
+        "/account/detail"
+      ],
+      "keywords": [
+        "转账",
+        "转移",
+        "调拨",
+        "还款"
+      ]
+    },
+    {
+      "pageId": "/account/reconcile",
+      "title": "账户核对",
+      "module": "accounts",
+      "description": "核对账户余额，确保记录与实际一致",
+      "useCases": [
+        "定期核对账户余额",
+        "发现记账遗漏或错误",
+        "调整账户余额"
+      ],
+      "steps": [
+        {
+          "title": "查看当前余额",
+          "description": "查看应用中记录的账户余额"
+        },
+        {
+          "title": "输入实际余额",
+          "description": "输入账户的实际余额（如银行卡余额）"
+        },
+        {
+          "title": "查看差异",
+          "description": "系统会显示记录余额与实际余额的差异"
+        },
+        {
+          "title": "调整余额",
+          "description": "如有差异，可以选择调整余额或查找原因"
+        }
+      ],
+      "tips": [
+        "建议每月核对一次账户",
+        "可以查看历史核对记录",
+        "调整余额会生成一笔调整记录"
+      ],
+      "relatedPages": [
+        "/account/detail",
+        "/accounts"
+      ],
+      "keywords": [
+        "核对",
+        "对账",
+        "调整",
+        "余额"
+      ]
+    },
+    {
+      "pageId": "/account/archive",
+      "title": "账户归档",
+      "module": "accounts",
+      "description": "归档不再使用的账户，保留历史记录但不显示在常用列表中",
+      "useCases": [
+        "归档已注销的银行卡",
+        "隐藏不常用的账户",
+        "整理账户列表"
+      ],
+      "steps": [
+        {
+          "title": "选择要归档的账户",
+          "description": "在账户列表中找到要归档的账户"
+        },
+        {
+          "title": "点击归档",
+          "description": "长按账户，选择归档选项"
+        },
+        {
+          "title": "确认归档",
+          "description": "确认后账户将从常用列表中移除"
+        },
+        {
+          "title": "查看归档账户",
+          "description": "可以在设置中查看和恢复归档的账户"
+        }
+      ],
+      "tips": [
+        "归档不会删除账户数据",
+        "归档账户的交易记录仍会保留",
+        "可以随时恢复归档的账户"
+      ],
+      "relatedPages": [
+        "/accounts",
+        "/settings/accounts"
+      ],
+      "keywords": [
+        "归档",
+        "隐藏",
+        "注销",
+        "整理"
+      ]
     }
   ]
 }

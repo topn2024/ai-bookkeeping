@@ -21,11 +21,11 @@
         },
         {
           "title": "说出需求",
-          "description": "清晰地说出您的需求"
+          "description": "清晰地说出您的需求，如记一笔午餐35元"
         },
         {
           "title": "确认操作",
-          "description": "助手会确认理解的内容"
+          "description": "助手会确认理解的内容，请确认是否正确"
         },
         {
           "title": "完成任务",
@@ -33,19 +33,328 @@
         }
       ],
       "tips": [
-        "支持连续对话",
+        "支持连续对话，无需重复唤醒",
         "可以打断助手的回答",
-        "支持多轮对话"
+        "支持多轮对话理解上下文"
       ],
       "relatedPages": [
         "/voice-chat",
-        "/voice-settings"
+        "/voice-settings",
+        "/voice-input"
       ],
       "keywords": [
         "语音",
         "助手",
         "对话",
         "AI"
+      ]
+    },
+    {
+      "pageId": "/voice-chat",
+      "title": "语音对话",
+      "module": "voice",
+      "description": "与语音助手进行自然对话，完成各种财务操作",
+      "useCases": [
+        "多轮对话记账",
+        "咨询财务问题",
+        "获取个性化建议"
+      ],
+      "steps": [
+        {
+          "title": "开始对话",
+          "description": "点击开始对话按钮或说出唤醒词"
+        },
+        {
+          "title": "自然交流",
+          "description": "像和朋友聊天一样说出您的需求"
+        },
+        {
+          "title": "理解反馈",
+          "description": "助手会理解您的意图并给出反馈"
+        },
+        {
+          "title": "继续对话",
+          "description": "可以继续提问或发出新的指令"
+        }
+      ],
+      "tips": [
+        "助手会记住对话上下文",
+        "可以随时说取消中止操作",
+        "支持语音和文字混合输入"
+      ],
+      "relatedPages": [
+        "/voice-assistant",
+        "/voice-history"
+      ],
+      "keywords": [
+        "对话",
+        "聊天",
+        "交流",
+        "沟通"
+      ]
+    },
+    {
+      "pageId": "/voice-history",
+      "title": "语音历史",
+      "module": "voice",
+      "description": "查看所有语音交互的历史记录",
+      "useCases": [
+        "回顾历史对话",
+        "查找之前的语音记账",
+        "了解助手使用情况"
+      ],
+      "steps": [
+        {
+          "title": "查看记录列表",
+          "description": "按时间倒序显示所有语音交互记录"
+        },
+        {
+          "title": "查看对话详情",
+          "description": "点击任意记录可查看完整对话内容"
+        },
+        {
+          "title": "重新执行",
+          "description": "可以重新执行历史记录中的操作"
+        },
+        {
+          "title": "删除记录",
+          "description": "可以删除不需要的历史记录"
+        }
+      ],
+      "tips": [
+        "支持搜索历史记录",
+        "可以导出对话记录",
+        "历史记录会自动清理"
+      ],
+      "relatedPages": [
+        "/voice-assistant",
+        "/voice-chat"
+      ],
+      "keywords": [
+        "历史",
+        "记录",
+        "回顾",
+        "查看"
+      ]
+    },
+    {
+      "pageId": "/voice-learning-report",
+      "title": "语音学习报告",
+      "module": "voice",
+      "description": "查看语音助手的学习进度和个性化程度",
+      "useCases": [
+        "了解助手对您的了解程度",
+        "查看个性化效果",
+        "优化助手表现"
+      ],
+      "steps": [
+        {
+          "title": "查看学习进度",
+          "description": "显示助手对您习惯的学习程度"
+        },
+        {
+          "title": "查看个性化项",
+          "description": "列出助手已学会的个性化内容"
+        },
+        {
+          "title": "查看准确率",
+          "description": "显示语音识别和意图理解的准确率"
+        },
+        {
+          "title": "提供反馈",
+          "description": "可以对助手的表现提供反馈"
+        }
+      ],
+      "tips": [
+        "使用越多，助手越智能",
+        "可以手动教助手新的表达方式",
+        "支持重置学习数据"
+      ],
+      "relatedPages": [
+        "/voice-assistant",
+        "/voice-settings"
+      ],
+      "keywords": [
+        "学习",
+        "报告",
+        "个性化",
+        "进度"
+      ]
+    },
+    {
+      "pageId": "/voice-assistant-settings",
+      "title": "语音助手设置",
+      "module": "voice",
+      "description": "配置语音助手的各项参数",
+      "useCases": [
+        "调整助手音色",
+        "设置唤醒方式",
+        "配置隐私选项"
+      ],
+      "steps": [
+        {
+          "title": "选择音色",
+          "description": "可以选择不同的助手音色"
+        },
+        {
+          "title": "设置唤醒词",
+          "description": "自定义唤醒词或使用默认唤醒词"
+        },
+        {
+          "title": "调整灵敏度",
+          "description": "设置语音识别的灵敏度"
+        },
+        {
+          "title": "配置隐私",
+          "description": "设置是否保存语音数据等隐私选项"
+        }
+      ],
+      "tips": [
+        "可以试听不同音色",
+        "唤醒词建议3-4个字",
+        "可以关闭语音数据上传"
+      ],
+      "relatedPages": [
+        "/voice-assistant",
+        "/wakeup-settings"
+      ],
+      "keywords": [
+        "设置",
+        "配置",
+        "音色",
+        "唤醒"
+      ]
+    },
+    {
+      "pageId": "/wakeup-settings",
+      "title": "唤醒设置",
+      "module": "voice",
+      "description": "配置语音助手的唤醒方式",
+      "useCases": [
+        "设置唤醒词",
+        "配置手势唤醒",
+        "设置场景唤醒"
+      ],
+      "steps": [
+        {
+          "title": "选择唤醒方式",
+          "description": "可以选择语音唤醒、手势唤醒或场景唤醒"
+        },
+        {
+          "title": "设置唤醒词",
+          "description": "录入自定义唤醒词"
+        },
+        {
+          "title": "配置手势",
+          "description": "设置摇一摇等手势唤醒"
+        },
+        {
+          "title": "测试唤醒",
+          "description": "测试唤醒是否正常工作"
+        }
+      ],
+      "tips": [
+        "支持多种唤醒方式组合",
+        "可以设置唤醒后的默认操作",
+        "建议在安静环境录入唤醒词"
+      ],
+      "relatedPages": [
+        "/voice-assistant-settings",
+        "/multimodal-wakeup-settings"
+      ],
+      "keywords": [
+        "唤醒",
+        "激活",
+        "启动",
+        "触发"
+      ]
+    },
+    {
+      "pageId": "/multimodal-wakeup-settings",
+      "title": "多模态唤醒设置",
+      "module": "voice",
+      "description": "配置多种方式组合唤醒语音助手",
+      "useCases": [
+        "设置场景化唤醒",
+        "配置智能唤醒",
+        "优化唤醒体验"
+      ],
+      "steps": [
+        {
+          "title": "选择唤醒组合",
+          "description": "可以组合语音、手势、位置等多种方式"
+        },
+        {
+          "title": "设置场景规则",
+          "description": "如在家时摇一摇唤醒"
+        },
+        {
+          "title": "配置优先级",
+          "description": "设置不同唤醒方式的优先级"
+        },
+        {
+          "title": "测试组合",
+          "description": "测试多模态唤醒是否正常"
+        }
+      ],
+      "tips": [
+        "场景唤醒可以提高便利性",
+        "可以设置时间段规则",
+        "支持自动学习常用场景"
+      ],
+      "relatedPages": [
+        "/wakeup-settings",
+        "/voice-assistant-settings"
+      ],
+      "keywords": [
+        "多模态",
+        "组合",
+        "场景",
+        "智能"
+      ]
+    },
+    {
+      "pageId": "/voice-recognition-settings",
+      "title": "语音识别设置",
+      "module": "voice",
+      "description": "配置语音识别的各项参数",
+      "useCases": [
+        "提高识别准确率",
+        "适配方言",
+        "优化识别速度"
+      ],
+      "steps": [
+        {
+          "title": "选择识别语言",
+          "description": "选择主要使用的语言"
+        },
+        {
+          "title": "选择方言",
+          "description": "如果使用方言，可以选择对应的方言"
+        },
+        {
+          "title": "调整灵敏度",
+          "description": "根据环境噪音调整识别灵敏度"
+        },
+        {
+          "title": "测试识别",
+          "description": "测试识别效果并调整"
+        }
+      ],
+      "tips": [
+        "支持多语言混合识别",
+        "可以添加自定义词汇",
+        "建议在常用环境中测试"
+      ],
+      "relatedPages": [
+        "/voice-assistant-settings",
+        "/voice-assistant"
+      ],
+      "keywords": [
+        "识别",
+        "语音",
+        "方言",
+        "准确率"
       ]
     }
   ]
