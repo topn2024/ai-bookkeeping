@@ -123,6 +123,7 @@ class VoicePipelineController {
     PipelineConfig? config,
     ResultBuffer? resultBuffer,
     UserPreferencesProvider? userPreferencesProvider,
+    LLMServiceProvider? llmServiceProvider,
   }) : _asrEngine = asrEngine,
        _ttsService = ttsService,
        _vadService = vadService,
@@ -145,12 +146,13 @@ class VoicePipelineController {
     );
 
     // 初始化主动对话管理器
-    // 如果提供了 ResultBuffer，使用 SmartTopicGenerator 以支持查询结果通知
+    // 如果提供了 ResultBuffer，使用 SmartTopicGenerator 以支持查询结果通知和LLM生成
     // 否则降级使用 SimpleTopicGenerator
     _topicGenerator = resultBuffer != null
         ? SmartTopicGenerator(
             resultBuffer: resultBuffer,
             preferencesProvider: userPreferencesProvider,
+            llmProvider: llmServiceProvider,
           )
         : SimpleTopicGenerator();
     _proactiveManager = ProactiveConversationManager(

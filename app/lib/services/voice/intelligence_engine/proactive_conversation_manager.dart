@@ -374,6 +374,15 @@ class SmartTopicGenerator implements ProactiveTopicGenerator {
   /// 用户偏好
   final UserPreferencesProvider? _preferencesProvider;
 
+  /// LLM服务（用于智能话题生成）
+  final LLMServiceProvider? _llmProvider;
+
+  /// 是否启用LLM生成
+  final bool enableLLMGeneration;
+
+  /// LLM生成超时时间（毫秒）
+  static const int _llmTimeoutMs = 3000;
+
   /// 话题索引（用于轮换预设话题）
   int _topicIndex = 0;
 
@@ -383,8 +392,11 @@ class SmartTopicGenerator implements ProactiveTopicGenerator {
   SmartTopicGenerator({
     ResultBuffer? resultBuffer,
     UserPreferencesProvider? preferencesProvider,
+    LLMServiceProvider? llmProvider,
+    this.enableLLMGeneration = true,
   })  : _resultBuffer = resultBuffer,
-        _preferencesProvider = preferencesProvider;
+        _preferencesProvider = preferencesProvider,
+        _llmProvider = llmProvider;
 
   @override
   Future<String?> generateTopic() async {
@@ -437,9 +449,90 @@ class SmartTopicGenerator implements ProactiveTopicGenerator {
       return null;
     }
 
-    // 3. 没有待通知的查询结果，使用时间相关的预设话题
+    // 3. 尝试使用LLM生成话题（带超时和降级）
+    if (enableLLMGeneration && _llmProvider != null && _llmProvider!.isAvailable) {
+      debugPrint('[SmartTopicGenerator] 尝试LLM生成话题...');
+      final llmTopic = await _tryLLMGeneration(dialogStyle);
+      if (llmTopic != null) {
+        debugPrint('[SmartTopicGenerator] LLM生成成功: $llmTopic');
+        return llmTopic;
+      }
+      debugPrint('[SmartTopicGenerator] LLM生成失败，降级到规则生成');
+    }
+
+    // 4. 没有待通知的查询结果，使用时间相关的预设话题
     debugPrint('[SmartTopicGenerator] 无待通知结果，使用预设话题 (风格: $dialogStyle)');
     return _getTimeBasedTopic(dialogStyle);
+  }
+
+  /// 尝试使用LLM生成话题
+  /// 带3秒超时，超时或失败返回null
+  Future<String?> _tryLLMGeneration(DialogStylePreference style) async {
+    try {
+      final hour = DateTime.now().hour;
+      final timeContext = _getTimeContext(hour);
+      final styleDesc = _getStyleDescription(style);
+
+      final prompt = '''你是一个智能记账助手"小白"，正在和用户进行语音对话。
+用户当前沉默了5秒，你需要主动发起一个话题。
+
+当前时间：$timeContext
+对话风格：$styleDesc
+
+请生成一句简短的主动对话（不超过15个字），用于引导用户继续对话。
+要求：
+- 简洁自然，像朋友聊天
+- 与当前时间段相关
+- 符合指定的对话风格
+- 不要使用表情符号
+
+直接输出话题文本，不要加引号或其他格式。''';
+
+      // 使用超时保护
+      final result = await Future.any([
+        _llmProvider!.generateTopic(prompt),
+        Future.delayed(
+          const Duration(milliseconds: _llmTimeoutMs),
+          () => null,
+        ),
+      ]);
+
+      // 验证结果
+      if (result != null && result.isNotEmpty && result.length <= 30) {
+        return result.trim();
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('[SmartTopicGenerator] LLM生成异常: $e');
+      return null;
+    }
+  }
+
+  /// 获取时间上下文描述
+  String _getTimeContext(int hour) {
+    if (hour >= 6 && hour < 10) return '早上（6-10点）';
+    if (hour >= 10 && hour < 12) return '上午（10-12点）';
+    if (hour >= 12 && hour < 14) return '中午（12-14点）';
+    if (hour >= 14 && hour < 18) return '下午（14-18点）';
+    if (hour >= 18 && hour < 22) return '晚上（18-22点）';
+    return '深夜/凌晨';
+  }
+
+  /// 获取风格描述
+  String _getStyleDescription(DialogStylePreference style) {
+    switch (style) {
+      case DialogStylePreference.professional:
+        return '专业简洁，正式礼貌';
+      case DialogStylePreference.playful:
+        return '活泼有趣，可以用语气词';
+      case DialogStylePreference.supportive:
+        return '温暖关怀，体贴用户';
+      case DialogStylePreference.casual:
+        return '随意轻松，像老朋友';
+      default:
+        return '自然平衡，不过度热情也不冷淡';
+    }
   }
 
   /// 根据时间和对话风格获取话题
@@ -562,6 +655,18 @@ class SmartTopicGenerator implements ProactiveTopicGenerator {
 /// 用于获取当前用户的对话偏好设置
 abstract class UserPreferencesProvider {
   UserPreferencesData? getPreferences();
+}
+
+/// LLM服务提供者接口
+/// 用于生成主动对话话题
+abstract class LLMServiceProvider {
+  /// 是否可用
+  bool get isAvailable;
+
+  /// 生成话题
+  /// [prompt] 提示词
+  /// 返回生成的话题文本，失败返回 null
+  Future<String?> generateTopic(String prompt);
 }
 
 /// 用户偏好数据

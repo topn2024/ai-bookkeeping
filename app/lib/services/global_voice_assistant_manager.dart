@@ -17,7 +17,7 @@ import 'voice/config/feature_flags.dart';
 import 'voice/config/pipeline_config.dart';
 import 'voice/pipeline/voice_pipeline_controller.dart';
 import 'voice/intelligence_engine/result_buffer.dart';
-import 'voice/intelligence_engine/proactive_conversation_manager.dart' show SimpleUserPreferencesProvider, DialogStylePreference;
+import 'voice/intelligence_engine/proactive_conversation_manager.dart' show SimpleUserPreferencesProvider, DialogStylePreference, LLMServiceProvider;
 import 'voice/agent/hybrid_intent_router.dart' show ProactiveNetworkMonitor, NetworkStatus;
 import 'voice/audio_processor_service.dart';
 import 'voice/ambient_noise_calibrator.dart';
@@ -101,6 +101,27 @@ class ChatMessage {
 /// 命令处理回调类型
 /// 返回处理结果消息，如果返回null则使用内置处理
 typedef CommandProcessorCallback = Future<String?> Function(String command);
+
+/// QwenLLM服务提供者
+/// 包装QwenService的chat方法，用于主动话题生成
+class QwenLLMServiceProvider implements LLMServiceProvider {
+  final QwenService _qwenService;
+
+  QwenLLMServiceProvider(this._qwenService);
+
+  @override
+  bool get isAvailable => _qwenService.isAvailable;
+
+  @override
+  Future<String?> generateTopic(String prompt) async {
+    try {
+      return await _qwenService.chat(prompt);
+    } catch (e) {
+      debugPrint('[QwenLLMServiceProvider] 生成话题失败: $e');
+      return null;
+    }
+  }
+}
 
 /// 全局语音助手管理器
 ///
@@ -201,6 +222,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   // 用户偏好提供者（用于主动对话个性化）
   SimpleUserPreferencesProvider? _userPreferencesProvider;
+
+  // LLM服务提供者（用于智能主动话题生成）
+  QwenLLMServiceProvider? _llmServiceProvider;
 
   // 命令处理中（TTS播放期间忽略ASR结果）
   bool _isProcessingCommand = false;
@@ -692,9 +716,13 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 创建用户偏好提供者（如果尚未创建）
     _userPreferencesProvider ??= SimpleUserPreferencesProvider();
 
+    // 创建LLM服务提供者（用于智能主动话题生成）
+    _llmServiceProvider ??= QwenLLMServiceProvider(QwenService());
+
     // 创建流水线控制器
     // 传入 ResultBuffer 使 SmartTopicGenerator 能够检索查询结果
     // 传入 UserPreferencesProvider 使主动对话能够根据用户偏好个性化
+    // 传入 LLMServiceProvider 使主动对话能够智能生成话题
     _pipelineController = VoicePipelineController(
       asrEngine: _recognitionEngine!,
       ttsService: _streamingTtsService!,
@@ -702,6 +730,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       config: PipelineConfig.defaultConfig,
       resultBuffer: _resultBuffer,
       userPreferencesProvider: _userPreferencesProvider,
+      llmServiceProvider: _llmServiceProvider,
     );
 
     // 重置重新初始化标记
@@ -727,7 +756,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       _pipelineController = null;
     }
 
-    // 重新创建流水线控制器（传入新的 ResultBuffer）
+    // 重新创建流水线控制器（传入新的 ResultBuffer 和服务提供者）
     _pipelineController = VoicePipelineController(
       asrEngine: _recognitionEngine!,
       ttsService: _streamingTtsService!,
@@ -735,6 +764,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       config: PipelineConfig.defaultConfig,
       resultBuffer: _resultBuffer,
       userPreferencesProvider: _userPreferencesProvider,
+      llmServiceProvider: _llmServiceProvider,
     );
 
     // 重新设置回调
