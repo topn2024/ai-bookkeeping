@@ -122,6 +122,7 @@ class VoicePipelineController {
     RealtimeVADService? vadService,
     PipelineConfig? config,
     ResultBuffer? resultBuffer,
+    UserPreferencesProvider? userPreferencesProvider,
   }) : _asrEngine = asrEngine,
        _ttsService = ttsService,
        _vadService = vadService,
@@ -147,7 +148,10 @@ class VoicePipelineController {
     // 如果提供了 ResultBuffer，使用 SmartTopicGenerator 以支持查询结果通知
     // 否则降级使用 SimpleTopicGenerator
     _topicGenerator = resultBuffer != null
-        ? SmartTopicGenerator(resultBuffer: resultBuffer)
+        ? SmartTopicGenerator(
+            resultBuffer: resultBuffer,
+            preferencesProvider: userPreferencesProvider,
+          )
         : SimpleTopicGenerator();
     _proactiveManager = ProactiveConversationManager(
       topicGenerator: _topicGenerator,

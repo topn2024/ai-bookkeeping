@@ -17,6 +17,7 @@ import 'voice/config/feature_flags.dart';
 import 'voice/config/pipeline_config.dart';
 import 'voice/pipeline/voice_pipeline_controller.dart';
 import 'voice/intelligence_engine/result_buffer.dart';
+import 'voice/intelligence_engine/proactive_conversation_manager.dart' show SimpleUserPreferencesProvider, DialogStylePreference;
 import 'voice/agent/hybrid_intent_router.dart' show ProactiveNetworkMonitor, NetworkStatus;
 import 'voice/audio_processor_service.dart';
 import 'voice/ambient_noise_calibrator.dart';
@@ -197,6 +198,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   // 连续无响应计数器（最多3次主动话题）
   int _consecutiveNoResponseCount = 0;
   static const int _maxConsecutiveNoResponse = 3;
+
+  // 用户偏好提供者（用于主动对话个性化）
+  SimpleUserPreferencesProvider? _userPreferencesProvider;
 
   // 命令处理中（TTS播放期间忽略ASR结果）
   bool _isProcessingCommand = false;
@@ -685,14 +689,19 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       debugPrint('[GlobalVoiceAssistant] 流式TTS服务已预加载，跳过初始化');
     }
 
+    // 创建用户偏好提供者（如果尚未创建）
+    _userPreferencesProvider ??= SimpleUserPreferencesProvider();
+
     // 创建流水线控制器
     // 传入 ResultBuffer 使 SmartTopicGenerator 能够检索查询结果
+    // 传入 UserPreferencesProvider 使主动对话能够根据用户偏好个性化
     _pipelineController = VoicePipelineController(
       asrEngine: _recognitionEngine!,
       ttsService: _streamingTtsService!,
       vadService: _vadService,
       config: PipelineConfig.defaultConfig,
       resultBuffer: _resultBuffer,
+      userPreferencesProvider: _userPreferencesProvider,
     );
 
     // 重置重新初始化标记
@@ -725,6 +734,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       vadService: _vadService,
       config: PipelineConfig.defaultConfig,
       resultBuffer: _resultBuffer,
+      userPreferencesProvider: _userPreferencesProvider,
     );
 
     // 重新设置回调
@@ -2527,6 +2537,44 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     } catch (e) {
       _handleError('处理失败');
     }
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 用户偏好设置
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /// 设置是否喜欢主动对话
+  ///
+  /// 当设置为 false 时，除非有待通知的查询结果，否则系统不会主动发起对话
+  void setLikesProactiveChat(bool value) {
+    _userPreferencesProvider ??= SimpleUserPreferencesProvider();
+    _userPreferencesProvider!.setLikesProactiveChat(value);
+    debugPrint('[GlobalVoiceAssistant] 设置主动对话偏好: $value');
+  }
+
+  /// 设置对话风格
+  ///
+  /// 影响主动对话的话术风格：
+  /// - professional: 专业简洁
+  /// - playful: 活泼有趣
+  /// - supportive: 温暖支持
+  /// - casual: 随意轻松
+  /// - neutral: 中性平衡
+  void setDialogStyle(DialogStylePreference style) {
+    _userPreferencesProvider ??= SimpleUserPreferencesProvider();
+    _userPreferencesProvider!.setDialogStyle(style);
+    debugPrint('[GlobalVoiceAssistant] 设置对话风格: $style');
+  }
+
+  /// 获取当前对话风格
+  DialogStylePreference get dialogStyle {
+    return _userPreferencesProvider?.getPreferences()?.dialogStyle
+        ?? DialogStylePreference.neutral;
+  }
+
+  /// 获取是否喜欢主动对话
+  bool get likesProactiveChat {
+    return _userPreferencesProvider?.getPreferences()?.likesProactiveChat ?? true;
   }
 
   @override

@@ -361,7 +361,8 @@ class SimpleTopicGenerator implements ProactiveTopicGenerator {
 /// 核心功能：
 /// - 优先从 ResultBuffer 获取待通知的查询结果
 /// - 如果有查询结果，返回用户友好的结果文本
-/// - 如果没有查询结果，降级到时间相关的预设话题
+/// - 如果没有查询结果，根据用户偏好和对话风格生成话题
+/// - 尊重用户的「不喜欢主动对话」设置
 ///
 /// 设计思想：
 /// 查询操作（如"今天花了多少"）是异步执行的，结果存入 ResultBuffer。
@@ -370,22 +371,29 @@ class SmartTopicGenerator implements ProactiveTopicGenerator {
   /// 结果缓冲区（用于获取待通知的查询结果）
   final ResultBuffer? _resultBuffer;
 
+  /// 用户偏好
+  final UserPreferencesProvider? _preferencesProvider;
+
   /// 话题索引（用于轮换预设话题）
   int _topicIndex = 0;
 
-  /// 预设话题（作为降级方案）
-  static const List<String> _defaultTopics = [
-    '需要我帮你记一笔账吗？',
-    '还有什么可以帮您的吗？',
-    '还在吗？',
-  ];
+  /// 上次使用的话题类型（避免连续重复）
+  String? _lastTopicType;
 
-  SmartTopicGenerator({ResultBuffer? resultBuffer})
-      : _resultBuffer = resultBuffer;
+  SmartTopicGenerator({
+    ResultBuffer? resultBuffer,
+    UserPreferencesProvider? preferencesProvider,
+  })  : _resultBuffer = resultBuffer,
+        _preferencesProvider = preferencesProvider;
 
   @override
   Future<String?> generateTopic() async {
-    debugPrint('[SmartTopicGenerator] 生成话题，检查 ResultBuffer...');
+    debugPrint('[SmartTopicGenerator] 生成话题...');
+
+    // 获取用户偏好
+    final prefs = _preferencesProvider?.getPreferences();
+    final likesProactiveChat = prefs?.likesProactiveChat ?? true;
+    final dialogStyle = prefs?.dialogStyle ?? DialogStylePreference.neutral;
 
     // 1. 优先检查 ResultBuffer 中是否有待通知的查询结果
     final resultBuffer = _resultBuffer;
@@ -415,47 +423,207 @@ class SmartTopicGenerator implements ProactiveTopicGenerator {
             // 标记为已通知
             resultBuffer.markNotified(bufferedResult.id);
 
-            return bufferedResult.description + '已完成';
+            // 根据风格调整反馈语
+            return _styleText('${bufferedResult.description}已完成', dialogStyle);
           }
         }
       }
     }
 
-    // 2. 没有待通知的查询结果，使用时间相关的预设话题
-    debugPrint('[SmartTopicGenerator] 无待通知结果，使用预设话题');
+    // 2. 检查用户是否喜欢主动对话
+    // 如果不喜欢且没有待通知结果，保持静默
+    if (!likesProactiveChat) {
+      debugPrint('[SmartTopicGenerator] 用户不喜欢主动对话，且无待通知结果，保持静默');
+      return null;
+    }
+
+    // 3. 没有待通知的查询结果，使用时间相关的预设话题
+    debugPrint('[SmartTopicGenerator] 无待通知结果，使用预设话题 (风格: $dialogStyle)');
+    return _getTimeBasedTopic(dialogStyle);
+  }
+
+  /// 根据时间和对话风格获取话题
+  String _getTimeBasedTopic(DialogStylePreference style) {
     final hour = DateTime.now().hour;
+    String topicType;
     List<String> topics;
 
     if (hour >= 6 && hour < 10) {
-      topics = const [
-        '早上好！要记录一下早餐花销吗？',
-        '新的一天开始了，需要帮你记账吗？',
-        '还在吗？',
-      ];
+      topicType = 'morning';
+      topics = _getMorningTopics(style);
     } else if (hour >= 11 && hour < 14) {
-      topics = const [
-        '午餐吃了吗？要记一笔吗？',
-        '中午好！需要记录午餐消费吗？',
-        '还在吗？',
-      ];
+      topicType = 'noon';
+      topics = _getNoonTopics(style);
     } else if (hour >= 18 && hour < 22) {
-      topics = const [
-        '今天的账记完了吗？要查看今日消费吗？',
-        '晚上好！要回顾一下今天的支出吗？',
-        '还在吗？',
-      ];
+      topicType = 'evening';
+      topics = _getEveningTopics(style);
     } else {
-      topics = _defaultTopics;
+      topicType = 'default';
+      topics = _getDefaultTopics(style);
     }
 
-    final topic = topics[_topicIndex % topics.length];
+    // 避免连续使用相同类型的话题
+    int index = _topicIndex;
+    if (_lastTopicType == topicType && topics.length > 1) {
+      index = (_topicIndex + 1) % topics.length;
+    }
+
+    final topic = topics[index % topics.length];
     _topicIndex++;
+    _lastTopicType = topicType;
 
     return topic;
+  }
+
+  /// 早晨话题（根据风格）
+  List<String> _getMorningTopics(DialogStylePreference style) {
+    switch (style) {
+      case DialogStylePreference.professional:
+        return const ['需要记录早餐消费吗？', '早上好，有什么可以帮您？'];
+      case DialogStylePreference.playful:
+        return const ['早呀~早餐记了没？', '新的一天，记个账呗~'];
+      case DialogStylePreference.supportive:
+        return const ['早上好！要帮你记录早餐吗？', '新的一天开始了，需要帮忙吗？'];
+      case DialogStylePreference.casual:
+        return const ['早餐记了吗？', '早，要记账吗？'];
+      default:
+        return const ['早上好！要记录一下早餐花销吗？', '需要帮你记账吗？'];
+    }
+  }
+
+  /// 中午话题（根据风格）
+  List<String> _getNoonTopics(DialogStylePreference style) {
+    switch (style) {
+      case DialogStylePreference.professional:
+        return const ['需要记录午餐消费吗？', '中午好，有什么可以帮您？'];
+      case DialogStylePreference.playful:
+        return const ['午饭记了没呀~', '中午啦，记个账？'];
+      case DialogStylePreference.supportive:
+        return const ['午餐时间到了，要帮你记一笔吗？', '中午好！需要帮忙记账吗？'];
+      case DialogStylePreference.casual:
+        return const ['午餐记了吗？', '中午，要记账吗？'];
+      default:
+        return const ['午餐吃了吗？要记一笔吗？', '中午好！需要记录午餐消费吗？'];
+    }
+  }
+
+  /// 晚上话题（根据风格）
+  List<String> _getEveningTopics(DialogStylePreference style) {
+    switch (style) {
+      case DialogStylePreference.professional:
+        return const ['今日账目记录完成了吗？', '晚上好，需要查看今日消费吗？'];
+      case DialogStylePreference.playful:
+        return const ['今天的账记完了吗~', '晚上好呀，回顾一下今天？'];
+      case DialogStylePreference.supportive:
+        return const ['辛苦了！今天的账记完了吗？', '晚上好！要回顾一下今天的支出吗？'];
+      case DialogStylePreference.casual:
+        return const ['今天账记完了吗？', '晚上好，要记账吗？'];
+      default:
+        return const ['今天的账记完了吗？要查看今日消费吗？', '晚上好！要回顾一下今天的支出吗？'];
+    }
+  }
+
+  /// 默认话题（根据风格）
+  List<String> _getDefaultTopics(DialogStylePreference style) {
+    switch (style) {
+      case DialogStylePreference.professional:
+        return const ['有什么可以帮您的吗？', '需要记账吗？'];
+      case DialogStylePreference.playful:
+        return const ['有啥要记的吗~', '需要帮忙吗？'];
+      case DialogStylePreference.supportive:
+        return const ['需要帮你做点什么吗？', '有什么可以帮忙的？'];
+      case DialogStylePreference.casual:
+        return const ['要记账吗？', '还在吗？'];
+      default:
+        return const ['需要我帮你记一笔账吗？', '还有什么可以帮您的吗？', '还在吗？'];
+    }
+  }
+
+  /// 根据风格调整文本
+  String _styleText(String text, DialogStylePreference style) {
+    switch (style) {
+      case DialogStylePreference.playful:
+        return '$text~';
+      case DialogStylePreference.professional:
+        return text.replaceAll('~', '');
+      default:
+        return text;
+    }
   }
 
   /// 重置话题索引
   void reset() {
     _topicIndex = 0;
+    _lastTopicType = null;
+  }
+}
+
+/// 用户偏好提供者接口
+/// 用于获取当前用户的对话偏好设置
+abstract class UserPreferencesProvider {
+  UserPreferencesData? getPreferences();
+}
+
+/// 用户偏好数据
+class UserPreferencesData {
+  /// 是否喜欢主动对话
+  final bool likesProactiveChat;
+
+  /// 对话风格
+  final DialogStylePreference dialogStyle;
+
+  const UserPreferencesData({
+    this.likesProactiveChat = true,
+    this.dialogStyle = DialogStylePreference.neutral,
+  });
+}
+
+/// 对话风格偏好
+enum DialogStylePreference {
+  professional, // 专业简洁
+  playful,      // 活泼有趣
+  supportive,   // 温暖支持
+  casual,       // 随意轻松
+  neutral,      // 中性平衡
+}
+
+/// 简单的用户偏好提供者实现
+///
+/// 用于存储和获取用户的对话偏好设置
+/// 支持动态更新偏好
+class SimpleUserPreferencesProvider implements UserPreferencesProvider {
+  UserPreferencesData _preferences;
+
+  SimpleUserPreferencesProvider({
+    bool likesProactiveChat = true,
+    DialogStylePreference dialogStyle = DialogStylePreference.neutral,
+  }) : _preferences = UserPreferencesData(
+          likesProactiveChat: likesProactiveChat,
+          dialogStyle: dialogStyle,
+        );
+
+  @override
+  UserPreferencesData? getPreferences() => _preferences;
+
+  /// 更新偏好设置
+  void updatePreferences({
+    bool? likesProactiveChat,
+    DialogStylePreference? dialogStyle,
+  }) {
+    _preferences = UserPreferencesData(
+      likesProactiveChat: likesProactiveChat ?? _preferences.likesProactiveChat,
+      dialogStyle: dialogStyle ?? _preferences.dialogStyle,
+    );
+    debugPrint('[UserPreferencesProvider] 偏好已更新: likesProactiveChat=${_preferences.likesProactiveChat}, style=${_preferences.dialogStyle}');
+  }
+
+  /// 设置是否喜欢主动对话
+  void setLikesProactiveChat(bool value) {
+    updatePreferences(likesProactiveChat: value);
+  }
+
+  /// 设置对话风格
+  void setDialogStyle(DialogStylePreference style) {
+    updatePreferences(dialogStyle: style);
   }
 }
