@@ -124,6 +124,7 @@ class VoicePipelineController {
     ResultBuffer? resultBuffer,
     UserPreferencesProvider? userPreferencesProvider,
     LLMServiceProvider? llmServiceProvider,
+    ConversationContextProvider? conversationContextProvider,
   }) : _asrEngine = asrEngine,
        _ttsService = ttsService,
        _vadService = vadService,
@@ -153,6 +154,7 @@ class VoicePipelineController {
             resultBuffer: resultBuffer,
             preferencesProvider: userPreferencesProvider,
             llmProvider: llmServiceProvider,
+            contextProvider: conversationContextProvider,
           )
         : SimpleTopicGenerator();
     _proactiveManager = ProactiveConversationManager(

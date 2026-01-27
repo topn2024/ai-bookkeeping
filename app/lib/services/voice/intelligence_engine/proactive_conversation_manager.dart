@@ -377,6 +377,9 @@ class SmartTopicGenerator implements ProactiveTopicGenerator {
   /// LLM服务（用于智能话题生成）
   final LLMServiceProvider? _llmProvider;
 
+  /// 对话上下文提供者（用于获取对话历史和用户习惯）
+  final ConversationContextProvider? _contextProvider;
+
   /// 是否启用LLM生成
   final bool enableLLMGeneration;
 
@@ -393,10 +396,12 @@ class SmartTopicGenerator implements ProactiveTopicGenerator {
     ResultBuffer? resultBuffer,
     UserPreferencesProvider? preferencesProvider,
     LLMServiceProvider? llmProvider,
+    ConversationContextProvider? contextProvider,
     this.enableLLMGeneration = true,
   })  : _resultBuffer = resultBuffer,
         _preferencesProvider = preferencesProvider,
-        _llmProvider = llmProvider;
+        _llmProvider = llmProvider,
+        _contextProvider = contextProvider;
 
   @override
   Future<String?> generateTopic() async {
@@ -473,18 +478,32 @@ class SmartTopicGenerator implements ProactiveTopicGenerator {
       final timeContext = _getTimeContext(hour);
       final styleDesc = _getStyleDescription(style);
 
+      // 获取对话上下文（如果有）
+      final contextSummary = _contextProvider?.getContextSummary();
+      final recentAction = _contextProvider?.getRecentActionDescription();
+
+      // 构建上下文部分
+      final contextPart = StringBuffer();
+      if (recentAction != null && recentAction.isNotEmpty) {
+        contextPart.writeln('最近操作：$recentAction');
+      }
+      if (contextSummary != null && contextSummary.isNotEmpty) {
+        contextPart.writeln('对话背景：$contextSummary');
+      }
+
       final prompt = '''你是一个智能记账助手"小白"，正在和用户进行语音对话。
 用户当前沉默了5秒，你需要主动发起一个话题。
 
 当前时间：$timeContext
 对话风格：$styleDesc
-
+${contextPart.isNotEmpty ? '\n$contextPart' : ''}
 请生成一句简短的主动对话（不超过15个字），用于引导用户继续对话。
 要求：
 - 简洁自然，像朋友聊天
 - 与当前时间段相关
 - 符合指定的对话风格
 - 不要使用表情符号
+- 如果有最近操作，可以基于此引导用户
 
 直接输出话题文本，不要加引号或其他格式。''';
 
@@ -667,6 +686,17 @@ abstract class LLMServiceProvider {
   /// [prompt] 提示词
   /// 返回生成的话题文本，失败返回 null
   Future<String?> generateTopic(String prompt);
+}
+
+/// 对话上下文提供者接口
+/// 用于获取对话上下文摘要，供LLM话题生成使用
+abstract class ConversationContextProvider {
+  /// 获取对话上下文摘要
+  /// 返回包含最近对话、用户习惯等信息的摘要文本
+  String? getContextSummary();
+
+  /// 获取最近的操作描述
+  String? getRecentActionDescription();
 }
 
 /// 用户偏好数据

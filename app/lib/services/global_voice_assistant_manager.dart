@@ -17,7 +17,7 @@ import 'voice/config/feature_flags.dart';
 import 'voice/config/pipeline_config.dart';
 import 'voice/pipeline/voice_pipeline_controller.dart';
 import 'voice/intelligence_engine/result_buffer.dart';
-import 'voice/intelligence_engine/proactive_conversation_manager.dart' show SimpleUserPreferencesProvider, DialogStylePreference, LLMServiceProvider;
+import 'voice/intelligence_engine/proactive_conversation_manager.dart' show SimpleUserPreferencesProvider, DialogStylePreference, LLMServiceProvider, ConversationContextProvider;
 import 'voice/agent/hybrid_intent_router.dart' show ProactiveNetworkMonitor, NetworkStatus;
 import 'voice/audio_processor_service.dart';
 import 'voice/ambient_noise_calibrator.dart';
@@ -123,6 +123,54 @@ class QwenLLMServiceProvider implements LLMServiceProvider {
   }
 }
 
+/// 简单的对话上下文提供者
+/// 从聊天历史中提取上下文信息
+class SimpleConversationContextProvider implements ConversationContextProvider {
+  final List<ChatMessage> Function() _getHistory;
+
+  SimpleConversationContextProvider(this._getHistory);
+
+  @override
+  String? getContextSummary() {
+    final history = _getHistory();
+    if (history.isEmpty) return null;
+
+    // 获取最近3条消息作为上下文
+    final recent = history.length > 3 ? history.sublist(history.length - 3) : history;
+    if (recent.isEmpty) return null;
+
+    final buffer = StringBuffer();
+    for (final msg in recent) {
+      final role = msg.type == ChatMessageType.user ? '用户' : '助手';
+      buffer.writeln('$role: ${msg.content}');
+    }
+    return buffer.toString().trim();
+  }
+
+  @override
+  String? getRecentActionDescription() {
+    final history = _getHistory();
+    if (history.isEmpty) return null;
+
+    // 查找最近一条助手消息中的操作描述
+    for (int i = history.length - 1; i >= 0; i--) {
+      final msg = history[i];
+      if (msg.type == ChatMessageType.assistant && msg.metadata != null) {
+        // 检查是否有操作信息
+        final actionType = msg.metadata!['actionType'] as String?;
+        if (actionType != null) {
+          final amount = msg.metadata!['amount'];
+          final category = msg.metadata!['category'] as String?;
+          if (amount != null && category != null) {
+            return '刚刚记录了一笔$category消费$amount元';
+          }
+        }
+      }
+    }
+    return null;
+  }
+}
+
 /// 全局语音助手管理器
 ///
 /// 单例模式，管理：
@@ -225,6 +273,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   // LLM服务提供者（用于智能主动话题生成）
   QwenLLMServiceProvider? _llmServiceProvider;
+
+  // 对话上下文提供者（用于给LLM提供对话背景）
+  SimpleConversationContextProvider? _conversationContextProvider;
 
   // 命令处理中（TTS播放期间忽略ASR结果）
   bool _isProcessingCommand = false;
@@ -719,10 +770,16 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 创建LLM服务提供者（用于智能主动话题生成）
     _llmServiceProvider ??= QwenLLMServiceProvider(QwenService());
 
+    // 创建对话上下文提供者（用于给LLM提供对话背景）
+    _conversationContextProvider ??= SimpleConversationContextProvider(
+      () => _conversationHistory,
+    );
+
     // 创建流水线控制器
     // 传入 ResultBuffer 使 SmartTopicGenerator 能够检索查询结果
     // 传入 UserPreferencesProvider 使主动对话能够根据用户偏好个性化
     // 传入 LLMServiceProvider 使主动对话能够智能生成话题
+    // 传入 ConversationContextProvider 使LLM能够了解对话背景
     _pipelineController = VoicePipelineController(
       asrEngine: _recognitionEngine!,
       ttsService: _streamingTtsService!,
@@ -731,6 +788,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       resultBuffer: _resultBuffer,
       userPreferencesProvider: _userPreferencesProvider,
       llmServiceProvider: _llmServiceProvider,
+      conversationContextProvider: _conversationContextProvider,
     );
 
     // 重置重新初始化标记
@@ -765,6 +823,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       resultBuffer: _resultBuffer,
       userPreferencesProvider: _userPreferencesProvider,
       llmServiceProvider: _llmServiceProvider,
+      conversationContextProvider: _conversationContextProvider,
     );
 
     // 重新设置回调
