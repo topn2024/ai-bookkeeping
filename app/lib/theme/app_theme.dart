@@ -248,13 +248,30 @@ class AppTheme {
   static ThemeData get lightTheme => createLightTheme(AntigravityColors.primary);
   static ThemeData get darkTheme => createDarkTheme(AntigravityColors.primary);
 
+  static TextTheme get _textTheme => const TextTheme(
+        displayLarge: TextStyle(fontSize: 48, fontWeight: FontWeight.w300), // H1
+        headlineLarge: TextStyle(fontSize: 34, fontWeight: FontWeight.w300), // H2
+        titleLarge: TextStyle(fontSize: 24, fontWeight: FontWeight.w400), // H3
+        titleMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.w500), // H4
+        titleSmall: TextStyle(fontSize: 18, fontWeight: FontWeight.w500), // H5
+        bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w400), // Body 1
+        bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w400), // Body 2
+        labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w500), // Button
+        bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400), // Caption
+        labelSmall: TextStyle(fontSize: 10, fontWeight: FontWeight.w400), // Overline
+      );
+
   static ThemeData createLightTheme(Color primaryColor) {
     return ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
         brightness: Brightness.light,
-        primary: primaryColor,  // 明确指定主色，避免 Material 3 自动调整
+        primary: primaryColor, // 明确指定主色，避免 Material 3 自动调整
+      ),
+      textTheme: _textTheme.apply(
+        bodyColor: AppColors.textPrimary,
+        displayColor: AppColors.textPrimary,
       ),
       // 启用 iOS 风格的页面过渡动画，支持滑动返回手势
       pageTransitionsTheme: const PageTransitionsTheme(
@@ -269,6 +286,7 @@ class AppTheme {
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        titleTextStyle: _textTheme.titleLarge?.copyWith(color: Colors.white),
       ),
       cardTheme: const CardThemeData(
         color: AppColors.cardBackground,
@@ -287,6 +305,8 @@ class AppTheme {
         unselectedItemColor: AppColors.textSecondary,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
+        selectedLabelStyle: _textTheme.bodySmall,
+        unselectedLabelStyle: _textTheme.bodySmall,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -312,6 +332,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
+          textStyle: _textTheme.labelLarge,
         ),
       ),
     );
@@ -323,7 +344,11 @@ class AppTheme {
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
         brightness: Brightness.dark,
-        primary: primaryColor,  // 明确指定主色，避免 Material 3 自动调整
+        primary: primaryColor, // 明确指定主色，避免 Material 3 自动调整
+      ),
+      textTheme: _textTheme.apply(
+        bodyColor: Colors.white,
+        displayColor: Colors.white,
       ),
       // 启用 iOS 风格的页面过渡动画，支持滑动返回手势
       pageTransitionsTheme: const PageTransitionsTheme(
@@ -333,11 +358,12 @@ class AppTheme {
         },
       ),
       scaffoldBackgroundColor: const Color(0xFF121212),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF1E1E1E),
+      appBarTheme: AppBarTheme(
+        backgroundColor: const Color(0xFF1E1E1E),
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        titleTextStyle: _textTheme.titleLarge?.copyWith(color: Colors.white),
       ),
       cardTheme: const CardThemeData(
         color: Color(0xFF1E1E1E),
@@ -356,6 +382,8 @@ class AppTheme {
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
+        selectedLabelStyle: _textTheme.bodySmall,
+        unselectedLabelStyle: _textTheme.bodySmall,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -381,6 +409,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
+          textStyle: _textTheme.labelLarge,
         ),
       ),
     );
