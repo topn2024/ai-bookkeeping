@@ -415,6 +415,14 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     debugPrint('[VoiceCoordinator] 网络状态提供者已${provider != null ? "设置" : "清除"}');
   }
 
+  /// 预加载用户城市信息
+  ///
+  /// 在APP启动时调用，提前获取用户位置信息
+  /// 供LLM识别时使用（如推断"深圳地铁"商户名称）
+  Future<void> preloadUserCity() async {
+    await _smartRecognizer.preloadUserCity();
+  }
+
   /// 播放TTS（考虑跳过标志）
   ///
   /// 如果 _skipTTSPlayback 为 true，则跳过实际播放
@@ -645,6 +653,10 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   ///
   /// 当检测到用户输入可能包含多个意图时，使用此方法进行处理。
   /// 返回的结果包含所有识别到的意图，需要用户确认后批量执行。
+  ///
+  /// 优先使用 LLM（SmartIntentRecognizer）进行整体语义理解，
+  /// 这样可以正确关联"花了15块钱"和"吃了肠粉"这种跨句子的上下文。
+  /// 只有当 LLM 不可用时才回退到旧的分句处理方式。
   Future<VoiceSessionResult> processMultiIntentCommand(String voiceInput) async {
     try {
       _sessionState = VoiceSessionState.processing;
@@ -665,6 +677,87 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         timestamp: DateTime.now(),
       );
       _addToHistory(command);
+
+      // ═══════════════════════════════════════════════════════════════
+      // 优先使用 LLM 进行整体语义理解（保持上下文关联）
+      // ═══════════════════════════════════════════════════════════════
+      debugPrint('[VoiceCoordinator] 多意图处理 - 尝试使用LLM整体识别...');
+      final llmResult = await _smartRecognizer.recognizeMultiOperation(voiceInput);
+
+      if (llmResult.isSuccess && llmResult.hasOperations) {
+        debugPrint('[VoiceCoordinator] LLM识别成功: ${llmResult.operations.length}个操作');
+
+        // 转换为 CompleteIntent 列表以复用执行逻辑
+        final completeIntents = <CompleteIntent>[];
+        for (final op in llmResult.operations) {
+          if (op.type == OperationType.addTransaction) {
+            final amount = op.params['amount'] as num?;
+            final category = op.params['category'] as String? ?? '其他';
+            final merchant = op.params['merchant'] as String?;
+            final note = op.params['note'] as String?;
+
+            if (amount != null && amount > 0) {
+              completeIntents.add(CompleteIntent(
+                type: TransactionIntentType.expense,
+                originalText: op.originalText,
+                confidence: llmResult.confidence,
+                amount: amount.toDouble(),
+                category: category,
+                merchant: merchant ?? note,  // 优先使用merchant，fallback到note
+                description: note,  // note作为描述/备注
+              ));
+            }
+          }
+        }
+
+        if (completeIntents.isNotEmpty) {
+          // 直接执行，不需要用户确认
+          final executedCount = await _executeCompleteIntents(completeIntents);
+
+          _sessionState = VoiceSessionState.idle;
+          notifyListeners();
+
+          // 使用LLM生成回复
+          final llmGenerator = LLMResponseGenerator.instance;
+          final message = await llmGenerator.generateResponse(
+            action: '记账',
+            result: '成功记录$executedCount笔交易',
+            success: true,
+            userInput: null,
+          );
+          await _speakWithSkipCheck(message);
+
+          return VoiceSessionResult.success(message, {
+            'executedCount': executedCount,
+            'navigation': null,
+          });
+        }
+      }
+
+      // 如果 LLM 返回需要澄清
+      if (llmResult.needsClarify) {
+        debugPrint('[VoiceCoordinator] LLM需要澄清: ${llmResult.clarifyQuestion}');
+        _sessionState = VoiceSessionState.idle;
+        notifyListeners();
+
+        final clarifyMsg = llmResult.clarifyQuestion ?? '请问您具体想要做什么呢？';
+        await _speakWithSkipCheck(clarifyMsg);
+
+        return VoiceSessionResult.success(clarifyMsg, {
+          'needsClarify': true,
+        });
+      }
+
+      // 如果 LLM 识别为闲聊
+      if (llmResult.isChat) {
+        debugPrint('[VoiceCoordinator] LLM识别为闲聊');
+        return await processVoiceCommand(voiceInput);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // LLM 不可用或识别失败，回退到旧的分句处理方式
+      // ═══════════════════════════════════════════════════════════════
+      debugPrint('[VoiceCoordinator] LLM识别未成功，回退到分句处理...');
 
       // 使用多意图分析
       final multiResult = await _intentRouter.analyzeMultipleIntents(

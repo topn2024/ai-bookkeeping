@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../qwen_service.dart';
 import '../voice_service_coordinator.dart' show VoiceIntentType;
 import '../voice_navigation_service.dart';
+import '../location_data_services.dart';
 import 'voice_intent_router.dart';
 import 'agent/hybrid_intent_router.dart' show NetworkStatus, RoutingMode;
 import 'unified_intent_type.dart' as unified;
@@ -36,6 +37,9 @@ class SmartIntentRecognizer {
   /// 是否已加载缓存
   bool _cacheLoaded = false;
 
+  /// 缓存的用户城市名称（APP启动时预加载）
+  String _cachedCityName = '深圳';  // 默认深圳
+
   /// 网络状态提供者（可选）
   /// 返回null时表示网络状态未知，将允许LLM调用
   NetworkStatus? Function()? networkStatusProvider;
@@ -52,6 +56,29 @@ class SmartIntentRecognizer {
   })  : _ruleRouter = ruleRouter ?? VoiceIntentRouter(),
         _qwenService = qwenService ?? QwenService(),
         _navigationService = navigationService ?? VoiceNavigationService();
+
+  /// 预加载用户城市信息（在APP启动时调用）
+  ///
+  /// 从位置服务获取当前城市，缓存起来供LLM prompt使用
+  /// 这样在语音识别时就不会有延迟
+  Future<void> preloadUserCity() async {
+    try {
+      final cityService = CityLocationService();
+      final cityInfo = await cityService.getCurrentCity();
+      if (cityInfo != null && cityInfo.name.isNotEmpty) {
+        // 移除"市"后缀
+        _cachedCityName = cityInfo.name.replaceAll('市', '');
+        debugPrint('[SmartIntent] 预加载城市信息成功: $_cachedCityName');
+      } else {
+        debugPrint('[SmartIntent] 无法获取城市信息，使用默认值: $_cachedCityName');
+      }
+    } catch (e) {
+      debugPrint('[SmartIntent] 预加载城市信息失败: $e，使用默认值: $_cachedCityName');
+    }
+  }
+
+  /// 获取当前缓存的城市名称
+  String get cachedCityName => _cachedCityName;
 
   /// LLM调用超时时间（毫秒）
   static const int _llmTimeoutMs = 5000; // 5秒超时，平衡响应速度和成功率
@@ -240,12 +267,15 @@ class SmartIntentRecognizer {
   ) async {
     try {
       final prompt = _buildMultiOperationLLMPrompt(input, pageContext);
+      debugPrint('[SmartIntent] LLM输入: $input');
       final response = await _qwenService.chat(prompt);
 
       if (response == null || response.isEmpty) {
+        debugPrint('[SmartIntent] LLM返回为空');
         return null;
       }
 
+      debugPrint('[SmartIntent] LLM原始返回: $response');
       return _parseMultiOperationLLMResponse(response, input);
     } catch (e) {
       debugPrint('[SmartIntent] 多操作LLM调用失败: $e');
@@ -293,6 +323,20 @@ class SmartIntentRecognizer {
    - "花了35块"等陈述句+金额 → add_transaction（记账）
    - 区分方法：有"？"或"多少"且无具体金额 = 查询；有具体金额 = 记账
 
+7. 【重要】跨句子语义关联：
+   - 用户可能先说金额后补充用途，或先说用途后补充金额，这都属于同一笔交易
+   - 模式A - 先金额后用途：
+     - "花了15块钱吃了肠粉" → 15元餐饮（肠粉）
+     - "中午花了30吃了外卖" → 30元餐饮（午餐外卖）
+   - 模式B - 先用途后金额（常见于口语，中间可能有停顿词"呃"、"是"、"大概"等）：
+     - "今天的午餐是25块" → 25元餐饮（午餐）
+     - "今天的午餐呃是大概25块钱" → 25元餐饮（午餐）
+     - "还有今天的午餐大概是25块钱" → 25元餐饮（午餐）
+     - "早餐呃七块" → 7元餐饮（早餐）
+   - 必须综合分析整个输入的上下文，将相关联的金额和用途正确配对
+   - 关键：识别"早餐/午餐/晚餐/打车/买菜"等用途词，并与后面的金额关联
+   - 忽略停顿词：用户口语中的"呃"、"嗯"、"是"、"大概是"等不影响语义理解
+
 【用户输入】$input
 【页面上下文】${pageContext ?? '首页'}
 
@@ -331,7 +375,26 @@ class SmartIntentRecognizer {
 【记账参数说明】
 - amount: 金额（必填）
 - category: 分类（必填）
-- note: 物品/用途说明（可选，用户说了具体物品时必须提取）
+- merchant: 商户名称（可选，如"深圳地铁"、"美团外卖"、"星巴克"等）
+- note: 用途说明（可选，简洁描述，如"去程"、"返程"、"午餐"等）
+
+【商户和备注提取规则】
+- 用户所在城市：$_cachedCityName（用于推断本地商户名称）
+- 地铁/公交：商户填"城市名+交通方式"（如"$_cachedCityName地铁"、"$_cachedCityName公交"）
+- 外卖平台：商户填平台名（如"美团外卖"、"饿了么"）
+- 网购：商户填平台（如"淘宝"、"京东"）
+- 打车：商户填平台（如"滴滴出行"）
+
+【备注提取原则 - 记录有意义的内容】
+- 保留具体信息：用户说的具体物品、地点、用途都要保留
+  - "吃了肠粉" → note="肠粉"（保留具体食物）
+  - "从福田到南山" → note="福田到南山"（保留路线）
+  - "买了个闹钟" → note="闹钟"（保留具体商品）
+- 去除口语填充词：移除"呃"、"嗯"、"大概是"、"今天的"等无意义词
+- 合理规范化：
+  - "去的时候" / "回来的时候" → "去程" / "返程"
+  - "上班" / "下班" → "通勤-上班" / "通勤-下班"
+- 不要过度简化：保留用户表达的关键语义，让记录具有回溯价值
 
 【查询参数说明】
 - queryType: 查询类型（summary/recent/trend/distribution/comparison）
@@ -360,6 +423,51 @@ class SmartIntentRecognizer {
 
 输入："午餐十五，晚餐二十"
 输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":15,"category":"餐饮","note":"午餐"}},{"type":"add_transaction","priority":"deferred","params":{"amount":20,"category":"餐饮","note":"晚餐"}}],"chat_content":null,"clarify_question":null}
+
+输入："花了15块钱吃了肠粉"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":15,"category":"餐饮","note":"肠粉"}}],"chat_content":null,"clarify_question":null}
+
+输入："中午花了30吃了外卖"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":30,"category":"餐饮","note":"午餐外卖"}}],"chat_content":null,"clarify_question":null}
+
+输入："今天早餐吃了七块然后中午又花了15块钱吃了一碗肠粉"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":7,"category":"餐饮","note":"早餐"}},{"type":"add_transaction","priority":"deferred","params":{"amount":15,"category":"餐饮","note":"肠粉"}}],"chat_content":null,"clarify_question":null}
+
+输入："早上花了10块买了包子晚上又花了25吃了米粉"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":10,"category":"餐饮","note":"包子"}},{"type":"add_transaction","priority":"deferred","params":{"amount":25,"category":"餐饮","note":"米粉"}}],"chat_content":null,"clarify_question":null}
+
+输入："今天的午餐呃是大概25块钱"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":25,"category":"餐饮","note":"午餐"}}],"chat_content":null,"clarify_question":null}
+
+输入："早餐呃七块"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":7,"category":"餐饮","note":"早餐"}}],"chat_content":null,"clarify_question":null}
+
+输入："还有今天的午餐大概是25块钱"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":25,"category":"餐饮","note":"午餐"}}],"chat_content":null,"clarify_question":null}
+
+输入："晚餐是35"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":35,"category":"餐饮","note":"晚餐"}}],"chat_content":null,"clarify_question":null}
+
+输入："今天打车呃花了20块"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":20,"category":"交通","merchant":"滴滴出行","note":"打车"}}],"chat_content":null,"clarify_question":null}
+
+输入："今天地铁去的时候三块回来的时候也是三块"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":3,"category":"交通","merchant":"$_cachedCityName地铁","note":"去程"}},{"type":"add_transaction","priority":"deferred","params":{"amount":3,"category":"交通","merchant":"$_cachedCityName地铁","note":"返程"}}],"chat_content":null,"clarify_question":null}
+
+输入："上班地铁3块下班也是3块"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":3,"category":"交通","merchant":"$_cachedCityName地铁","note":"通勤-上班"}},{"type":"add_transaction","priority":"deferred","params":{"amount":3,"category":"交通","merchant":"$_cachedCityName地铁","note":"通勤-下班"}}],"chat_content":null,"clarify_question":null}
+
+输入："地铁从福田到南山5块"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":5,"category":"交通","merchant":"$_cachedCityName地铁","note":"福田到南山"}}],"chat_content":null,"clarify_question":null}
+
+输入："坐地铁花了5块"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":5,"category":"交通","merchant":"$_cachedCityName地铁","note":"地铁"}}],"chat_content":null,"clarify_question":null}
+
+输入："公交2块去见客户"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":2,"category":"交通","merchant":"$_cachedCityName公交","note":"见客户"}}],"chat_content":null,"clarify_question":null}
+
+输入："美团外卖25块"
+输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":25,"category":"餐饮","merchant":"美团外卖","note":"外卖"}}],"chat_content":null,"clarify_question":null}
 
 输入："买了个闹钟11块，柜子200，桌子300"
 输出：{"result_type":"operation","operations":[{"type":"add_transaction","priority":"deferred","params":{"amount":11,"category":"购物","note":"闹钟"}},{"type":"add_transaction","priority":"deferred","params":{"amount":200,"category":"购物","note":"柜子"}},{"type":"add_transaction","priority":"deferred","params":{"amount":300,"category":"购物","note":"桌子"}}],"chat_content":null,"clarify_question":null}
@@ -504,6 +612,8 @@ class SmartIntentRecognizer {
             final type = opMap['type'] as String? ?? 'unknown';
             final priority = opMap['priority'] as String? ?? 'normal';
             final params = opMap['params'] as Map<String, dynamic>? ?? {};
+
+            debugPrint('[SmartIntent] 解析操作: type=$type, params=$params');
 
             operations.add(Operation(
               type: _parseOperationType(type),

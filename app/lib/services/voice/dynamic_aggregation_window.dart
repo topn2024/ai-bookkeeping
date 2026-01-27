@@ -185,7 +185,18 @@ class DynamicAggregationWindow {
       );
     }
 
-    // 3.6 检测记账意图（有金额但无结束信号，可能还有后续）
+    // 3.6 检测"有分类词但无金额"（如"今天的早餐"）
+    //     用户可能需要更长时间思考金额，给4秒等待
+    //     这是最常见的不完整记账意图，需要足够的时间让用户思考并补充金额
+    if (_hasCategoryWithoutAmount(text)) {
+      debugPrint('[DynamicAggregationWindow] 检测到分类词但无金额，延长等待4秒');
+      return const WaitTimeResult(
+        waitTimeMs: 4000,  // 4秒，给用户足够时间思考金额
+        reason: '分类词无金额（等待用户补充）',
+      );
+    }
+
+    // 3.7 检测记账意图（有金额但无结束信号，可能还有后续）
     if (_hasBookkeepingIntent(text)) {
       debugPrint('[DynamicAggregationWindow] 检测到记账意图，延长等待以收集后续');
       return const WaitTimeResult(
@@ -295,7 +306,7 @@ class DynamicAggregationWindow {
     '寄笔账',
   ];
 
-  /// 检测是否有记账意图（包含金额或记账请求短语）
+  /// 检测是否有记账意图（包含金额、记账请求短语、或分类词但无金额）
   bool _hasBookkeepingIntent(String text) {
     // 1. 包含数字金额
     if (_amountPattern.hasMatch(text)) {
@@ -309,6 +320,14 @@ class DynamicAggregationWindow {
       }
     }
 
+    // 3. 包含分类词但没有金额（如"今天的早餐"、"午餐"）
+    //    这是不完整的记账意图，用户很可能还要继续说金额
+    //    注意：这种情况需要更长的等待时间，在 calculateWaitTime 中特殊处理
+    if (_categoryPattern.hasMatch(text)) {
+      debugPrint('[DynamicAggregationWindow] 检测到分类词但无金额，等待用户补充');
+      return true;
+    }
+
     return false;
   }
 
@@ -320,5 +339,19 @@ class DynamicAggregationWindow {
       }
     }
     return false;
+  }
+
+  /// 检测是否有分类词但没有金额
+  /// 这种情况用户很可能还要继续说金额，需要更长的等待时间
+  bool _hasCategoryWithoutAmount(String text) {
+    // 必须有分类词
+    if (!_categoryPattern.hasMatch(text)) {
+      return false;
+    }
+    // 必须没有金额
+    if (_amountPattern.hasMatch(text)) {
+      return false;
+    }
+    return true;
   }
 }

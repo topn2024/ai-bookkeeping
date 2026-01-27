@@ -263,6 +263,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       () => GlobalVoiceAssistantManager.instance.networkStatus,
     );
 
+    // 预加载用户城市信息（用于LLM推断商户名称，如"深圳地铁"）
+    coordinator.preloadUserCity();
+
     GlobalVoiceAssistantManager.instance.setCommandProcessor((command) async {
       debugPrint('[App] 处理语音命令: $command');
 
