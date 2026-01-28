@@ -20,7 +20,8 @@ class CategoryRepository implements ICategoryRepository {
     final categories = await _db.getCategories();
     try {
       return categories.firstWhere((c) => c.id == id);
-    } catch (_) {
+    } on StateError {
+      // firstWhere throws StateError when no element is found
       return null;
     }
   }

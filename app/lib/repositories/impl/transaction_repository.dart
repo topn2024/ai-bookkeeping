@@ -21,7 +21,8 @@ class TransactionRepository implements ITransactionRepository {
     final transactions = await _db.getTransactions();
     try {
       return transactions.firstWhere((t) => t.id == id);
-    } catch (_) {
+    } on StateError {
+      // firstWhere throws StateError when no element is found
       return null;
     }
   }

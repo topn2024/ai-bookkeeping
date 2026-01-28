@@ -65,13 +65,13 @@ class FormattingService {
       // 使用自定义小数位数
       final code = currencyCode ?? _delegate.getDefaultCurrencyForLanguage();
       final currency = LocaleFormatService.getCurrencyInfo(code) ??
-          LocaleFormatService.getCurrencyInfo('CNY')!;
+          LocaleFormatService.getCurrencyInfo('CNY');
 
       // 四舍五入到指定小数位
       final roundedAmount = _roundToDecimalPlaces(amount, decimalPlaces);
       final formattedNumber = _formatNumberWithDecimals(roundedAmount, decimalPlaces);
 
-      if (!showSymbol) {
+      if (!showSymbol || currency == null) {
         return formattedNumber;
       }
 

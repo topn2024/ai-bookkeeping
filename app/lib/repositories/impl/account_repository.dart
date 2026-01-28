@@ -20,7 +20,8 @@ class AccountRepository implements IAccountRepository {
     final accounts = await _db.getAccounts();
     try {
       return accounts.firstWhere((a) => a.id == id);
-    } catch (_) {
+    } on StateError {
+      // firstWhere throws StateError when no element is found
       return null;
     }
   }

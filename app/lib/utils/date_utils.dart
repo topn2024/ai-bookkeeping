@@ -279,6 +279,8 @@ class AppDateUtils {
       '十二月'
     ];
     const shortNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+    // 边界检查，防止数组越界
+    if (month < 1 || month > 12) return '';
     return short ? shortNames[month] : fullNames[month];
   }
 
@@ -286,6 +288,8 @@ class AppDateUtils {
   static String weekdayName(int weekday, {bool short = false}) {
     const fullNames = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
     const shortNames = ['', '一', '二', '三', '四', '五', '六', '日'];
+    // 边界检查，防止数组越界
+    if (weekday < 1 || weekday > 7) return '';
     return short ? shortNames[weekday] : fullNames[weekday];
   }
 

@@ -73,7 +73,8 @@ class BudgetRepository implements IBudgetRepository {
     final budgets = await _db.getBudgets();
     try {
       return budgets.firstWhere((b) => b.categoryId == category);
-    } catch (_) {
+    } on StateError {
+      // firstWhere throws StateError when no element is found
       return null;
     }
   }

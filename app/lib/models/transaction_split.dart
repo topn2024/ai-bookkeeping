@@ -47,12 +47,12 @@ class TransactionSplit {
 
   factory TransactionSplit.fromMap(Map<String, dynamic> map) {
     return TransactionSplit(
-      id: map['id'],
-      transactionId: map['transactionId'],
-      category: map['category'],
-      subcategory: map['subcategory'],
+      id: map['id'] as String,
+      transactionId: map['transactionId'] as String,
+      category: map['category'] as String,
+      subcategory: map['subcategory'] as String?,
       amount: (map['amount'] as num).toDouble(),
-      note: map['note'],
+      note: map['note'] as String?,
     );
   }
 }
