@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'engine_config.dart';
 import '../smart_intent_recognizer.dart';
 import 'intelligence_engine.dart';
 import 'models.dart';
@@ -93,11 +94,6 @@ class ExecutionChannel {
   // 聚合计时器
   Timer? _aggregationTimer;
 
-  // 队列容量限制
-  static const int _maxQueueSize = 10;
-
-  // 聚合窗口时间（毫秒）
-  static const int _aggregationWindowMs = 1500;
 
   // 执行锁状态
   bool _isExecuting = false;
@@ -149,8 +145,8 @@ class ExecutionChannel {
       case OperationPriority.deferred:
         // 先检查队列容量，如果已满则先执行再添加
         // 这样可以保证队列不会超出限制
-        if (_deferredQueue.length >= _maxQueueSize) {
-          debugPrint('[ExecutionChannel] 队列已满($_maxQueueSize)，先执行现有操作');
+        if (_deferredQueue.length >= EngineConfig.maxQueueSize) {
+          debugPrint('[ExecutionChannel] 队列已满($EngineConfig.maxQueueSize)，先执行现有操作');
           await _executeDeferredQueue();
         }
 
@@ -253,8 +249,6 @@ class ExecutionChannel {
     }
   }
 
-  // 锁等待超时时间（秒）
-  static const int _lockTimeoutSeconds = 30;
 
   /// 获取执行锁（异步队列实现，保证严格串行）
   ///
@@ -293,10 +287,10 @@ class ExecutionChannel {
     // 等待被唤醒（带超时保护）
     try {
       await completer.future.timeout(
-        Duration(seconds: _lockTimeoutSeconds),
+        Duration(seconds: EngineConfig.lockTimeoutSeconds),
       );
     } on TimeoutException {
-      debugPrint('[ExecutionChannel] 等待执行锁超时（${_lockTimeoutSeconds}秒）');
+      debugPrint('[ExecutionChannel] 等待执行锁超时（${EngineConfig.lockTimeoutSeconds}秒）');
 
       // 从队列中移除自己（如果还在队列中）
       // 注意：可能在超时瞬间被 _releaseExecutionLock 移除并完成
@@ -360,10 +354,10 @@ class ExecutionChannel {
       return;
     }
 
-    debugPrint('[ExecutionChannel] 启动聚合计时器: ${_aggregationWindowMs}ms');
+    debugPrint('[ExecutionChannel] 启动聚合计时器: ${EngineConfig.aggregationWindowMs}ms');
 
     _aggregationTimer = Timer(
-      Duration(milliseconds: _aggregationWindowMs),
+      Duration(milliseconds: EngineConfig.aggregationWindowMs),
       () async {
         // 检查是否已释放（计时器回调可能在 dispose 后触发）
         if (_isDisposed) {

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'engine_config.dart';
 import 'models.dart';
 import 'multi_operation_recognizer.dart';
 import 'dual_channel_processor.dart';
@@ -10,7 +11,7 @@ import 'timing_judge.dart';
 import '../input_filter.dart';
 import '../smart_intent_recognizer.dart' show MultiOperationResult, Operation, OperationPriority, OperationType, RecognitionSource;
 import '../adapters/bookkeeping_feedback_adapter.dart';
-import '../agent/hybrid_intent_router.dart' show NetworkStatus;
+import '../network_monitor.dart' show NetworkStatus;
 
 /// 智能语音引擎
 ///
@@ -61,18 +62,6 @@ class IntelligenceEngine {
   /// Deferred 操作首次缓存时间
   DateTime? _deferredStartTime;
 
-  /// Deferred 操作等待时间（毫秒）
-  /// 延长到 2500ms 以收集连续记账（如"早餐15，午餐20"）
-  static const int _deferredWaitMs = 2500;
-
-  /// Deferred 操作最大等待时间（毫秒）
-  /// 即使用户持续输入，也会在此时间后强制执行
-  static const int _maxDeferredWaitMs = 10000;
-
-  /// 网络重试配置
-  static const int _maxRetries = 3;
-  static const int _initialRetryDelayMs = 100;
-  static const int _recognitionTimeoutSeconds = 5;
 
   /// Deferred 响应回调
   ///
@@ -296,30 +285,11 @@ class IntelligenceEngine {
       // 如果有立即操作，立即响应
       if (immediateOps.isNotEmpty) {
         debugPrint('[IntelligenceEngine] 有立即操作，立即响应');
-        debugPrint('[IntelligenceEngine] ===== 开始为查询操作生成operationId =====');
-        debugPrint('[IntelligenceEngine] recognitionResult.operations.length=${recognitionResult.operations.length}');
 
         // 为查询操作生成 operationId（在执行前）
-        final enhancedOperations = recognitionResult.operations.map((op) {
-          debugPrint('[IntelligenceEngine] 处理操作: type=${op.type}, isQuery=${op.type == OperationType.query}');
-          if (op.type == OperationType.query) {
-            final operationId = 'query_${DateTime.now().millisecondsSinceEpoch}_${op.hashCode}';
-            debugPrint('[IntelligenceEngine] [立即模式] 生成查询operationId: $operationId');
-            return Operation(
-              type: op.type,
-              priority: op.priority,
-              params: {
-                ...op.params,
-                'operationId': operationId,
-              },
-              originalText: op.originalText,
-            );
-          }
-          debugPrint('[IntelligenceEngine] 非查询操作，跳过');
-          return op;
-        }).toList();
-
-        debugPrint('[IntelligenceEngine] enhancedOperations.length=${enhancedOperations.length}');
+        final enhancedOperations = recognitionResult.operations
+            .map((op) => _ensureOperationId(op))
+            .toList();
 
         // 创建增强后的 recognitionResult
         final enhancedRecognitionResult = MultiOperationResult(
@@ -357,7 +327,7 @@ class IntelligenceEngine {
       }
 
       // 只有 deferred 操作：缓存并等待
-      debugPrint('[IntelligenceEngine] 只有延迟操作，缓存并等待${_deferredWaitMs}ms');
+      debugPrint('[IntelligenceEngine] 只有延迟操作，缓存并等待${EngineConfig.deferredWaitMs}ms');
 
       // 再次检查是否已释放（防止在异步处理期间被 dispose）
       if (_isDisposed) {
@@ -382,7 +352,7 @@ class IntelligenceEngine {
       _deferredTimer?.cancel();
       if (!_isDisposed) {
         _deferredTimer = Timer(
-          Duration(milliseconds: _deferredWaitMs),
+          Duration(milliseconds: EngineConfig.deferredWaitMs),
           () => _safeTriggerDeferredProcessing('滑动窗口计时器'),
         );
       }
@@ -391,7 +361,7 @@ class IntelligenceEngine {
       // 确保即使用户持续输入，也会在最大等待时间后强制执行
       if (_maxDeferredTimer == null && !_isDisposed) {
         _maxDeferredTimer = Timer(
-          Duration(milliseconds: _maxDeferredWaitMs),
+          Duration(milliseconds: EngineConfig.maxDeferredWaitMs),
           () => _safeTriggerDeferredProcessing('最大等待计时器'),
         );
       }
@@ -428,25 +398,25 @@ class IntelligenceEngine {
 
   /// 带重试机制的识别方法
   ///
-  /// 使用指数退避策略，最多重试 [_maxRetries] 次
+  /// 使用指数退避策略，最多重试 [EngineConfig.maxRetries] 次
   /// 只对网络相关错误进行重试，业务错误直接返回
   Future<MultiOperationResult> _recognizeWithRetry(String input) async {
     int attempt = 0;
-    int delayMs = _initialRetryDelayMs;
+    int delayMs = EngineConfig.initialRetryDelayMs;
     Object? lastError;
 
-    while (attempt < _maxRetries) {
+    while (attempt < EngineConfig.maxRetries) {
       try {
         final result = await _recognizer.recognize(input).timeout(
-          const Duration(seconds: _recognitionTimeoutSeconds),
+          const Duration(seconds: EngineConfig.recognitionTimeoutSeconds),
         );
         return result;
       } on TimeoutException {
         attempt++;
         lastError = TimeoutException('识别超时');
-        debugPrint('[IntelligenceEngine] 识别超时，重试 $attempt/$_maxRetries');
+        debugPrint('[IntelligenceEngine] 识别超时，重试 $attempt/$EngineConfig.maxRetries');
 
-        if (attempt >= _maxRetries) {
+        if (attempt >= EngineConfig.maxRetries) {
           debugPrint('[IntelligenceEngine] 重试次数耗尽，降级到本地处理');
           return _fallbackToLocalRecognition(input);
         }
@@ -457,9 +427,9 @@ class IntelligenceEngine {
         // 网络错误，重试
         attempt++;
         lastError = e;
-        debugPrint('[IntelligenceEngine] 网络错误: $e，重试 $attempt/$_maxRetries');
+        debugPrint('[IntelligenceEngine] 网络错误: $e，重试 $attempt/$EngineConfig.maxRetries');
 
-        if (attempt >= _maxRetries) {
+        if (attempt >= EngineConfig.maxRetries) {
           debugPrint('[IntelligenceEngine] 网络重试耗尽，降级到本地处理');
           return _fallbackToLocalRecognition(input);
         }
@@ -610,115 +580,16 @@ class IntelligenceEngine {
 
     final reportItems = <OperationResultItem>[];
 
-    // 将用户输入传递给FeedbackAdapter
-    if (feedbackAdapter is BookkeepingFeedbackAdapter) {
-      (feedbackAdapter as BookkeepingFeedbackAdapter).setLastUserInput(input);
-    }
-
-    debugPrint('[IntelligenceEngine] ===== 准备进入for循环，operations.length=${recognitionResult.operations.length} =====');
-
     // 逐个执行操作，记录每个操作的结果
     for (int i = 0; i < recognitionResult.operations.length; i++) {
-      final operation = recognitionResult.operations[i];
-      final description = _generateOperationDescription(operation);
-      final amount = _safeParseAmount(operation.params['amount']);
-
-      debugPrint('[IntelligenceEngine] 处理操作 $i: type=${operation.type}, priority=${operation.priority}');
-
-      try {
-        // 如果是查询操作，确保有operationId（如果已存在则使用现有的，否则生成新的）
-        final Operation enhancedOperation;
-        debugPrint('[IntelligenceEngine] 检查是否为查询操作: ${operation.type} == ${OperationType.query} ? ${operation.type == OperationType.query}');
-        if (operation.type == OperationType.query) {
-          // 检查是否已有operationId（在立即执行路径中已生成）
-          final existingOperationId = operation.params['operationId'] as String?;
-          if (existingOperationId != null) {
-            debugPrint('[IntelligenceEngine] 使用已有的查询operationId: $existingOperationId');
-            enhancedOperation = operation;
-          } else {
-            // 如果没有，生成新的（兜底逻辑）
-            final operationId = 'query_${DateTime.now().millisecondsSinceEpoch}_${operation.hashCode}';
-            enhancedOperation = Operation(
-              type: operation.type,
-              priority: operation.priority,
-              params: {
-                ...operation.params,
-                'operationId': operationId,
-              },
-              originalText: operation.originalText,
-            );
-            debugPrint('[IntelligenceEngine] 生成新的查询operationId: $operationId');
-          }
-        } else {
-          enhancedOperation = operation;
-        }
-
-        // 创建单操作的 MultiOperationResult 进行处理
-        final singleOpResult = MultiOperationResult(
-          resultType: recognitionResult.resultType,
-          operations: [enhancedOperation],
-          chatContent: i == 0 ? recognitionResult.chatContent : null,
-          confidence: recognitionResult.confidence,
-          source: recognitionResult.source,
-          originalInput: recognitionResult.originalInput,
-          isOfflineMode: recognitionResult.isOfflineMode,
-        );
-
-        // 双通道处理
-        await _processor.process(singleOpResult);
-
-        // 从 ConversationChannel 获取执行结果
-        final results = _processor.conversationChannel.getRecentResults();
-        final ExecutionResult executionResult;
-        if (results.isNotEmpty) {
-          executionResult = results.last;
-        } else {
-          // 未获取到结果时，不应假设成功，而应标记为未知状态
-          debugPrint('[IntelligenceEngine] 警告: 操作 $i 执行后未获取到结果，标记为失败');
-          executionResult = ExecutionResult.failure('未获取到执行结果');
-        }
-
-        // 记录到报告
-        reportItems.add(OperationResultItem(
-          index: i,
-          description: description,
-          isSuccess: executionResult.success,
-          errorMessage: executionResult.error,
-          amount: amount,
-          operationType: operation.type,
-        ));
-
-        // 添加到结果缓冲器
-        _resultBuffer.add(
-          result: executionResult,
-          description: description,
-          amount: amount,
-          operationType: operation.type,
-        );
-
-        debugPrint('[IntelligenceEngine] 操作 $i 执行${executionResult.success ? "成功" : "失败"}: $description');
-      } catch (e, stack) {
-        debugPrint('[IntelligenceEngine] 操作 $i 执行异常: $e');
-        debugPrint('[IntelligenceEngine] 堆栈: $stack');
-
-        // 记录失败到报告
-        reportItems.add(OperationResultItem(
-          index: i,
-          description: description,
-          isSuccess: false,
-          errorMessage: e.toString(),
-          amount: amount,
-          operationType: operation.type,
-        ));
-
-        // 添加失败记录到缓冲器（不暴露内部错误给用户）
-        _resultBuffer.add(
-          result: ExecutionResult.failure('操作执行失败'),
-          description: description,
-          amount: amount,
-          operationType: operation.type,
-        );
-      }
+      final resultItem = await _executeSingleOperation(
+        operation: recognitionResult.operations[i],
+        recognitionResult: recognitionResult,
+        input: input,
+        index: i,
+        isFirstOperation: i == 0,
+      );
+      reportItems.add(resultItem);
     }
 
     final report = OperationExecutionReport(reportItems);
@@ -764,6 +635,114 @@ class IntelligenceEngine {
 
     debugPrint('[IntelligenceEngine] 无法解析金额，类型: ${value.runtimeType}, 值: $value');
     return null;
+  }
+
+  /// 确保查询操作有operationId
+  ///
+  /// 如果操作不是查询类型，直接返回原操作
+  /// 如果已有operationId，直接返回原操作
+  /// 否则生成新的operationId并返回增强后的操作
+  Operation _ensureOperationId(Operation op) {
+    if (op.type != OperationType.query) return op;
+    if (op.params['operationId'] != null) return op;
+
+    final operationId = 'query_${DateTime.now().millisecondsSinceEpoch}_${op.hashCode}';
+    debugPrint('[IntelligenceEngine] 生成查询operationId: $operationId');
+    return Operation(
+      type: op.type,
+      priority: op.priority,
+      params: {...op.params, 'operationId': operationId},
+      originalText: op.originalText,
+    );
+  }
+
+  /// 执行单个操作并返回结果
+  ///
+  /// 统一的操作执行逻辑，被 _executeOperationsAsync 和 _processDeferredOperations 共用
+  Future<OperationResultItem> _executeSingleOperation({
+    required Operation operation,
+    required MultiOperationResult recognitionResult,
+    required String input,
+    required int index,
+    bool isFirstOperation = false,
+  }) async {
+    final description = _generateOperationDescription(operation);
+    final amount = _safeParseAmount(operation.params['amount']);
+
+    debugPrint('[IntelligenceEngine] 处理操作 $index: type=${operation.type}, priority=${operation.priority}');
+
+    try {
+      // 将用户输入传递给FeedbackAdapter
+      if (feedbackAdapter is BookkeepingFeedbackAdapter) {
+        (feedbackAdapter as BookkeepingFeedbackAdapter).setLastUserInput(input);
+      }
+
+      // 确保查询操作有operationId
+      final enhancedOperation = _ensureOperationId(operation);
+
+      // 创建单操作的 MultiOperationResult 进行处理
+      final singleOpResult = MultiOperationResult(
+        resultType: recognitionResult.resultType,
+        operations: [enhancedOperation],
+        chatContent: isFirstOperation ? recognitionResult.chatContent : null,
+        confidence: recognitionResult.confidence,
+        source: recognitionResult.source,
+        originalInput: recognitionResult.originalInput,
+        isOfflineMode: recognitionResult.isOfflineMode,
+      );
+
+      // 双通道处理
+      await _processor.process(singleOpResult);
+
+      // 从 ConversationChannel 获取执行结果
+      final results = _processor.conversationChannel.getRecentResults();
+      final ExecutionResult executionResult;
+      if (results.isNotEmpty) {
+        executionResult = results.last;
+      } else {
+        debugPrint('[IntelligenceEngine] 警告: 操作 $index 执行后未获取到结果，标记为失败');
+        executionResult = ExecutionResult.failure('未获取到执行结果');
+      }
+
+      // 添加到结果缓冲器
+      _resultBuffer.add(
+        result: executionResult,
+        description: description,
+        amount: amount,
+        operationType: operation.type,
+      );
+
+      debugPrint('[IntelligenceEngine] 操作 $index 执行${executionResult.success ? "成功" : "失败"}: $description');
+
+      return OperationResultItem(
+        index: index,
+        description: description,
+        isSuccess: executionResult.success,
+        errorMessage: executionResult.error,
+        amount: amount,
+        operationType: operation.type,
+      );
+    } catch (e, stack) {
+      debugPrint('[IntelligenceEngine] 操作 $index 执行异常: $e');
+      debugPrint('[IntelligenceEngine] 堆栈: $stack');
+
+      // 添加失败记录到缓冲器（不暴露内部错误给用户）
+      _resultBuffer.add(
+        result: ExecutionResult.failure('操作执行失败'),
+        description: description,
+        amount: amount,
+        operationType: operation.type,
+      );
+
+      return OperationResultItem(
+        index: index,
+        description: description,
+        isSuccess: false,
+        errorMessage: e.toString(),
+        amount: amount,
+        operationType: operation.type,
+      );
+    }
   }
 
   /// 生成操作描述
@@ -847,9 +826,12 @@ class IntelligenceEngine {
     _isProcessingDeferred = true;
 
     // 异步执行并捕获错误（fire-and-forget 模式，但记录错误）
+    // 注意：_isProcessingDeferred 在 _processDeferredOperations 的 finally 块中重置
     _processDeferredOperations().catchError((error, stackTrace) {
       debugPrint('[IntelligenceEngine] $source 触发的处理失败: $error');
       debugPrint('[IntelligenceEngine] 堆栈: $stackTrace');
+      // 确保错误情况下也重置标志（虽然 finally 应该已处理，但做双重保护）
+      _isProcessingDeferred = false;
       return OperationExecutionReport([]); // 返回空报告
     });
   }
@@ -900,97 +882,14 @@ class IntelligenceEngine {
       // 执行所有缓存的操作，逐个记录结果
       for (int i = 0; i < pendingOperationsSnapshot.length; i++) {
         final pending = pendingOperationsSnapshot[i];
-        final description = _generateOperationDescription(pending.operation);
-        final amount = _safeParseAmount(pending.operation.params['amount']);
-
-        try {
-          // 将用户输入传递给FeedbackAdapter（在处理前设置，确保上下文正确）
-          if (feedbackAdapter is BookkeepingFeedbackAdapter) {
-            (feedbackAdapter as BookkeepingFeedbackAdapter).setLastUserInput(pending.input);
-          }
-
-          // 如果是查询操作，生成operationId
-          final Operation enhancedOperation;
-          if (pending.operation.type == OperationType.query) {
-            final operationId = 'query_${DateTime.now().millisecondsSinceEpoch}_${pending.operation.hashCode}';
-            enhancedOperation = Operation(
-              type: pending.operation.type,
-              priority: pending.operation.priority,
-              params: {
-                ...pending.operation.params,
-                'operationId': operationId,
-              },
-              originalText: pending.operation.originalText,
-            );
-            debugPrint('[IntelligenceEngine] 生成延迟查询operationId: $operationId');
-          } else {
-            enhancedOperation = pending.operation;
-          }
-
-          // 创建增强后的 MultiOperationResult
-          final enhancedResult = MultiOperationResult(
-            resultType: pending.recognitionResult.resultType,
-            operations: [enhancedOperation],
-            chatContent: pending.recognitionResult.chatContent,
-            confidence: pending.recognitionResult.confidence,
-            source: pending.recognitionResult.source,
-            originalInput: pending.recognitionResult.originalInput,
-            isOfflineMode: pending.recognitionResult.isOfflineMode,
-          );
-
-          await _processor.process(enhancedResult);
-
-          // 获取执行结果
-          final results = _processor.conversationChannel.getRecentResults();
-          final ExecutionResult executionResult;
-          if (results.isNotEmpty) {
-            executionResult = results.last;
-          } else {
-            // 未获取到结果时，不应假设成功，而应标记为未知状态
-            debugPrint('[IntelligenceEngine] 警告: 延迟操作 $i 执行后未获取到结果，标记为失败');
-            executionResult = ExecutionResult.failure('未获取到执行结果');
-          }
-
-          // 记录到报告
-          reportItems.add(OperationResultItem(
-            index: i,
-            description: description,
-            isSuccess: executionResult.success,
-            errorMessage: executionResult.error,
-            amount: amount,
-            operationType: pending.operation.type,
-          ));
-
-          _resultBuffer.add(
-            result: executionResult,
-            description: description,
-            amount: amount,
-            operationType: pending.operation.type,
-          );
-
-          debugPrint('[IntelligenceEngine] 延迟操作 $i 执行${executionResult.success ? "成功" : "失败"}: $description');
-        } catch (e, stack) {
-          debugPrint('[IntelligenceEngine] 延迟操作 $i 执行异常: $e');
-          debugPrint('[IntelligenceEngine] 堆栈: $stack');
-
-          // 记录失败到报告
-          reportItems.add(OperationResultItem(
-            index: i,
-            description: description,
-            isSuccess: false,
-            errorMessage: e.toString(),
-            amount: amount,
-            operationType: pending.operation.type,
-          ));
-
-          // 不暴露内部错误给用户
-          _resultBuffer.add(
-            result: ExecutionResult.failure('操作执行失败'),
-            description: description,
-            amount: amount,
-            operationType: pending.operation.type,
-          );
-        }
+        final resultItem = await _executeSingleOperation(
+          operation: pending.operation,
+          recognitionResult: pending.recognitionResult,
+          input: pending.input,
+          index: i,
+          isFirstOperation: i == 0,
+        );
+        reportItems.add(resultItem);
       }
 
       // 生成执行报告
