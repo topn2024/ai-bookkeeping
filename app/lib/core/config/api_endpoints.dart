@@ -86,10 +86,10 @@ class ApiEndpoints {
   static const String syncPull = '/sync/pull';
   static const String syncStatus = '/sync/status';
 
-  /// 备份相关
-  static const String backupCreate = '/backup/create';
-  static const String backupList = '/backup/list';
-  static const String backupRestore = '/backup/restore';
+  /// 备份相关 (RESTful API)
+  static const String backup = '/backup';
+  static const String backupById = '/backup/{id}';
+  static const String backupRestore = '/backup/{id}/restore';
 
   /// 应用升级
   static const String appVersion = '/app/version';

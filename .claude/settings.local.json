@@ -861,7 +861,8 @@
       "Bash(do sleep 10)",
       "Bash(then echo 'Upload completed')",
       "Bash(break)",
-      "Bash(./scripts/fix_server2_minio_urls.sh:*)"
+      "Bash(./scripts/fix_server2_minio_urls.sh:*)",
+      "Bash(openspec-cn init:*)"
     ]
   }
 }
