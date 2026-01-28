@@ -293,7 +293,10 @@ class InputPipeline {
     final controller = _audioStreamController;
     _audioStreamController = null;
     if (controller != null && !controller.isClosed) {
-      controller.close(); // 不await，避免死锁
+      // 不await避免死锁，但添加错误处理防止未处理异常
+      controller.close().catchError((e) {
+        debugPrint('[InputPipeline] 关闭音频流控制器异常: $e');
+      });
     }
     debugPrint('[InputPipeline] 音频流控制器已关闭');
 

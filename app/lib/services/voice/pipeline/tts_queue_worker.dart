@@ -229,8 +229,12 @@ class TTSQueueWorker {
   }
 
   /// 释放资源
-  void dispose() {
-    stop();
-    _stateController.close();
+  Future<void> dispose() async {
+    await stop();
+    try {
+      await _stateController.close();
+    } catch (e) {
+      debugPrint('[TTSQueueWorker] 关闭StateController异常: $e');
+    }
   }
 }

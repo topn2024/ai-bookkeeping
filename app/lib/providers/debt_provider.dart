@@ -37,7 +37,8 @@ class DebtNotifier extends SimpleCrudNotifier<Debt, String> {
 
   /// 记录还款
   Future<void> makePayment(String debtId, double amount, {String? note}) async {
-    final debt = state.firstWhere((d) => d.id == debtId);
+    final debt = getById(debtId);
+    if (debt == null) return;
 
     // 计算利息和本金
     final interest = debt.monthlyInterest;
@@ -69,7 +70,8 @@ class DebtNotifier extends SimpleCrudNotifier<Debt, String> {
 
   /// 标记为已还清
   Future<void> markAsCompleted(String id) async {
-    final debt = state.firstWhere((d) => d.id == id);
+    final debt = getById(id);
+    if (debt == null) return;
     final updated = debt.copyWith(
       currentBalance: 0,
       isCompleted: true,

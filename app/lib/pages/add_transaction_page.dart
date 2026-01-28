@@ -874,7 +874,7 @@ class _AddTransactionPageState extends ConsumerState<AddTransactionPage>
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
     );
-    if (date != null) {
+    if (date != null && mounted) {
       setState(() {
         _selectedDate = date;
       });

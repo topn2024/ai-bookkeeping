@@ -119,6 +119,10 @@ class _ExpenseConfirmationDialogState extends State<ExpenseConfirmationDialog>
     }
 
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       setState(() {
         _remainingSeconds--;
         if (_remainingSeconds <= 0) {

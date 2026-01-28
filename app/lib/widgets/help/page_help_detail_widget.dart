@@ -40,7 +40,7 @@ class _PageHelpDetailWidgetState extends State<PageHelpDetailWidget> {
         });
       }
     } catch (e) {
-      print('加载反馈失败: $e');
+      debugPrint('[PageHelpDetailWidget] 加载反馈失败: $e');
     }
   }
 
@@ -60,7 +60,7 @@ class _PageHelpDetailWidgetState extends State<PageHelpDetailWidget> {
         );
       }
     } catch (e) {
-      print('保存反馈失败: $e');
+      debugPrint('[PageHelpDetailWidget] 保存反馈失败: $e');
     }
   }
 
@@ -82,7 +82,7 @@ class _PageHelpDetailWidgetState extends State<PageHelpDetailWidget> {
               AppColors.primary,
               [
                 Text(
-                  content.description,
+                  widget.content.description,
                   style: const TextStyle(
                     fontSize: 15,
                     height: 1.6,
@@ -93,26 +93,26 @@ class _PageHelpDetailWidgetState extends State<PageHelpDetailWidget> {
             ),
 
             // 使用场景
-            if (content.useCases.isNotEmpty) ...[
+            if (widget.content.useCases.isNotEmpty) ...[
               const SizedBox(height: 24),
               _buildSection(
                 '使用场景',
                 Icons.lightbulb_outline,
                 AppColors.income,
-                content.useCases
+                widget.content.useCases
                     .map((useCase) => _buildListItem(useCase))
                     .toList(),
               ),
             ],
 
             // 操作步骤
-            if (content.steps.isNotEmpty) ...[
+            if (widget.content.steps.isNotEmpty) ...[
               const SizedBox(height: 24),
               _buildSection(
                 '操作步骤',
                 Icons.format_list_numbered,
                 AppColors.transfer,
-                content.steps.asMap().entries.map((entry) {
+                widget.content.steps.asMap().entries.map((entry) {
                   final index = entry.key;
                   final step = entry.value;
                   return _buildStepItem(index + 1, step);
@@ -121,13 +121,13 @@ class _PageHelpDetailWidgetState extends State<PageHelpDetailWidget> {
             ],
 
             // 注意事项
-            if (content.tips.isNotEmpty) ...[
+            if (widget.content.tips.isNotEmpty) ...[
               const SizedBox(height: 24),
               _buildSection(
                 '注意事项',
                 Icons.info_outline,
                 Colors.orange,
-                content.tips.map((tip) => _buildTipItem(tip)).toList(),
+                widget.content.tips.map((tip) => _buildTipItem(tip)).toList(),
               ),
             ],
 

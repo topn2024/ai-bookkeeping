@@ -28,7 +28,7 @@ class FloatingBallService {
   Stream<void> get onClicked => _clickController.stream;
 
   FloatingBallState _currentState = FloatingBallState.normal;
-  bool _isEnabled = true;  // 默认启用悬浮球
+  bool _isEnabled = false;  // 默认隐藏，需要手动打开
   String? _detectedAmount;
 
   /// 初始化
@@ -145,6 +145,7 @@ class _FloatingBallWidgetState extends State<FloatingBallWidget>
   late AnimationController _animationController;
   late AnimationController _breatheController;
   Animation<Offset>? _snapAnimation;
+  StreamSubscription<FloatingBallState>? _stateSubscription;
 
   // 悬浮球尺寸
   static const double _ballSize = 52.0;
@@ -176,7 +177,7 @@ class _FloatingBallWidgetState extends State<FloatingBallWidget>
       }
     });
 
-    FloatingBallService().onStateChanged.listen((state) {
+    _stateSubscription = FloatingBallService().onStateChanged.listen((state) {
       if (mounted) {
         setState(() => _state = state);
       }
@@ -185,6 +186,7 @@ class _FloatingBallWidgetState extends State<FloatingBallWidget>
 
   @override
   void dispose() {
+    _stateSubscription?.cancel();
     _animationController.dispose();
     _breatheController.dispose();
     super.dispose();

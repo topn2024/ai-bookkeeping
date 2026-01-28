@@ -238,8 +238,13 @@ class BackupService {
 
     if (response.statusCode == 200) {
       final data = response.data as Map<String, dynamic>;
-      final backups = (data['backups'] as List)
-          .map((b) => BackupInfo.fromJson(b as Map<String, dynamic>))
+      final backupsList = data['backups'];
+      if (backupsList is! List) {
+        return [];
+      }
+      final backups = backupsList
+          .whereType<Map<String, dynamic>>()
+          .map((b) => BackupInfo.fromJson(b))
           .toList();
       return backups;
     } else {

@@ -9,7 +9,7 @@ import '../pages/voice_chat_page.dart';
 import '../providers/global_voice_assistant_provider.dart';
 import '../providers/voice_coordinator_provider.dart';
 import '../services/global_voice_assistant_manager.dart';
-import '../services/voice/agent/hybrid_intent_router.dart' show NetworkStatus;
+import '../services/voice/network_monitor.dart' show NetworkStatus;
 import 'waveform_animation.dart';
 
 /// 全局悬浮球组件
@@ -69,6 +69,7 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
 
     // 设置权限回调
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final manager = ref.read(globalVoiceAssistantProvider);
       manager.onPermissionRequired = _handlePermissionRequired;
 
@@ -175,9 +176,12 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
       _trySubscribeNetworkStatus(manager);
     });
 
+    debugPrint('[GlobalFloatingBall] build - settings.enabled=${settings.enabled}, shouldHide=$shouldHide');
     if (shouldHide || !settings.enabled) {
+      debugPrint('[GlobalFloatingBall] 悬浮球被隐藏');
       return const SizedBox.shrink();
     }
+    debugPrint('[GlobalFloatingBall] 悬浮球显示中');
 
     final currentSize = manager.ballState == FloatingBallState.recording
         ? _ballSizeExpanded

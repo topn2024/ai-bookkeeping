@@ -347,7 +347,7 @@ class AuthNotifier extends Notifier<AuthState> {
         return true;
       }
     } catch (e) {
-      // 网络错误，本地更新
+      // 网络错误，本地更新（离线模式下仍算成功）
       final updatedUser = state.user!.copyWith(
         nickname: nickname,
         avatarUrl: avatarUrl,
@@ -355,8 +355,9 @@ class AuthNotifier extends Notifier<AuthState> {
       await _secureStorage.write(
           'current_user_data', jsonEncode(updatedUser.toJson()));
       state = state.copyWith(user: updatedUser);
+      return true; // 本地更新成功
     }
-    return false;
+    return false; // 服务器响应非200
   }
 
   /// 清除错误

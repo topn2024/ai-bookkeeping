@@ -277,7 +277,8 @@ class VoiceInteractionNotifier extends StateNotifier<VoiceInteractionState> {
     await _provideFeedback('正在添加新交易记录...');
     // 解析语音中的交易信息
     final amountMatch = RegExp(r'(\d+(?:\.\d+)?)\s*[元块钱]?').firstMatch(command);
-    final amount = amountMatch != null ? double.tryParse(amountMatch.group(1)!) : null;
+    final amountStr = amountMatch?.group(1);
+    final amount = amountStr != null ? double.tryParse(amountStr) : null;
 
     if (amount == null || amount <= 0) {
       await _provideFeedback('请告诉我金额是多少');

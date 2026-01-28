@@ -45,14 +45,16 @@ class CreditCardNotifier extends SimpleCrudNotifier<CreditCard, String> {
 
   /// 更新已用额度
   Future<void> updateUsedAmount(String id, double amount) async {
-    final card = state.firstWhere((c) => c.id == id);
+    final card = getById(id);
+    if (card == null) return;
     final updated = card.copyWith(usedAmount: card.usedAmount + amount);
     await updateCreditCard(updated);
   }
 
   /// 还款
   Future<void> makePayment(String id, double amount) async {
-    final card = state.firstWhere((c) => c.id == id);
+    final card = getById(id);
+    if (card == null) return;
     final newUsedAmount = (card.usedAmount - amount).clamp(0.0, card.creditLimit);
     final updated = card.copyWith(usedAmount: newUsedAmount);
     await updateCreditCard(updated);

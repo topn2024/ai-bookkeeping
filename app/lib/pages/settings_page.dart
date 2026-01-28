@@ -212,7 +212,7 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ).then((_) => nameController.dispose()); // 对话框关闭后释放Controller
   }
 
   void _confirmLogout(BuildContext context, WidgetRef ref) {

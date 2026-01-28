@@ -224,10 +224,10 @@ class AudioStreamPlayer {
   Duration? get duration => _player.duration;
 
   /// 释放资源
-  void dispose() {
+  Future<void> dispose() async {
     _playerStateSubscription?.cancel();
-    stop();
-    _stateController.close();
+    await stop();
+    await _stateController.close();
     _player.dispose();
   }
 }
@@ -314,8 +314,8 @@ class AudioQueuePlayer {
   }
 
   /// 释放资源
-  void dispose() {
-    stop();
-    _player.dispose();
+  Future<void> dispose() async {
+    await stop();
+    await _player.dispose();
   }
 }

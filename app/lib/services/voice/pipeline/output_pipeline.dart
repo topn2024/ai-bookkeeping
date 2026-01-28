@@ -321,9 +321,17 @@ class OutputPipeline {
   /// 释放资源
   ///
   /// 注意：异步方法，确保 stop() 完成后再释放其他资源
+  /// 使用 try-finally 确保 StateController 一定被关闭
   Future<void> dispose() async {
-    await stop();
-    _ttsQueueWorker.dispose();
-    await _stateController.close();
+    try {
+      await stop();
+      await _ttsQueueWorker.dispose();
+    } finally {
+      try {
+        await _stateController.close();
+      } catch (e) {
+        debugPrint('[OutputPipeline] 关闭StateController异常: $e');
+      }
+    }
   }
 }

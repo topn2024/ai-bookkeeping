@@ -147,6 +147,21 @@ class ClientVADService {
         debugPrint('[ClientVAD] Silero VAD检测已启动');
       } catch (e) {
         debugPrint('[ClientVAD] 启动Silero VAD失败，降级到能量检测: $e');
+
+        // 清理已创建的订阅，防止资源泄漏
+        await _speechStartSubscription?.cancel();
+        await _speechEndSubscription?.cancel();
+        await _vadMisfireSubscription?.cancel();
+        await _frameProcessedSubscription?.cancel();
+        _speechStartSubscription = null;
+        _speechEndSubscription = null;
+        _vadMisfireSubscription = null;
+        _frameProcessedSubscription = null;
+
+        // 关闭音频流控制器
+        await _audioStreamController?.close();
+        _audioStreamController = null;
+
         _useFallback = true;
         onError?.call('VAD启动失败，使用降级模式: $e');
       }

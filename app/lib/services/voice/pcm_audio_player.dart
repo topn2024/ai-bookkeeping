@@ -164,8 +164,10 @@ class PCMAudioPlayer {
     _isPlaying = true;
     _stateController.add(PCMPlayerState.playing);
 
-    // 创建完成Completer
-    _playCompleter = Completer<void>();
+    // 创建完成Completer并保存本地引用
+    // 防止在异步等待期间被其他调用覆盖
+    final completer = Completer<void>();
+    _playCompleter = completer;
 
     // 触发AEC回调
     onAudioPlayed?.call(pcmData);
@@ -176,8 +178,8 @@ class PCMAudioPlayer {
     // 启动播放
     FlutterPcmSound.start();
 
-    // 等待播放完成
-    await _playCompleter?.future;
+    // 等待播放完成（使用本地引用确保等待正确的Completer）
+    await completer.future;
   }
 
   /// 将PCM数据添加到队列并播放
