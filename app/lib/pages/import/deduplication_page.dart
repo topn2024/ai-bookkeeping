@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import 'dart:io';
+import 'dart:convert';
 
 import '../../theme/app_theme.dart';
+import '../../models/transaction.dart';
+import '../../services/duplicate_detection_service.dart';
+import '../../providers/database_provider.dart';
 import 'import_preview_confirm_page.dart';
 
 /// 三层去重详情页面
@@ -31,34 +37,22 @@ class DeduplicationPage extends ConsumerStatefulWidget {
 class _DeduplicationPageState extends ConsumerState<DeduplicationPage> {
   bool _isProcessing = true;
 
-  // 模拟去重检测结果
-  final int _totalRecords = 156;
-  final int _newRecords = 142;
-  final int _suspectedDuplicates = 8;
-  final int _confirmedDuplicates = 6;
+  // 真实检测数据
+  int _totalRecords = 0;
+  int _newRecords = 0;
+  int _suspectedDuplicates = 0;
+  int _confirmedDuplicates = 0;
 
   // 三层去重结果
-  final int _exactMatches = 6;
-  final int _featureMatches = 5;
-  final int _semanticMatches = 3;
+  int _exactMatches = 0;
+  int _featureMatches = 0;
+  int _semanticMatches = 0;
 
   // 疑似重复记录
-  final List<SuspectedDuplicate> _suspectedList = [
-    SuspectedDuplicate(
-      description: '美团外卖',
-      amount: -35.00,
-      matchType: '特征匹配',
-      matchPercentage: 85,
-      similarDate: '12月28日',
-    ),
-    SuspectedDuplicate(
-      description: '滴滴出行',
-      amount: -15.00,
-      matchType: 'AI语义',
-      matchPercentage: 72,
-      similarDate: '12月27日',
-    ),
-  ];
+  List<SuspectedDuplicate> _suspectedList = [];
+
+  // 导入的交易列表
+  List<ImportedTransaction> _importedTransactions = [];
 
   @override
   void initState() {
@@ -67,9 +61,137 @@ class _DeduplicationPageState extends ConsumerState<DeduplicationPage> {
   }
 
   Future<void> _startDeduplication() async {
-    // 模拟去重检测过程
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() => _isProcessing = false);
+    try {
+      // 1. 读取并解析文件
+      final file = File(widget.filePath);
+      if (!await file.exists()) {
+        throw Exception('文件不存在');
+      }
+
+      final content = await file.readAsString();
+      final lines = const LineSplitter().convert(content);
+
+      if (lines.isEmpty) {
+        throw Exception('文件内容为空');
+      }
+
+      // 2. 解析CSV (简化版，假设是标准格式)
+      _importedTransactions = _parseCSV(lines);
+      _totalRecords = _importedTransactions.length;
+
+      // 3. 执行真实的去重检测
+      final db = ref.read(databaseProvider);
+      final existingTransactions = await db.getTransactions();
+
+      final suspectedList = <SuspectedDuplicate>[];
+      int exactCount = 0;
+      int featureCount = 0;
+      int semanticCount = 0;
+
+      // 对每笔导入的交易进行去重检测
+      for (final imported in _importedTransactions) {
+        // 转换为Transaction对象
+        final newTransaction = Transaction(
+          id: const Uuid().v4(),
+          type: imported.amount > 0 ? TransactionType.income : TransactionType.expense,
+          amount: imported.amount.abs(),
+          category: imported.category ?? 'other',
+          accountId: 'temp_account',
+          date: imported.date,
+          note: imported.merchant,
+          createdAt: DateTime.now(),
+        );
+
+        // 执行去重检测
+        final result = DuplicateDetectionService.checkDuplicate(
+          newTransaction,
+          existingTransactions,
+        );
+
+        if (result.hasPotentialDuplicate && result.potentialDuplicates.isNotEmpty) {
+          final existing = result.potentialDuplicates.first;
+          final similarity = result.similarityScore;
+
+          // 根据相似度分类
+          if (similarity >= 95) {
+            // 95分以上 - 精确匹配
+            exactCount++;
+          } else if (similarity >= 85) {
+            // 85-94分 - 确定重复
+            exactCount++;
+          } else if (similarity >= 75) {
+            // 75-84分 - 特征匹配
+            featureCount++;
+            suspectedList.add(SuspectedDuplicate(
+              description: imported.merchant,
+              amount: imported.amount,
+              matchType: '特征匹配',
+              matchPercentage: similarity,
+              similarDate: _formatDate(existing.date),
+            ));
+          } else if (similarity >= 55) {
+            // 55-74分 - 语义匹配
+            semanticCount++;
+            suspectedList.add(SuspectedDuplicate(
+              description: imported.merchant,
+              amount: imported.amount,
+              matchType: 'AI语义',
+              matchPercentage: similarity,
+              similarDate: _formatDate(existing.date),
+            ));
+          }
+        }
+      }
+
+      setState(() {
+        _exactMatches = exactCount;
+        _featureMatches = featureCount;
+        _semanticMatches = semanticCount;
+        _confirmedDuplicates = exactCount;
+        _suspectedDuplicates = featureCount + semanticCount;
+        _newRecords = _totalRecords - _confirmedDuplicates - _suspectedDuplicates;
+        _suspectedList = suspectedList;
+        _isProcessing = false;
+      });
+    } catch (e) {
+      debugPrint('去重检测失败: $e');
+      setState(() {
+        // 如果解析失败，至少设置总记录数
+        _newRecords = _totalRecords;
+        _isProcessing = false;
+      });
+    }
+  }
+
+  /// 简单的CSV解析
+  List<ImportedTransaction> _parseCSV(List<String> lines) {
+    final transactions = <ImportedTransaction>[];
+
+    // 跳过表头
+    for (int i = 1; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isEmpty) continue;
+
+      try {
+        final fields = line.split(',');
+        if (fields.length >= 3) {
+          transactions.add(ImportedTransaction(
+            merchant: fields[0].trim(),
+            amount: double.tryParse(fields[1].trim()) ?? 0.0,
+            date: DateTime.tryParse(fields[2].trim()) ?? DateTime.now(),
+            category: fields.length > 3 ? fields[3].trim() : null,
+          ));
+        }
+      } catch (e) {
+        debugPrint('解析行失败: $line, 错误: $e');
+      }
+    }
+
+    return transactions;
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.month}月${date.day}日';
   }
 
   @override
@@ -357,7 +479,18 @@ class _DeduplicationPageState extends ConsumerState<DeduplicationPage> {
             ),
           ),
           const SizedBox(height: 8),
-          ..._suspectedList.map((item) => _buildSuspectedItem(theme, item)),
+          ..._suspectedList.take(5).map((item) => _buildSuspectedItem(theme, item)),
+          if (_suspectedList.length > 5)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '还有 ${_suspectedList.length - 5} 条记录...',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -378,14 +511,18 @@ class _DeduplicationPageState extends ConsumerState<DeduplicationPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                item.description,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: theme.colorScheme.onSurface,
+              Expanded(
+                child: Text(
+                  item.description,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 '${item.amount > 0 ? "+" : ""}¥${item.amount.toStringAsFixed(2)}',
                 style: TextStyle(
@@ -439,7 +576,9 @@ class _DeduplicationPageState extends ConsumerState<DeduplicationPage> {
             onPressed: _goToPreview,
             icon: const Icon(Icons.arrow_forward),
             label: Text(
-              '处理疑似重复（$_suspectedDuplicates条）',
+              _suspectedDuplicates > 0
+                  ? '处理疑似重复（$_suspectedDuplicates条）'
+                  : '继续导入（$_newRecords条）',
               style: const TextStyle(fontSize: 16),
             ),
             style: ElevatedButton.styleFrom(
