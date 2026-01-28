@@ -7,7 +7,8 @@ import 'dart:convert';
 import '../../theme/app_theme.dart';
 import '../../models/transaction.dart';
 import '../../services/duplicate_detection_service.dart';
-import '../../providers/database_provider.dart';
+import '../../core/di/service_locator.dart';
+import '../../core/contracts/i_database_service.dart';
 import 'import_preview_confirm_page.dart';
 
 /// 三层去重详情页面
@@ -80,7 +81,7 @@ class _DeduplicationPageState extends ConsumerState<DeduplicationPage> {
       _totalRecords = _importedTransactions.length;
 
       // 3. 执行真实的去重检测
-      final db = ref.read(databaseProvider);
+      final db = sl<IDatabaseService>();
       final existingTransactions = await db.getTransactions();
 
       final suspectedList = <SuspectedDuplicate>[];
@@ -176,6 +177,7 @@ class _DeduplicationPageState extends ConsumerState<DeduplicationPage> {
         final fields = line.split(',');
         if (fields.length >= 3) {
           transactions.add(ImportedTransaction(
+            id: const Uuid().v4(),
             merchant: fields[0].trim(),
             amount: double.tryParse(fields[1].trim()) ?? 0.0,
             date: DateTime.tryParse(fields[2].trim()) ?? DateTime.now(),
@@ -624,5 +626,22 @@ class SuspectedDuplicate {
     required this.matchType,
     required this.matchPercentage,
     required this.similarDate,
+  });
+}
+
+/// 导入的交易数据
+class ImportedTransaction {
+  final String id;
+  final String merchant;
+  final double amount;
+  final DateTime date;
+  final String? category;
+
+  ImportedTransaction({
+    required this.id,
+    required this.merchant,
+    required this.amount,
+    required this.date,
+    this.category,
   });
 }
