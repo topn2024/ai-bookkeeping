@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'engine_config.dart';
+import 'engine_error.dart';
 import '../smart_intent_recognizer.dart';
 import 'intelligence_engine.dart';
 import 'models.dart';
@@ -75,15 +76,20 @@ class DualChannelProcessor {
 ///
 /// 职责：
 /// - 优先级队列管理
-/// - 操作聚合（1.5秒基础窗口）
+/// - 操作聚合（2.5秒基础窗口）
 /// - 通过 OperationAdapter 执行操作
 /// - 执行结果回调
 class ExecutionChannel {
   final OperationAdapter adapter;
+  final EngineErrorHandler? errorHandler;
   final List<OperationCallback> _callbacks = [];
 
-  /// 错误回调（可选）
+  /// 组件名称（用于错误日志）
+  static const String _componentName = 'ExecutionChannel';
+
+  /// 错误回调（可选，已废弃，推荐使用 errorHandler）
   /// 当回调执行失败时调用，用于外部监控和错误处理
+  @Deprecated('Use errorHandler instead')
   void Function(Object error, StackTrace? stackTrace, OperationCallback callback)? onCallbackError;
 
   // 优先级队列
@@ -93,7 +99,6 @@ class ExecutionChannel {
 
   // 聚合计时器
   Timer? _aggregationTimer;
-
 
   // 执行锁状态
   bool _isExecuting = false;
@@ -107,6 +112,7 @@ class ExecutionChannel {
 
   ExecutionChannel({
     required this.adapter,
+    this.errorHandler,
   });
 
   /// 注册回调
@@ -376,31 +382,37 @@ class ExecutionChannel {
   void _notifyCallbacks(ExecutionResult result) {
     // 释放后不再触发回调
     if (_isDisposed) {
-      debugPrint('[ExecutionChannel] 已释放，跳过回调通知');
+      debugPrint('[$_componentName] 已释放，跳过回调通知');
       return;
     }
 
     for (final callback in _callbacks) {
       // 每次回调前再次检查（回调执行可能较慢，期间可能被 dispose）
       if (_isDisposed) {
-        debugPrint('[ExecutionChannel] 回调期间被释放，停止后续回调');
+        debugPrint('[$_componentName] 回调期间被释放，停止后续回调');
         break;
       }
 
       try {
         callback(result);
       } catch (e, stackTrace) {
-        // 记录详细的错误信息
-        debugPrint('[ExecutionChannel] 回调执行失败: $e');
-        debugPrint('[ExecutionChannel] 堆栈: $stackTrace');
+        // 使用统一错误处理器
+        errorHandler?.handleCallbackError(
+          message: '回调执行失败: $e',
+          component: _componentName,
+          callbackName: 'OperationCallback',
+          originalError: e,
+          stackTrace: stackTrace,
+        );
 
-        // 通知外部错误处理器（如果已设置且未释放）
+        // 兼容旧的错误回调（已废弃）
         if (!_isDisposed) {
           try {
+            // ignore: deprecated_member_use_from_same_package
             onCallbackError?.call(e, stackTrace, callback);
           } catch (callbackError) {
             // 防止错误回调本身抛出异常
-            debugPrint('[ExecutionChannel] 错误回调处理器执行失败: $callbackError');
+            debugPrint('[$_componentName] 错误回调处理器执行失败: $callbackError');
           }
         }
       }
@@ -457,11 +469,16 @@ class ExecutionChannel {
 /// - 通过 FeedbackAdapter 生成响应
 class ConversationChannel {
   final FeedbackAdapter adapter;
+  final EngineErrorHandler? errorHandler;
   final List<ExecutionResult> _executionResults = [];
   String? _chatContent;
 
+  /// 组件名称（用于错误日志）
+  static const String _componentName = 'ConversationChannel';
+
   ConversationChannel({
     required this.adapter,
+    this.errorHandler,
   });
 
   /// 添加对话内容
@@ -500,13 +517,22 @@ class ConversationChannel {
         chatContentSnapshot,
       );
 
-      debugPrint('[ConversationChannel] 生成的响应: $response');
+      debugPrint('[$_componentName] 生成的响应: $response');
       return response;
     } catch (e, stackTrace) {
-      debugPrint('[ConversationChannel] 生成响应失败: $e');
-      debugPrint('[ConversationChannel] 堆栈: $stackTrace');
+      // 使用统一错误处理器
+      final error = EngineError.execution(
+        message: '生成响应失败: $e',
+        component: _componentName,
+        originalError: e,
+        stackTrace: stackTrace,
+        userMessage: '抱歉，生成响应时遇到了问题',
+        context: {'mode': mode.toString()},
+      );
+      errorHandler?.handleError(error);
+
       // 返回一个友好的错误提示，而不是让异常传播
-      return '抱歉，生成响应时遇到了问题';
+      return error.userMessage!;
     }
   }
 

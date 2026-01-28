@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'engine_config.dart';
+import 'engine_error.dart';
 import 'models.dart';
 import 'multi_operation_recognizer.dart';
 import 'dual_channel_processor.dart';
@@ -10,8 +11,12 @@ import 'result_buffer.dart';
 import 'timing_judge.dart';
 import '../input_filter.dart';
 import '../smart_intent_recognizer.dart' show MultiOperationResult, Operation, OperationPriority, OperationType, RecognitionSource;
+import '../adapters/adapter_interfaces.dart';
 import '../adapters/bookkeeping_feedback_adapter.dart';
 import '../network_monitor.dart' show NetworkStatus;
+
+// Re-export adapter interfaces for backward compatibility
+export '../adapters/adapter_interfaces.dart';
 
 /// 智能语音引擎
 ///
@@ -25,11 +30,17 @@ class IntelligenceEngine {
   final OperationAdapter operationAdapter;
   final FeedbackAdapter feedbackAdapter;
 
+  /// 错误处理器
+  final EngineErrorHandler errorHandler;
+
   late final InputFilter _inputFilter;
   late final MultiOperationRecognizer _recognizer;
   late final DualChannelProcessor _processor;
   late final ResultBuffer _resultBuffer;
   late final TimingJudge _timingJudge;
+
+  /// 组件名称（用于错误日志）
+  static const String _componentName = 'IntelligenceEngine';
 
   /// 上一条响应（用于 feedback.repeat）
   String? _lastResponse;
@@ -78,12 +89,19 @@ class IntelligenceEngine {
   IntelligenceEngine({
     required this.operationAdapter,
     required this.feedbackAdapter,
-  }) {
+    EngineErrorHandler? errorHandler,
+  }) : errorHandler = errorHandler ?? DefaultEngineErrorHandler() {
     _inputFilter = InputFilter();
     _recognizer = MultiOperationRecognizer();
     _processor = DualChannelProcessor(
-      executionChannel: ExecutionChannel(adapter: operationAdapter),
-      conversationChannel: ConversationChannel(adapter: feedbackAdapter),
+      executionChannel: ExecutionChannel(
+        adapter: operationAdapter,
+        errorHandler: this.errorHandler,
+      ),
+      conversationChannel: ConversationChannel(
+        adapter: feedbackAdapter,
+        errorHandler: this.errorHandler,
+      ),
     );
     _resultBuffer = ResultBuffer();
     _timingJudge = TimingJudge();
@@ -377,17 +395,40 @@ class IntelligenceEngine {
         message: null, // 暂不响应，等待更多指令
       );
     } catch (e, stack) {
-      debugPrint('[IntelligenceEngine] 处理失败: $e\n$stack');
+      // 使用统一错误处理器
+      final EngineError error;
+      final String userMessage;
 
-      // 根据错误类型返回更具体的用户友好消息
-      String userMessage;
       if (e is TimeoutException) {
-        userMessage = '网络响应太慢，请稍后重试';
+        error = EngineError.timeout(
+          message: '处理输入超时',
+          component: _componentName,
+          timeout: const Duration(seconds: EngineConfig.recognitionTimeoutSeconds),
+          operation: 'process',
+          userMessage: '网络响应太慢，请稍后重试',
+        );
+        userMessage = error.userMessage!;
       } else if (e is SocketException) {
-        userMessage = '网络连接失败，请检查网络后重试';
+        error = EngineError.network(
+          message: '网络连接失败: $e',
+          component: _componentName,
+          originalError: e,
+          stackTrace: stack,
+          userMessage: '网络连接失败，请检查网络后重试',
+        );
+        userMessage = error.userMessage!;
       } else {
-        userMessage = '抱歉，处理您的请求时出现了问题';
+        error = EngineError.recognition(
+          message: '处理输入失败: $e',
+          component: _componentName,
+          originalError: e,
+          stackTrace: stack,
+          userMessage: '抱歉，处理您的请求时出现了问题',
+        );
+        userMessage = error.userMessage!;
       }
+
+      errorHandler.handleError(error);
 
       return VoiceSessionResult(
         success: false,
@@ -414,10 +455,16 @@ class IntelligenceEngine {
       } on TimeoutException {
         attempt++;
         lastError = TimeoutException('识别超时');
-        debugPrint('[IntelligenceEngine] 识别超时，重试 $attempt/$EngineConfig.maxRetries');
+
+        errorHandler.handleTimeoutError(
+          message: '识别超时，重试 $attempt/${EngineConfig.maxRetries}',
+          component: _componentName,
+          timeout: const Duration(seconds: EngineConfig.recognitionTimeoutSeconds),
+          operation: 'recognize',
+        );
 
         if (attempt >= EngineConfig.maxRetries) {
-          debugPrint('[IntelligenceEngine] 重试次数耗尽，降级到本地处理');
+          debugPrint('[$_componentName] 重试次数耗尽，降级到本地处理');
           return _fallbackToLocalRecognition(input);
         }
 
@@ -427,7 +474,12 @@ class IntelligenceEngine {
         // 网络错误，重试
         attempt++;
         lastError = e;
-        debugPrint('[IntelligenceEngine] 网络错误: $e，重试 $attempt/$EngineConfig.maxRetries');
+
+        errorHandler.handleNetworkError(
+          message: '网络错误，重试 $attempt/${EngineConfig.maxRetries}',
+          component: _componentName,
+          originalError: e,
+        );
 
         if (attempt >= EngineConfig.maxRetries) {
           debugPrint('[IntelligenceEngine] 网络重试耗尽，降级到本地处理');
@@ -438,15 +490,25 @@ class IntelligenceEngine {
         delayMs *= 2;
       } catch (e, stackTrace) {
         // 其他错误（可能是业务错误），不重试
-        debugPrint('[IntelligenceEngine] 识别错误（不重试）: $e');
-        debugPrint('[IntelligenceEngine] 堆栈: $stackTrace');
+        errorHandler.handleRecognitionError(
+          message: '识别错误（不重试）: $e',
+          component: _componentName,
+          input: input,
+          originalError: e,
+          stackTrace: stackTrace,
+        );
         // 不暴露内部错误详情给用户
         return MultiOperationResult.error('处理请求时遇到问题，请重试');
       }
     }
 
     // 理论上不会到达这里，但为了类型安全
-    debugPrint('[IntelligenceEngine] 重试循环异常退出，最后错误: $lastError');
+    errorHandler.handleError(EngineError(
+      category: EngineErrorCategory.state,
+      severity: ErrorSeverity.warning,
+      message: '重试循环异常退出，最后错误: $lastError',
+      component: _componentName,
+    ));
     return _fallbackToLocalRecognition(input);
   }
 
@@ -723,8 +785,14 @@ class IntelligenceEngine {
         operationType: operation.type,
       );
     } catch (e, stack) {
-      debugPrint('[IntelligenceEngine] 操作 $index 执行异常: $e');
-      debugPrint('[IntelligenceEngine] 堆栈: $stack');
+      // 使用统一错误处理器
+      errorHandler.handleExecutionError(
+        message: '操作 $index 执行异常: $e',
+        component: _componentName,
+        operationType: operation.type,
+        originalError: e,
+        stackTrace: stack,
+      );
 
       // 添加失败记录到缓冲器（不暴露内部错误给用户）
       _resultBuffer.add(
@@ -828,8 +896,14 @@ class IntelligenceEngine {
     // 异步执行并捕获错误（fire-and-forget 模式，但记录错误）
     // 注意：_isProcessingDeferred 在 _processDeferredOperations 的 finally 块中重置
     _processDeferredOperations().catchError((error, stackTrace) {
-      debugPrint('[IntelligenceEngine] $source 触发的处理失败: $error');
-      debugPrint('[IntelligenceEngine] 堆栈: $stackTrace');
+      // 使用统一错误处理器
+      errorHandler.handleError(EngineError.execution(
+        message: '$source 触发的延迟操作处理失败: $error',
+        component: _componentName,
+        originalError: error,
+        stackTrace: stackTrace,
+        severity: ErrorSeverity.error,
+      ));
       // 确保错误情况下也重置标志（虽然 finally 应该已处理，但做双重保护）
       _isProcessingDeferred = false;
       return OperationExecutionReport([]); // 返回空报告
@@ -902,15 +976,21 @@ class IntelligenceEngine {
 
       // 通过回调通知外部（再次检查 _isDisposed，因为异步执行期间状态可能已改变）
       if (!_isDisposed) {
-        debugPrint('[IntelligenceEngine] 延迟操作处理完成，通知外部: $responseMessage');
+        debugPrint('[$_componentName] 延迟操作处理完成，通知外部: $responseMessage');
         // 保护回调异常不影响内部状态
         try {
           onDeferredResponse?.call(responseMessage);
-        } catch (e) {
-          debugPrint('[IntelligenceEngine] 延迟响应回调异常: $e');
+        } catch (e, stack) {
+          errorHandler.handleCallbackError(
+            message: '延迟响应回调异常: $e',
+            component: _componentName,
+            callbackName: 'onDeferredResponse',
+            originalError: e,
+            stackTrace: stack,
+          );
         }
       } else {
-        debugPrint('[IntelligenceEngine] 已释放，跳过延迟响应通知');
+        debugPrint('[$_componentName] 已释放，跳过延迟响应通知');
       }
 
       return report;
@@ -967,43 +1047,6 @@ class _PendingOperation {
     required this.recognitionResult,
     required this.input,
   });
-}
-
-/// 操作适配器接口
-abstract class OperationAdapter {
-  /// 执行操作
-  Future<ExecutionResult> execute(Operation operation);
-
-  /// 是否支持该操作类型
-  bool canHandle(OperationType type);
-
-  /// 适配器名称
-  String get adapterName;
-}
-
-/// 反馈适配器接口
-abstract class FeedbackAdapter {
-  /// 生成反馈
-  Future<String> generateFeedback(
-    ConversationMode mode,
-    List<ExecutionResult> results,
-    String? chatContent,
-  );
-
-  /// 是否支持该对话模式
-  bool supportsMode(ConversationMode mode);
-
-  /// 适配器名称
-  String get adapterName;
-}
-
-/// 对话模式
-enum ConversationMode {
-  chat,              // 闲聊：默认1-2句，用户要求时可展开（讲故事等）
-  chatWithIntent,    // 有诉求的闲聊：详细回答
-  quickBookkeeping,  // 快速记账：极简"✓ 2笔"
-  mixed,             // 混合：简短确认+操作反馈
-  clarify,           // 澄清：反问用户获取更多信息
 }
 
 /// 语音会话结果（临时占位，后续会完善）

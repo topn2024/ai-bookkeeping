@@ -1,6 +1,6 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../qwen_service.dart';
 import '../voice_service_coordinator.dart' show VoiceIntentType;
 import '../voice_navigation_service.dart';
@@ -9,6 +9,7 @@ import 'voice_intent_router.dart';
 import 'network_monitor.dart' show NetworkStatus, RoutingMode;
 import 'unified_intent_type.dart' as unified;
 import 'intelligence_engine/models.dart' show RecognitionResultType;
+import 'learning_cache_service.dart';
 
 /// 智能意图识别器
 ///
@@ -31,11 +32,8 @@ class SmartIntentRecognizer {
   final QwenService _qwenService;
   final VoiceNavigationService _navigationService;
 
-  /// 学习缓存
-  final Map<String, LearnedPattern> _learnedCache = {};
-
-  /// 是否已加载缓存
-  bool _cacheLoaded = false;
+  /// 学习缓存服务
+  final LearningCacheService _learningCache;
 
   /// 缓存的用户城市名称（APP启动时预加载）
   String _cachedCityName = '深圳';  // 默认深圳
@@ -51,11 +49,25 @@ class SmartIntentRecognizer {
     VoiceIntentRouter? ruleRouter,
     QwenService? qwenService,
     VoiceNavigationService? navigationService,
+    LearningCacheService? learningCache,
     this.networkStatusProvider,
     this.onProgressiveFeedback,
   })  : _ruleRouter = ruleRouter ?? VoiceIntentRouter(),
         _qwenService = qwenService ?? QwenService(),
-        _navigationService = navigationService ?? VoiceNavigationService();
+        _navigationService = navigationService ?? VoiceNavigationService(),
+        _learningCache = learningCache ?? SharedPreferencesLearningCache(
+          inputValidator: _isValidInput,
+        );
+
+  /// 验证输入是否有效（非ASR乱码）
+  static bool _isValidInput(String input) {
+    // 检测无意义输入的简化逻辑
+    if (input.length < 2) return false;
+    // 检查字符多样性
+    final charSet = input.split('').toSet();
+    if (charSet.length < input.length / 3) return false;
+    return true;
+  }
 
   /// 预加载用户城市信息（在APP启动时调用）
   ///
@@ -1580,61 +1592,58 @@ $historyContext
   // ═══════════════════════════════════════════════════════════════
 
   Future<SmartIntentResult?> _layer4LearnedCache(String input) async {
-    await _ensureCacheLoaded();
+    // 确保缓存已加载
+    if (!_learningCache.isLoaded) {
+      await _learningCache.load();
+    }
 
-    // 检查是否是被错误缓存的闲聊模式
-    bool isWronglyCachedChat(String key, LearnedPattern pattern) {
-      if (pattern.intentType != SmartIntentType.navigate) return false;
+    // 清理被错误缓存的闲聊模式
+    await _learningCache.removeWhere((key, pattern) {
+      if (pattern.intentTypeName != 'navigate') return false;
       for (final keyword in _chatKeywords) {
         if (key.contains(keyword)) {
-          debugPrint('[SmartIntent] 跳过错误缓存的闲聊模式: $key');
-          // 从缓存中移除错误的模式
-          _learnedCache.remove(key);
-          _saveCache();
+          debugPrint('[SmartIntent] 移除错误缓存的闲聊模式: $key');
           return true;
         }
       }
       return false;
-    }
+    });
 
     // 精确匹配
-    if (_learnedCache.containsKey(input)) {
-      final pattern = _learnedCache[input]!;
-      // 跳过被错误缓存的闲聊模式
-      if (isWronglyCachedChat(input, pattern)) {
-        return null;
-      }
+    final exactMatch = _learningCache.matchExact(input);
+    if (exactMatch != null) {
+      final intentType = _parseIntentType(exactMatch.pattern.intentTypeName);
       return SmartIntentResult(
-        intentType: pattern.intentType,
-        confidence: 0.9,
-        entities: pattern.entities,
+        intentType: intentType,
+        confidence: exactMatch.confidence,
+        entities: exactMatch.pattern.entities,
         source: RecognitionSource.learnedCache,
         originalInput: input,
       );
     }
 
-    // 模糊匹配（编辑距离）
-    for (final entry in _learnedCache.entries) {
-      final distance = _levenshteinDistance(input, entry.key);
-      final similarity = 1 - (distance / input.length.clamp(1, 100));
-
-      if (similarity >= 0.85) {
-        final pattern = entry.value;
-        // 跳过被错误缓存的闲聊模式
-        if (isWronglyCachedChat(entry.key, pattern)) {
-          continue;
-        }
-        return SmartIntentResult(
-          intentType: pattern.intentType,
-          confidence: similarity * 0.95,
-          entities: pattern.entities,
-          source: RecognitionSource.learnedCache,
-          originalInput: input,
-        );
-      }
+    // 模糊匹配
+    final fuzzyMatch = _learningCache.matchFuzzy(input);
+    if (fuzzyMatch != null) {
+      final intentType = _parseIntentType(fuzzyMatch.pattern.intentTypeName);
+      return SmartIntentResult(
+        intentType: intentType,
+        confidence: fuzzyMatch.confidence,
+        entities: fuzzyMatch.pattern.entities,
+        source: RecognitionSource.learnedCache,
+        originalInput: input,
+      );
     }
 
     return null;
+  }
+
+  /// 解析意图类型名称为枚举
+  SmartIntentType _parseIntentType(String name) {
+    return SmartIntentType.values.firstWhere(
+      (e) => e.name == name,
+      orElse: () => SmartIntentType.unknown,
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1874,60 +1883,11 @@ $historyContext
       }
     }
 
-    final pattern = LearnedPattern(
-      intentType: result.intentType,
+    await _learningCache.learn(
+      normalizedInput: input,
+      intentTypeName: result.intentType.name,
       entities: result.entities,
-      learnedAt: DateTime.now(),
-      hitCount: 1,
     );
-
-    _learnedCache[input] = pattern;
-    await _saveCache();
-
-    debugPrint('[SmartIntent] 学习新模式: $input → ${result.intentType}');
-  }
-
-  /// 确保缓存已加载
-  Future<void> _ensureCacheLoaded() async {
-    if (_cacheLoaded) return;
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cacheJson = prefs.getString('smart_intent_cache');
-
-      if (cacheJson != null) {
-        final cacheMap = jsonDecode(cacheJson) as Map<String, dynamic>;
-        int cleanedCount = 0;
-        for (final entry in cacheMap.entries) {
-          // 清理之前学习的无意义模式
-          if (_isNonsensicalInput(entry.key)) {
-            cleanedCount++;
-            continue;
-          }
-          _learnedCache[entry.key] = LearnedPattern.fromJson(entry.value);
-        }
-        if (cleanedCount > 0) {
-          debugPrint('[SmartIntent] 清理了$cleanedCount个无意义模式');
-          await _saveCache();
-        }
-        debugPrint('[SmartIntent] 加载了${_learnedCache.length}个学习模式');
-      }
-    } catch (e) {
-      debugPrint('[SmartIntent] 加载缓存失败: $e');
-    }
-
-    _cacheLoaded = true;
-  }
-
-  /// 保存缓存
-  Future<void> _saveCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cacheMap = _learnedCache.map((k, v) => MapEntry(k, v.toJson()));
-      await prefs.setString('smart_intent_cache', jsonEncode(cacheMap));
-    } catch (e) {
-      debugPrint('[SmartIntent] 保存缓存失败: $e');
-    }
   }
 
   /// 手动添加学习模式（用户纠正时）
@@ -1936,16 +1896,12 @@ $historyContext
     SmartIntentType correctIntent,
     Map<String, dynamic> correctEntities,
   ) async {
-    final pattern = LearnedPattern(
-      intentType: correctIntent,
+    await _learningCache.learn(
+      normalizedInput: _normalize(input),
+      intentTypeName: correctIntent.name,
       entities: correctEntities,
-      learnedAt: DateTime.now(),
-      hitCount: 1,
       isUserCorrection: true,
     );
-
-    _learnedCache[_normalize(input)] = pattern;
-    await _saveCache();
 
     debugPrint('[SmartIntent] 从纠正中学习: $input → $correctIntent');
   }
@@ -2188,73 +2144,8 @@ $historyContext
     }
   }
 
-  SmartIntentType _parseIntentType(String type) {
-    switch (type.toLowerCase()) {
-      case 'add_transaction':
-        return SmartIntentType.addTransaction;
-      case 'navigate':
-        return SmartIntentType.navigate;
-      case 'query':
-        return SmartIntentType.query;
-      case 'modify':
-        return SmartIntentType.modify;
-      case 'delete':
-        return SmartIntentType.delete;
-      case 'confirm':
-        return SmartIntentType.confirm;
-      case 'cancel':
-        return SmartIntentType.cancel;
-      case 'config':
-        return SmartIntentType.config;
-      case 'money_age':
-        return SmartIntentType.moneyAge;
-      case 'habit':
-        return SmartIntentType.habit;
-      case 'vault':
-        return SmartIntentType.vault;
-      case 'data':
-        return SmartIntentType.dataOp;
-      case 'share':
-        return SmartIntentType.share;
-      case 'system':
-        return SmartIntentType.systemOp;
-      case 'clarify':
-        return SmartIntentType.clarify;
-      case 'chat':
-        return SmartIntentType.chat;
-      default:
-        return SmartIntentType.unknown;
-    }
-  }
-
   Map<String, dynamic> _extractEntities(IntentAnalysisResult result) {
     return Map<String, dynamic>.from(result.entities);
-  }
-
-  /// 计算编辑距离（Levenshtein Distance）
-  int _levenshteinDistance(String s1, String s2) {
-    if (s1.isEmpty) return s2.length;
-    if (s2.isEmpty) return s1.length;
-
-    List<int> prev = List.generate(s2.length + 1, (i) => i);
-    List<int> curr = List.filled(s2.length + 1, 0);
-
-    for (int i = 1; i <= s1.length; i++) {
-      curr[0] = i;
-      for (int j = 1; j <= s2.length; j++) {
-        int cost = s1[i - 1] == s2[j - 1] ? 0 : 1;
-        curr[j] = [
-          prev[j] + 1,
-          curr[j - 1] + 1,
-          prev[j - 1] + cost,
-        ].reduce((a, b) => a < b ? a : b);
-      }
-      final temp = prev;
-      prev = curr;
-      curr = temp;
-    }
-
-    return prev[s2.length];
   }
 }
 
@@ -2330,45 +2221,6 @@ enum RecognitionSource {
   error,           // 错误
 }
 
-/// 学习的模式
-class LearnedPattern {
-  final SmartIntentType intentType;
-  final Map<String, dynamic> entities;
-  final DateTime learnedAt;
-  final int hitCount;
-  final bool isUserCorrection;
-
-  LearnedPattern({
-    required this.intentType,
-    required this.entities,
-    required this.learnedAt,
-    this.hitCount = 0,
-    this.isUserCorrection = false,
-  });
-
-  factory LearnedPattern.fromJson(Map<String, dynamic> json) {
-    return LearnedPattern(
-      intentType: SmartIntentType.values.firstWhere(
-        (e) => e.name == json['intentType'],
-        orElse: () => SmartIntentType.unknown,
-      ),
-      entities: json['entities'] as Map<String, dynamic>? ?? {},
-      learnedAt: DateTime.parse(json['learnedAt'] as String),
-      hitCount: json['hitCount'] as int? ?? 0,
-      isUserCorrection: json['isUserCorrection'] as bool? ?? false,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'intentType': intentType.name,
-      'entities': entities,
-      'learnedAt': learnedAt.toIso8601String(),
-      'hitCount': hitCount,
-      'isUserCorrection': isUserCorrection,
-    };
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════
 // 多操作识别数据模型
