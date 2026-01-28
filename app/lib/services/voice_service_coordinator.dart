@@ -36,6 +36,39 @@ import 'vault_repository.dart';
 import 'casual_chat_service.dart';
 import 'learning/voice_intent_learning_service.dart';
 import 'category_localization_service.dart';
+import 'voice_config_service.dart';
+import 'voice/voice_advice_service.dart';
+
+/// 解析中文数字为整数
+int _parseChineseNumber(String str) {
+  final parsed = int.tryParse(str);
+  if (parsed != null) return parsed;
+
+  const chineseNumbers = {
+    '零': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4,
+    '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+  };
+
+  if (chineseNumbers.containsKey(str)) return chineseNumbers[str]!;
+
+  // 处理"十几"
+  if (str.startsWith('十') && str.length == 2) {
+    final digit = chineseNumbers[str[1]];
+    if (digit != null) return 10 + digit;
+  }
+
+  // 处理"几十"或"几十几"
+  if (str.contains('十')) {
+    final parts = str.split('十');
+    final tens = parts[0].isEmpty ? 1 : (chineseNumbers[parts[0]] ?? 1);
+    final ones = parts.length > 1 && parts[1].isNotEmpty
+        ? (chineseNumbers[parts[1]] ?? 0)
+        : 0;
+    return tens * 10 + ones;
+  }
+
+  return 1;
+}
 
 /// 语音服务协调器
 ///
@@ -60,6 +93,8 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   final AutomationTaskService _automationService;
   final NaturalLanguageSearchService _nlSearchService;
   final CasualChatService _casualChatService;
+  final VoiceConfigService _configService;
+  final VoiceAdviceService _adviceService;
   VoiceBudgetQueryService? _budgetQueryService;
 
   /// 对话上下文管理
@@ -142,6 +177,8 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     AutomationTaskService? automationService,
     NaturalLanguageSearchService? nlSearchService,
     CasualChatService? casualChatService,
+    VoiceConfigService? configService,
+    VoiceAdviceService? adviceService,
     ConversationContext? conversationContext,
     BargeInDetector? bargeInDetector,
     AIIntentDecomposer? aiDecomposer,
@@ -162,6 +199,8 @@ class VoiceServiceCoordinator extends ChangeNotifier {
        _automationService = automationService ?? AutomationTaskService(),
        _nlSearchService = nlSearchService ?? _createDefaultNLSearchService(databaseService ?? sl<IDatabaseService>()),
        _casualChatService = casualChatService ?? CasualChatService(),
+       _configService = configService ?? VoiceConfigService(),
+       _adviceService = adviceService ?? VoiceAdviceService(databaseService: databaseService ?? sl<IDatabaseService>()),
        _conversationContext = conversationContext ?? ConversationContext(),
        _bargeInDetector = bargeInDetector ?? BargeInDetector(),
        _aiDecomposer = aiDecomposer ?? AIIntentDecomposer(),
@@ -640,6 +679,9 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       case VoiceIntentType.systemOperation:
         return await _handleSystemIntent(intentResult, originalInput);
+
+      case VoiceIntentType.adviceOperation:
+        return await _handleAdviceIntent(intentResult, originalInput);
 
       case VoiceIntentType.chatOperation:
         return await _handleChatIntent(intentResult, originalInput);
@@ -1268,6 +1310,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       case VoiceIntentType.dataOperation:
       case VoiceIntentType.shareOperation:
       case VoiceIntentType.systemOperation:
+      case VoiceIntentType.adviceOperation:
       case VoiceIntentType.chatOperation:
         // No specific cleanup needed for these types
         break;
@@ -1792,6 +1835,50 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           final months = int.parse(recentMonthsMatch.group(1)!);
           final startDate = DateTime(now.year, now.month - months, 1);
           return DateRange(start: startDate, end: now);
+        }
+        // 尝试解析"X天前"格式 (一天前=昨天, 三天前=3天前至今)
+        final daysAgoMatch = RegExp(r'([一二两三四五六七八九十\d]+)天前').firstMatch(timeParam);
+        if (daysAgoMatch != null) {
+          final daysStr = daysAgoMatch.group(1)!;
+          final days = _parseChineseNumber(daysStr);
+          if (days == 1) {
+            // 一天前 = 昨天
+            final yesterday = today.subtract(const Duration(days: 1));
+            return DateRange(start: yesterday, end: today);
+          } else {
+            // N天前 = 从N天前到今天
+            return DateRange(start: today.subtract(Duration(days: days)), end: now);
+          }
+        }
+        // 尝试解析"X周前"格式 (一周前=上周)
+        final weeksAgoMatch = RegExp(r'([一二两三四五六七八九十\d]+)(?:个)?(?:星期|周)前').firstMatch(timeParam);
+        if (weeksAgoMatch != null) {
+          final weeksStr = weeksAgoMatch.group(1)!;
+          final weeks = _parseChineseNumber(weeksStr);
+          if (weeks == 1) {
+            // 一周前 = 上周
+            final lastWeekStart = today.subtract(Duration(days: now.weekday + 6));
+            final lastWeekEnd = today.subtract(Duration(days: now.weekday));
+            return DateRange(start: lastWeekStart, end: lastWeekEnd);
+          } else {
+            // N周前 = 从N周前到今天
+            return DateRange(start: today.subtract(Duration(days: weeks * 7)), end: now);
+          }
+        }
+        // 尝试解析"X个月前"格式
+        final monthsAgoMatch = RegExp(r'([一二两三四五六七八九十\d]+)个?月前').firstMatch(timeParam);
+        if (monthsAgoMatch != null) {
+          final monthsStr = monthsAgoMatch.group(1)!;
+          final months = _parseChineseNumber(monthsStr);
+          if (months == 1) {
+            // 一个月前 = 上月
+            final lastMonth = DateTime(now.year, now.month - 1, 1);
+            final lastMonthEnd = DateTime(now.year, now.month, 1);
+            return DateRange(start: lastMonth, end: lastMonthEnd);
+          } else {
+            final startDate = DateTime(now.year, now.month - months, 1);
+            return DateRange(start: startDate, end: now);
+          }
         }
         return null;
     }
@@ -2490,32 +2577,58 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 处理配置操作意图
   ///
   /// 支持通过语音修改各类系统配置，如预算、账户、主题、提醒等
+  /// 使用 VoiceConfigService 解析和执行配置命令
   Future<VoiceSessionResult> _handleConfigIntent(
     IntentAnalysisResult intentResult,
     String originalInput,
   ) async {
     try {
       debugPrint('[VoiceCoordinator] 处理配置意图: $originalInput');
-      final entities = intentResult.entities;
-      final configId = entities['configId'] as String?;
-      final configValue = entities['value'];
 
-      if (configId == null) {
-        const message = '请告诉我要修改哪个配置';
+      // 使用 VoiceConfigService 解析配置命令
+      final parseResult = _configService.parseConfigCommand(originalInput);
+
+      if (!parseResult.success) {
+        // 解析失败，尝试从 entities 获取配置信息
+        final entities = intentResult.entities;
+        final configId = entities['configId'] as String?;
+
+        if (configId == null) {
+          final message = parseResult.errorMessage ?? '请告诉我要修改哪个配置，比如"把餐饮预算改成2000"';
+          await _speakWithSkipCheck(message);
+          return VoiceSessionResult.error(message);
+        }
+
+        // 有 configId 但无法解析具体值
+        final message = '请告诉我要把$configId改成什么';
+        await _speakWithSkipCheck(message);
+        return VoiceSessionResult.partial(message);
+      }
+
+      // 解析成功，执行配置修改
+      final command = parseResult.config!;
+      debugPrint('[VoiceCoordinator] 配置命令解析成功: ${command.definition.id} = ${command.value}');
+
+      // 执行配置
+      final executeResult = await _configService.executeConfig(command);
+
+      if (executeResult.success) {
+        final message = executeResult.confirmText ?? '配置已更新';
+        await _speakWithSkipCheck(message);
+
+        return VoiceSessionResult.success(message, {
+          'configId': command.definition.id,
+          'configName': command.definition.name,
+          'value': command.value,
+          'category': command.definition.category.toString(),
+        });
+      } else {
+        final message = executeResult.errorMessage ?? '配置修改失败';
         await _speakWithSkipCheck(message);
         return VoiceSessionResult.error(message);
       }
-
-      // 通过VoiceConfigService处理配置
-      // TODO: 集成VoiceConfigService执行配置修改
-      final message = '已更新配置：$configId';
-      await _speakWithSkipCheck(message);
-
-      return VoiceSessionResult.success(message, {
-        'config': configId,
-        'value': configValue,
-      });
     } catch (e) {
+      debugPrint('[VoiceCoordinator] 配置修改异常: $e');
       final message = '配置修改失败: $e';
       await _speakWithSkipCheck(message);
       return VoiceSessionResult.error(message);
@@ -2893,6 +3006,37 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  // 建议操作处理器
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 处理建议操作意图
+  ///
+  /// 支持多种建议类型：
+  /// - 财务建议：省钱、理财、消费分析
+  /// - 预算建议：预算设置、预算优化
+  /// - 洞察分析：消费洞察、趋势分析
+  /// - 功能推荐：推荐适合用户的功能
+  /// - 储蓄建议：存钱计划、储蓄目标
+  ///
+  /// 使用 VoiceAdviceService 策略模式统一处理
+  Future<VoiceSessionResult> _handleAdviceIntent(
+    IntentAnalysisResult intentResult,
+    String originalInput,
+  ) async {
+    debugPrint('[VoiceCoordinator] 处理建议意图: $originalInput');
+
+    final result = await _adviceService.generateAdvice(originalInput);
+    debugPrint('[VoiceCoordinator] 建议类型: ${result.category}, LLM生成: ${result.isLLMGenerated}');
+
+    await _speakWithSkipCheck(result.spokenText);
+    return VoiceSessionResult.success(result.spokenText, {
+      'type': result.category.name,
+      'isLLMGenerated': result.isLLMGenerated,
+      ...?result.data,
+    });
+  }
+
   /// 处理闲聊意图（讲故事、讲笑话、问候等）
   Future<VoiceSessionResult> _handleChatIntent(
     IntentAnalysisResult intentResult,
@@ -3186,15 +3330,43 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 查询交易记录的回调方法
   Future<List<TransactionRecord>> _queryTransactions(QueryConditions conditions) async {
-    final transactions = await _databaseService.queryTransactions(
+    // 先尝试按分类和描述同时搜索
+    var transactions = await _databaseService.queryTransactions(
       startDate: conditions.startDate,
       endDate: conditions.endDate,
       category: conditions.categoryHint,
+      description: conditions.descriptionKeyword,  // 同时搜索描述字段
       merchant: conditions.merchantHint,
       minAmount: conditions.amountMin,
       maxAmount: conditions.amountMax,
       limit: conditions.limit,
     );
+
+    // 如果没找到且有descriptionKeyword，尝试只按描述搜索（可能分类不匹配）
+    if (transactions.isEmpty && conditions.descriptionKeyword != null) {
+      debugPrint('[VoiceCoordinator] 按分类+描述未找到，尝试只按描述搜索');
+      transactions = await _databaseService.queryTransactions(
+        startDate: conditions.startDate,
+        endDate: conditions.endDate,
+        description: conditions.descriptionKeyword,
+        minAmount: conditions.amountMin,
+        maxAmount: conditions.amountMax,
+        limit: conditions.limit,
+      );
+    }
+
+    // 如果还没找到且有categoryHint，尝试只按分类搜索
+    if (transactions.isEmpty && conditions.categoryHint != null) {
+      debugPrint('[VoiceCoordinator] 按描述未找到，尝试只按分类搜索');
+      transactions = await _databaseService.queryTransactions(
+        startDate: conditions.startDate,
+        endDate: conditions.endDate,
+        category: conditions.categoryHint,
+        minAmount: conditions.amountMin,
+        maxAmount: conditions.amountMax,
+        limit: conditions.limit,
+      );
+    }
 
     return transactions.map((t) => TransactionRecord(
       id: t.id,
@@ -3660,6 +3832,8 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         return VoiceIntentType.shareOperation;
       case SmartIntentType.systemOp:
         return VoiceIntentType.systemOperation;
+      case SmartIntentType.advice:
+        return VoiceIntentType.adviceOperation;
       case SmartIntentType.clarify:
         return VoiceIntentType.clarifySelection;
       case SmartIntentType.chat:
@@ -3764,9 +3938,11 @@ enum VoiceIntentType {
   dataOperation,             // 数据操作
   shareOperation,            // 分享操作
   systemOperation,           // 系统操作
+  adviceOperation,           // 建议操作（财务建议、省钱建议、洞察分析等）
   chatOperation,             // 闲聊操作（讲故事、讲笑话等）
 }
 
+/// 建议类型（内部使用）
 /// 语音会话结果状态
 enum VoiceSessionStatus {
   success,

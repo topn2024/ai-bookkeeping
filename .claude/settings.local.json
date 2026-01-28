@@ -853,7 +853,15 @@
       "Bash(osascript:*)",
       "Bash(openspec-cn change show:*)",
       "Bash(git log:*)",
-      "Bash(md5:*)"
+      "Bash(md5:*)",
+      "Bash(../scripts/publish_unified.sh:*)",
+      "Bash(API_BASE_URL=\"http://160.202.238.29:8001\" ADMIN_PASSWORD=\"admin123\" ./scripts/publish_apk.sh --version 2.0.13 --code 59 --apk ./app/build/app/outputs/flutter-apk/app-release.apk --notes \"全面代码质量优化：修复资源泄漏、异常处理、类型安全等49个问题，提升应用稳定性\" --publish)",
+      "Bash(SERVER1_URL=\"http://160.202.238.29:8001\" ./scripts/sync_version.sh:*)",
+      "Bash(for i in {1..12})",
+      "Bash(do sleep 10)",
+      "Bash(then echo 'Upload completed')",
+      "Bash(break)",
+      "Bash(./scripts/fix_server2_minio_urls.sh:*)"
     ]
   }
 }

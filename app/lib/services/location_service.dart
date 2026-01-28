@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart' as geo;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/common_types.dart';
@@ -71,40 +73,96 @@ class Position {
 /// 精确地理位置服务
 class PreciseLocationService implements LocationService {
   StreamController<Position>? _locationStreamController;
-  Timer? _locationTimer;
+  StreamSubscription<geo.Position>? _geoSubscription;
 
   /// 检查并请求精确位置权限
   @override
   Future<LocationPermissionResult> requestPermission() async {
-    // 实际实现需要使用 permission_handler 和 geolocator 包
-    // 这里提供模拟实现
-    return LocationPermissionResult.full;
+    try {
+      // 检查位置服务是否启用
+      final serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('[LocationService] 位置服务未启用');
+        return LocationPermissionResult.denied;
+      }
+
+      var permission = await geo.Geolocator.checkPermission();
+      if (permission == geo.LocationPermission.denied) {
+        permission = await geo.Geolocator.requestPermission();
+      }
+
+      return _mapPermission(permission);
+    } catch (e) {
+      debugPrint('[LocationService] 请求权限失败: $e');
+      return LocationPermissionResult.denied;
+    }
   }
 
   @override
   Future<LocationPermissionResult> checkPermission() async {
-    return LocationPermissionResult.full;
+    try {
+      final serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('[LocationService] 位置服务未启用');
+        return LocationPermissionResult.denied;
+      }
+
+      final permission = await geo.Geolocator.checkPermission();
+      return _mapPermission(permission);
+    } catch (e) {
+      debugPrint('[LocationService] 检查权限失败: $e');
+      return LocationPermissionResult.denied;
+    }
+  }
+
+  /// 映射权限结果
+  LocationPermissionResult _mapPermission(geo.LocationPermission permission) {
+    switch (permission) {
+      case geo.LocationPermission.always:
+        return LocationPermissionResult.full;
+      case geo.LocationPermission.whileInUse:
+        return LocationPermissionResult.foregroundOnly;
+      case geo.LocationPermission.denied:
+        return LocationPermissionResult.denied;
+      case geo.LocationPermission.deniedForever:
+        return LocationPermissionResult.permanentlyDenied;
+      case geo.LocationPermission.unableToDetermine:
+        return LocationPermissionResult.denied;
+    }
   }
 
   /// 获取当前精确位置
   @override
   Future<Position?> getCurrentPosition() async {
-    final hasPermission = await checkPermission();
-    if (hasPermission == LocationPermissionResult.denied ||
-        hasPermission == LocationPermissionResult.permanentlyDenied) {
+    try {
+      final hasPermission = await checkPermission();
+      if (hasPermission == LocationPermissionResult.denied ||
+          hasPermission == LocationPermissionResult.permanentlyDenied) {
+        debugPrint('[LocationService] 无位置权限');
+        return null;
+      }
+
+      debugPrint('[LocationService] 正在获取位置...');
+      final geoPosition = await geo.Geolocator.getCurrentPosition(
+        locationSettings: const geo.LocationSettings(
+          accuracy: geo.LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      debugPrint('[LocationService] 获取位置成功: ${geoPosition.latitude}, ${geoPosition.longitude}');
+      return Position(
+        latitude: geoPosition.latitude,
+        longitude: geoPosition.longitude,
+        accuracy: geoPosition.accuracy,
+        altitude: geoPosition.altitude,
+        speed: geoPosition.speed,
+        timestamp: geoPosition.timestamp,
+      );
+    } catch (e) {
+      debugPrint('[LocationService] 获取位置失败: $e');
       return null;
     }
-
-    // 实际实现需要调用 Geolocator.getCurrentPosition
-    // 这里提供模拟实现
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    return Position(
-      latitude: 39.9042, // 北京坐标示例
-      longitude: 116.4074,
-      accuracy: 10.0,
-      timestamp: DateTime.now(),
-    );
   }
 
   /// 获取当前精确位置（带详细信息）
@@ -135,24 +193,46 @@ class PreciseLocationService implements LocationService {
   @override
   Stream<Position> startLocationStream() {
     _locationStreamController?.close();
+    _geoSubscription?.cancel();
     _locationStreamController = StreamController<Position>.broadcast();
 
-    // 模拟位置更新
-    _locationTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
-      final position = await getCurrentPosition();
-      if (position != null) {
-        _locationStreamController?.add(position);
-      }
-    });
+    try {
+      _geoSubscription = geo.Geolocator.getPositionStream(
+        locationSettings: const geo.LocationSettings(
+          accuracy: geo.LocationAccuracy.medium,
+          distanceFilter: 10, // 每移动10米更新一次
+        ),
+      ).listen(
+        (geoPosition) {
+          final position = Position(
+            latitude: geoPosition.latitude,
+            longitude: geoPosition.longitude,
+            accuracy: geoPosition.accuracy,
+            altitude: geoPosition.altitude,
+            speed: geoPosition.speed,
+            timestamp: geoPosition.timestamp,
+          );
+          _locationStreamController?.add(position);
+        },
+        onError: (e) {
+          debugPrint('[LocationService] 位置流错误: $e');
+        },
+      );
+      debugPrint('[LocationService] 位置流监听已启动');
+    } catch (e) {
+      debugPrint('[LocationService] 启动位置流失败: $e');
+    }
 
     return _locationStreamController!.stream;
   }
 
   @override
   void stopLocationStream() {
-    _locationTimer?.cancel();
+    _geoSubscription?.cancel();
+    _geoSubscription = null;
     _locationStreamController?.close();
     _locationStreamController = null;
+    debugPrint('[LocationService] 位置流监听已停止');
   }
 
   /// 反向地理编码

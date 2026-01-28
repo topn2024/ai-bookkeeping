@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
+import '../services/location_service.dart' show PreciseLocationService, LocationPermissionResult, Position;
+import '../services/location_data_services.dart' show UserHomeLocationService, HomeLocationType;
 
 /// 8.15 常驻地点设置页面
 /// 设置家庭、公司等常驻位置
@@ -292,13 +294,95 @@ class _ResidentLocationPageState extends ConsumerState<ResidentLocationPage> {
     );
   }
 
-  void _autoDetectLocation(_LocationItem location) {
+  void _autoDetectLocation(_LocationItem location) async {
+    // 显示加载提示
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('正在检测${location.name}...'),
         backgroundColor: AppColors.primary,
+        duration: const Duration(seconds: 10),
       ),
     );
+
+    try {
+      final locationService = PreciseLocationService();
+
+      // 请求权限
+      final permission = await locationService.requestPermission();
+      if (permission == LocationPermissionResult.denied ||
+          permission == LocationPermissionResult.permanentlyDenied) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('需要位置权限才能自动检测'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
+      // 获取当前位置
+      final position = await locationService.getCurrentPosition();
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      if (position == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('无法获取当前位置，请检查位置服务是否开启'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
+      // 保存位置
+      final homeService = UserHomeLocationService();
+      final locationType = location.id == 'home'
+          ? HomeLocationType.home
+          : location.id == 'work'
+              ? HomeLocationType.office
+              : HomeLocationType.frequent;
+
+      await homeService.setHomeLocation(
+        type: locationType,
+        position: position,
+        name: location.name,
+      );
+
+      // 更新UI
+      setState(() {
+        final index = _locations.indexWhere((l) => l.id == location.id);
+        if (index >= 0) {
+          _locations[index] = _LocationItem(
+            id: location.id,
+            name: location.name,
+            address: '纬度: ${position.latitude.toStringAsFixed(6)}, 经度: ${position.longitude.toStringAsFixed(6)}',
+            icon: location.icon,
+            gradientColors: location.gradientColors,
+            isSet: true,
+          );
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${location.name}已设置为当前位置'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('检测失败: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   void _manualSetLocation(_LocationItem location) {

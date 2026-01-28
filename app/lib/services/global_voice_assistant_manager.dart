@@ -18,7 +18,7 @@ import 'voice/config/pipeline_config.dart';
 import 'voice/pipeline/voice_pipeline_controller.dart';
 import 'voice/intelligence_engine/result_buffer.dart';
 import 'voice/intelligence_engine/proactive_conversation_manager.dart' show SimpleUserPreferencesProvider, DialogStylePreference, LLMServiceProvider, ConversationContextProvider;
-import 'voice/agent/hybrid_intent_router.dart' show ProactiveNetworkMonitor, NetworkStatus;
+import 'voice/network_monitor.dart' show ProactiveNetworkMonitor, NetworkStatus;
 import 'voice/audio_processor_service.dart';
 import 'voice/ambient_noise_calibrator.dart';
 import 'qwen_service.dart';

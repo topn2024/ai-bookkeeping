@@ -114,7 +114,7 @@ class FloatingBallSettings {
   final double opacity;
 
   const FloatingBallSettings({
-    this.enabled = true,
+    this.enabled = false,  // 默认隐藏，需要手动打开
     this.size = 50.0,
     this.opacity = 1.0,
   });

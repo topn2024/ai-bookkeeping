@@ -27,7 +27,7 @@ import 'actions/share_actions.dart';
 import 'actions/system_actions.dart';
 import 'actions/automation_actions.dart';
 import 'actions/vault_actions.dart';
-import 'hybrid_intent_router.dart';
+import '../network_monitor.dart';
 import 'safety_confirmation_service.dart';
 import 'action_auto_registry.dart';
 

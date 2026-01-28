@@ -9,7 +9,7 @@
 /// → ActionIntent: "打车费15元" → 后台执行
 library;
 
-import 'hybrid_intent_router.dart';
+import '../network_monitor.dart';
 
 /// 分解意图结果
 class DecomposedIntentResult {

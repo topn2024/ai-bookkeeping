@@ -3954,9 +3954,9 @@ class DatabaseService implements IDatabaseService {
       whereArgs.add(maxAmount);
     }
 
-    // 描述过滤
+    // 描述过滤（数据库列名是note）
     if (description != null && description.isNotEmpty) {
-      whereConditions.add('description LIKE ?');
+      whereConditions.add('note LIKE ?');
       whereArgs.add('%$description%');
     }
 

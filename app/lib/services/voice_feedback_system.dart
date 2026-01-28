@@ -288,7 +288,8 @@ class VoiceFeedbackSystem extends ChangeNotifier {
     final entities = intentResult.entities;
 
     if (entities.containsKey('amount') && entities.containsKey('category')) {
-      return '正在为您添加${entities['category']}支出${entities['amount']}元...';
+      final typeLabel = entities['type'] == 'income' ? '收入' : '支出';
+      return '正在为您添加${entities['category']}$typeLabel${entities['amount']}元...';
     } else if (entities.containsKey('amount')) {
       return '正在为您添加${entities['amount']}元的交易记录...';
     } else {
