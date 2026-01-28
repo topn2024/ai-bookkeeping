@@ -1693,31 +1693,36 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     try {
       // 解析时间范围
       final dateRange = _parseTimeParameter(timeParam);
+      // 规范化分类名称（中文 → 英文ID，如 "交通" → "transport"）
+      final normalizedCategory = category != null
+          ? CategoryLocalizationService.instance.normalizeCategoryId(category)
+          : null;
+      debugPrint('[VoiceCoordinator] 分类规范化: "$category" → "$normalizedCategory"');
       // 解析交易类型筛选（income/expense，默认expense）
       final transactionType = allParams['transactionType'] as String?;
       final isIncomeQuery = transactionType == 'income';
 
-      // 根据queryType执行不同的查询
+      // 根据queryType执行不同的查询（使用规范化后的分类）
       switch (queryType) {
         case 'summary':
         case 'statistics':
-          return await _handleSummaryQuery(dateRange, category, isIncomeQuery: isIncomeQuery);
+          return await _handleSummaryQuery(dateRange, normalizedCategory, isIncomeQuery: isIncomeQuery);
 
         case 'recent':
           final limit = allParams['limit'] as int? ?? 10;
-          return await _handleRecentQuery(dateRange, category, limit, isIncomeQuery: isIncomeQuery);
+          return await _handleRecentQuery(dateRange, normalizedCategory, limit, isIncomeQuery: isIncomeQuery);
 
         case 'trend':
           final groupBy = allParams['groupBy'] as String? ?? 'date';
-          return await _handleTrendQuery(dateRange, category, groupBy, isIncomeQuery: isIncomeQuery);
+          return await _handleTrendQuery(dateRange, normalizedCategory, groupBy, isIncomeQuery: isIncomeQuery);
 
         case 'distribution':
           final groupBy = allParams['groupBy'] as String? ?? 'category';
           final limit = allParams['limit'] as int?;
-          return await _handleDistributionQuery(dateRange, category, groupBy, limit, isIncomeQuery: isIncomeQuery);
+          return await _handleDistributionQuery(dateRange, normalizedCategory, groupBy, limit, isIncomeQuery: isIncomeQuery);
 
         case 'comparison':
-          return await _handleComparisonQuery(dateRange, category, isIncomeQuery: isIncomeQuery);
+          return await _handleComparisonQuery(dateRange, normalizedCategory, isIncomeQuery: isIncomeQuery);
 
         default:
           debugPrint('[VoiceCoordinator] 未知的查询类型: $queryType，降级到NaturalLanguageSearchService');
@@ -1794,12 +1799,14 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 处理汇总查询（花了多少钱 / 收入多少）
   Future<VoiceSessionResult> _handleSummaryQuery(DateRange? dateRange, String? category, {bool isIncomeQuery = false}) async {
+    debugPrint('[VoiceCoordinator] 汇总查询: dateRange=${dateRange?.start}-${dateRange?.end}, category=$category');
     final transactions = await _databaseService.queryTransactions(
       startDate: dateRange?.start,
       endDate: dateRange?.end,
       category: category,
       limit: 1000,
     );
+    debugPrint('[VoiceCoordinator] 查询到 ${transactions.length} 笔交易');
 
     double totalExpense = 0;
     double totalIncome = 0;

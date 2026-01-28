@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'category_localization_service.dart';
 
 /// 自然语言搜索服务
 ///
@@ -906,10 +907,15 @@ class DatabaseTransactionRepository implements NLSearchTransactionRepository {
     AmountRange? amountRange,
     int? limit,
   }) async {
+    // 规范化分类名称为标准英文ID（如 '餐饮' → 'food', '交通' → 'transport'）
+    final normalizedCategory = categoryName != null
+        ? CategoryLocalizationService.instance.normalizeCategoryId(categoryName)
+        : null;
+
     return await queryTransactions(
       startDate: dateRange?.start,
       endDate: dateRange?.end,
-      category: categoryName,
+      category: normalizedCategory,
       merchant: merchant,
       minAmount: amountRange?.min,
       maxAmount: amountRange?.max,

@@ -7,12 +7,194 @@ import '../core/base/base_localization_service.dart';
 class CategoryLocalizationService extends BaseLocalizationService<String> {
   static CategoryLocalizationService? _instance;
 
+  /// 多语言反向映射表（缓存）
+  /// 将所有语言的分类名称映射到标准分类ID
+  static Map<String, String>? _reverseNameMap;
+
   CategoryLocalizationService._();
 
   static CategoryLocalizationService get instance {
     _instance ??= CategoryLocalizationService._();
     return _instance!;
   }
+
+  /// 获取多语言反向映射表
+  /// 懒加载构建，包含所有语言的分类名称 → ID 映射
+  static Map<String, String> get _allLanguageNameMap {
+    if (_reverseNameMap != null) return _reverseNameMap!;
+
+    _reverseNameMap = <String, String>{};
+
+    // 1. 从 _categoryTranslations 构建所有语言的反向映射
+    for (final entry in _categoryTranslations.entries) {
+      final categoryId = entry.key;
+      final translations = entry.value;
+
+      // 添加所有语言的翻译
+      for (final langEntry in translations.entries) {
+        final translatedName = langEntry.value.trim();
+        if (translatedName.isNotEmpty) {
+          _reverseNameMap![translatedName] = categoryId;
+          // 也添加小写版本（用于英文等）
+          _reverseNameMap![translatedName.toLowerCase()] = categoryId;
+        }
+      }
+    }
+
+    // 2. 合并英文名称映射
+    _reverseNameMap!.addAll(_englishNameMap);
+
+    // 3. 添加中文常见别名（口语化表达）
+    _reverseNameMap!.addAll(_chineseAliasMap);
+
+    return _reverseNameMap!;
+  }
+
+  /// 中文常见别名映射
+  /// 将口语化的分类名称映射到标准分类ID
+  static const Map<String, String> _chineseAliasMap = {
+    // 餐饮相关
+    '吃饭': 'food',
+    '吃的': 'food',
+    '饭钱': 'food',
+    '饭费': 'food',
+    '伙食': 'food',
+    '伙食费': 'food',
+    '食物': 'food',
+    '食品': 'food',
+    '吃喝': 'food',
+
+    // 交通相关
+    '打车': 'transport_taxi',
+    '打的': 'transport_taxi',
+    '出租车': 'transport_taxi',
+    '网约车': 'transport_taxi',
+    '滴滴': 'transport_taxi',
+    '地铁': 'transport_public',
+    '公交': 'transport_public',
+    '公共交通': 'transport_public',
+    '出行': 'transport',
+    '交通费': 'transport',
+    '车费': 'transport',
+    '路费': 'transport',
+
+    // 购物相关
+    '买东西': 'shopping',
+    '网购': 'shopping',
+    '淘宝': 'shopping',
+    '京东': 'shopping',
+    '拼多多': 'shopping',
+
+    // 娱乐相关
+    '玩': 'entertainment',
+    '玩乐': 'entertainment',
+    '休闲': 'entertainment',
+    '看电影': 'entertainment_movie',
+    '电影票': 'entertainment_movie',
+    '游戏充值': 'entertainment_game',
+    '氪金': 'entertainment_game',
+
+    // 居住相关
+    '房租': 'housing_rent',
+    '租房': 'housing_rent',
+    '房贷': 'housing_mortgage',
+    '物业': 'housing_property',
+    '物业费': 'housing_property',
+
+    // 水电燃气相关
+    '水电': 'utilities',
+    '水电费': 'utilities',
+    '电费': 'utilities_electric',
+    '水费': 'utilities_water',
+    '煤气': 'utilities_gas',
+    '天然气': 'utilities_gas',
+
+    // 医疗相关
+    '看病': 'medical',
+    '医药': 'medical',
+    '医药费': 'medical',
+    '药费': 'medical_medicine',
+    '买药': 'medical_medicine',
+    '挂号': 'medical_clinic',
+    '挂号费': 'medical_clinic',
+
+    // 教育相关
+    '学习': 'education',
+    '培训': 'education_training',
+    '课程': 'education_training',
+    '补课': 'education_training',
+    '学费': 'education_tuition',
+    '买书': 'education_books',
+
+    // 通讯相关
+    '话费': 'communication_phone',
+    '充话费': 'communication_phone',
+    '手机费': 'communication_phone',
+    '宽带': 'communication_internet',
+    '网费': 'communication_internet',
+
+    // 服饰相关
+    '买衣服': 'clothing',
+    '衣服': 'clothing_clothes',
+    '买鞋': 'clothing_shoes',
+    '鞋子': 'clothing_shoes',
+
+    // 美容相关
+    '化妆品': 'beauty_cosmetics',
+    '护肤品': 'beauty_skincare',
+    '理发': 'beauty_haircut',
+    '剪头发': 'beauty_haircut',
+
+    // 会员订阅相关
+    '会员': 'subscription',
+    '订阅': 'subscription',
+    '视频会员': 'subscription_video',
+    '音乐会员': 'subscription_music',
+    '网盘': 'subscription_cloud',
+
+    // 人情往来相关
+    '红包': 'social_redpacket',
+    '发红包': 'social_redpacket',
+    '份子钱': 'social_gift_money',
+    '随份子': 'social_gift_money',
+    '请客': 'social_treat',
+    '请吃饭': 'social_treat',
+
+    // 金融保险相关
+    '保险': 'finance',
+    '车险': 'finance_car_insurance',
+    '手续费': 'finance_fee',
+    '利息': 'finance_loan_interest',
+
+    // 宠物相关
+    '猫粮': 'pet_food',
+    '狗粮': 'pet_food',
+    '宠物粮': 'pet_food',
+
+    // 收入相关
+    '工资': 'salary',
+    '薪水': 'salary',
+    '月薪': 'salary',
+    '发工资': 'salary',
+    '底薪': 'salary_base',
+    '基本工资': 'salary_base',
+    '绩效': 'salary_performance',
+    '加班费': 'salary_overtime',
+    '年终奖': 'salary_annual',
+    '奖金': 'bonus',
+    '投资': 'investment',
+    '理财': 'investment',
+    '股票': 'investment_stock',
+    '基金': 'investment_fund',
+    '分红': 'investment_dividend',
+    '兼职': 'parttime',
+    '副业': 'parttime',
+    '外快': 'parttime',
+    '报销': 'reimburse',
+    '经营': 'business',
+    '生意': 'business',
+    '转账': 'transfer',
+  };
 
   @override
   Map<String, Map<String, String>> get translations => _categoryTranslations;
@@ -31,7 +213,7 @@ class CategoryLocalizationService extends BaseLocalizationService<String> {
     if (categoryId.isEmpty) return categoryId;
 
     // 先规范化分类ID
-    final normalizedId = _normalizeCategoryId(categoryId);
+    final normalizedId = normalizeCategoryId(categoryId);
 
     // 检查自定义翻译
     final custom = _customTranslations[normalizedId]?[currentLocale];
@@ -44,34 +226,72 @@ class CategoryLocalizationService extends BaseLocalizationService<String> {
 
   /// 规范化分类ID
   /// 将各种不规范的分类ID转换为标准的小写ID
-  String _normalizeCategoryId(String categoryId) {
+  /// 支持所有语言（中文、英文、日文、韩文）和常见别名
+  /// 如：'工资' → 'salary', '餐饮' → 'food', 'Food' → 'food', '吃饭' → 'food'
+  String normalizeCategoryId(String categoryId) {
+    if (categoryId.isEmpty) return categoryId;
+
+    final trimmedId = categoryId.trim();
+
     // 1. 如果已经是有效的分类ID，直接返回
-    if (_categoryTranslations.containsKey(categoryId)) {
-      return categoryId;
+    if (_categoryTranslations.containsKey(trimmedId)) {
+      return trimmedId;
     }
 
-    // 2. 尝试小写转换
-    final lowerCategoryId = categoryId.toLowerCase().trim();
+    // 2. 尝试小写转换（用于英文ID）
+    final lowerCategoryId = trimmedId.toLowerCase();
     if (_categoryTranslations.containsKey(lowerCategoryId)) {
       return lowerCategoryId;
     }
 
-    // 3. 尝试通过英文名称映射
-    final mappedId = _englishNameMap[categoryId] ?? _englishNameMap[lowerCategoryId];
+    // 3. 通过多语言反向映射表查找（O(1)查找）
+    //    包含：所有语言翻译、英文名称映射、中文常见别名
+    final mappedId = _allLanguageNameMap[trimmedId] ?? _allLanguageNameMap[lowerCategoryId];
     if (mappedId != null && _categoryTranslations.containsKey(mappedId)) {
       return mappedId;
     }
 
-    // 4. 尝试通过中文名称反向查找
-    for (final entry in _categoryTranslations.entries) {
-      final zhName = entry.value['zh'];
-      if (zhName == categoryId) {
-        return entry.key;
+    // 4. 如果都找不到，返回小写版本（保持向后兼容）
+    return lowerCategoryId;
+  }
+
+  /// 检查是否是有效的分类ID或分类名称
+  bool isValidCategory(String categoryId) {
+    if (categoryId.isEmpty) return false;
+
+    final trimmedId = categoryId.trim();
+    final lowerCategoryId = trimmedId.toLowerCase();
+
+    // 直接是分类ID
+    if (_categoryTranslations.containsKey(trimmedId) ||
+        _categoryTranslations.containsKey(lowerCategoryId)) {
+      return true;
+    }
+
+    // 是已知的分类名称
+    return _allLanguageNameMap.containsKey(trimmedId) ||
+           _allLanguageNameMap.containsKey(lowerCategoryId);
+  }
+
+  /// 获取指定分类ID的所有已知名称（用于调试）
+  List<String> getAllNamesForCategory(String categoryId) {
+    final normalizedId = normalizeCategoryId(categoryId);
+    final names = <String>[];
+
+    // 从翻译表获取
+    final translations = _categoryTranslations[normalizedId];
+    if (translations != null) {
+      names.addAll(translations.values);
+    }
+
+    // 从反向映射表中查找所有指向此ID的名称
+    for (final entry in _allLanguageNameMap.entries) {
+      if (entry.value == normalizedId && !names.contains(entry.key)) {
+        names.add(entry.key);
       }
     }
 
-    // 5. 如果都找不到，返回原始ID
-    return lowerCategoryId;
+    return names;
   }
 
   /// 英文名称到分类ID的映射表

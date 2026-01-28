@@ -8,6 +8,7 @@ import '../../../models/transaction.dart';
 import '../query/query_executor.dart';
 import '../query/query_result_router.dart';
 import '../query/query_models.dart' as query;
+import '../../category_localization_service.dart';
 
 /// 记账操作适配器
 ///
@@ -80,7 +81,9 @@ class BookkeepingOperationAdapter implements OperationAdapter {
   /// 添加交易记录
   Future<ExecutionResult> _addTransaction(Map<String, dynamic> params) async {
     final amount = params['amount'] as num?;
-    final category = params['category'] as String? ?? '其他';
+    final rawCategory = params['category'] as String? ?? '其他';
+    // 规范化分类为标准英文ID（如 '工资' → 'salary'）
+    final category = CategoryLocalizationService.instance.normalizeCategoryId(rawCategory);
     final type = params['type'] as String? ?? 'expense';
     final note = params['note'] as String?;
     final accountId = params['accountId'] as String? ?? 'default';
@@ -141,10 +144,14 @@ class BookkeepingOperationAdapter implements OperationAdapter {
     final queryType = params['queryType'] as String? ?? 'summary';
     final time = params['time'] as String?;
     final period = params['period'] as String?;
-    final category = params['category'] as String?;
+    final rawCategory = params['category'] as String?;
+    // 规范化分类为标准英文ID（如 '餐饮' → 'food', '交通' → 'transport'）
+    final category = rawCategory != null
+        ? CategoryLocalizationService.instance.normalizeCategoryId(rawCategory)
+        : null;
     final operationId = params['operationId'] as String?;
 
-    debugPrint('[BookkeepingOperationAdapter] 查询: queryType=$queryType, time=$time, period=$period, category=$category, operationId=$operationId');
+    debugPrint('[BookkeepingOperationAdapter] 查询: queryType=$queryType, time=$time, period=$period, category=$category (原: $rawCategory), operationId=$operationId');
 
     try {
       // 1. 解析时间范围
@@ -476,12 +483,18 @@ class BookkeepingOperationAdapter implements OperationAdapter {
         orElse: () => throw Exception('未找到要修改的交易'),
       );
 
+      // 规范化新分类（如果有）
+      final rawCategory = params['category'] as String?;
+      final normalizedCategory = rawCategory != null
+          ? CategoryLocalizationService.instance.normalizeCategoryId(rawCategory)
+          : null;
+
       // 构建修改后的交易
       final updatedTransaction = Transaction(
         id: originalTransaction.id,
         type: originalTransaction.type,
         amount: (params['amount'] as num?)?.toDouble() ?? originalTransaction.amount,
-        category: params['category'] as String? ?? originalTransaction.category,
+        category: normalizedCategory ?? originalTransaction.category,
         note: params['note'] as String? ?? originalTransaction.note,
         date: originalTransaction.date,
         accountId: originalTransaction.accountId,
