@@ -6,7 +6,7 @@ import '../voice_service_coordinator.dart' show VoiceIntentType;
 import '../voice_navigation_service.dart';
 import '../location_data_services.dart';
 import 'voice_intent_router.dart';
-import 'agent/hybrid_intent_router.dart' show NetworkStatus, RoutingMode;
+import 'network_monitor.dart' show NetworkStatus, RoutingMode;
 import 'unified_intent_type.dart' as unified;
 import 'intelligence_engine/models.dart' show RecognitionResultType;
 
@@ -124,36 +124,65 @@ class SmartIntentRecognizer {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 主路径: LLM识别（优先）
+    // 主路径: LLM智能识别（优先使用）
     // 使用标准化输入，移除ASR产生的多余标点符号
     // ═══════════════════════════════════════════════════════════════
-    if (_qwenService.isAvailable) {
-      debugPrint('[SmartIntent] 尝试LLM识别...');
+    if (!_qwenService.isAvailable) {
+      debugPrint('[SmartIntent] LLM不可用（未配置API Key），使用规则兜底');
+      return _fallbackToRules(normalizedInput, input, pageContext);
+    }
 
-      // 2秒后显示渐进式反馈
-      Future.delayed(const Duration(milliseconds: 2000), () {
-        onProgressiveFeedback?.call('正在思考...');
-      });
+    debugPrint('[SmartIntent] LLM可用，开始智能识别...');
 
-      final llmResult = await _tryLLMWithTimeout(normalizedInput, pageContext, conversationHistory);
-      if (llmResult != null && llmResult.isSuccess && llmResult.confidence >= 0.7) {
+    // 2秒后显示渐进式反馈
+    Future.delayed(const Duration(milliseconds: 2000), () {
+      onProgressiveFeedback?.call('正在思考...');
+    });
+
+    final llmResult = await _tryLLMWithTimeout(normalizedInput, pageContext, conversationHistory);
+
+    if (llmResult != null && llmResult.isSuccess) {
+      if (llmResult.confidence >= 0.7) {
         debugPrint('[SmartIntent] LLM识别成功: ${llmResult.intentType}, 置信度: ${llmResult.confidence}');
-        // 反向学习：将LLM结果加入缓存，加速后续相似请求
+        // 反向学习：将高置信度LLM结果加入缓存，加速后续相似请求
         if (llmResult.confidence >= 0.85) {
           await _learnPattern(normalizedInput, llmResult);
         }
         return llmResult;
+      } else {
+        // 置信度不足但有结果，可能需要clarify
+        debugPrint('[SmartIntent] LLM置信度不足(${llmResult.confidence})，但仍返回结果');
+        return llmResult; // 保留低置信度结果，让上层决定是否需要clarify
       }
-      debugPrint('[SmartIntent] LLM识别失败或置信度不足，使用规则兜底');
-      onProgressiveFeedback?.call('切换到快速模式');
-    } else {
-      debugPrint('[SmartIntent] LLM不可用（未配置API Key），使用规则兜底');
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 兜底路径: 规则匹配
+    // LLM调用失败处理
+    // 只有在网络问题时才降级到规则兜底，其他失败返回错误
     // ═══════════════════════════════════════════════════════════════
-    return _fallbackToRules(normalizedInput, input, pageContext);
+    debugPrint('[SmartIntent] LLM调用失败，检查是否网络问题...');
+
+    // 检查网络状态，如果是网络问题导致的失败，降级到规则
+    final isNetworkIssue = networkStatus != null &&
+        (networkStatus.recommendedMode == RoutingMode.ruleOnly ||
+         networkStatus.recommendedMode == RoutingMode.offline);
+
+    if (isNetworkIssue) {
+      debugPrint('[SmartIntent] 检测到网络问题，降级到规则兜底');
+      onProgressiveFeedback?.call('切换到离线模式');
+      return _fallbackToRules(normalizedInput, input, pageContext);
+    }
+
+    // 非网络问题导致的失败，返回错误提示而非降级
+    debugPrint('[SmartIntent] LLM服务异常，返回错误提示');
+    return SmartIntentResult(
+      intentType: SmartIntentType.unknown,
+      confidence: 0.0,
+      entities: {'error': '语音识别服务暂时不可用，请稍后重试'},
+      source: RecognitionSource.error,
+      originalInput: input,
+      errorMessage: '语音识别服务暂时不可用，请稍后重试',
+    );
   }
 
   /// 带超时的LLM调用
@@ -175,6 +204,7 @@ class SmartIntentRecognizer {
   Future<MultiOperationResult> recognizeMultiOperation(
     String input, {
     String? pageContext,
+    List<Map<String, String>>? conversationHistory,
   }) async {
     if (input.trim().isEmpty) {
       return MultiOperationResult.error('输入为空');
@@ -208,14 +238,12 @@ class SmartIntentRecognizer {
         'mode=${networkStatus?.recommendedMode}, '
         'qwenAvailable=${_qwenService.isAvailable}');
 
-    final shouldUseLLM = _qwenService.isAvailable &&
-        (networkStatus == null || networkStatus.recommendedMode != RoutingMode.ruleOnly);
-
-    if (!shouldUseLLM) {
-      final reason = !_qwenService.isAvailable
-          ? '未配置API Key'
-          : '网络状态: ${networkStatus?.recommendedMode}';
-      debugPrint('[SmartIntent] 跳过LLM，直接使用规则兜底 ($reason)');
+    // ═══════════════════════════════════════════════════════════════
+    // 检查LLM是否完全不可用（未配置API Key）
+    // 只有在LLM完全不可用时，才直接使用规则兜底
+    // ═══════════════════════════════════════════════════════════════
+    if (!_qwenService.isAvailable) {
+      debugPrint('[SmartIntent] LLM不可用（未配置API Key），使用规则兜底');
       return _multiOperationFallbackToRules(normalizedInput, input, pageContext);
     }
 
@@ -224,7 +252,7 @@ class SmartIntentRecognizer {
     // 使用标准化输入，移除ASR产生的多余标点符号
     // ═══════════════════════════════════════════════════════════════
     debugPrint('[SmartIntent] 尝试LLM多操作识别...');
-    final llmResult = await _tryMultiOperationLLMWithTimeout(normalizedInput, pageContext);
+    final llmResult = await _tryMultiOperationLLMWithTimeout(normalizedInput, pageContext, conversationHistory);
     if (llmResult != null && llmResult.isSuccess) {
       // LLM成功识别（包括 operation、chat、clarify 三种情况）
       debugPrint('[SmartIntent] LLM识别成功: resultType=${llmResult.resultType}, '
@@ -233,12 +261,31 @@ class SmartIntentRecognizer {
           'needsClarify=${llmResult.needsClarify}');
       return llmResult;
     }
-    debugPrint('[SmartIntent] LLM识别失败或超时，使用规则兜底');
 
     // ═══════════════════════════════════════════════════════════════
-    // 兜底路径: 使用现有单操作识别
+    // LLM调用失败处理
+    // 只有在网络问题时才降级到规则兜底，其他失败返回错误
     // ═══════════════════════════════════════════════════════════════
-    return _multiOperationFallbackToRules(normalizedInput, input, pageContext);
+    final isNetworkIssue = networkStatus != null &&
+        (networkStatus.recommendedMode == RoutingMode.ruleOnly ||
+         networkStatus.recommendedMode == RoutingMode.offline);
+
+    if (isNetworkIssue) {
+      debugPrint('[SmartIntent] 检测到网络问题，降级到规则兜底');
+      return _multiOperationFallbackToRules(normalizedInput, input, pageContext);
+    }
+
+    // 非网络问题导致的失败，返回错误提示而非降级
+    debugPrint('[SmartIntent] LLM识别失败（非网络问题），返回错误');
+    return MultiOperationResult(
+      resultType: RecognitionResultType.chat,
+      operations: [],
+      chatContent: '语音识别服务暂时不可用，请稍后重试',
+      confidence: 0.0,
+      source: RecognitionSource.error,
+      originalInput: input,
+      isOfflineMode: false,
+    );
   }
 
   /// 多操作规则兜底识别
@@ -283,9 +330,10 @@ class SmartIntentRecognizer {
   Future<MultiOperationResult?> _tryMultiOperationLLMWithTimeout(
     String input,
     String? pageContext,
+    List<Map<String, String>>? conversationHistory,
   ) async {
     try {
-      return await _multiOperationLLMRecognition(input, pageContext)
+      return await _multiOperationLLMRecognition(input, pageContext, conversationHistory)
           .timeout(Duration(milliseconds: _llmTimeoutMs));
     } catch (e) {
       debugPrint('[SmartIntent] 多操作LLM调用超时或失败: $e');
@@ -297,9 +345,10 @@ class SmartIntentRecognizer {
   Future<MultiOperationResult?> _multiOperationLLMRecognition(
     String input,
     String? pageContext,
+    List<Map<String, String>>? conversationHistory,
   ) async {
     try {
-      final prompt = _buildMultiOperationLLMPrompt(input, pageContext);
+      final prompt = _buildMultiOperationLLMPrompt(input, pageContext, conversationHistory);
       debugPrint('[SmartIntent] LLM输入: $input');
       final response = await _qwenService.chat(prompt);
 
@@ -317,15 +366,33 @@ class SmartIntentRecognizer {
   }
 
   /// 构建多操作LLM Prompt
-  String _buildMultiOperationLLMPrompt(String input, String? pageContext) {
+  String _buildMultiOperationLLMPrompt(String input, String? pageContext, List<Map<String, String>>? conversationHistory) {
     final highAdaptPages = _navigationService.highAdaptationPages;
     final pageList = highAdaptPages
         .take(30)
         .map((p) => '${p.name}(${p.route})')
         .join('、');
 
+    // 构建对话历史上下文（只取最近6条，即3轮对话）
+    String historyContext = '';
+    if (conversationHistory != null && conversationHistory.isNotEmpty) {
+      final recentHistory = conversationHistory.length > 6
+          ? conversationHistory.sublist(conversationHistory.length - 6)
+          : conversationHistory;
+      final historyLines = recentHistory.map((h) {
+        final role = h['role'] == 'user' ? '用户' : '助手';
+        return '$role: ${h['content']}';
+      }).join('\n');
+      historyContext = '''
+【对话历史 - 用于理解上下文和关联交易】
+$historyLines
+
+''';
+    }
+
     return '''
 你是一个记账助手，请理解用户输入并返回JSON。
+$historyContext
 
 【核心规则 - 必须严格遵守】
 1. 记账(add_transaction)必须同时满足两个条件：
@@ -400,6 +467,20 @@ class SmartIntentRecognizer {
    - 用户可能一次说多笔交易，如"早餐7块午餐18晚餐25"
    - 必须逐一检查每个金额，确保都生成对应的add_transaction
    - 连接词"然后"、"还有"、"另外"表示新的一笔交易
+
+11. 【重要】上下文补充交易（结合对话历史）：
+   - 如果对话历史中刚刚记录了交易，当前输入可能是后续补充的新交易
+   - 用户可能分多次说多笔交易，每次说一部分：
+     * 第一次："今天打车花了15块" → 记录打车15元
+     * 第二次："然后坐地铁花了44块" → 这是新的交易，记录地铁44元
+     * 第三次："还有18块钱是牛腩粉" → 这是新的交易，记录餐饮18元
+   - 关键识别模式：
+     * "然后" + 用途/金额 → 新的交易
+     * "还有" + 金额 + 用途 → 新的交易
+     * "另外" + 记账内容 → 新的交易
+   - 即使输入分散在多句话中，只要能关联金额和用途，就要生成add_transaction
+   - 示例："呃，然后坐地铁。花了44块。" → 44元交通（地铁）
+   - 示例："还有18块钱。是牛腩粉。" → 18元餐饮（牛腩粉）
    - 时间词"早上/中午/晚上"、"早餐/午餐/晚餐"表示不同的交易
    - 检查方法：统计输入中的金额数量，输出的operations数量应该匹配
    - 例如："早餐7块然后午餐18然后晚上25" → 3笔交易（7元、18元、25元）
@@ -470,6 +551,7 @@ class SmartIntentRecognizer {
 - category: 分类筛选（可选）
 - groupBy: 分组维度（可选，month/date/category）
 - limit: 结果数量限制（可选，当用户问"最多的一项"、"最少的一项"、"前N项"时使用）
+- transactionType: 交易类型（可选，默认expense。用户问收入时填income）
 
 【支出分类】餐饮、交通、购物、娱乐、居住、水电燃气、医疗、教育、通讯、服饰、美容、会员订阅、人情往来、金融保险、宠物、其他
 【收入分类】工资、奖金、投资收益、兼职、红包、报销、经营所得、其他
@@ -682,6 +764,45 @@ class SmartIntentRecognizer {
 
 输入："最近一周每天花了多少"
 输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"trend","time":"本周","groupBy":"date"}}],"chat_content":null,"clarify_question":null}
+
+输入："最近几个月每个月分别花了多少钱"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"trend","time":"最近几个月","groupBy":"month"}}],"chat_content":null,"clarify_question":null}
+
+输入："最近几个月每个月收入是多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"trend","time":"最近几个月","groupBy":"month","transactionType":"income"}}],"chat_content":null,"clarify_question":null}
+
+输入："每个月的支出分别是多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"trend","time":"今年","groupBy":"month"}}],"chat_content":null,"clarify_question":null}
+
+输入："每个月收入分别是多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"trend","time":"今年","groupBy":"month","transactionType":"income"}}],"chat_content":null,"clarify_question":null}
+
+输入："各月支出汇总"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"trend","time":"今年","groupBy":"month"}}],"chat_content":null,"clarify_question":null}
+
+输入："各月收入汇总"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"trend","time":"今年","groupBy":"month","transactionType":"income"}}],"chat_content":null,"clarify_question":null}
+
+输入："这几个月每月花了多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"trend","time":"最近几个月","groupBy":"month"}}],"chat_content":null,"clarify_question":null}
+
+输入："查一下最近几个月每个月收入是多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"trend","time":"最近几个月","groupBy":"month","transactionType":"income"}}],"chat_content":null,"clarify_question":null}
+
+输入："年收入多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"summary","time":"今年","transactionType":"income"}}],"chat_content":null,"clarify_question":null}
+
+输入："今年收入多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"summary","time":"今年","transactionType":"income"}}],"chat_content":null,"clarify_question":null}
+
+输入："今年赚了多少钱"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"summary","time":"今年","transactionType":"income"}}],"chat_content":null,"clarify_question":null}
+
+输入："年支出多少"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"summary","time":"今年"}}],"chat_content":null,"clarify_question":null}
+
+输入："今年花了多少钱"
+输出：{"result_type":"operation","operations":[{"type":"query","priority":"normal","params":{"queryType":"summary","time":"今年"}}],"chat_content":null,"clarify_question":null}
 
 只返回JSON：''';
   }
@@ -1635,7 +1756,7 @@ $historyContext
 - "花了100块吃饭" → add_transaction（有金额有用途）
 
 【返回格式】
-{"intent":"意图类型","confidence":0.9,"entities":{"amount":金额,"category":"分类","type":"income或expense","note":"具体物品或用途","targetPage":"页面名","route":"路由","operation":"操作类型","configId":"配置项ID","vaultName":"小金库名称"}}
+{"intent":"意图类型","confidence":0.9,"entities":{"amount":金额,"category":"分类","type":"income或expense","note":"具体物品或用途","targetPage":"页面名","route":"路由","operation":"操作类型","configId":"配置项ID","vaultName":"小金库名称","queryType":"查询类型","time":"时间范围"}}
 
 【记账参数说明】
 - amount: 金额（必填）
@@ -1648,6 +1769,47 @@ $historyContext
 【支出分类】餐饮、交通、购物、娱乐、居住、水电燃气、医疗、教育、通讯、服饰、美容、会员订阅、人情往来、金融保险、宠物、其他
 【收入分类】工资、奖金、投资收益、兼职、红包、报销、经营所得、其他
 【常用页面】$pageList
+
+【查询参数说明（intent为query时必填）】
+- queryType: 查询类型（必填）
+  * "summary" - 汇总统计（如"花了多少钱"、"总共花了多少"）
+  * "recent" - 最近记录（如"最近的消费"、"最近几笔"）
+  * "trend" - 趋势分析（如"消费趋势"、"每月变化"）
+  * "distribution" - 分布统计（如"各分类占比"、"花在哪些地方"）
+  * "comparison" - 对比分析（如"比上月多还是少"）
+- time: 时间范围（必填）
+  * 今天、昨天、本周、上周、本月、上月、今年、去年、最近X天/周/月等
+  * 如果用户没说时间，默认使用"本月"
+- category: 分类筛选（可选）
+  * 如果用户指定了分类（餐饮、交通等），则填写分类名
+- transactionType: 交易类型筛选（可选）
+  * "expense" - 仅查询支出（默认，用户问"花了多少"、"消费"、"支出"时）
+  * "income" - 仅查询收入（用户问"收入多少"、"赚了多少"、"进账"时）
+
+【查询示例】
+输入："帮我查一下最近花了多少钱"
+输出：{"intent":"query","confidence":0.9,"entities":{"queryType":"summary","time":"本月"}}
+
+输入："今天花了多少"
+输出：{"intent":"query","confidence":0.9,"entities":{"queryType":"summary","time":"今天"}}
+
+输入："这个月餐饮花了多少"
+输出：{"intent":"query","confidence":0.9,"entities":{"queryType":"summary","time":"本月","category":"餐饮"}}
+
+输入："最近的消费记录"
+输出：{"intent":"query","confidence":0.9,"entities":{"queryType":"recent","time":"最近7天"}}
+
+输入："这个月收入多少"
+输出：{"intent":"query","confidence":0.9,"entities":{"queryType":"summary","time":"本月","transactionType":"income"}}
+
+输入："收入都来自哪里"
+输出：{"intent":"query","confidence":0.9,"entities":{"queryType":"distribution","time":"本月","transactionType":"income"}}
+
+输入："最近收入趋势"
+输出：{"intent":"query","confidence":0.9,"entities":{"queryType":"trend","time":"最近3个月","transactionType":"income"}}
+
+输入："这个月赚了多少钱"
+输出：{"intent":"query","confidence":0.9,"entities":{"queryType":"summary","time":"本月","transactionType":"income"}}
 
 只返回JSON，不要其他内容：''';
   }

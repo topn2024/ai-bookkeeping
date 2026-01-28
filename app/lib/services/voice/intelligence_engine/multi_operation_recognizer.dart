@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../smart_intent_recognizer.dart';
-import '../agent/hybrid_intent_router.dart' show NetworkStatus;
+import '../network_monitor.dart' show NetworkStatus;
 
 /// 多操作识别器
 ///
@@ -25,6 +25,7 @@ class MultiOperationRecognizer {
   Future<MultiOperationResult> recognize(
     String input, {
     String? pageContext,
+    List<Map<String, String>>? conversationHistory,
   }) async {
     debugPrint('[MultiOperationRecognizer] 识别输入: $input');
 
@@ -32,6 +33,7 @@ class MultiOperationRecognizer {
     final result = await _recognizer.recognizeMultiOperation(
       input,
       pageContext: pageContext,
+      conversationHistory: conversationHistory,
     );
 
     if (!result.isSuccess) {

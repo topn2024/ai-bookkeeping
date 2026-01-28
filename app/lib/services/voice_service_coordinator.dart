@@ -19,7 +19,7 @@ import 'voice/llm_response_generator.dart';
 import 'voice/intelligence_engine/intelligence_engine.dart';
 import 'voice/intelligence_engine/result_buffer.dart';
 import 'voice/intelligence_engine/models.dart';
-import 'voice/agent/hybrid_intent_router.dart' show NetworkStatus;
+import 'voice/network_monitor.dart' show NetworkStatus;
 import 'voice/adapters/bookkeeping_operation_adapter.dart';
 import 'voice/adapters/bookkeeping_feedback_adapter.dart';
 import 'voice_recognition_engine.dart';
@@ -35,6 +35,7 @@ import 'voice_budget_query_service.dart';
 import 'vault_repository.dart';
 import 'casual_chat_service.dart';
 import 'learning/voice_intent_learning_service.dart';
+import 'category_localization_service.dart';
 
 /// 语音服务协调器
 ///
@@ -682,10 +683,24 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       _addToHistory(command);
 
       // ═══════════════════════════════════════════════════════════════
+      // 获取对话历史用于上下文理解（关键：让LLM知道之前记录了什么）
+      // ═══════════════════════════════════════════════════════════════
+      final conversationHistory = GlobalVoiceAssistantManager.instance.conversationHistory
+          .where((m) => m.type == ChatMessageType.user || m.type == ChatMessageType.assistant)
+          .map((m) => {
+            'role': m.type == ChatMessageType.user ? 'user' : 'assistant',
+            'content': m.content,
+          })
+          .toList();
+
+      // ═══════════════════════════════════════════════════════════════
       // 优先使用 LLM 进行整体语义理解（保持上下文关联）
       // ═══════════════════════════════════════════════════════════════
       debugPrint('[VoiceCoordinator] 多意图处理 - 尝试使用LLM整体识别...');
-      final llmResult = await _smartRecognizer.recognizeMultiOperation(voiceInput);
+      final llmResult = await _smartRecognizer.recognizeMultiOperation(
+        voiceInput,
+        conversationHistory: conversationHistory.isNotEmpty ? conversationHistory : null,
+      );
 
       if (llmResult.isSuccess && llmResult.hasOperations) {
         debugPrint('[VoiceCoordinator] LLM识别成功: ${llmResult.operations.length}个操作');
@@ -695,12 +710,20 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         for (final op in llmResult.operations) {
           if (op.type == OperationType.addTransaction) {
             final amount = op.params['amount'] as num?;
-            final category = op.params['category'] as String? ?? '其他';
+            final rawCategory = op.params['category'] as String? ?? '其他';
+            // 规范化分类为标准英文ID（如 '工资' → 'salary'）
+            final category = CategoryLocalizationService.instance.normalizeCategoryId(rawCategory);
             final merchant = op.params['merchant'] as String?;
             final note = op.params['note'] as String?;
             // 检查LLM返回的type参数，判断是收入还是支出
             final typeStr = op.params['type'] as String?;
-            final isIncome = typeStr == 'income';
+            // 已知的收入分类ID（作为兜底判断）
+            const incomeCategoryIds = {
+              'salary', 'bonus', 'investment', 'parttime', 'redpacket',
+              'reimburse', 'business', 'other_income',
+            };
+            final isIncome = typeStr == 'income' ||
+                (typeStr == null && incomeCategoryIds.contains(category));
 
             if (amount != null && amount > 0) {
               completeIntents.add(CompleteIntent(
@@ -1324,19 +1347,23 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       final entities = intentResult.entities;
       // 使用 num 类型处理，因为 LLM 可能返回 int 或 double
       final amount = (entities['amount'] as num?)?.toDouble();
-      final category = entities['category'] as String?;
+      final rawCategory = entities['category'] as String?;
+      // 规范化分类为标准英文ID（如 '工资' → 'salary', '餐饮' → 'food'）
+      final category = rawCategory != null
+          ? CategoryLocalizationService.instance.normalizeCategoryId(rawCategory)
+          : null;
       final merchant = entities['merchant'] as String?;
       // 检查type参数，判断是收入还是支出
       final typeStr = entities['type'] as String?;
-      // 已知的收入分类关键词（作为兜底判断）
-      const incomeCategories = [
-        '工资', '薪资', '奖金', '投资收益', '利息', '股息', '分红',
-        '兼职', '红包', '报销', '经营所得', '租金收入', '退款', '其他收入',
-      ];
+      // 已知的收入分类ID（作为兜底判断，使用标准化后的英文ID）
+      const incomeCategoryIds = {
+        'salary', 'bonus', 'investment', 'parttime', 'redpacket',
+        'reimburse', 'business', 'other_income',
+      };
       // 先检查type参数，如果没有则根据分类判断
       final isIncome = typeStr == 'income' ||
-          (typeStr == null && category != null && incomeCategories.any((c) => category.contains(c)));
-      debugPrint('[VoiceCoordinator] 解析结果: amount=$amount, category=$category, merchant=$merchant, type=$typeStr, isIncome=$isIncome');
+          (typeStr == null && category != null && incomeCategoryIds.contains(category));
+      debugPrint('[VoiceCoordinator] 解析结果: amount=$amount, rawCategory=$rawCategory, category=$category, merchant=$merchant, type=$typeStr, isIncome=$isIncome');
 
       if (amount == null || amount <= 0) {
         debugPrint('[VoiceCoordinator] 金额无效，返回错误');
@@ -1540,6 +1567,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   ) async {
     try {
       debugPrint('[VoiceCoordinator] 处理查询意图: $originalInput');
+      debugPrint('[VoiceCoordinator] LLM识别的参数: ${intentResult.entities}');
 
       // 1. 先检测是否是预算相关查询
       if (_isBudgetQuery(originalInput)) {
@@ -1547,7 +1575,18 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         return await _handleBudgetQuery(originalInput);
       }
 
-      // 2. 否则使用 NaturalLanguageSearchService 进行交易记录查询
+      // 2. 优先使用LLM识别的结构化查询参数
+      final queryType = intentResult.entities['queryType'] as String?;
+      final time = intentResult.entities['time'] as String?;
+      final category = intentResult.entities['category'] as String?;
+
+      if (queryType != null) {
+        debugPrint('[VoiceCoordinator] 使用LLM识别的查询参数: queryType=$queryType, time=$time, category=$category');
+        return await _handleStructuredQuery(queryType, time, category, intentResult.entities, originalInput);
+      }
+
+      // 3. 降级：如果LLM没有识别出queryType，使用 NaturalLanguageSearchService 重新解析
+      debugPrint('[VoiceCoordinator] LLM未识别出queryType，降级到NaturalLanguageSearchService');
       final searchResult = await _nlSearchService.search(originalInput);
 
       debugPrint('[VoiceCoordinator] 查询结果类型: ${searchResult.type}, 答案: ${searchResult.answer}');
@@ -1641,6 +1680,540 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       );
       return VoiceSessionResult.error(message);
     }
+  }
+
+  /// 处理结构化查询（使用LLM识别的参数）
+  Future<VoiceSessionResult> _handleStructuredQuery(
+    String queryType,
+    String? timeParam,
+    String? category,
+    Map<String, dynamic> allParams,
+    String originalInput,
+  ) async {
+    try {
+      // 解析时间范围
+      final dateRange = _parseTimeParameter(timeParam);
+      // 解析交易类型筛选（income/expense，默认expense）
+      final transactionType = allParams['transactionType'] as String?;
+      final isIncomeQuery = transactionType == 'income';
+
+      // 根据queryType执行不同的查询
+      switch (queryType) {
+        case 'summary':
+        case 'statistics':
+          return await _handleSummaryQuery(dateRange, category, isIncomeQuery: isIncomeQuery);
+
+        case 'recent':
+          final limit = allParams['limit'] as int? ?? 10;
+          return await _handleRecentQuery(dateRange, category, limit, isIncomeQuery: isIncomeQuery);
+
+        case 'trend':
+          final groupBy = allParams['groupBy'] as String? ?? 'date';
+          return await _handleTrendQuery(dateRange, category, groupBy, isIncomeQuery: isIncomeQuery);
+
+        case 'distribution':
+          final groupBy = allParams['groupBy'] as String? ?? 'category';
+          final limit = allParams['limit'] as int?;
+          return await _handleDistributionQuery(dateRange, category, groupBy, limit, isIncomeQuery: isIncomeQuery);
+
+        case 'comparison':
+          return await _handleComparisonQuery(dateRange, category, isIncomeQuery: isIncomeQuery);
+
+        default:
+          debugPrint('[VoiceCoordinator] 未知的查询类型: $queryType，降级到NaturalLanguageSearchService');
+          final searchResult = await _nlSearchService.search(originalInput);
+          return _buildSearchResult(searchResult);
+      }
+    } catch (e) {
+      debugPrint('[VoiceCoordinator] 结构化查询失败: $e');
+      return VoiceSessionResult.error('查询失败: $e');
+    }
+  }
+
+  /// 解析时间参数为日期范围
+  DateRange? _parseTimeParameter(String? timeParam) {
+    if (timeParam == null) return null;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    switch (timeParam) {
+      case '今天':
+        return DateRange(start: today, end: today.add(const Duration(days: 1)));
+      case '昨天':
+        final yesterday = today.subtract(const Duration(days: 1));
+        return DateRange(start: yesterday, end: today);
+      case '本周':
+      case '这周':
+        final weekStart = today.subtract(Duration(days: now.weekday - 1));
+        return DateRange(start: weekStart, end: now);
+      case '上周':
+        final lastWeekStart = today.subtract(Duration(days: now.weekday + 6));
+        final lastWeekEnd = today.subtract(Duration(days: now.weekday));
+        return DateRange(start: lastWeekStart, end: lastWeekEnd);
+      case '本月':
+      case '这个月':
+        final monthStart = DateTime(now.year, now.month, 1);
+        return DateRange(start: monthStart, end: now);
+      case '上月':
+      case '上个月':
+        final lastMonth = DateTime(now.year, now.month - 1, 1);
+        final lastMonthEnd = DateTime(now.year, now.month, 1);
+        return DateRange(start: lastMonth, end: lastMonthEnd);
+      case '今年':
+      case '这一年':
+        final yearStart = DateTime(now.year, 1, 1);
+        return DateRange(start: yearStart, end: now);
+      case '最近':
+      case '最近7天':
+        return DateRange(start: today.subtract(const Duration(days: 7)), end: now);
+      case '最近30天':
+        return DateRange(start: today.subtract(const Duration(days: 30)), end: now);
+      case '最近几个月':
+      case '这几个月':
+        // 默认3个月
+        final threeMonthsAgo = DateTime(now.year, now.month - 3, 1);
+        return DateRange(start: threeMonthsAgo, end: now);
+      default:
+        // 尝试解析"最近N天"格式
+        final recentDaysMatch = RegExp(r'最近(\d+)天').firstMatch(timeParam);
+        if (recentDaysMatch != null) {
+          final days = int.parse(recentDaysMatch.group(1)!);
+          return DateRange(start: today.subtract(Duration(days: days)), end: now);
+        }
+        // 尝试解析"最近N个月"格式
+        final recentMonthsMatch = RegExp(r'最近(\d+)个?月').firstMatch(timeParam);
+        if (recentMonthsMatch != null) {
+          final months = int.parse(recentMonthsMatch.group(1)!);
+          final startDate = DateTime(now.year, now.month - months, 1);
+          return DateRange(start: startDate, end: now);
+        }
+        return null;
+    }
+  }
+
+  /// 处理汇总查询（花了多少钱 / 收入多少）
+  Future<VoiceSessionResult> _handleSummaryQuery(DateRange? dateRange, String? category, {bool isIncomeQuery = false}) async {
+    final transactions = await _databaseService.queryTransactions(
+      startDate: dateRange?.start,
+      endDate: dateRange?.end,
+      category: category,
+      limit: 1000,
+    );
+
+    double totalExpense = 0;
+    double totalIncome = 0;
+    int expenseCount = 0;
+    int incomeCount = 0;
+
+    for (final t in transactions) {
+      if (t.type == model.TransactionType.income || _isIncomeLikeCategory(t.category)) {
+        totalIncome += t.amount;
+        incomeCount++;
+      } else if (t.type == model.TransactionType.expense) {
+        totalExpense += t.amount;
+        expenseCount++;
+      }
+    }
+
+    final timeDesc = _formatTimeRange(dateRange);
+    final categoryDesc = category != null ? '${_localizedCategoryName(category)}分类' : '';
+
+    String message;
+    if (isIncomeQuery) {
+      // 收入查询
+      if (incomeCount == 0) {
+        message = '$timeDesc${categoryDesc}没有收入记录';
+      } else {
+        message = '$timeDesc${categoryDesc}共收入${totalIncome.toStringAsFixed(2)}元，${incomeCount}笔';
+        if (totalExpense > 0) {
+          final net = totalIncome - totalExpense;
+          message += '，支出${totalExpense.toStringAsFixed(2)}元，净收入${net.toStringAsFixed(2)}元';
+        }
+      }
+    } else {
+      // 支出查询（默认）
+      if (category != null) {
+        message = '$timeDesc$categoryDesc共花费${totalExpense.toStringAsFixed(2)}元，${expenseCount}笔';
+      } else if (totalIncome > 0) {
+        // 同时显示支出和收入时，分别标注笔数，避免歧义
+        message = '$timeDesc共花费${totalExpense.toStringAsFixed(2)}元（${expenseCount}笔），收入${totalIncome.toStringAsFixed(2)}元（${incomeCount}笔）';
+      } else {
+        message = '$timeDesc共花费${totalExpense.toStringAsFixed(2)}元，${expenseCount}笔';
+      }
+    }
+
+    await _speakWithSkipCheck(message);
+    return VoiceSessionResult.success(message, {
+      'totalExpense': totalExpense,
+      'totalIncome': totalIncome,
+      'count': isIncomeQuery ? incomeCount : expenseCount,
+    });
+  }
+
+  /// 处理最近记录查询
+  Future<VoiceSessionResult> _handleRecentQuery(DateRange? dateRange, String? category, int limit, {bool isIncomeQuery = false}) async {
+    final transactions = await _databaseService.queryTransactions(
+      startDate: dateRange?.start,
+      endDate: dateRange?.end,
+      category: category,
+      limit: isIncomeQuery ? 1000 : limit,
+    );
+
+    final typeLabel = isIncomeQuery ? '收入' : '';
+
+    // 按收入/支出筛选
+    final filtered = isIncomeQuery
+        ? transactions.where((t) => t.type == model.TransactionType.income || _isIncomeLikeCategory(t.category)).toList()
+        : transactions;
+
+    final result = isIncomeQuery ? filtered.take(limit).toList() : filtered;
+
+    if (result.isEmpty) {
+      final message = '没有找到相关${typeLabel}记录';
+      await _speakWithSkipCheck(message);
+      return VoiceSessionResult.success(message);
+    }
+
+    final firstCategory = _localizedCategoryName(result.first.category);
+    final message = '找到${result.length}条${typeLabel}记录，最近的是$firstCategory${result.first.amount}元';
+    await _speakWithSkipCheck(message);
+    return VoiceSessionResult.success(message, {
+      'transactions': result,
+    });
+  }
+
+  /// 处理趋势查询
+  Future<VoiceSessionResult> _handleTrendQuery(DateRange? dateRange, String? category, String groupBy, {bool isIncomeQuery = false}) async {
+    final range = dateRange ?? DateRange(
+      start: DateTime.now().subtract(const Duration(days: 30)),
+      end: DateTime.now(),
+    );
+    final transactions = await _databaseService.queryTransactions(
+      startDate: range.start,
+      endDate: range.end,
+      category: category,
+      limit: 1000,
+    );
+
+    final typeLabel = isIncomeQuery ? '收入' : '消费';
+    if (transactions.isEmpty) {
+      final message = '该时间段没有找到${typeLabel}记录';
+      await _speakWithSkipCheck(message);
+      return VoiceSessionResult.success(message);
+    }
+
+    // 按时间分组统计
+    final Map<String, double> grouped = {};
+    for (final t in transactions) {
+      if (isIncomeQuery) {
+        // 收入查询：只统计收入类交易
+        if (t.type != model.TransactionType.income && !_isIncomeLikeCategory(t.category)) continue;
+      } else {
+        // 支出查询：排除收入和转账类
+        if (t.type != model.TransactionType.expense || _isIncomeLikeCategory(t.category)) continue;
+      }
+      String key;
+      if (groupBy == 'month') {
+        key = '${t.date.year}-${t.date.month.toString().padLeft(2, '0')}';
+      } else if (groupBy == 'week') {
+        final weekStart = t.date.subtract(Duration(days: t.date.weekday - 1));
+        key = '${weekStart.month}/${weekStart.day}周';
+      } else {
+        key = '${t.date.month}/${t.date.day}';
+      }
+      grouped[key] = (grouped[key] ?? 0) + t.amount;
+    }
+
+    if (grouped.isEmpty) {
+      final message = '该时间段没有${typeLabel}记录';
+      await _speakWithSkipCheck(message);
+      return VoiceSessionResult.success(message);
+    }
+
+    final sortedKeys = grouped.keys.toList()..sort();
+    final verbLabel = isIncomeQuery ? '收入' : '花费';
+    final parts = sortedKeys.map((k) => '$k$verbLabel${grouped[k]!.toStringAsFixed(0)}元').toList();
+    final timeDesc = _formatTimeRange(dateRange);
+    final message = '$timeDesc${typeLabel}趋势：${parts.join("，")}';
+    await _speakWithSkipCheck(message);
+    return VoiceSessionResult.success(message, {'trend': grouped});
+  }
+
+  /// 处理分布查询
+  Future<VoiceSessionResult> _handleDistributionQuery(DateRange? dateRange, String? category, String groupBy, int? limit, {bool isIncomeQuery = false}) async {
+    final range = dateRange ?? DateRange(
+      start: DateTime(DateTime.now().year, DateTime.now().month, 1),
+      end: DateTime.now(),
+    );
+    final transactions = await _databaseService.queryTransactions(
+      startDate: range.start,
+      endDate: range.end,
+      category: category,
+      limit: 1000,
+    );
+
+    final typeLabel = isIncomeQuery ? '收入' : '消费';
+    if (transactions.isEmpty) {
+      final message = '该时间段没有找到${typeLabel}记录';
+      await _speakWithSkipCheck(message);
+      return VoiceSessionResult.success(message);
+    }
+
+    // 按分类分组统计
+    final Map<String, double> categoryTotals = {};
+    double total = 0;
+    for (final t in transactions) {
+      if (isIncomeQuery) {
+        // 收入查询：只统计收入类交易
+        if (t.type != model.TransactionType.income && !_isIncomeLikeCategory(t.category)) continue;
+      } else {
+        // 支出查询：排除收入和转账类
+        if (t.type != model.TransactionType.expense) continue;
+        if (_isIncomeLikeCategory(t.category)) continue;
+      }
+      final displayName = _localizedCategoryName(t.category);
+      categoryTotals[displayName] = (categoryTotals[displayName] ?? 0) + t.amount;
+      total += t.amount;
+    }
+
+    if (categoryTotals.isEmpty) {
+      final message = '该时间段没有${typeLabel}记录';
+      await _speakWithSkipCheck(message);
+      return VoiceSessionResult.success(message);
+    }
+
+    // 按金额排序
+    final sorted = categoryTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final displayCount = limit ?? 5;
+    final topItems = sorted.take(displayCount);
+    final timeDesc = _formatTimeRange(dateRange);
+    final parts = topItems.map((e) {
+      final percent = (e.value / total * 100).toStringAsFixed(0);
+      return '${e.key}${e.value.toStringAsFixed(0)}元占$percent%';
+    }).toList();
+
+    final totalLabel = isIncomeQuery ? '总收入' : '总支出';
+    final topLabel = isIncomeQuery ? '收入最多的是' : '花费最多的是';
+    final message = '$timeDesc$totalLabel${total.toStringAsFixed(0)}元，$topLabel：${parts.join("，")}';
+    await _speakWithSkipCheck(message);
+    return VoiceSessionResult.success(message, {
+      'distribution': categoryTotals,
+      'total': total,
+    });
+  }
+
+  /// 处理对比查询
+  Future<VoiceSessionResult> _handleComparisonQuery(DateRange? dateRange, String? category, {bool isIncomeQuery = false}) async {
+    // 确定当前周期和上一个周期
+    final now = DateTime.now();
+    final currentStart = dateRange?.start ?? DateTime(now.year, now.month, 1);
+    final currentEnd = dateRange?.end ?? now;
+    final duration = currentEnd.difference(currentStart);
+
+    final prevEnd = currentStart;
+    final prevStart = prevEnd.subtract(duration);
+
+    // 查询两个时间段的数据
+    final currentTransactions = await _databaseService.queryTransactions(
+      startDate: currentStart,
+      endDate: currentEnd,
+      category: category,
+      limit: 1000,
+    );
+    final prevTransactions = await _databaseService.queryTransactions(
+      startDate: prevStart,
+      endDate: prevEnd,
+      category: category,
+      limit: 1000,
+    );
+
+    double currentAmount = 0;
+    double prevAmount = 0;
+
+    bool _matchType(model.Transaction t) {
+      if (isIncomeQuery) {
+        return t.type == model.TransactionType.income || _isIncomeLikeCategory(t.category);
+      } else {
+        return t.type == model.TransactionType.expense && !_isIncomeLikeCategory(t.category);
+      }
+    }
+
+    for (final t in currentTransactions) {
+      if (_matchType(t)) currentAmount += t.amount;
+    }
+    for (final t in prevTransactions) {
+      if (_matchType(t)) prevAmount += t.amount;
+    }
+
+    final diff = currentAmount - prevAmount;
+    final timeDesc = _formatTimeRange(dateRange);
+    final categoryDesc = category != null ? _localizedCategoryName(category) : '';
+    final typeLabel = isIncomeQuery ? '收入' : '支出';
+
+    String message;
+    if (prevAmount == 0 && currentAmount == 0) {
+      message = '两个时间段都没有$categoryDesc${typeLabel}记录';
+    } else if (prevAmount == 0) {
+      message = '$timeDesc$categoryDesc$typeLabel${currentAmount.toStringAsFixed(0)}元，上个周期没有记录';
+    } else {
+      final changePercent = (diff / prevAmount * 100).abs().toStringAsFixed(0);
+      if (diff > 0) {
+        message = '$timeDesc$categoryDesc$typeLabel${currentAmount.toStringAsFixed(0)}元，比上个周期多了${diff.toStringAsFixed(0)}元，增长$changePercent%';
+      } else if (diff < 0) {
+        message = '$timeDesc$categoryDesc$typeLabel${currentAmount.toStringAsFixed(0)}元，比上个周期少了${diff.abs().toStringAsFixed(0)}元，减少$changePercent%';
+      } else {
+        message = '$timeDesc$categoryDesc$typeLabel${currentAmount.toStringAsFixed(0)}元，与上个周期持平';
+      }
+    }
+
+    await _speakWithSkipCheck(message);
+    return VoiceSessionResult.success(message, {
+      'currentAmount': currentAmount,
+      'prevAmount': prevAmount,
+      'diff': diff,
+    });
+  }
+
+  /// 格式化时间范围为描述文字
+  String _formatTimeRange(DateRange? dateRange) {
+    if (dateRange == null) return '';
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // 今天
+    if (dateRange.start == today && dateRange.end.isAfter(today)) {
+      return '今天';
+    }
+
+    // 昨天
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (dateRange.start == yesterday && dateRange.end == today) {
+      return '昨天';
+    }
+
+    // 今年（必须在本月判断之前检查，因为1月份时今年开始==本月开始）
+    final yearStart = DateTime(now.year, 1, 1);
+    if (dateRange.start == yearStart) {
+      // 如果是1月份，需要额外判断结束时间是否跨越了多天（排除"本月1日"的情况）
+      if (now.month == 1) {
+        // 1月份时，如果结束时间接近现在，可能是今年也可能是本月
+        // 通过检查是否明确请求了"今年"来区分（这里假设如果start是1月1日就是今年）
+        return '今年';
+      }
+      return '今年';
+    }
+
+    // 本月
+    final monthStart = DateTime(now.year, now.month, 1);
+    if (dateRange.start == monthStart) {
+      return '本月';
+    }
+
+    // 最近几个月（3个月前的月初）
+    final threeMonthsAgo = DateTime(now.year, now.month - 3, 1);
+    if (dateRange.start.year == threeMonthsAgo.year &&
+        dateRange.start.month == threeMonthsAgo.month &&
+        dateRange.start.day == 1) {
+      return '最近几个月';
+    }
+
+    return ''; // 其他情况返回空
+  }
+
+  /// 获取分类的本地化显示名称
+  String _localizedCategoryName(String category) {
+    return CategoryLocalizationService.instance.getCategoryName(category);
+  }
+
+  /// 判断分类是否属于收入或转账类型（用于过滤被错误标记为支出的交易）
+  bool _isIncomeLikeCategory(String category) {
+    const incomeCategories = {
+      // 收入一级分类
+      'salary', 'bonus', 'investment', 'parttime', 'redpacket',
+      'reimburse', 'business', 'other_income',
+      // 转账分类
+      'transfer', 'account_transfer',
+      // 中文收入分类名称（数据库中可能直接存储中文）
+      '收入', '工资', '奖金', '投资收益', '兼职', '红包', '报销',
+      '经营所得', '转账', '账户互转',
+    };
+    final lower = category.toLowerCase().trim();
+    if (incomeCategories.contains(lower)) return true;
+    // 检查子分类前缀
+    if (lower.startsWith('salary_') ||
+        lower.startsWith('bonus_') ||
+        lower.startsWith('investment_') ||
+        lower.startsWith('parttime_') ||
+        lower.startsWith('redpacket_') ||
+        lower.startsWith('reimburse_') ||
+        lower.startsWith('business_')) {
+      return true;
+    }
+    return false;
+  }
+
+  /// 从SearchResult构建VoiceSessionResult
+  VoiceSessionResult _buildSearchResult(SearchResult searchResult) {
+    String message;
+    Map<String, dynamic>? resultData;
+
+    switch (searchResult.type) {
+      case ResultType.answer:
+        message = searchResult.answer;
+        resultData = searchResult.data;
+        break;
+      case ResultType.single:
+        message = searchResult.answer;
+        final transaction = searchResult.data?['transaction'] as NLSearchTransaction?;
+        if (transaction != null) {
+          message += '，${transaction.category ?? ''}${transaction.description ?? ''}';
+          resultData = {
+            'transaction': {
+              'id': transaction.id,
+              'amount': transaction.amount,
+              'category': transaction.category,
+              'merchant': transaction.merchant,
+              'date': transaction.date.toIso8601String(),
+            },
+          };
+        }
+        break;
+      case ResultType.list:
+        final transactions = searchResult.data?['transactions'] as List<NLSearchTransaction>?;
+        if (transactions != null && transactions.isNotEmpty) {
+          final totalAmount = transactions.fold(0.0, (sum, t) => sum + t.amount);
+          message = '${searchResult.answer}，总金额${totalAmount.toStringAsFixed(2)}元';
+          resultData = {
+            'count': transactions.length,
+            'totalAmount': totalAmount,
+            'transactions': transactions.map((t) => {
+              'id': t.id,
+              'amount': t.amount,
+              'category': t.category,
+              'date': t.date.toIso8601String(),
+            }).toList(),
+          };
+        } else {
+          message = searchResult.answer;
+        }
+        break;
+      case ResultType.trend:
+      case ResultType.stats:
+        message = searchResult.answer;
+        resultData = searchResult.data;
+        break;
+      case ResultType.empty:
+        message = searchResult.answer;
+        break;
+      case ResultType.error:
+        return VoiceSessionResult.error(searchResult.answer);
+    }
+
+    return VoiceSessionResult.success(message, resultData);
   }
 
   /// 处理导航意图
