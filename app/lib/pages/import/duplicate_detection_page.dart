@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../theme/app_theme.dart';
+import '../../models/transaction.dart';
+import '../../services/duplicate_detection_service.dart';
+import '../../providers/database_provider.dart';
 import 'transaction_comparison_page.dart';
 
 /// 去重检测页面
@@ -29,69 +33,90 @@ class _DuplicateDetectionPageState extends ConsumerState<DuplicateDetectionPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // 模拟数据
-  late int _newCount;
-  late int _suspectedCount;
-  late int _confirmedCount;
-  late List<DuplicateItem> _suspectedDuplicates;
-  late List<DuplicateItem> _confirmedDuplicates;
+  // 真实检测数据
+  bool _isLoading = true;
+  int _newCount = 0;
+  int _suspectedCount = 0;
+  int _confirmedCount = 0;
+  List<DuplicateItem> _suspectedDuplicates = [];
+  List<DuplicateItem> _confirmedDuplicates = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this, initialIndex: 1);
-    _initializeData();
+    _performDuplicateDetection();
   }
 
-  void _initializeData() {
-    // 模拟去重检测结果
-    final total = widget.transactions.length;
-    _confirmedCount = (total * 0.08).round();
-    _suspectedCount = (total * 0.12).round();
-    _newCount = total - _confirmedCount - _suspectedCount;
+  /// 执行真实的去重检测
+  Future<void> _performDuplicateDetection() async {
+    try {
+      final db = ref.read(databaseProvider);
 
-    // 模拟疑似重复数据
-    _suspectedDuplicates = [
-      DuplicateItem(
-        merchant: '星巴克',
-        amount: 38.00,
-        date: DateTime.now().subtract(const Duration(days: 1)),
-        similarity: 92,
-        existingMerchant: '星巴克',
-        existingAmount: 38.00,
-        existingDate: DateTime.now().subtract(const Duration(days: 1, minutes: 2)),
-      ),
-      DuplicateItem(
-        merchant: '美团外卖',
-        amount: 45.50,
-        date: DateTime.now().subtract(const Duration(days: 2)),
-        similarity: 75,
-        existingMerchant: '美团外卖-午餐',
-        existingAmount: 45.50,
-        existingDate: DateTime.now().subtract(const Duration(days: 2, hours: 1)),
-      ),
-      DuplicateItem(
-        merchant: '滴滴出行',
-        amount: 23.00,
-        date: DateTime.now().subtract(const Duration(days: 3)),
-        similarity: 60,
-        existingMerchant: '滴滴打车',
-        existingAmount: 23.00,
-        existingDate: DateTime.now().subtract(const Duration(days: 3)),
-      ),
-    ];
+      // 获取现有交易（最近3个月的数据用于去重检测）
+      final existingTransactions = await db.getTransactions();
 
-    _confirmedDuplicates = [
-      DuplicateItem(
-        merchant: '微信转账',
-        amount: 100.00,
-        date: DateTime.now().subtract(const Duration(days: 1)),
-        similarity: 100,
-        existingMerchant: '微信转账',
-        existingAmount: 100.00,
-        existingDate: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-    ];
+      final suspectedList = <DuplicateItem>[];
+      final confirmedList = <DuplicateItem>[];
+
+      // 对每笔导入的交易进行去重检测
+      for (final imported in widget.transactions) {
+        // 转换为Transaction对象
+        final newTransaction = Transaction(
+          id: const Uuid().v4(),
+          type: imported.amount > 0 ? TransactionType.income : TransactionType.expense,
+          amount: imported.amount.abs(),
+          category: imported.category ?? 'other',
+          accountId: 'temp_account',
+          date: imported.date,
+          note: imported.merchant,
+          createdAt: DateTime.now(),
+        );
+
+        // 执行去重检测
+        final result = DuplicateDetectionService.checkDuplicate(
+          newTransaction,
+          existingTransactions,
+        );
+
+        if (result.hasPotentialDuplicate && result.potentialDuplicates.isNotEmpty) {
+          final existing = result.potentialDuplicates.first;
+          final duplicateItem = DuplicateItem(
+            merchant: imported.merchant,
+            amount: imported.amount,
+            date: imported.date,
+            similarity: result.similarityScore,
+            existingMerchant: existing.note ?? '未命名',
+            existingAmount: existing.amount,
+            existingDate: existing.date,
+          );
+
+          // 根据相似度分类
+          if (result.similarityScore >= 85) {
+            // 85分以上为确定重复
+            confirmedList.add(duplicateItem);
+          } else if (result.similarityScore >= 55) {
+            // 55-84分为疑似重复
+            suspectedList.add(duplicateItem);
+          }
+        }
+      }
+
+      setState(() {
+        _suspectedDuplicates = suspectedList;
+        _confirmedDuplicates = confirmedList;
+        _suspectedCount = suspectedList.length;
+        _confirmedCount = confirmedList.length;
+        _newCount = widget.transactions.length - _suspectedCount - _confirmedCount;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('去重检测失败: $e');
+      setState(() {
+        _isLoading = false;
+        _newCount = widget.transactions.length;
+      });
+    }
   }
 
   @override
@@ -109,24 +134,49 @@ class _DuplicateDetectionPageState extends ConsumerState<DuplicateDetectionPage>
       appBar: AppBar(
         title: const Text('去重检测'),
       ),
-      body: Column(
-        children: [
-          _buildProgressSteps(theme),
-          _buildSummaryCards(theme),
-          _buildTabBar(theme, total),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
+      body: _isLoading
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    '正在检测重复交易...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '已导入 $total 笔交易',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : Column(
               children: [
-                _buildAllList(theme),
-                _buildSuspectedList(theme),
-                _buildConfirmedList(theme),
+                _buildProgressSteps(theme),
+                _buildSummaryCards(theme),
+                _buildTabBar(theme, total),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildAllList(theme),
+                      _buildSuspectedList(theme),
+                      _buildConfirmedList(theme),
+                    ],
+                  ),
+                ),
+                _buildBottomActions(context, theme),
               ],
             ),
-          ),
-          _buildBottomActions(context, theme),
-        ],
-      ),
     );
   }
 
