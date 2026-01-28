@@ -64,6 +64,9 @@ class QueryCalculator {
   /// 查询结果缓存（5分钟有效期）
   final Map<String, _CachedResult> _cache = {};
 
+  /// 定期清理定时器
+  Timer? _cleanupTimer;
+
   /// 最大查询时间范围（天）
   static const int maxTimeRangeDays = 365;
 
@@ -73,6 +76,14 @@ class QueryCalculator {
   QueryCalculator(this._database) {
     // 启动定期清理任务
     _startPeriodicCleanup();
+  }
+
+  /// 释放资源
+  void dispose() {
+    _cleanupTimer?.cancel();
+    _cleanupTimer = null;
+    _cache.clear();
+    debugPrint('[QueryCalculator] 资源已释放');
   }
 
   /// 计算查询结果
@@ -244,7 +255,8 @@ class QueryCalculator {
 
   /// 定期清理过期缓存
   void _startPeriodicCleanup() {
-    Timer.periodic(const Duration(minutes: 5), (_) {
+    _cleanupTimer?.cancel();
+    _cleanupTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       final now = DateTime.now();
       _cache.removeWhere((key, value) => value.expiresAt.isBefore(now));
       if (_cache.isNotEmpty) {

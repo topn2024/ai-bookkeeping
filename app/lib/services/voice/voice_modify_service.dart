@@ -24,6 +24,9 @@ class VoiceModifyService extends ChangeNotifier {
   /// 修改历史栈（用于撤销）
   final List<ModifyOperation> _modifyHistory = [];
 
+  /// 已执行的操作ID集合（用于幂等性保护）
+  final Set<String> _executedOperationIds = {};
+
   /// 最大历史记录数
   static const int maxHistorySize = 50;
 
@@ -44,6 +47,16 @@ class VoiceModifyService extends ChangeNotifier {
       RegExp(r'(金额)?[调改][高低大小]\s*(\d+\.?\d*)'),
       RegExp(r'(\d+\.?\d*)\s*[块元]?改[成为]?\s*(\d+\.?\d*)'),
       RegExp(r'把?\s*(\d+\.?\d*)\s*改[成为]?\s*(\d+\.?\d*)'),
+      // 支持"XX是YY不是ZZ"格式：牛腩是35不是30
+      RegExp(r'.+是\s*(\d+\.?\d*)\s*[块元]?[,，]?\s*不是'),
+      // 支持"XX不是YY是ZZ"格式：牛腩不是30是35
+      RegExp(r'.+不是\s*\d+\.?\d*\s*[块元]?[,，]?\s*是\s*(\d+\.?\d*)'),
+      // 支持"不对，是XX"格式
+      RegExp(r'不对[,，]?\s*是\s*(\d+\.?\d*)\s*[块元]?'),
+      // 支持"说错了，是XX"格式
+      RegExp(r'[说搞]错了?[,，]?\s*是?\s*(\d+\.?\d*)\s*[块元]?'),
+      // 支持"我说XX是YY"格式
+      RegExp(r'我说.+是\s*(\d+\.?\d*)\s*[块元]?'),
     ],
     // 分类修改
     ModifyField.category: [
@@ -378,31 +391,43 @@ class VoiceModifyService extends ChangeNotifier {
       return DateTime(now.year, now.month, now.day);
     }
     if (text.contains('昨天')) {
-      return DateTime(now.year, now.month, now.day - 1);
+      // 使用 subtract 避免跨月计算错误
+      final yesterday = now.subtract(const Duration(days: 1));
+      return DateTime(yesterday.year, yesterday.month, yesterday.day);
     }
     if (text.contains('前天')) {
-      return DateTime(now.year, now.month, now.day - 2);
+      final dayBeforeYesterday = now.subtract(const Duration(days: 2));
+      return DateTime(dayBeforeYesterday.year, dayBeforeYesterday.month, dayBeforeYesterday.day);
     }
+
+    // 计算上周某天的辅助方法
+    DateTime getLastWeekday(int targetWeekday) {
+      // 先回到上周的同一天，再调整到目标星期
+      final daysToSubtract = now.weekday + (7 - targetWeekday);
+      final result = now.subtract(Duration(days: daysToSubtract));
+      return DateTime(result.year, result.month, result.day);
+    }
+
     if (text.contains('上周一')) {
-      return now.subtract(Duration(days: now.weekday + 6));
+      return getLastWeekday(DateTime.monday);
     }
     if (text.contains('上周二')) {
-      return now.subtract(Duration(days: now.weekday + 5));
+      return getLastWeekday(DateTime.tuesday);
     }
     if (text.contains('上周三')) {
-      return now.subtract(Duration(days: now.weekday + 4));
+      return getLastWeekday(DateTime.wednesday);
     }
     if (text.contains('上周四')) {
-      return now.subtract(Duration(days: now.weekday + 3));
+      return getLastWeekday(DateTime.thursday);
     }
     if (text.contains('上周五')) {
-      return now.subtract(Duration(days: now.weekday + 2));
+      return getLastWeekday(DateTime.friday);
     }
     if (text.contains('上周六')) {
-      return now.subtract(Duration(days: now.weekday + 1));
+      return getLastWeekday(DateTime.saturday);
     }
     if (text.contains('上周日') || text.contains('上周天')) {
-      return now.subtract(Duration(days: now.weekday));
+      return getLastWeekday(DateTime.sunday);
     }
 
     // 解析 "X月X日" 格式
@@ -455,7 +480,14 @@ class VoiceModifyService extends ChangeNotifier {
     // 检查金额相关变更
     for (final mod in modifications) {
       if (mod.field == ModifyField.amount) {
-        final newAmount = mod.newValue as double;
+        // 类型安全检查
+        if (mod.newValue is! double && mod.newValue is! int) {
+          debugPrint('[VoiceModify] 金额类型错误: ${mod.newValue.runtimeType}');
+          continue;
+        }
+        final newAmount = (mod.newValue is int)
+            ? (mod.newValue as int).toDouble()
+            : mod.newValue as double;
         final diff = (newAmount - record.amount).abs();
         final changeRatio = record.amount > 0 ? diff / record.amount : 1.0;
 
@@ -482,6 +514,11 @@ class VoiceModifyService extends ChangeNotifier {
 
       // 日期跨度超过7天需要标准确认
       if (mod.field == ModifyField.date) {
+        // 类型安全检查
+        if (mod.newValue is! DateTime) {
+          debugPrint('[VoiceModify] 日期类型错误: ${mod.newValue.runtimeType}');
+          continue;
+        }
         final newDate = mod.newValue as DateTime;
         final dateDiff = newDate.difference(record.date).inDays.abs();
         if (dateDiff > 7) {
@@ -606,15 +643,21 @@ class VoiceModifyService extends ChangeNotifier {
   Future<ModifyResult> confirmModification(
     TransactionUpdateCallback updateCallback,
   ) async {
-    if (_currentSession == null ||
-        _currentSession!.currentRecord == null ||
-        _currentSession!.pendingModifications == null) {
+    // 先检查并保存本地引用，防止异步期间被清除
+    final session = _currentSession;
+    if (session == null ||
+        session.currentRecord == null ||
+        session.pendingModifications == null) {
       return ModifyResult.error('没有待确认的修改');
     }
 
+    // 保存本地引用后再执行异步操作
+    final record = session.currentRecord!;
+    final modifications = session.pendingModifications!;
+
     final result = await _doExecuteModification(
-      _currentSession!.currentRecord!,
-      _currentSession!.pendingModifications!,
+      record,
+      modifications,
       updateCallback,
     );
 
@@ -677,6 +720,19 @@ class VoiceModifyService extends ChangeNotifier {
     List<FieldModification> modifications,
     TransactionUpdateCallback updateCallback,
   ) async {
+    // 幂等性检查：生成操作ID
+    final modKey = modifications.map((m) => '${m.field}:${m.newValue}').join('|');
+    final operationId = '${record.id}_$modKey';
+
+    if (_executedOperationIds.contains(operationId)) {
+      debugPrint('[VoiceModify] 操作已执行过，跳过重复修改: $operationId');
+      return ModifyResult.success(
+        originalRecord: record,
+        updatedRecord: record,
+        modifications: modifications,
+      );
+    }
+
     try {
       // 保存修改历史（用于撤销）
       final operation = ModifyOperation(
@@ -694,6 +750,14 @@ class VoiceModifyService extends ChangeNotifier {
       final success = await updateCallback(updatedRecord);
 
       if (success) {
+        // 记录已执行的操作ID（幂等性保护）
+        _executedOperationIds.add(operationId);
+        // 限制集合大小，防止内存泄漏
+        if (_executedOperationIds.length > maxHistorySize * 2) {
+          final toRemove = _executedOperationIds.take(_executedOperationIds.length - maxHistorySize).toList();
+          _executedOperationIds.removeAll(toRemove);
+        }
+
         // 通知消歧服务记录最近操作
         _disambiguationService.recordRecentOperation(updatedRecord);
 

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../category_localization_service.dart';
+
 /// 实体消歧服务
 ///
 /// 对应设计文档第18.11.1节：实体消歧引擎
@@ -103,8 +105,15 @@ class EntityDisambiguationService extends ChangeNotifier {
     final queryConditions = _buildQueryConditions(references, context);
     debugPrint('[Disambiguate] 查询条件: startDate=${queryConditions.startDate}, endDate=${queryConditions.endDate}, limit=${queryConditions.limit}');
 
-    // Step 3: 候选记录检索
-    final candidates = await queryCallback(queryConditions);
+    // Step 3: 候选记录检索（带异常保护）
+    List<TransactionRecord> candidates;
+    try {
+      candidates = await queryCallback(queryConditions);
+    } catch (e, stackTrace) {
+      debugPrint('[Disambiguate] 查询回调异常: $e');
+      debugPrint('[Disambiguate] stackTrace: $stackTrace');
+      return DisambiguationResult.noMatch(references);
+    }
     debugPrint('[Disambiguate] 查询到${candidates.length}条候选记录');
     for (var i = 0; i < candidates.length && i < 5; i++) {
       final c = candidates[i];
@@ -169,6 +178,7 @@ class EntityDisambiguationService extends ChangeNotifier {
     DateTime? startDate;
     DateTime? endDate;
     String? categoryHint;
+    String? descriptionKeyword;  // 原始关键词，用于搜索note字段
     String? merchantHint;
     double? amountHint;
     double? amountMin;
@@ -192,6 +202,7 @@ class EntityDisambiguationService extends ChangeNotifier {
           break;
         case ReferenceType.description:
           categoryHint = _parseCategoryReference(ref);
+          descriptionKeyword = ref.rawText;  // 保存原始关键词（如"地铁"）
           break;
         case ReferenceType.amount:
           final amountInfo = _parseAmountReference(ref);
@@ -217,6 +228,7 @@ class EntityDisambiguationService extends ChangeNotifier {
       startDate: startDate,
       endDate: endDate,
       categoryHint: categoryHint,
+      descriptionKeyword: descriptionKeyword,
       merchantHint: merchantHint,
       amountHint: amountHint,
       amountMin: amountMin,
@@ -255,7 +267,8 @@ class EntityDisambiguationService extends ChangeNotifier {
       return DateTimeRange(start: lastMonth, end: thisMonth);
     }
     if (text.contains('刚才') || text.contains('刚刚')) {
-      return DateTimeRange(start: now.subtract(const Duration(minutes: 30)), end: now);
+      // 扩大时间范围到3小时，因为用户可能指的是今天早些时候记录的
+      return DateTimeRange(start: now.subtract(const Duration(hours: 3)), end: now);
     }
     if (text.contains('最近')) {
       return DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now);
@@ -397,8 +410,17 @@ class EntityDisambiguationService extends ChangeNotifier {
             break;
           case ReferenceType.description:
             final categoryHint = _parseCategoryReference(ref);
-            if (candidate.category?.contains(categoryHint ?? '') == true ||
-                candidate.description?.contains(ref.rawText) == true) {
+            // 使用本地化服务将英文分类名转为中文
+            final candidateCategoryCn = candidate.category != null
+                ? CategoryLocalizationService.instance.getCategoryName(candidate.category!)
+                : null;
+            // 简化空值检查逻辑
+            final categoryMatches = categoryHint != null &&
+                candidateCategoryCn != null &&
+                candidateCategoryCn.contains(categoryHint);
+            final descriptionMatches = candidate.description != null &&
+                candidate.description!.contains(ref.rawText);
+            if (categoryMatches || descriptionMatches) {
               score += 0.4; // 描述匹配很重要，提高权重
             }
             break;
@@ -470,6 +492,16 @@ class EntityDisambiguationService extends ChangeNotifier {
 
     final best = candidates.first;
     final second = candidates.length > 1 ? candidates[1] : null;
+
+    // 只有一个候选且置信度≥0.5，没有歧义，直接解析
+    if (candidates.length == 1 && best.confidence >= 0.5) {
+      return DisambiguationResult.resolved(
+        record: best.record,
+        confidence: best.confidence,
+        references: references,
+        needConfirmation: best.confidence < 0.7,
+      );
+    }
 
     // 如果最佳匹配的置信度太低（< 0.7），直接告诉用户没有找到
     if (best.confidence < 0.7) {
@@ -578,8 +610,12 @@ class EntityDisambiguationService extends ChangeNotifier {
       if (c.record.description != null && lowerInput.contains(c.record.description!.toLowerCase())) {
         return DisambiguationResult.resolved(record: c.record, confidence: 0.95, references: []);
       }
-      if (c.record.category != null && lowerInput.contains(c.record.category!.toLowerCase())) {
-        return DisambiguationResult.resolved(record: c.record, confidence: 0.9, references: []);
+      if (c.record.category != null) {
+        // 使用本地化服务将英文分类转为中文后比较
+        final categoryCn = CategoryLocalizationService.instance.getCategoryName(c.record.category!);
+        if (lowerInput.contains(categoryCn.toLowerCase()) || lowerInput.contains(c.record.category!.toLowerCase())) {
+          return DisambiguationResult.resolved(record: c.record, confidence: 0.9, references: []);
+        }
       }
     }
 
@@ -621,6 +657,7 @@ class QueryConditions {
   final DateTime startDate;
   final DateTime endDate;
   final String? categoryHint;
+  final String? descriptionKeyword;  // 原始描述关键词（如"地铁"），用于搜索note字段
   final String? merchantHint;
   final double? amountHint;
   final double? amountMin;
@@ -633,6 +670,7 @@ class QueryConditions {
     required this.startDate,
     required this.endDate,
     this.categoryHint,
+    this.descriptionKeyword,
     this.merchantHint,
     this.amountHint,
     this.amountMin,

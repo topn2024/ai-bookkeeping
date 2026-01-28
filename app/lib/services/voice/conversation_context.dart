@@ -124,9 +124,12 @@ class ConversationContext {
   }
 
   /// 裁剪历史
+  ///
+  /// 使用 removeRange 替代 removeAt(0) 循环，避免 O(n²) 性能问题
   void _trimHistory() {
-    while (_history.length > maxHistoryTurns * 2) {
-      _history.removeAt(0);
+    final maxLength = maxHistoryTurns * 2;
+    if (_history.length > maxLength) {
+      _history.removeRange(0, _history.length - maxLength);
     }
   }
 
@@ -384,6 +387,9 @@ class TransactionReference {
 
 /// 响应模板
 class ResponseTemplate {
+  /// 共享的随机数生成器（避免每次调用都创建新实例）
+  static final Random _random = Random();
+
   /// 记账成功响应模板
   static String recordSuccess({
     required double amount,
@@ -396,7 +402,7 @@ class ResponseTemplate {
         '嗯，$category${_formatAmount(amount)}，记下了',
         '记好了，$category${_formatAmount(amount)}',
       ];
-      return templates[Random().nextInt(templates.length)];
+      return templates[_random.nextInt(templates.length)];
     }
     return '已记录$category支出${_formatAmount(amount)}';
   }
@@ -411,7 +417,7 @@ class ResponseTemplate {
       '$period一共花了${_formatAmount(total)}，共$count笔',
       '$period消费${_formatAmount(total)}，$count笔记录',
     ];
-    return templates[Random().nextInt(templates.length)];
+    return templates[_random.nextInt(templates.length)];
   }
 
   /// 格式化金额

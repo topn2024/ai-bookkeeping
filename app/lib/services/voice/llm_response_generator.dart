@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import '../qwen_service.dart';
 
@@ -33,7 +35,10 @@ class LLMResponseGenerator {
 
     try {
       final prompt = _buildTransactionPrompt(transactions, userInput);
-      final response = await _qwenService.chat(prompt).timeout(_timeout);
+      final response = await _qwenService.chat(prompt).timeout(
+        _timeout,
+        onTimeout: () => throw TimeoutException('LLM响应超时', _timeout),
+      );
 
       if (response != null && response.isNotEmpty) {
         final cleaned = _cleanResponse(response);
@@ -42,6 +47,8 @@ class LLMResponseGenerator {
           return cleaned;
         }
       }
+    } on TimeoutException catch (e) {
+      debugPrint('[LLMResponse] LLM调用超时(${e.duration}), 降级到模板');
     } catch (e) {
       debugPrint('[LLMResponse] LLM调用失败，使用模板: $e');
     }
@@ -67,7 +74,10 @@ class LLMResponseGenerator {
 
     try {
       final prompt = _buildGeneralPrompt(action, result, success, userInput);
-      final response = await _qwenService.chat(prompt).timeout(_timeout);
+      final response = await _qwenService.chat(prompt).timeout(
+        _timeout,
+        onTimeout: () => throw TimeoutException('LLM响应超时', _timeout),
+      );
 
       if (response != null && response.isNotEmpty) {
         final cleaned = _cleanResponse(response);
@@ -76,6 +86,8 @@ class LLMResponseGenerator {
           return cleaned;
         }
       }
+    } on TimeoutException catch (e) {
+      debugPrint('[LLMResponse] LLM调用超时(${e.duration}), 降级到模板');
     } catch (e) {
       debugPrint('[LLMResponse] LLM调用失败，使用模板: $e');
     }

@@ -83,13 +83,26 @@ class BookkeepingOperationAdapter implements OperationAdapter {
     final amount = params['amount'] as num?;
     final rawCategory = params['category'] as String? ?? '其他';
     // 规范化分类为标准英文ID（如 '工资' → 'salary'）
-    final category = CategoryLocalizationService.instance.normalizeCategoryId(rawCategory);
+    var category = CategoryLocalizationService.instance.normalizeCategoryId(rawCategory);
     final type = params['type'] as String? ?? 'expense';
     final note = params['note'] as String?;
     final accountId = params['accountId'] as String? ?? 'default';
 
+    // 参数验证
     if (amount == null || amount <= 0) {
       return ExecutionResult.failure('金额无效');
+    }
+
+    // 验证交易类型
+    final validTypes = ['income', 'expense', 'transfer'];
+    if (!validTypes.contains(type.toLowerCase())) {
+      debugPrint('[BookkeepingOperationAdapter] 无效交易类型: $type, 使用默认值expense');
+    }
+
+    // 验证分类（normalizeCategoryId会处理无效分类，返回原值或空字符串）
+    if (category.isEmpty) {
+      debugPrint('[BookkeepingOperationAdapter] 无效分类: $rawCategory, 使用默认值other');
+      category = 'other';  // 实际设置为默认值
     }
 
     debugPrint('[BookkeepingOperationAdapter] 添加交易: $amount, $category, $type');
@@ -151,12 +164,13 @@ class BookkeepingOperationAdapter implements OperationAdapter {
         : null;
     final operationId = params['operationId'] as String?;
 
+    debugPrint('[BookkeepingOperationAdapter] ========== 查询开始 ==========');
     debugPrint('[BookkeepingOperationAdapter] 查询: queryType=$queryType, time=$time, period=$period, category=$category (原: $rawCategory), operationId=$operationId');
 
     try {
       // 1. 解析时间范围
       final timeRange = _parseTimeRange(time, period);
-      debugPrint('[BookkeepingOperationAdapter] 时间范围: ${timeRange.startDate} - ${timeRange.endDate}, 显示: ${timeRange.periodText}');
+      debugPrint('[BookkeepingOperationAdapter] 解析后时间范围: start=${timeRange.startDate}, end=${timeRange.endDate}, text=${timeRange.periodText}');
 
       // 2. 构建QueryRequest
       final queryRequest = _buildQueryRequest(
@@ -278,6 +292,7 @@ class BookkeepingOperationAdapter implements OperationAdapter {
 
   /// 解析时间范围
   _TimeRange _parseTimeRange(String? time, String? period) {
+    debugPrint('[_parseTimeRange] 输入: time="$time", period="$period"');
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final tomorrow = today.add(const Duration(days: 1));
@@ -301,9 +316,11 @@ class BookkeepingOperationAdapter implements OperationAdapter {
       }
       // 最近N天 / 近N天
       final recentDaysMatch = RegExp(r'(?:最近|近)(\d+)天').firstMatch(time);
+      debugPrint('[_parseTimeRange] 最近N天匹配: ${recentDaysMatch != null}, time="$time"');
       if (recentDaysMatch != null) {
         final days = int.parse(recentDaysMatch.group(1)!);
         final startDate = today.subtract(Duration(days: days - 1));
+        debugPrint('[_parseTimeRange] 匹配最近${days}天: start=$startDate, end=$tomorrow');
         return _TimeRange(startDate, tomorrow, '最近$days天');
       }
       // 本周/这周
@@ -354,6 +371,44 @@ class BookkeepingOperationAdapter implements OperationAdapter {
       // 全部/所有
       if (time.contains('全部') || time.contains('所有') || time.contains('一共')) {
         return _TimeRange(DateTime(2000), tomorrow, '全部');
+      }
+
+      // X天前 (一天前、3天前、三天前等)
+      final daysAgoMatch = RegExp(r'([一二两三四五六七八九十\d]+)天前').firstMatch(time);
+      if (daysAgoMatch != null) {
+        final daysStr = daysAgoMatch.group(1)!;
+        final days = _parseChineseNumber(daysStr);
+        if (days != null && days > 0 && days <= 365) {
+          final startDate = today.subtract(Duration(days: days));
+          return _TimeRange(startDate, tomorrow, '$days天前至今');
+        }
+      }
+
+      // X周前 (一周前、2周前、两周前等)
+      final weeksAgoMatch = RegExp(r'([一二两三四五六七八九十\d]+)(?:个)?(?:星期|周)前').firstMatch(time);
+      debugPrint('[_parseTimeRange] 检查周前模式: time="$time", match=${weeksAgoMatch != null}');
+      if (weeksAgoMatch != null) {
+        final weeksStr = weeksAgoMatch.group(1)!;
+        final weeks = _parseChineseNumber(weeksStr);
+        if (weeks != null && weeks > 0 && weeks <= 52) {
+          final startDate = today.subtract(Duration(days: weeks * 7));
+          debugPrint('[_parseTimeRange] 匹配成功: weeks=$weeks, startDate=$startDate');
+          return _TimeRange(startDate, tomorrow, '$weeks周前至今');
+        }
+      }
+
+      // X个月前 (一个月前、3个月前等)
+      final monthsAgoMatch = RegExp(r'([一二两三四五六七八九十\d]+)个?月前').firstMatch(time);
+      if (monthsAgoMatch != null) {
+        final monthsStr = monthsAgoMatch.group(1)!;
+        final months = _parseChineseNumber(monthsStr);
+        if (months != null && months > 0 && months <= 60) {
+          final startMonth = now.month - months;
+          final startYear = now.year + (startMonth <= 0 ? -1 : 0);
+          final adjustedMonth = startMonth <= 0 ? startMonth + 12 : startMonth;
+          final startDate = DateTime(startYear, adjustedMonth, now.day);
+          return _TimeRange(startDate, tomorrow, '$months个月前至今');
+        }
       }
     }
 
@@ -552,4 +607,53 @@ class _TimeRange {
   final String periodText;
 
   _TimeRange(this.startDate, this.endDate, this.periodText);
+}
+
+/// 解析中文数字为整数
+/// 解析中文数字
+///
+/// 返回解析结果，如果无法解析则返回 null
+int? _parseChineseNumber(String str) {
+  if (str.isEmpty) return null;
+
+  // 先尝试直接解析数字
+  final parsed = int.tryParse(str);
+  if (parsed != null) return parsed;
+
+  // 中文数字映射
+  const chineseNumbers = {
+    '零': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4,
+    '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+    '十一': 11, '十二': 12,
+  };
+
+  // 单字符匹配
+  if (chineseNumbers.containsKey(str)) {
+    return chineseNumbers[str]!;
+  }
+
+  // 处理"十几"的情况 (如"十三" = 13)
+  if (str.startsWith('十') && str.length == 2) {
+    final digit = chineseNumbers[str[1]];
+    if (digit != null) return 10 + digit;
+  }
+
+  // 处理"几十"的情况 (如"三十" = 30, "二十五" = 25)
+  if (str.contains('十')) {
+    final parts = str.split('十');
+    final tensChar = parts[0].isEmpty ? null : parts[0];
+    final onesChar = parts.length > 1 && parts[1].isNotEmpty ? parts[1] : null;
+
+    final tens = tensChar == null ? 1 : chineseNumbers[tensChar];
+    if (tens == null) return null; // 无效的十位数字
+
+    final ones = onesChar == null ? 0 : (chineseNumbers[onesChar] ?? -1);
+    if (ones < 0) return null; // 无效的个位数字
+
+    return tens * 10 + ones;
+  }
+
+  // 无法解析
+  debugPrint('[_parseChineseNumber] 无法解析: $str');
+  return null;
 }

@@ -238,7 +238,11 @@ class SharedPreferencesLearningCache implements LearningCacheService {
 
     for (final entry in _cache.entries) {
       final distance = _levenshteinDistance(normalizedInput, entry.key);
-      final maxLen = normalizedInput.length.clamp(1, 100);
+      // 使用两个字符串中较长的长度作为分母，确保相似度在 [0, 1] 范围内
+      final maxLen = (normalizedInput.length > entry.key.length
+              ? normalizedInput.length
+              : entry.key.length)
+          .clamp(1, 100);
       final similarity = 1 - (distance / maxLen);
 
       if (similarity >= similarityThreshold && similarity > bestSimilarity) {

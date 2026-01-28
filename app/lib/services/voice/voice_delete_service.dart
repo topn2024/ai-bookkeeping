@@ -23,6 +23,9 @@ class VoiceDeleteService extends ChangeNotifier {
   /// 删除历史（用于恢复）
   final List<DeleteOperation> _deleteHistory = [];
 
+  /// 已执行的操作ID集合（用于幂等性保护）
+  final Set<String> _executedOperationIds = {};
+
   /// 最大历史记录数
   static const int maxHistorySize = 100;
 
@@ -289,6 +292,11 @@ class VoiceDeleteService extends ChangeNotifier {
     required List<TransactionRecord> records,
     required bool isBatch,
   }) {
+    // 边界条件检查：空列表返回最高确认级别
+    if (records.isEmpty) {
+      return ConfirmLevel.level3;
+    }
+
     if (isBatch || records.length >= 2) {
       return ConfirmLevel.level3; // 批量删除
     }
@@ -417,6 +425,20 @@ class VoiceDeleteService extends ChangeNotifier {
 
     final records =
         _currentSession!.targetRecords!.map((s) => s.record).toList();
+
+    // 幂等性检查：生成操作ID并检查是否已执行
+    final operationId = records.map((r) => r.id).join('_');
+    if (_executedOperationIds.contains(operationId)) {
+      debugPrint('[VoiceDelete] 操作已执行过，跳过重复删除: $operationId');
+      _currentSession = null;
+      return DeleteResult.success(
+        deletedRecords: records,
+        canRecover: true,
+        recoveryDays: recycleBinRetentionDays,
+        message: '已删除',
+      );
+    }
+
     debugPrint('[VoiceDelete] 待删除记录数: ${records.length}');
     for (final r in records) {
       debugPrint('[VoiceDelete]   - id=${r.id}, ${r.category} ¥${r.amount}');
@@ -438,6 +460,14 @@ class VoiceDeleteService extends ChangeNotifier {
       debugPrint('[VoiceDelete] deleteCallback 返回: $success');
 
       if (success) {
+        // 记录已执行的操作ID（幂等性保护）
+        _executedOperationIds.add(operationId);
+        // 限制集合大小，防止内存泄漏
+        if (_executedOperationIds.length > maxHistorySize * 2) {
+          final toRemove = _executedOperationIds.take(_executedOperationIds.length - maxHistorySize).toList();
+          _executedOperationIds.removeAll(toRemove);
+        }
+
         _currentSession = null;
         notifyListeners();
 

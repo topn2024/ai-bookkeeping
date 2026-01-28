@@ -10,6 +10,8 @@
 /// - processable: 可处理内容 → 进入意图识别
 library;
 
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 
 /// 输入分类类型
@@ -556,10 +558,12 @@ class InputFilter {
       // 只有重复3次以上才算情绪表达
       if (repeatCount >= 3) {
         // 根据重复的字符判断情绪
+        // 注意：'呵'字有歧义，需要根据上下文判断，这里归类为正面
         if (['哈', '嘻', '呵'].contains(repeatedChar)) {
           return (EmotionType.positive, _getRandomResponse(EmotionType.positive));
         }
-        if (['呜', '呵'].contains(repeatedChar)) {
+        // '呜'明确表示负面情绪
+        if (['呜'].contains(repeatedChar)) {
           return (EmotionType.negative, _getRandomResponse(EmotionType.negative));
         }
         if (['啊', '呃'].contains(repeatedChar)) {
@@ -596,10 +600,13 @@ class InputFilter {
     return null;
   }
 
+  /// 随机数生成器
+  static final Random _random = Random();
+
   /// 获取随机情绪回复
   String _getRandomResponse(EmotionType type) {
     final responses = _emotionResponses[type] ?? ['有什么需要帮忙的吗？'];
-    // 简单起见，总是返回第一个（实际可以用随机）
-    return responses.first;
+    // 随机选择一个回复，增加多样性
+    return responses[_random.nextInt(responses.length)];
   }
 }

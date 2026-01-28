@@ -115,18 +115,22 @@ class MultiIntentResult {
   ) {
     // 根据意图类型创建对应的结果
     if (singleResult.entities.containsKey('targetPage')) {
-      return MultiIntentResult(
-        completeIntents: const [],
-        incompleteIntents: const [],
-        navigationIntent: NavigationIntent(
-          targetPage: singleResult.entities['targetPage'] as String,
-          targetPageName: singleResult.entities['targetPage'] as String,
-          originalText: rawInput,
-        ),
-        filteredNoise: const [],
-        rawInput: rawInput,
-        segments: [rawInput],
-      );
+      final targetPage = singleResult.entities['targetPage'];
+      // 类型安全检查，避免强制转换异常
+      if (targetPage is String && targetPage.isNotEmpty) {
+        return MultiIntentResult(
+          completeIntents: const [],
+          incompleteIntents: const [],
+          navigationIntent: NavigationIntent(
+            targetPage: targetPage,
+            targetPageName: targetPage,
+            originalText: rawInput,
+          ),
+          filteredNoise: const [],
+          rawInput: rawInput,
+          segments: [rawInput],
+        );
+      }
     }
 
     final amount = (singleResult.entities['amount'] as num?)?.toDouble();

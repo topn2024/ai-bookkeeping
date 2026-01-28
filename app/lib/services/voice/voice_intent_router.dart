@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
+
 import '../voice_service_coordinator.dart' show VoiceIntentType, VoiceSessionContext;
 import 'multi_intent_models.dart';
 import 'sentence_splitter.dart';
@@ -39,6 +41,12 @@ class VoiceIntentRouter {
     RegExp(r'把.*改', caseSensitive: false),
     RegExp(r'改.*为|改.*成', caseSensitive: false),
     RegExp(r'更新|变更', caseSensitive: false),
+    // 支持纠正语句："XX是YY不是ZZ"、"不对，是XX"
+    RegExp(r'.+是\s*\d+.*不是', caseSensitive: false),
+    RegExp(r'.+不是\s*\d+.*是\s*\d+', caseSensitive: false),
+    RegExp(r'不对[,，]?\s*是', caseSensitive: false),
+    RegExp(r'[说搞]错了', caseSensitive: false),
+    RegExp(r'我说.+是\s*\d+', caseSensitive: false),
   ];
 
   /// 添加意图的关键词模式
@@ -77,10 +85,15 @@ class VoiceIntentRouter {
   ];
 
   /// 取消意图的关键词模式
+  /// 注意：避免与修改意图冲突，"不对，是XX"应该是修改意图
   static final _cancelPatterns = [
-    RegExp(r'取消|不要|算了|停止', caseSensitive: false),
-    RegExp(r'不对|错了|重新', caseSensitive: false),
-    RegExp(r'退出|返回|no', caseSensitive: false),
+    RegExp(r'取消|不要了|算了|停止', caseSensitive: false),
+    // "不对"后面不跟金额时才是取消（"不对，是50"是修改意图）
+    RegExp(r'不对[,，]?\s*(?!是?\s*\d)', caseSensitive: false),
+    // "错了"后面不跟金额时才是取消（"错了，是50"是修改意图）
+    RegExp(r'错了[,，]?\s*(?!是?\s*\d)', caseSensitive: false),
+    RegExp(r'重新来|重新开始', caseSensitive: false),
+    RegExp(r'退出|no', caseSensitive: false),
   ];
 
   /// 澄清意图的关键词模式（选择项目）
@@ -136,27 +149,37 @@ class VoiceIntentRouter {
       );
     }
 
-    // 预处理输入
-    final normalizedInput = _normalizeInput(input);
+    try {
+      // 预处理输入
+      final normalizedInput = _normalizeInput(input);
 
-    // 计算各意图的匹配分数
-    final intentScores = await _calculateIntentScores(normalizedInput, context);
+      // 计算各意图的匹配分数
+      final intentScores = await _calculateIntentScores(normalizedInput, context);
 
-    // 获取最佳匹配意图
-    final bestMatch = _getBestMatch(intentScores);
+      // 获取最佳匹配意图
+      final bestMatch = _getBestMatch(intentScores);
 
-    // 提取相关实体
-    final entities = await _extractEntities(normalizedInput, bestMatch.intent);
+      // 提取相关实体
+      final entities = await _extractEntities(normalizedInput, bestMatch.intent);
 
-    return IntentAnalysisResult(
-      intent: bestMatch.intent,
-      confidence: bestMatch.score,
-      rawInput: input,
-      normalizedInput: normalizedInput,
-      entities: entities,
-      candidateIntents: _getCandidateIntents(intentScores),
-      contextBoosted: context != null,
-    );
+      return IntentAnalysisResult(
+        intent: bestMatch.intent,
+        confidence: bestMatch.score,
+        rawInput: input,
+        normalizedInput: normalizedInput,
+        entities: entities,
+        candidateIntents: _getCandidateIntents(intentScores),
+        contextBoosted: context != null,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[VoiceIntentRouter] analyzeIntent error: $e');
+      debugPrint('[VoiceIntentRouter] stackTrace: $stackTrace');
+      return IntentAnalysisResult(
+        intent: VoiceIntentType.unknown,
+        confidence: 0.0,
+        rawInput: input,
+      );
+    }
   }
 
   /// 分析多意图语音输入
@@ -180,34 +203,42 @@ class VoiceIntentRouter {
       return MultiIntentResult.empty(input);
     }
 
-    // 如果禁用多意图处理，回退到单意图模式
-    if (!config.enabled) {
+    try {
+      // 如果禁用多意图处理，回退到单意图模式
+      if (!config.enabled) {
+        final singleResult = await analyzeIntent(input, context: context);
+        return MultiIntentResult.fromSingle(singleResult, input);
+      }
+
+      // 1. 分句
+      final splitter = SentenceSplitter();
+      final segments = splitter.split(input);
+
+      // 如果只有一个分句，回退到单意图处理
+      if (segments.length <= 1) {
+        final singleResult = await analyzeIntent(input, context: context);
+        return MultiIntentResult.fromSingle(singleResult, input);
+      }
+
+      // 2. 批量分析
+      final analyzer = BatchIntentAnalyzer();
+      final analysisResults = await analyzer.analyzeSegments(
+        segments,
+        context: context,
+      );
+
+      // 3. 合并意图
+      final merger = IntentMerger();
+      final result = merger.merge(analysisResults, input);
+
+      return result;
+    } catch (e, stackTrace) {
+      debugPrint('[VoiceIntentRouter] analyzeMultipleIntents error: $e');
+      debugPrint('[VoiceIntentRouter] stackTrace: $stackTrace');
+      // 出错时回退到单意图模式
       final singleResult = await analyzeIntent(input, context: context);
       return MultiIntentResult.fromSingle(singleResult, input);
     }
-
-    // 1. 分句
-    final splitter = SentenceSplitter();
-    final segments = splitter.split(input);
-
-    // 如果只有一个分句，回退到单意图处理
-    if (segments.length <= 1) {
-      final singleResult = await analyzeIntent(input, context: context);
-      return MultiIntentResult.fromSingle(singleResult, input);
-    }
-
-    // 2. 批量分析
-    final analyzer = BatchIntentAnalyzer();
-    final analysisResults = await analyzer.analyzeSegments(
-      segments,
-      context: context,
-    );
-
-    // 3. 合并意图
-    final merger = IntentMerger();
-    final result = merger.merge(analysisResults, input);
-
-    return result;
   }
 
   /// 快速检查输入是否可能包含多个意图
@@ -803,6 +834,8 @@ class VoiceIntentRouter {
         return '分享操作';
       case VoiceIntentType.systemOperation:
         return '系统操作';
+      case VoiceIntentType.adviceOperation:
+        return '建议咨询';
       case VoiceIntentType.chatOperation:
         return '闲聊';
       case VoiceIntentType.unknown:

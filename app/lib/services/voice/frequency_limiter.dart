@@ -139,6 +139,11 @@ class FrequencyLimiter {
     String? recordId,
     bool isModification = false,
   }) {
+    // 空字符串直接通过（由上层处理）
+    if (input.trim().isEmpty) {
+      return FrequencyCheckResult.ok();
+    }
+
     // 检查是否在冷却期
     if (_isInCooldown()) {
       final remaining = _cooldownUntil!.difference(DateTime.now()).inSeconds;

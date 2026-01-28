@@ -121,6 +121,9 @@ class ConversationMemory {
   /// 最近提到的实体
   final Map<String, ReferencedEntity> _recentEntities = {};
 
+  /// 上次清理过期实体的时间
+  DateTime _lastEntityCleanup = DateTime.now();
+
   ConversationMemory({ConversationMemoryConfig? config})
       : config = config ?? const ConversationMemoryConfig();
 
@@ -270,8 +273,42 @@ class ConversationMemory {
   }
 
   /// 获取最近提到的实体
+  ///
+  /// 自动过滤已过期的实体
   ReferencedEntity? getRecentEntity(String type) {
-    return _recentEntities[type];
+    // 定期清理过期实体
+    _cleanupExpiredEntities();
+
+    final entity = _recentEntities[type];
+    if (entity == null) return null;
+
+    // 检查是否过期
+    final maxAge = Duration(seconds: config.entityExpirationSeconds);
+    if (entity.isExpired(maxAge)) {
+      _recentEntities.remove(type);
+      return null;
+    }
+
+    return entity;
+  }
+
+  /// 清理过期的实体
+  ///
+  /// 避免频繁清理，每30秒最多清理一次
+  void _cleanupExpiredEntities() {
+    final now = DateTime.now();
+    if (now.difference(_lastEntityCleanup).inSeconds < 30) {
+      return;
+    }
+
+    _lastEntityCleanup = now;
+    final maxAge = Duration(seconds: config.entityExpirationSeconds);
+
+    _recentEntities.removeWhere((key, entity) => entity.isExpired(maxAge));
+
+    if (_recentEntities.isNotEmpty) {
+      debugPrint('[ConversationMemory] 清理后剩余实体: ${_recentEntities.length}');
+    }
   }
 
   /// 清除历史
@@ -279,6 +316,7 @@ class ConversationMemory {
     _turns.clear();
     _lastAction = null;
     _recentEntities.clear();
+    _lastEntityCleanup = DateTime.now();
     debugPrint('[ConversationMemory] 历史已清除');
   }
 

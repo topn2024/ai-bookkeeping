@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+
 import '../nlu_engine.dart';
 import '../voice_service_coordinator.dart' show VoiceSessionContext;
 import 'multi_intent_models.dart';
@@ -38,11 +42,22 @@ class BatchIntentAnalyzer {
       return [];
     }
 
-    // 并行分析所有片段
-    final futures = segments.map((segment) => _analyzeSegment(segment, context));
-    final results = await Future.wait(futures);
+    // 限制最大并行数量，避免资源耗尽
+    final limitedSegments = segments.length > config.maxParallel
+        ? segments.take(config.maxParallel).toList()
+        : segments;
 
-    return results;
+    // 并行分析所有片段，添加超时保护
+    final futures = limitedSegments.map((segment) => _analyzeSegment(segment, context));
+
+    try {
+      final results = await Future.wait(futures)
+          .timeout(Duration(milliseconds: config.timeoutMs * limitedSegments.length));
+      return results;
+    } on TimeoutException {
+      debugPrint('[BatchIntentAnalyzer] 批量分析超时，返回空结果');
+      return [];
+    }
   }
 
   /// 分析单个语义片段

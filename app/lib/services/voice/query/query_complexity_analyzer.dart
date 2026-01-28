@@ -129,7 +129,9 @@ class QueryComplexityAnalyzer {
         final endMonth = request.timeRange?.endDate.month ?? 1;
         final startYear = request.timeRange?.startDate.year ?? 0;
         final endYear = request.timeRange?.endDate.year ?? 0;
-        estimatedPoints = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
+        // 确保结果至少为1，防止时间范围无效时出现负数
+        final monthDiff = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
+        estimatedPoints = monthDiff > 0 ? monthDiff : 1;
       } else if (request.groupBy!.contains(GroupByDimension.category)) {
         // 按分类分组：假设7个分类
         estimatedPoints = 7;

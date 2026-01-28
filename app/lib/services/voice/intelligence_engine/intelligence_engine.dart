@@ -161,6 +161,16 @@ class IntelligenceEngine {
       );
     }
 
+    // 输入长度防御：防止超大输入导致内存问题
+    const maxInputLength = 10000;
+    if (input.length > maxInputLength) {
+      debugPrint('[IntelligenceEngine] 输入过长（${input.length} > $maxInputLength），拒绝处理');
+      return const VoiceSessionResult(
+        success: false,
+        message: '输入内容过长，请简短一些',
+      );
+    }
+
     // 注意：不在日志中打印完整输入，避免泄露用户隐私（金额、交易对方等）
     debugPrint('[IntelligenceEngine] 处理输入，长度: ${input.length}');
 
@@ -849,15 +859,24 @@ class IntelligenceEngine {
     );
   }
 
+  /// 统一清理所有计时器
+  ///
+  /// 确保计时器被完整清理，避免内存泄漏
+  void _cancelAllTimers() {
+    _deferredTimer?.cancel();
+    _deferredTimer = null;
+    _maxDeferredTimer?.cancel();
+    _maxDeferredTimer = null;
+  }
+
   /// 释放资源
   void dispose() {
     // 首先标记为已释放，防止计时器回调执行
     _isDisposed = true;
 
-    _deferredTimer?.cancel();
-    _deferredTimer = null;
-    _maxDeferredTimer?.cancel();
-    _maxDeferredTimer = null;
+    // 统一清理计时器
+    _cancelAllTimers();
+
     _deferredStartTime = null;
     _pendingDeferredOperations.clear();
     _resultBuffer.dispose();

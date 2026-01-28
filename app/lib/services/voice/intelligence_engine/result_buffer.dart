@@ -159,6 +159,8 @@ class ResultBuffer {
     );
 
     // 容量检查：如果已满，移除最旧的已通知/过期结果
+    // 注意：此操作在 Flutter 单线程事件循环中是安全的
+    // 如果将来需要支持多 isolate，需要添加同步机制
     if (_buffer.length >= maxCapacity) {
       _evictOldest();
     }

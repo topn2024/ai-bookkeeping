@@ -341,16 +341,18 @@ class KnowledgeBaseService {
   /// 搜索 FAQ
   ///
   /// 返回匹配的 FAQ 列表，按相关度排序
+  /// 优化：使用预计算的小写版本，支持早期终止
   List<FAQSearchResult> searchFAQ(String query) {
     if (query.trim().isEmpty) return [];
 
     final results = <FAQSearchResult>[];
     final normalizedQuery = query.toLowerCase();
+    FAQSearchResult? exactMatch;
 
     for (final entry in _faqEntries) {
       final score = _calculateMatchScore(normalizedQuery, entry);
       if (score > 0.3) {
-        results.add(FAQSearchResult(
+        final result = FAQSearchResult(
           entry: entry,
           score: score,
           matchType: score >= 0.8
@@ -358,7 +360,18 @@ class KnowledgeBaseService {
               : score >= 0.5
                   ? FAQMatchType.keyword
                   : FAQMatchType.fuzzy,
-        ));
+        );
+        results.add(result);
+
+        // 早期终止：找到精确匹配时，只需再找几个相关的
+        if (score >= 0.9 && exactMatch == null) {
+          exactMatch = result;
+        }
+      }
+
+      // 如果已找到精确匹配且结果数足够，提前退出
+      if (exactMatch != null && results.length >= 5) {
+        break;
       }
     }
 
@@ -398,18 +411,20 @@ class KnowledgeBaseService {
   }
 
   /// 计算匹配分数
+  ///
+  /// 使用预计算的小写版本提高效率
   double _calculateMatchScore(String query, FAQEntry entry) {
     double score = 0.0;
 
-    // 问题精确匹配
-    if (entry.question.toLowerCase().contains(query)) {
+    // 问题精确匹配（使用预计算的小写版本）
+    if (entry.questionLower.contains(query)) {
       score = 0.9;
     }
-    // 关键词匹配
+    // 关键词匹配（使用预计算的小写版本）
     else {
       int matchedKeywords = 0;
-      for (final keyword in entry.keywords) {
-        if (query.contains(keyword.toLowerCase())) {
+      for (final keyword in entry.keywordsLower) {
+        if (query.contains(keyword)) {
           matchedKeywords++;
         }
       }
@@ -577,6 +592,10 @@ class FAQEntry {
   final String? voiceGuide;
   final List<String> relatedQuestions;
 
+  /// 预计算的小写版本（用于搜索优化）
+  late final String _questionLower;
+  late final List<String> _keywordsLower;
+
   FAQEntry({
     required this.id,
     required this.category,
@@ -585,7 +604,17 @@ class FAQEntry {
     required this.answer,
     this.voiceGuide,
     this.relatedQuestions = const [],
-  });
+  }) {
+    // 预计算小写版本，避免每次搜索都转换
+    _questionLower = question.toLowerCase();
+    _keywordsLower = keywords.map((k) => k.toLowerCase()).toList();
+  }
+
+  /// 获取预计算的小写问题
+  String get questionLower => _questionLower;
+
+  /// 获取预计算的小写关键词
+  List<String> get keywordsLower => _keywordsLower;
 }
 
 /// FAQ 搜索结果

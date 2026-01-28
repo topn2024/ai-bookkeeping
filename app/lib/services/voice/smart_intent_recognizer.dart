@@ -1251,6 +1251,12 @@ $historyContext
       '{那笔|上一笔|刚才的}{改成|改为}{value}',   // 那笔改成50
       '{改}{category|amount}',                    // 改成交通
       '{不对}{是}{value}',                        // 不对，是50
+      '{刚才|那个|刚才那个}{item}{是}{value}{不是}',  // 刚才那个牛腩是35不是30
+      '{item}{是}{value}{不是}',                  // 牛腩是35不是30
+      '{item}{不是}{value}{是}{value}',           // 牛腩不是30是35
+      '{我说}{item}{是}{value}',                  // 我说牛腩是35
+      '{说错了}{item}{是}{value}',                // 说错了，牛腩是35
+      '{搞错了}{item}{是}{value}',                // 搞错了，牛腩是35
     ],
     SmartIntentType.delete: [
       '{删除|删掉|去掉}{那笔|上一笔|这笔}',       // 删掉那笔
@@ -1304,6 +1310,33 @@ $historyContext
       '{联系|找}客服',                            // 联系客服
       '{清理|清除}缓存',                          // 清理缓存
       '{释放|节省}空间',                          // 释放空间
+    ],
+    SmartIntentType.advice: [
+      // 通用建议请求
+      '{给我|有什么}{建议|推荐}',                 // 给我一些建议
+      '{有没有|有什么}{省钱|理财|财务}建议',      // 有没有省钱建议
+      '给点{省钱|理财|消费}建议',                 // 给点省钱建议
+      '{怎么|如何}{省钱|存钱|理财}',              // 怎么省钱
+      '帮我{分析|看看}{消费|支出}',               // 帮我分析消费
+      // 预算相关建议
+      '{预算|分类预算}{建议|推荐|怎么设}',        // 预算建议
+      '{怎么|如何}设置预算',                      // 怎么设置预算
+      '预算{不够|超了|超支}{怎么办}',             // 预算超了怎么办
+      // 洞察分析
+      '{我的|有什么}{洞察|分析|报告}',            // 我的洞察
+      '消费{分析|洞察|趋势}',                     // 消费分析
+      '{哪里|什么地方}花{多了|太多}',             // 哪里花多了
+      '哪些{消费|支出}可以{省|减少|优化}',        // 哪些消费可以省
+      // 功能推荐
+      '{有什么|推荐}功能',                        // 有什么功能推荐
+      '{应该|可以}用什么功能',                    // 应该用什么功能
+      // 分类建议（记账时）
+      '{这个|这笔}{是什么|算什么}分类',           // 这个是什么分类
+      '{应该|要}记到哪个分类',                    // 应该记到哪个分类
+      // 储蓄建议
+      '{怎么|如何}存{更多|钱}',                   // 怎么存更多钱
+      '储蓄{建议|计划|目标}',                     // 储蓄建议
+      '存钱{建议|技巧|方法}',                     // 存钱建议
     ],
   };
 
@@ -1754,6 +1787,20 @@ $historyContext
 6. 无法理解的内容或乱码
 7. 任何不包含明确操作指令的对话
 
+【重要：modify意图的判断规则】
+以下情况必须返回modify意图（修改之前的记录）：
+1. 明确说要修改/改成："那笔改成50"、"改成交通"、"把金额改成35" → modify
+2. 表达之前记错了："不对，是50"、"说错了，是35"、"搞错了，应该是25" → modify
+3. 纠正之前的金额："XX是35不是30"、"牛腩是35不是30"、"刚才那个是35不是30" → modify
+4. 纠正之前的分类："那笔是交通不是餐饮"、"刚才是购物不是餐饮" → modify
+5. 包含"不是"的纠正句："牛腩不是30是35"、"刚才那个牛腩是35，不是三十" → modify
+
+【modify参数说明】
+- targetItem: 要修改的项目（如"牛腩"、"那笔"、"上一笔"）
+- newAmount: 新金额（如果修改金额）
+- oldAmount: 旧金额（用户提到的错误金额，可选）
+- newCategory: 新分类（如果修改分类）
+
 【关键区分】
 - "你会记账吗" → chat（询问能力，不是记账指令）
 - "帮我记一笔30元" → add_transaction（明确的记账指令）
@@ -1763,6 +1810,9 @@ $historyContext
 - "这个月花了多少" → query（查询统计）
 - "50元" → clarify（单独金额，需要问用途）
 - "花了100块吃饭" → add_transaction（有金额有用途）
+- "牛腩是35不是30" → modify（纠正之前记录的金额）
+- "刚才那个改成35" → modify（修改之前的记录）
+- "不对，是50" → modify（纠正金额）
 
 【返回格式】
 {"intent":"意图类型","confidence":0.9,"entities":{"amount":金额,"category":"分类","type":"income或expense","note":"具体物品或用途","targetPage":"页面名","route":"路由","operation":"操作类型","configId":"配置项ID","vaultName":"小金库名称","queryType":"查询类型","time":"时间范围"}}
@@ -2023,7 +2073,11 @@ $historyContext
     // 阿拉伯数字
     final arabicMatch = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(input);
     if (arabicMatch != null) {
-      return double.tryParse(arabicMatch.group(1)!);
+      // 安全获取捕获组，避免空指针
+      final captured = arabicMatch.group(1);
+      if (captured != null) {
+        return double.tryParse(captured);
+      }
     }
 
     // 中文数字
@@ -2040,7 +2094,9 @@ $historyContext
     final match = RegExp(r'[零一二两三四五六七八九十百千万]+').firstMatch(input);
     if (match == null) return null;
 
-    final chineseNum = match.group(0)!;
+    // 安全获取匹配结果
+    final chineseNum = match.group(0);
+    if (chineseNum == null || chineseNum.isEmpty) return null;
     double result = 0;
     double current = 0;
 
@@ -2206,6 +2262,7 @@ enum SmartIntentType {
   dataOp,        // 数据操作
   share,         // 分享操作
   systemOp,      // 系统操作
+  advice,        // 建议操作（财务建议、省钱建议、洞察分析等）
   clarify,       // 需要澄清（信息不完整）
   chat,          // 闲聊（讲故事、讲笑话、问候等）
   unknown,

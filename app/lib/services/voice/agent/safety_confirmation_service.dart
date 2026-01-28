@@ -248,14 +248,30 @@ class SafetyConfirmationService {
     }
   }
 
+  /// 规范化输入文本
+  ///
+  /// 移除空格、特殊字符等，防止正则表达式绕过
+  String _normalizeInput(String text) {
+    // 移除空格、零宽字符、不可见字符
+    var normalized = text.replaceAll(RegExp(r'[\s\u200B-\u200D\uFEFF]'), '');
+    // 转换全角字符到半角
+    normalized = normalized.replaceAllMapped(
+      RegExp(r'[\uFF01-\uFF5E]'),
+      (match) => String.fromCharCode(match.group(0)!.codeUnitAt(0) - 0xFEE0),
+    );
+    return normalized.toLowerCase();
+  }
+
   /// 检测是否是高风险操作
   bool _isHighRiskOperation(String text) {
-    return _highRiskPatterns.any((p) => p.hasMatch(text));
+    final normalized = _normalizeInput(text);
+    return _highRiskPatterns.any((p) => p.hasMatch(normalized));
   }
 
   /// 检测是否是批量删除
   bool _isBatchDelete(String text) {
-    return _batchDeletePatterns.any((p) => p.hasMatch(text));
+    final normalized = _normalizeInput(text);
+    return _batchDeletePatterns.any((p) => p.hasMatch(normalized));
   }
 
   /// 获取高风险操作重定向路由

@@ -17,7 +17,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 import 'action_registry.dart';
-import 'hybrid_intent_router.dart';
+import '../network_monitor.dart';
 
 /// 执行状态
 enum ExecutionState {
@@ -863,6 +863,8 @@ class ActionExecutor {
   }
 
   /// 从意图中提取与缺失参数相关的实体
+  ///
+  /// 添加类型验证，确保提取的值类型正确
   Map<String, dynamic> _extractRelevantEntities(
     List<String> missingParams,
     IntentResult intent,
@@ -871,7 +873,12 @@ class ActionExecutor {
 
     for (final param in missingParams) {
       if (intent.entities.containsKey(param) && intent.entities[param] != null) {
-        relevant[param] = intent.entities[param];
+        final value = intent.entities[param];
+        // 类型验证
+        final validatedValue = _validateParamType(param, value);
+        if (validatedValue != null) {
+          relevant[param] = validatedValue;
+        }
       }
 
       // 处理参数别名
@@ -881,8 +888,9 @@ class ActionExecutor {
           if (!relevant.containsKey('amount') &&
               intent.entities.containsKey('configValue')) {
             final value = intent.entities['configValue'];
-            if (value is num) {
-              relevant['amount'] = value.toDouble();
+            final validated = _validateParamType('amount', value);
+            if (validated != null) {
+              relevant['amount'] = validated;
             }
           }
           break;
@@ -890,9 +898,15 @@ class ActionExecutor {
           // category 可能来自 merchant 或 description
           if (!relevant.containsKey('category')) {
             if (intent.entities.containsKey('merchant')) {
-              relevant['category'] = intent.entities['merchant'];
+              final value = intent.entities['merchant'];
+              if (value is String && value.isNotEmpty) {
+                relevant['category'] = value;
+              }
             } else if (intent.entities.containsKey('description')) {
-              relevant['category'] = intent.entities['description'];
+              final value = intent.entities['description'];
+              if (value is String && value.isNotEmpty) {
+                relevant['category'] = value;
+              }
             }
           }
           break;
@@ -900,6 +914,65 @@ class ActionExecutor {
     }
 
     return relevant;
+  }
+
+  /// 验证参数类型
+  ///
+  /// 确保参数值类型正确，必要时进行转换
+  dynamic _validateParamType(String paramName, dynamic value) {
+    if (value == null) return null;
+
+    switch (paramName) {
+      case 'amount':
+        // 金额必须是数字
+        if (value is num) {
+          final doubleVal = value.toDouble();
+          // 金额必须为正数且在合理范围内
+          if (doubleVal > 0 && doubleVal <= 10000000) {
+            return doubleVal;
+          }
+        }
+        if (value is String) {
+          final parsed = double.tryParse(value);
+          if (parsed != null && parsed > 0 && parsed <= 10000000) {
+            return parsed;
+          }
+        }
+        return null;
+
+      case 'category':
+      case 'merchant':
+      case 'note':
+      case 'description':
+      case 'account':
+      case 'transactionType':
+        // 字符串类型参数
+        if (value is String && value.trim().isNotEmpty) {
+          // 限制长度防止异常输入
+          final trimmed = value.trim();
+          return trimmed.length <= 100 ? trimmed : trimmed.substring(0, 100);
+        }
+        return null;
+
+      case 'date':
+        // 日期类型
+        if (value is DateTime) return value;
+        if (value is String) {
+          return DateTime.tryParse(value);
+        }
+        return null;
+
+      case 'transactionId':
+        // ID类型
+        if (value is String && value.isNotEmpty && value.length <= 64) {
+          return value;
+        }
+        return null;
+
+      default:
+        // 其他参数原样返回
+        return value;
+    }
   }
 
   /// 尝试从原始输入中提取参数

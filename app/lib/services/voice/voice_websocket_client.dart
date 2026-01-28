@@ -316,12 +316,22 @@ class VoiceWebSocketClient {
     // 先更新状态，防止在关闭过程中有新消息进来
     _setState(WebSocketState.disconnected);
 
-    // 再关闭资源
-    await _subscription?.cancel();
-    _subscription = null;
+    // 再关闭资源，使用 try-finally 确保清理
+    try {
+      await _subscription?.cancel();
+    } catch (e) {
+      debugPrint('[VoiceWebSocket] 取消订阅失败: $e');
+    } finally {
+      _subscription = null;
+    }
 
-    await _channel?.sink.close();
-    _channel = null;
+    try {
+      await _channel?.sink.close();
+    } catch (e) {
+      debugPrint('[VoiceWebSocket] 关闭连接失败: $e');
+    } finally {
+      _channel = null;
+    }
   }
 
   /// 发送音频数据
