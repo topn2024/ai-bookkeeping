@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../theme/app_theme.dart';
+import '../../models/transaction.dart';
+import '../../services/import/wechat_bill_parser.dart';
+import '../../services/import/alipay_bill_parser.dart';
+import '../../services/import/bill_parser.dart';
 import 'field_mapping_page.dart';
 import 'deduplication_page.dart';
 
@@ -125,12 +129,8 @@ class _SmartFormatDetectionPageState extends ConsumerState<SmartFormatDetectionP
         _steps[3].description = _needsFieldMapping ? '需要手动配置字段映射' : '使用$_detectedSource解析器';
       });
 
-      // 生成预览数据（模拟）
-      _previewData = [
-        {'date': '2024-12-30 12:35', 'amount': '-¥35.00', 'description': '美团外卖 - 午餐'},
-        {'date': '2024-12-30 09:15', 'amount': '-¥6.00', 'description': '滴滴出行 - 地铁'},
-        {'date': '2024-12-29 18:20', 'amount': '-¥128.00', 'description': '盒马鲜生'},
-      ];
+      // 生成预览数据（真实解析）
+      await _loadPreviewData();
 
       setState(() => _isDetecting = false);
     } catch (e) {
@@ -138,6 +138,50 @@ class _SmartFormatDetectionPageState extends ConsumerState<SmartFormatDetectionP
         _isDetecting = false;
         _errorMessage = e.toString();
       });
+    }
+  }
+
+  /// 加载真实的预览数据
+  Future<void> _loadPreviewData() async {
+    try {
+      final file = File(widget.filePath);
+      if (!await file.exists()) {
+        return;
+      }
+
+      final bytes = await file.readAsBytes();
+      BillParser? parser;
+
+      // 根据检测到的数据源选择解析器
+      if (_detectedSource?.contains('微信') == true) {
+        parser = WechatBillParser();
+      } else if (_detectedSource?.contains('支付宝') == true) {
+        parser = AlipayBillParser();
+      }
+
+      if (parser != null) {
+        final result = await parser.parse(bytes);
+        if (result.candidates.isNotEmpty) {
+          // 取前3条作为预览
+          _previewData = result.candidates.take(3).map((candidate) {
+            final amountStr = candidate.type == TransactionType.expense
+                ? '-¥${candidate.amount.toStringAsFixed(2)}'
+                : '+¥${candidate.amount.toStringAsFixed(2)}';
+            return {
+              'date': candidate.date.toString().substring(0, 16),
+              'amount': amountStr,
+              'description': '${candidate.rawMerchant ?? ''} ${candidate.note ?? ''}'.trim(),
+            };
+          }).toList();
+        } else {
+          // 无数据时显示空列表
+          _previewData = [];
+        }
+      }
+    } catch (e) {
+      debugPrint('加载预览数据失败: $e');
+      // 出错时显示空列表
+      _previewData = [];
     }
   }
 

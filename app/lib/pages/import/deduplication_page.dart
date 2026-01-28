@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:io';
-import 'dart:convert';
 
 import '../../theme/app_theme.dart';
 import '../../models/transaction.dart';
+import '../../models/import_candidate.dart';
 import '../../services/duplicate_detection_service.dart';
+import '../../services/import/wechat_bill_parser.dart';
+import '../../services/import/alipay_bill_parser.dart';
+import '../../services/import/bill_parser.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/contracts/i_database_service.dart';
 import 'import_preview_confirm_page.dart';
@@ -63,21 +66,43 @@ class _DeduplicationPageState extends ConsumerState<DeduplicationPage> {
 
   Future<void> _startDeduplication() async {
     try {
-      // 1. 读取并解析文件
+      // 1. 读取文件
       final file = File(widget.filePath);
       if (!await file.exists()) {
         throw Exception('文件不存在');
       }
 
-      final content = await file.readAsString();
-      final lines = const LineSplitter().convert(content);
+      final bytes = await file.readAsBytes();
 
-      if (lines.isEmpty) {
-        throw Exception('文件内容为空');
+      // 2. 根据文件名或检测到的数据源选择解析器
+      BillParser? parser;
+      if (widget.fileName.contains('微信') || widget.detectedSource?.contains('微信') == true) {
+        parser = WechatBillParser();
+      } else if (widget.fileName.contains('支付宝') || widget.detectedSource?.contains('支付宝') == true) {
+        parser = AlipayBillParser();
       }
 
-      // 2. 解析CSV (简化版，假设是标准格式)
-      _importedTransactions = _parseCSV(lines);
+      if (parser == null) {
+        throw Exception('无法识别账单格式');
+      }
+
+      // 3. 解析账单
+      final parseResult = await parser.parse(bytes);
+      if (parseResult.candidates.isEmpty) {
+        throw Exception('未能解析出任何交易记录');
+      }
+
+      // 4. 转换为 ImportedTransaction
+      _importedTransactions = parseResult.candidates.map((candidate) {
+        return ImportedTransaction(
+          id: const Uuid().v4(),
+          merchant: candidate.rawMerchant ?? '',
+          amount: candidate.type == TransactionType.expense ? -candidate.amount : candidate.amount,
+          date: candidate.date,
+          category: candidate.category,
+        );
+      }).toList();
+
       _totalRecords = _importedTransactions.length;
 
       // 3. 执行真实的去重检测
@@ -162,34 +187,6 @@ class _DeduplicationPageState extends ConsumerState<DeduplicationPage> {
         _isProcessing = false;
       });
     }
-  }
-
-  /// 简单的CSV解析
-  List<ImportedTransaction> _parseCSV(List<String> lines) {
-    final transactions = <ImportedTransaction>[];
-
-    // 跳过表头
-    for (int i = 1; i < lines.length; i++) {
-      final line = lines[i].trim();
-      if (line.isEmpty) continue;
-
-      try {
-        final fields = line.split(',');
-        if (fields.length >= 3) {
-          transactions.add(ImportedTransaction(
-            id: const Uuid().v4(),
-            merchant: fields[0].trim(),
-            amount: double.tryParse(fields[1].trim()) ?? 0.0,
-            date: DateTime.tryParse(fields[2].trim()) ?? DateTime.now(),
-            category: fields.length > 3 ? fields[3].trim() : null,
-          ));
-        }
-      } catch (e) {
-        debugPrint('解析行失败: $line, 错误: $e');
-      }
-    }
-
-    return transactions;
   }
 
   String _formatDate(DateTime date) {
