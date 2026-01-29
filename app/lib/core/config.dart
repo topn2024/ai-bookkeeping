@@ -38,7 +38,11 @@ class AppConfig {
       return envKey;
     }
     // Android平台使用Native安全存储的密钥
-    if (_nativeQwenApiKey != null && _nativeQwenApiKey!.isNotEmpty) {
+    // 验证密钥格式：必须以 sk- 开头且只包含合法字符
+    if (_nativeQwenApiKey != null &&
+        _nativeQwenApiKey!.isNotEmpty &&
+        _nativeQwenApiKey!.startsWith('sk-') &&
+        RegExp(r'^sk-[a-zA-Z0-9]+$').hasMatch(_nativeQwenApiKey!)) {
       return _nativeQwenApiKey!;
     }
     // 降级使用内置密钥

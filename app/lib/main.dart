@@ -287,13 +287,15 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       debugPrint('[App] 处理语音命令: $command');
 
       try {
-        // 检查是否可能包含多个意图
+        // 统一使用多意图处理流程，以支持对话式金额补充
+        // 即使是短输入（如"买了肠粉"），也需要走多意图流程来正确处理部分操作
         final intentRouter = coordinator.intentRouter;
         final mightBeMultiple = intentRouter.mightContainMultipleIntents(command);
         debugPrint('[App] 是否多意图: $mightBeMultiple');
 
         VoiceSessionResult result;
-        if (mightBeMultiple) {
+        // 始终使用多意图处理，因为它能更好地处理有分类无金额的情况
+        if (true) {  // 原: if (mightBeMultiple)
           result = await coordinator.processMultiIntentCommand(command);
           // 多意图处理后自动确认执行（仅当确实有待确认的多意图时）
           if (result.status == VoiceSessionStatus.success && coordinator.hasPendingMultiIntent) {
