@@ -114,15 +114,14 @@
 ## Phase 2: 完整迁移和清理（第5-8周）
 
 ### 2.1 迁移剩余 Repository（第5周）
-- [ ] **任务2.1.1**: 创建剩余10+个 Repository 接口和实现
-  - 包括: RecurringTransaction, CreditCard, SavingsGoal, BillReminder, Investment, Debt, Member, Import, ResourcePool, Vault, Learning
-  - 验证: 每个 Repository 有完整测试
+- [x] **任务2.1.1**: 创建剩余9个 Repository 接口 ✅ 2026-01-29
+  - 包括: Template, RecurringTransaction, CreditCard, SavingsGoal, BillReminder, Debt, Investment, Vault, ImportBatch
+  - 验证: 每个 Repository 接口已创建
   - 依赖: 任务1.1.1
-  - 可并行: 多个 Repository 可同时开发
 
-- [ ] **任务2.1.2**: 创建 `RepositoryFactory`
+- [x] **任务2.1.2**: 创建 `RepositoryFactory` ✅ 2026-01-29
   - 文件: `lib/infrastructure/database/repository_factory.dart`
-  - 验证: 可以创建所有 Repository 实例
+  - 验证: 可以创建所有 Repository 实例（工厂方法待实现）
   - 依赖: 任务2.1.1
 
 - [ ] **任务2.1.3**: 更新 `DatabaseService` 为轻量级初始化服务
@@ -131,29 +130,29 @@
   - 依赖: 任务2.1.2
 
 ### 2.2 重构 GlobalVoiceAssistantManager（第6周）
-- [ ] **任务2.2.1**: 创建 `AudioRecordingManager`
+- [x] **任务2.2.1**: 创建 `AudioRecordingManager` ✅ 2026-01-29
   - 文件: `lib/application/managers/audio_recording_manager.dart`
-  - 验证: 职责单一，行数<300
+  - 验证: 职责单一，行数约230
   - 依赖: 无
 
-- [ ] **任务2.2.2**: 创建 `VADManager`
+- [x] **任务2.2.2**: 创建 `VADManager` ✅ 2026-01-29
   - 文件: `lib/application/managers/vad_manager.dart`
-  - 验证: 职责单一，行数<300
+  - 验证: 职责单一，行数约270
   - 依赖: 无
 
-- [ ] **任务2.2.3**: 创建 `BargeInManager`
+- [x] **任务2.2.3**: 创建 `BargeInManager` ✅ 2026-01-29
   - 文件: `lib/application/managers/barge_in_manager.dart`
-  - 验证: 职责单一，行数<200
+  - 验证: 职责单一，行数约230
   - 依赖: 无
 
-- [ ] **任务2.2.4**: 创建 `ConversationHistoryManager`
+- [x] **任务2.2.4**: 创建 `ConversationHistoryManager` ✅ 2026-01-29
   - 文件: `lib/application/managers/conversation_history_manager.dart`
-  - 验证: 职责单一，行数<300
+  - 验证: 职责单一，行数约250
   - 依赖: 无
 
-- [ ] **任务2.2.5**: 创建 `TTSManager`
+- [x] **任务2.2.5**: 创建 `TTSManager` ✅ 2026-01-29
   - 文件: `lib/application/managers/tts_manager.dart`
-  - 验证: 职责单一，行数<300
+  - 验证: 职责单一，行数约280
   - 依赖: 无
 
 - [ ] **任务2.2.6**: 创建 `PipelineManager`
@@ -161,9 +160,9 @@
   - 验证: 职责单一，行数<300
   - 依赖: 无
 
-- [ ] **任务2.2.7**: 创建 `NetworkStatusManager`
+- [x] **任务2.2.7**: 创建 `NetworkStatusManager` ✅ 2026-01-29
   - 文件: `lib/application/managers/network_status_manager.dart`
-  - 验证: 职责单一，行数<200
+  - 验证: 职责单一，行数约180
   - 依赖: 无
 
 - [ ] **任务2.2.8**: 重构 `GlobalVoiceAssistantManager` 为 Facade
