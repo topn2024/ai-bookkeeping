@@ -51,7 +51,9 @@ class VoiceIntentRouter {
 
   /// 添加意图的关键词模式
   static final _addPatterns = [
-    RegExp(r'添加|新增|记录|记一笔', caseSensitive: false),
+    RegExp(r'添加|新增|记一笔', caseSensitive: false),
+    // "记录"需排除查询场景（如"查交易记录"）
+    RegExp(r'(?<!查.{0,5})记录(?!.{0,5}(查|看|显示|列表))', caseSensitive: false),
     RegExp(r'花了|买了|付了|支付|消费', caseSensitive: false),
     // 计划/预计支出（如"打算花"、"预计花"、"准备花"、"要花"）
     RegExp(r'(打算|预计|准备|计划|想要?|要).{0,5}(花|买|付|消费)', caseSensitive: false),
@@ -69,6 +71,10 @@ class VoiceIntentRouter {
     RegExp(r'多少钱|多少块|总共.*钱', caseSensitive: false),
     RegExp(r'什么时候|哪天|几号', caseSensitive: false),
     RegExp(r'分析|报告|汇总', caseSensitive: false),
+    // 交易记录查询
+    RegExp(r'(查看?|看看?|显示).*(交易|记录|账单|明细|流水)', caseSensitive: false),
+    RegExp(r'(交易|账单|明细|流水).*(记录|列表|详情)', caseSensitive: false),
+    RegExp(r'最近.*(消费|交易|记录|账单)', caseSensitive: false),
   ];
 
   /// 导航意图的关键词模式
