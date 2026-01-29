@@ -6,9 +6,9 @@
 
 #### God Object 反模式
 
-**VoiceServiceCoordinator (4,063行)**
+**VoiceServiceCoordinator (4,645行 - 2026-01-29更新，原4,063行)**
 ```
-职责过多：
+职责过多（持续增长中）：
 ├── 语音识别生命周期管理
 ├── 意图分析和路由
 ├── 多意图处理
@@ -23,7 +23,11 @@
 ├── 会话超时管理
 ├── 打断检测
 ├── 网络状态监控
-└── 学习服务集成
+├── 学习服务集成
+├── [NEW] 对话式金额补充 (_pendingAmountIntent)
+├── [NEW] 对话式分类补充 (_pendingCategoryIntent)
+├── [NEW] 备注提取和分类推断
+└── [NEW] TTS消息记录到聊天历史
 
 依赖注入（17+个）：
 - VoiceRecognitionEngine
