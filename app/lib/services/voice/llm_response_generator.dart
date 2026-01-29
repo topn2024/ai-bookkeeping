@@ -212,6 +212,120 @@ ${chatIntent != null ? '（检测到的意图：$chatIntent）' : ''}
     return '嗯嗯~要记账还是查账呢？';
   }
 
+  /// 生成告别回复
+  ///
+  /// [farewellType] 告别类型：
+  /// - 'userEnd': 用户主动说再见
+  /// - 'silenceTimeout': 用户静默超时
+  /// - 'sessionTimeout': 会话超时
+  /// - 'default': 默认告别
+  Future<String> generateFarewellResponse({
+    String farewellType = 'default',
+  }) async {
+    if (!isAvailable) {
+      return _fallbackFarewellResponse(farewellType);
+    }
+
+    try {
+      final hour = DateTime.now().hour;
+      String timeContext;
+      if (hour >= 5 && hour < 12) {
+        timeContext = '早上';
+      } else if (hour >= 12 && hour < 18) {
+        timeContext = '下午';
+      } else if (hour >= 22 || hour < 5) {
+        timeContext = '深夜';
+      } else {
+        timeContext = '晚上';
+      }
+
+      String scenario;
+      switch (farewellType) {
+        case 'userEnd':
+          scenario = '用户主动说再见，请温馨告别';
+          break;
+        case 'silenceTimeout':
+          scenario = '用户一段时间没说话，你准备先休息，但表示随时可以再聊';
+          break;
+        case 'sessionTimeout':
+          scenario = '对话暂时结束，表示随时可以继续';
+          break;
+        default:
+          scenario = '对话结束，温馨告别';
+      }
+
+      final prompt = '''
+你是小记，一个可爱的记账助手。现在对话要结束了，请用自然、亲切的方式告别。
+
+当前时间：$timeContext
+场景：$scenario
+
+要求：
+1. 简短自然（10-20字）
+2. 口语化，像朋友告别
+3. 可以根据时间给一句关心的话（如晚上提醒早点休息）
+4. 【重要】让每次告别都有变化，不要总说"有需要随时叫我"
+5. 可以用一些变化的表达，如"下次见"、"记得常来记账哦"、"拜拜啦"等
+6. 保持积极友好的态度
+
+直接输出回复内容，不要加引号：''';
+
+      final response = await _qwenService.chat(prompt).timeout(_timeout);
+      if (response != null && response.isNotEmpty) {
+        final cleaned = _cleanResponse(response, maxLength: 40);
+        if (cleaned.isNotEmpty) {
+          debugPrint('[LLMResponse] 告别回复: $cleaned');
+          return cleaned;
+        }
+      }
+    } catch (e) {
+      debugPrint('[LLMResponse] 告别回复生成失败: $e');
+    }
+
+    return _fallbackFarewellResponse(farewellType);
+  }
+
+  /// 告别模板回复（降级方案）
+  String _fallbackFarewellResponse(String farewellType) {
+    final hour = DateTime.now().hour;
+    final random = DateTime.now().millisecond;
+
+    List<String> templates;
+    switch (farewellType) {
+      case 'userEnd':
+        templates = [
+          '拜拜~记得常来记账哦',
+          '好的，下次见~',
+          '再见啦，祝你开心',
+        ];
+        break;
+      case 'silenceTimeout':
+        templates = [
+          '你不说话我就先休息啦，随时可以叫我~',
+          '那我先休息咯，有事叫我~',
+          '先不打扰你啦，回头见~',
+        ];
+        break;
+      default:
+        templates = [
+          '好的，有需要随时叫我~',
+          '下次再聊~',
+          '好嘞，有事叫我~',
+        ];
+    }
+
+    // 深夜特殊关心
+    if (hour >= 22 || hour < 5) {
+      templates = [
+        '这么晚了，早点休息哦~',
+        '夜深了，记得早点睡~',
+        '好的，晚安~',
+      ];
+    }
+
+    return templates[random % templates.length];
+  }
+
   /// 生成错误/异常回复
   Future<String> generateErrorResponse({
     required String errorType,

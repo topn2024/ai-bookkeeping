@@ -199,67 +199,68 @@ class ChatEngine {
     String? context,
     String? emotion,
   }) async {
-    // 检测特殊意图
-    final specialResponse = _checkSpecialIntent(input);
-    if (specialResponse != null) {
-      return specialResponse;
-    }
+    final normalizedInput = input.toLowerCase();
 
-    // 如果LLM可用，使用LLM生成响应
+    // 检测特殊意图类型（用于LLM提示词增强）
+    final intentType = _detectIntentType(normalizedInput);
+
+    // 如果LLM可用，使用LLM生成响应（包括问候、告别等）
     if (isLLMAvailable) {
       try {
-        return await _generateLLMResponse(input, context, emotion);
+        return await _generateLLMResponse(input, context, emotion, intentType: intentType);
       } catch (e) {
-        debugPrint('[ChatEngine] LLM响应失败: $e');
+        debugPrint('[ChatEngine] LLM响应失败: $e，降级到预设响应');
         // 降级到预设响应
       }
     }
 
-    // 使用预设响应
-    return _generatePresetResponse(input, emotion);
+    // LLM不可用或失败，使用预设响应
+    return _generatePresetResponseByIntent(input, emotion, intentType);
   }
 
-  /// 检测特殊意图
-  ChatResponse? _checkSpecialIntent(String input) {
-    final normalizedInput = input.toLowerCase();
-
-    // 问候
-    if (_isGreeting(normalizedInput)) {
-      final greeting = _persona.speechStyle.greeting.getGreeting();
-      final responses = [
-        '$greeting！有什么我能帮你的吗？',
-        '$greeting！今天想记点什么？',
-        '$greeting！',
-      ];
-      return ChatResponse(
-        text: responses[_random.nextInt(responses.length)],
-      );
-    }
-
-    // 感谢
-    if (_isThanks(normalizedInput)) {
-      return ChatResponse(
-        text: _presetResponses['thanks']![_random.nextInt(_presetResponses['thanks']!.length)],
-      );
-    }
-
-    // 告别
-    if (_isGoodbye(normalizedInput)) {
-      return ChatResponse(
-        text: _presetResponses['goodbye']![_random.nextInt(_presetResponses['goodbye']!.length)],
-      );
-    }
-
+  /// 检测意图类型
+  String? _detectIntentType(String normalizedInput) {
+    if (_isGreeting(normalizedInput)) return 'greeting';
+    if (_isThanks(normalizedInput)) return 'thanks';
+    if (_isGoodbye(normalizedInput)) return 'goodbye';
     return null;
+  }
+
+  /// 根据意图类型生成预设响应（降级方案）
+  ChatResponse _generatePresetResponseByIntent(String input, String? emotion, String? intentType) {
+    switch (intentType) {
+      case 'greeting':
+        final greeting = _persona.speechStyle.greeting.getGreeting();
+        final responses = [
+          '$greeting！有什么我能帮你的吗？',
+          '$greeting！今天想记点什么？',
+          '$greeting！',
+        ];
+        return ChatResponse(text: responses[_random.nextInt(responses.length)]);
+
+      case 'thanks':
+        return ChatResponse(
+          text: _presetResponses['thanks']![_random.nextInt(_presetResponses['thanks']!.length)],
+        );
+
+      case 'goodbye':
+        return ChatResponse(
+          text: _presetResponses['goodbye']![_random.nextInt(_presetResponses['goodbye']!.length)],
+        );
+
+      default:
+        return _generatePresetResponse(input, emotion);
+    }
   }
 
   /// 使用LLM生成响应
   Future<ChatResponse> _generateLLMResponse(
     String input,
     String? context,
-    String? emotion,
-  ) async {
-    final prompt = _buildChatPrompt(input, context, emotion);
+    String? emotion, {
+    String? intentType,
+  }) async {
+    final prompt = _buildChatPrompt(input, context, emotion, intentType: intentType);
     final response = await _qwenService.chat(prompt);
 
     if (response == null || response.isEmpty) {
@@ -307,8 +308,40 @@ class ChatEngine {
   }
 
   /// 构建聊天提示词
-  String _buildChatPrompt(String input, String? context, String? emotion) {
+  String _buildChatPrompt(String input, String? context, String? emotion, {String? intentType}) {
     final emotionHint = emotion != null ? '\n用户当前情绪: $emotion' : '';
+    final hour = DateTime.now().hour;
+    final timeOfDay = hour < 12 ? '上午' : (hour < 18 ? '下午' : '晚上');
+
+    // 根据意图类型添加特殊指导
+    String intentGuidance = '';
+    switch (intentType) {
+      case 'greeting':
+        intentGuidance = '''
+【特殊场景：用户打招呼】
+- 这是对话的开始，用自然、热情的方式回应
+- 根据时间段($timeOfDay)选择合适的问候
+- 可以主动询问用户需要什么帮助
+- 让回复有变化，不要每次都一样
+- 示例风格：亲切、自然、有个性''';
+        break;
+      case 'thanks':
+        intentGuidance = '''
+【特殊场景：用户表示感谢】
+- 用自然、谦虚的方式回应
+- 可以表示随时乐意帮忙
+- 让回复有变化，不要每次都说"不客气"
+- 可以适当加一句关心的话''';
+        break;
+      case 'goodbye':
+        intentGuidance = '''
+【特殊场景：用户告别】
+- 用温暖、自然的方式道别
+- 可以表示期待下次见面
+- 让回复有变化，不要每次都说"有需要随时叫我"
+- 可以根据时间段给一句关心的话（如晚上提醒早点休息）''';
+        break;
+    }
 
     return '''你是"${_persona.name}"，一个${_persona.role}。
 性格特点：${_persona.traits.join('、')}
@@ -320,7 +353,8 @@ class ChatEngine {
 - 如果话题与理财相关，可以适当引导到记账
 - 保持一致的人格特点
 - 根据用户情绪适当调整语气
-
+- 【重要】让每次回复都有变化，避免重复同样的话
+$intentGuidance
 ${context != null ? '对话背景：\n$context\n' : ''}$emotionHint
 
 用户说：$input

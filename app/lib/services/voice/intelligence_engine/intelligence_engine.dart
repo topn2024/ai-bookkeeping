@@ -258,19 +258,9 @@ class IntelligenceEngine {
           );
         }
 
-        // 优先使用SmartIntentRecognizer已生成的chatContent（如故事、笑话等）
-        // 只有当chatContent为空或与用户输入相同时，才调用FeedbackAdapter生成新回复
-        final preGeneratedContent = recognitionResult.chatContent;
-        if (preGeneratedContent != null &&
-            preGeneratedContent.isNotEmpty &&
-            preGeneratedContent != input) {
-          debugPrint('[IntelligenceEngine] 使用预生成的闲聊内容: $preGeneratedContent');
-          _lastResponse = preGeneratedContent;
-          return VoiceSessionResult(
-            success: true,
-            message: preGeneratedContent,
-          );
-        }
+        // 始终使用 BookkeepingFeedbackAdapter 生成闲聊回复
+        // 这样可以确保每次都使用 LLM 生成自然、多样化的回复
+        // 而不是使用 SmartIntentRecognizer 中的固定示例
 
         // 将用户输入传递给FeedbackAdapter
         if (feedbackAdapter is BookkeepingFeedbackAdapter) {

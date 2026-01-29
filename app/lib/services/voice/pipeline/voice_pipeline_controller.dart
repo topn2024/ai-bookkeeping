@@ -147,16 +147,14 @@ class VoicePipelineController {
     );
 
     // 初始化主动对话管理器
-    // 如果提供了 ResultBuffer，使用 SmartTopicGenerator 以支持查询结果通知和LLM生成
-    // 否则降级使用 SimpleTopicGenerator
-    _topicGenerator = resultBuffer != null
-        ? SmartTopicGenerator(
-            resultBuffer: resultBuffer,
-            preferencesProvider: userPreferencesProvider,
-            llmProvider: llmServiceProvider,
-            contextProvider: conversationContextProvider,
-          )
-        : SimpleTopicGenerator();
+    // 始终使用 SmartTopicGenerator 以支持 LLM 生成多样化话题
+    // ResultBuffer 可选，用于查询结果通知
+    _topicGenerator = SmartTopicGenerator(
+      resultBuffer: resultBuffer,
+      preferencesProvider: userPreferencesProvider,
+      llmProvider: llmServiceProvider,
+      contextProvider: conversationContextProvider,
+    );
     _proactiveManager = ProactiveConversationManager(
       topicGenerator: _topicGenerator,
       onProactiveMessage: _handleProactiveMessage,

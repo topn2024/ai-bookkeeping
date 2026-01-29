@@ -21,6 +21,7 @@ import 'voice/intelligence_engine/proactive_conversation_manager.dart' show Simp
 import 'voice/network_monitor.dart' show ProactiveNetworkMonitor, NetworkStatus;
 import 'voice/audio_processor_service.dart';
 import 'voice/ambient_noise_calibrator.dart';
+import 'voice/llm_response_generator.dart';
 import 'qwen_service.dart';
 
 /// 麦克风权限状态
@@ -920,8 +921,19 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   Future<void> _handleProactiveSessionTimeout() async {
     debugPrint('[GlobalVoiceAssistant] 处理主动对话会话超时');
 
-    // 添加告别消息到对话历史
-    _addAssistantMessage('好的，有需要随时叫我~');
+    // 使用LLM生成告别消息
+    final farewell = await LLMResponseGenerator.instance.generateFarewellResponse(
+      farewellType: 'sessionTimeout',
+    );
+    _addAssistantMessage(farewell);
+
+    // 播放告别消息
+    try {
+      await _streamingTtsService?.speak(farewell);
+      debugPrint('[GlobalVoiceAssistant] 告别消息播放完成');
+    } catch (e) {
+      debugPrint('[GlobalVoiceAssistant] 播放告别消息失败: $e');
+    }
 
     // 重置状态
     _isProcessingCommand = false;
@@ -1003,8 +1015,10 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 首先检查是否为结束命令
     if (_isVoiceEndCommand(userInput)) {
       debugPrint('[GlobalVoiceAssistant] 检测到结束命令: $userInput');
-      // 播放告别语
-      const farewell = '好的，有需要随时叫我';
+      // 使用LLM生成告别语
+      final farewell = await LLMResponseGenerator.instance.generateFarewellResponse(
+        farewellType: 'userEnd',
+      );
       _addAssistantMessage(farewell);
       onChunk(farewell);
       onComplete();
@@ -1903,12 +1917,15 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 2. 清除处理中标志
     _isProcessingCommand = false;
 
-    // 3. 添加系统消息到对话历史
-    _addAssistantMessage('好的，有需要随时叫我');
+    // 3. 使用LLM生成告别消息并播放
+    final farewell = await LLMResponseGenerator.instance.generateFarewellResponse(
+      farewellType: 'userEnd',
+    );
+    _addAssistantMessage(farewell);
 
-    // 4. 播放简短告别语
+    // 4. 播放告别语
     try {
-      await _streamingTtsService?.speak('好的');
+      await _streamingTtsService?.speak(farewell);
     } catch (e) {
       debugPrint('[GlobalVoiceAssistant] 播放告别语失败: $e');
     }
@@ -1936,12 +1953,15 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 2. 清除处理中标志
     _isProcessingCommand = false;
 
-    // 3. 添加系统消息到对话历史
-    _addAssistantMessage('你不说话我就先休息啦，有需要随时叫我');
+    // 3. 使用LLM生成沉默超时告别消息并播放
+    final farewell = await LLMResponseGenerator.instance.generateFarewellResponse(
+      farewellType: 'silenceTimeout',
+    );
+    _addAssistantMessage(farewell);
 
-    // 4. 播放简短告别语
+    // 4. 播放告别语
     try {
-      await _streamingTtsService?.speak('有需要随时叫我');
+      await _streamingTtsService?.speak(farewell);
     } catch (e) {
       debugPrint('[GlobalVoiceAssistant] 播放告别语失败: $e');
     }
@@ -2449,7 +2469,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   /// 处理30秒强制结束超时
   ///
   /// 用户30秒内没有任何响应，强制结束对话
-  void _handleForceEndTimeout() {
+  Future<void> _handleForceEndTimeout() async {
     debugPrint('[GlobalVoiceAssistant] 30秒静默超时，强制结束对话');
 
     // 停止所有计时器
@@ -2458,8 +2478,19 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 重置无响应计数
     _consecutiveNoResponseCount = 0;
 
-    // 播放结束提示
-    _addAssistantMessage('好的，有需要随时叫我~');
+    // 使用LLM生成告别消息
+    final farewell = await LLMResponseGenerator.instance.generateFarewellResponse(
+      farewellType: 'sessionTimeout',
+    );
+    _addAssistantMessage(farewell);
+
+    // 播放告别消息
+    try {
+      await _streamingTtsService?.speak(farewell);
+      debugPrint('[GlobalVoiceAssistant] 告别消息播放完成');
+    } catch (e) {
+      debugPrint('[GlobalVoiceAssistant] 播放告别消息失败: $e');
+    }
 
     // 停止录音并结束对话
     if (_ballState == FloatingBallState.recording) {
