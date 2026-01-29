@@ -12,6 +12,7 @@ import '../services/voice/entity_disambiguation_service.dart';
 import '../services/voice/voice_delete_service.dart';
 import '../services/voice/voice_modify_service.dart';
 import '../services/voice/voice_intent_router.dart';
+import '../services/voice/prompt_builder.dart';
 import '../services/voice_recognition_engine.dart';
 import '../services/tts_service.dart';
 import '../services/voice_feedback_system.dart';
@@ -19,7 +20,10 @@ import '../services/duplicate_detection_service.dart';
 import '../services/voice_service_coordinator.dart' as legacy;
 import '../application/coordinators/coordinators.dart';
 import '../application/facades/facades.dart';
+import '../application/factories/factories.dart';
 import '../domain/repositories/repositories.dart';
+import '../domain/events/events.dart';
+import '../infrastructure/events/events.dart';
 
 /// 实体消歧服务Provider
 final entityDisambiguationServiceProvider = Provider<EntityDisambiguationService>((ref) {
@@ -142,6 +146,117 @@ final voiceServiceFacadeProvider = Provider<VoiceServiceFacade>((ref) {
     legacyImpl: legacyImpl,
     featureFlags: featureFlags,
   );
+});
+
+// ==================== Phase 3: Command 和 Event Providers ====================
+
+/// Prompt 构建器 Provider
+final promptBuilderProvider = Provider<PromptBuilder>((ref) {
+  return PromptBuilder();
+});
+
+/// 命令工厂 Provider
+final commandFactoryProvider = Provider<CommandFactory>((ref) {
+  final transactionRepo = ref.read(transactionRepositoryProvider);
+  final accountRepo = ref.read(accountRepositoryProvider);
+
+  return CommandFactory(
+    transactionRepository: transactionRepo,
+    accountRepository: accountRepo,
+  );
+});
+
+/// 命令执行器 Provider
+final commandExecutorProvider = Provider<CommandExecutor>((ref) {
+  return CommandExecutor(maxHistorySize: 50);
+});
+
+/// 命令流水线 Provider
+final commandPipelineProvider = Provider<CommandPipeline>((ref) {
+  final executor = ref.read(commandExecutorProvider);
+  final pipeline = CommandPipeline(executor: executor);
+
+  // 添加日志拦截器（可选）
+  if (FeatureFlags.instance.enableVerboseLogging) {
+    pipeline.addPreInterceptor(LoggingInterceptor());
+    pipeline.addPostInterceptor(LoggingInterceptor());
+  }
+
+  // 添加验证拦截器
+  pipeline.addPreInterceptor(ValidationInterceptor());
+
+  return pipeline;
+});
+
+/// 事件总线 Provider
+final eventBusProvider = Provider<EventBus>((ref) {
+  final eventBus = EventBus.instance;
+  eventBus.enableLogging = FeatureFlags.instance.enableVerboseLogging;
+  return eventBus;
+});
+
+/// 预算警报处理器 Provider
+final budgetAlertHandlerProvider = Provider<BudgetAlertHandler>((ref) {
+  final budgetRepo = ref.read(budgetRepositoryProvider);
+  final eventBus = ref.read(eventBusProvider);
+
+  return BudgetAlertHandler(
+    budgetRepository: budgetRepo,
+    onEventPublish: (event) => eventBus.publish(event),
+  );
+});
+
+/// 统计更新处理器 Provider
+final statisticsUpdateHandlerProvider = Provider<StatisticsUpdateHandler>((ref) {
+  return StatisticsUpdateHandler(
+    onStatisticsUpdate: (period) async {
+      debugPrint('[StatisticsHandler] 更新周期: $period');
+      // TODO: 触发统计缓存刷新
+    },
+  );
+});
+
+/// 通知处理器 Provider
+final notificationHandlerProvider = Provider<NotificationHandler>((ref) {
+  return NotificationHandler(
+    onNotify: (title, message) async {
+      debugPrint('[NotificationHandler] $title: $message');
+      // TODO: 显示实际通知
+    },
+  );
+});
+
+/// 事件处理器注册 Provider（初始化时调用）
+final eventHandlersInitProvider = Provider<void>((ref) {
+  final eventBus = ref.read(eventBusProvider);
+  final budgetHandler = ref.read(budgetAlertHandlerProvider);
+  final statisticsHandler = ref.read(statisticsUpdateHandlerProvider);
+  final notificationHandler = ref.read(notificationHandlerProvider);
+
+  // 注册事件处理器
+  eventBus.subscribe(budgetHandler);
+  eventBus.subscribe(statisticsHandler);
+  eventBus.subscribe(notificationHandler);
+
+  debugPrint('[EventHandlers] 事件处理器已注册');
+});
+
+/// 交易仓储 Provider（使用适配器）
+final transactionRepositoryProvider = Provider<ITransactionRepository>((ref) {
+  final dbService = ref.read(databaseServiceProvider);
+  return _TransactionRepositoryAdapter(dbService);
+});
+
+/// 账户仓储 Provider（使用适配器）
+final accountRepositoryProvider = Provider<IAccountRepository>((ref) {
+  final dbService = ref.read(databaseServiceProvider);
+  return _AccountRepositoryAdapter(dbService);
+});
+
+/// 预算仓储 Provider（使用适配器）
+final budgetRepositoryProvider = Provider<IBudgetRepository>((ref) {
+  final dbService = ref.read(databaseServiceProvider);
+  return _BudgetRepositoryAdapter(dbService);
 });
 
 // ==================== 适配器类 ====================
@@ -416,6 +531,70 @@ class _AccountRepositoryAdapter implements IAccountRepository {
 
   @override
   Future<List<dynamic>> findActive() async => [];
+}
+
+/// 预算仓库适配器
+class _BudgetRepositoryAdapter implements IBudgetRepository {
+  final IDatabaseService _dbService;
+
+  _BudgetRepositoryAdapter(this._dbService);
+
+  @override
+  Future<dynamic> findById(String id) async => null;
+
+  @override
+  Future<List<dynamic>> findAll({bool includeDeleted = false}) async => [];
+
+  @override
+  Future<int> insert(dynamic entity) async => 0;
+
+  @override
+  Future<void> insertAll(List<dynamic> entities) async {}
+
+  @override
+  Future<int> update(dynamic entity) async => 0;
+
+  @override
+  Future<int> delete(String id) async => 0;
+
+  @override
+  Future<int> softDelete(String id) async => 0;
+
+  @override
+  Future<int> restore(String id) async => 0;
+
+  @override
+  Future<bool> exists(String id) async => false;
+
+  @override
+  Future<int> count() async => 0;
+
+  @override
+  Future<List<dynamic>> findByLedger(String ledgerId) async => [];
+
+  @override
+  Future<List<dynamic>> findByCategory(String category) async => [];
+
+  @override
+  Future<List<dynamic>> findByPeriod(String period) async => [];
+
+  @override
+  Future<List<dynamic>> findActive() async => [];
+
+  @override
+  Future<List<dynamic>> findExceeded() async => [];
+
+  @override
+  Future<int> updateExecution(String budgetId, double usedAmount) async => 0;
+
+  @override
+  Future<double> getUsedAmount(String budgetId) async => 0;
+
+  @override
+  Future<double> getRemainingAmount(String budgetId) async => 0;
+
+  @override
+  Future<List<dynamic>> findNearLimit({double threshold = 0.8}) async => [];
 }
 
 /// TTS服务适配器

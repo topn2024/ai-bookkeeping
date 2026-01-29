@@ -469,3 +469,125 @@ class EntityCandidate {
     required this.value,
   });
 }
+
+/// 意图到命令的转换器
+///
+/// 将 ProcessedIntent 转换为操作数据，可用于 CommandFactory
+class IntentToCommandConverter {
+  /// 将 ProcessedIntent 转换为操作数据
+  ///
+  /// 返回的 Map 可直接传给 CommandFactory.createFromOperation()
+  static Map<String, dynamic>? toOperationData(ProcessedIntent intent) {
+    switch (intent.type) {
+      case IntentType.addTransaction:
+        return {
+          'type': 'add_transaction',
+          'params': {
+            'amount': intent.getEntity<num>('amount'),
+            'category': intent.getEntity<String>('category'),
+            'type': intent.getEntity<String>('type') ?? 'expense',
+            'note': intent.getEntity<String>('note'),
+            'merchant': intent.getEntity<String>('merchant'),
+            'accountId': intent.getEntity<String>('accountId'),
+          },
+          'priority': 'deferred',
+        };
+
+      case IntentType.deleteTransaction:
+        return {
+          'type': 'delete',
+          'params': {
+            'transactionId': intent.getEntity<String>('transactionId') ??
+                intent.getEntity<String>('transactionRef'),
+            'softDelete': true,
+          },
+          'priority': 'normal',
+        };
+
+      case IntentType.modifyTransaction:
+        return {
+          'type': 'modify',
+          'params': {
+            'transactionId': intent.getEntity<String>('transactionId') ??
+                intent.getEntity<String>('transactionRef'),
+            'amount': intent.getEntity<num>('newAmount'),
+            'category': intent.getEntity<String>('newCategory'),
+            'note': intent.getEntity<String>('newNote'),
+          },
+          'priority': 'normal',
+        };
+
+      case IntentType.navigation:
+        return {
+          'type': 'navigate',
+          'params': {
+            'targetPage': intent.getEntity<String>('target'),
+            'route': intent.getEntity<String>('route'),
+            'category': intent.getEntity<String>('category'),
+            'timeRange': intent.getEntity<String>('timeRange'),
+          },
+          'priority': 'immediate',
+        };
+
+      case IntentType.queryTransaction:
+      case IntentType.queryStatistics:
+        return {
+          'type': 'query',
+          'params': {
+            'queryType': intent.getEntity<String>('queryType') ?? 'summary',
+            'time': intent.getEntity<String>('time') ?? '本月',
+            'category': intent.getEntity<String>('category'),
+            'transactionType': intent.getEntity<String>('transactionType'),
+            'groupBy': intent.getEntity<String>('groupBy'),
+            'limit': intent.getEntity<int>('limit'),
+          },
+          'priority': 'normal',
+        };
+
+      case IntentType.chat:
+      case IntentType.greeting:
+      case IntentType.farewell:
+        // 聊天类意图不需要转换为命令
+        return null;
+
+      default:
+        return null;
+    }
+  }
+
+  /// 将多个子意图转换为操作数据列表
+  static List<Map<String, dynamic>> toOperationDataList(ProcessedIntent intent) {
+    final operations = <Map<String, dynamic>>[];
+
+    if (intent.isMultiIntent && intent.subIntents != null) {
+      for (final subIntent in intent.subIntents!) {
+        final op = toOperationData(subIntent);
+        if (op != null) {
+          operations.add(op);
+        }
+      }
+    } else {
+      final op = toOperationData(intent);
+      if (op != null) {
+        operations.add(op);
+      }
+    }
+
+    return operations;
+  }
+
+  /// 检查意图是否可以转换为命令
+  static bool canConvert(ProcessedIntent intent) {
+    switch (intent.type) {
+      case IntentType.addTransaction:
+      case IntentType.deleteTransaction:
+      case IntentType.modifyTransaction:
+      case IntentType.navigation:
+      case IntentType.queryTransaction:
+      case IntentType.queryStatistics:
+        return true;
+      default:
+        return false;
+    }
+  }
+}
