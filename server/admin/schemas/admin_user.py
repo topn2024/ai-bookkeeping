@@ -43,7 +43,7 @@ class AdminUserResponse(BaseModel):
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     phone: Optional[str] = None
-    role: AdminRoleInfo
+    role: Optional[AdminRoleInfo] = None  # 允许 role 为空
     is_active: bool
     is_superadmin: bool
     mfa_enabled: bool
