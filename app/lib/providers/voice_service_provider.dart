@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/riverpod.dart';
 
 import '../models/transaction.dart';
+import '../models/account.dart';
+import '../models/budget.dart';
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
 import '../core/feature_flags.dart';
@@ -18,7 +20,7 @@ import '../services/tts_service.dart';
 import '../services/voice_feedback_system.dart';
 import '../services/duplicate_detection_service.dart';
 import '../services/voice_service_coordinator.dart' as legacy;
-import '../application/coordinators/coordinators.dart';
+import '../application/coordinators/coordinators.dart' hide TransactionType;
 import '../application/facades/facades.dart';
 import '../application/factories/factories.dart';
 import '../domain/repositories/repositories.dart';
@@ -405,27 +407,69 @@ class _TransactionRepositoryAdapter implements ITransactionRepository {
     return list.length;
   }
 
-  // 以下方法暂时返回空/默认值
+  // IDateRangeRepository implementation
   @override
-  Future<List<Transaction>> findByDateRange(DateTime start, DateTime end) async {
+  Future<List<Transaction>> findByDateRange({required DateTime startDate, required DateTime endDate}) async {
     final all = await findAll();
-    return all.where((t) => t.date.isAfter(start) && t.date.isBefore(end)).toList();
+    return all.where((t) => t.date.isAfter(startDate) && t.date.isBefore(endDate)).toList();
   }
 
   @override
-  Future<List<Transaction>> findByCategory(String category, {String? subcategory}) async {
+  Future<List<Transaction>> findByCategory(String category) async {
     final all = await findAll();
     return all.where((t) => t.category == category).toList();
   }
 
   @override
-  Future<List<Transaction>> findByAccount(String accountId) async {
+  Future<List<Transaction>> findByAccountId(String accountId) async {
     final all = await findAll();
     return all.where((t) => t.accountId == accountId).toList();
   }
 
   @override
-  Future<List<Transaction>> findByVault(String vaultId) async {
+  Future<List<Transaction>> findByVaultId(String vaultId) async {
+    return [];
+  }
+
+  @override
+  Future<List<Transaction>> findByResourcePoolId(String resourcePoolId) async {
+    return [];
+  }
+
+  @override
+  Future<List<Transaction>> findByType(TransactionType type) async {
+    final all = await findAll();
+    return all.where((t) => t.type == type).toList();
+  }
+
+  @override
+  Future<List<Transaction>> findBySource(TransactionSource source) async {
+    final all = await findAll();
+    return all.where((t) => t.source == source).toList();
+  }
+
+  @override
+  Future<List<Transaction>> findByImportBatchId(String batchId) async {
+    return [];
+  }
+
+  @override
+  Future<Transaction?> findByExternalId(String externalId, ExternalSource source) async {
+    return null;
+  }
+
+  @override
+  Future<List<Transaction>> findPotentialDuplicates({
+    required double amount,
+    required DateTime date,
+    String? note,
+    Duration tolerance = const Duration(days: 1),
+  }) async {
+    return [];
+  }
+
+  @override
+  Future<List<Transaction>> findByMemberId(String memberId) async {
     return [];
   }
 
@@ -435,27 +479,39 @@ class _TransactionRepositoryAdapter implements ITransactionRepository {
   }
 
   @override
-  Future<TransactionStatistics> getStatistics({DateTime? start, DateTime? end, String? category}) async {
+  Future<Transaction?> findFirst() async {
+    final all = await findAll();
+    return all.isNotEmpty ? all.first : null;
+  }
+
+  @override
+  Future<TransactionStatistics> getStatistics({DateTime? startDate, DateTime? endDate, String? accountId}) async {
     return TransactionStatistics(
       totalIncome: 0,
       totalExpense: 0,
-      transactionCount: 0,
-      averageAmount: 0,
-      categoryBreakdown: {},
+      netAmount: 0,
+      count: 0,
     );
   }
 
   @override
-  Future<List<Transaction>> findRecent({int limit = 10}) async {
-    final all = await findAll();
-    all.sort((a, b) => b.date.compareTo(a.date));
-    return all.take(limit).toList();
+  Future<Map<String, TransactionStatistics>> getMonthlyStatistics({required int year, String? accountId}) async {
+    return {};
   }
 
   @override
-  Future<double> getTotalByType(TransactionType type, {DateTime? start, DateTime? end}) async {
-    final all = await findAll();
-    return all.where((t) => t.type == type).fold(0.0, (sum, t) => sum + t.amount);
+  Future<List<Transaction>> findReimbursable() async {
+    return [];
+  }
+
+  @override
+  Future<List<Transaction>> findReimbursed() async {
+    return [];
+  }
+
+  @override
+  Future<int> markAsReimbursed(String id) async {
+    return 0;
   }
 }
 
@@ -466,35 +522,34 @@ class _AccountRepositoryAdapter implements IAccountRepository {
   _AccountRepositoryAdapter(this._dbService);
 
   @override
-  Future<void> increaseBalance(String accountId, double amount) async {
+  Future<int> increaseBalance(String id, double amount) async {
+    return 0; // TODO: 实现
+  }
+
+  @override
+  Future<int> decreaseBalance(String id, double amount) async {
+    return 0; // TODO: 实现
+  }
+
+  @override
+  Future<void> transfer(String fromId, String toId, double amount) async {
     // TODO: 实现
   }
 
   @override
-  Future<void> decreaseBalance(String accountId, double amount) async {
-    // TODO: 实现
-  }
+  Future<Account?> findById(String id) async => null;
 
   @override
-  Future<void> transfer(String fromAccountId, String toAccountId, double amount) async {
-    // TODO: 实现
-  }
-
-  // 其他方法暂时返回空/默认值
-  @override
-  Future<dynamic> findById(String id) async => null;
+  Future<List<Account>> findAll({bool includeDeleted = false}) async => [];
 
   @override
-  Future<List<dynamic>> findAll({bool includeDeleted = false}) async => [];
+  Future<int> insert(Account entity) async => 0;
 
   @override
-  Future<int> insert(dynamic entity) async => 0;
+  Future<void> insertAll(List<Account> entities) async {}
 
   @override
-  Future<void> insertAll(List<dynamic> entities) async {}
-
-  @override
-  Future<int> update(dynamic entity) async => 0;
+  Future<int> update(Account entity) async => 0;
 
   @override
   Future<int> delete(String id) async => 0;
@@ -512,25 +567,28 @@ class _AccountRepositoryAdapter implements IAccountRepository {
   Future<int> count() async => 0;
 
   @override
-  Future<dynamic> findDefault() async => null;
+  Future<Account?> findDefault() async => null;
 
   @override
   Future<int> setDefault(String id) async => 0;
 
   @override
-  Future<List<dynamic>> findByLedger(String ledgerId) async => [];
+  Future<List<Account>> findByType(AccountType type) async => [];
 
   @override
-  Future<List<dynamic>> findByType(dynamic type) async => [];
+  Future<List<Account>> findActive() async => [];
 
   @override
-  Future<double> getBalance(String accountId) async => 0;
+  Future<List<Account>> findCustom() async => [];
 
   @override
-  Future<double> getTotalBalance({String? ledgerId}) async => 0;
+  Future<int> updateBalance(String id, double newBalance) async => 0;
 
   @override
-  Future<List<dynamic>> findActive() async => [];
+  Future<double> getTotalBalance() async => 0;
+
+  @override
+  Future<Map<AccountType, double>> getTotalBalanceByType() async => {};
 }
 
 /// 预算仓库适配器
@@ -540,19 +598,19 @@ class _BudgetRepositoryAdapter implements IBudgetRepository {
   _BudgetRepositoryAdapter(this._dbService);
 
   @override
-  Future<dynamic> findById(String id) async => null;
+  Future<Budget?> findById(String id) async => null;
 
   @override
-  Future<List<dynamic>> findAll({bool includeDeleted = false}) async => [];
+  Future<List<Budget>> findAll({bool includeDeleted = false}) async => [];
 
   @override
-  Future<int> insert(dynamic entity) async => 0;
+  Future<int> insert(Budget entity) async => 0;
 
   @override
-  Future<void> insertAll(List<dynamic> entities) async {}
+  Future<void> insertAll(List<Budget> entities) async {}
 
   @override
-  Future<int> update(dynamic entity) async => 0;
+  Future<int> update(Budget entity) async => 0;
 
   @override
   Future<int> delete(String id) async => 0;
@@ -570,31 +628,45 @@ class _BudgetRepositoryAdapter implements IBudgetRepository {
   Future<int> count() async => 0;
 
   @override
-  Future<List<dynamic>> findByLedger(String ledgerId) async => [];
+  Future<Budget?> findByCategory(String category) async => null;
 
   @override
-  Future<List<dynamic>> findByCategory(String category) async => [];
+  Future<List<Budget>> findByPeriod(BudgetPeriod period) async => [];
 
   @override
-  Future<List<dynamic>> findByPeriod(String period) async => [];
+  Future<List<Budget>> findByType(BudgetType type) async => [];
 
   @override
-  Future<List<dynamic>> findActive() async => [];
+  Future<List<Budget>> findActive() async => [];
 
   @override
-  Future<List<dynamic>> findExceeded() async => [];
+  Future<List<Budget>> findByMonth(int year, int month) async => [];
 
   @override
-  Future<int> updateExecution(String budgetId, double usedAmount) async => 0;
+  Future<BudgetExecution> getExecution(String budgetId, {int? year, int? month}) async {
+    return BudgetExecution.calculate(budgetId: budgetId, budgetAmount: 0, usedAmount: 0);
+  }
 
   @override
-  Future<double> getUsedAmount(String budgetId) async => 0;
+  Future<List<BudgetExecution>> getAllExecutions({int? year, int? month}) async => [];
 
   @override
-  Future<double> getRemainingAmount(String budgetId) async => 0;
+  Future<List<BudgetCarryover>> getCarryovers(String budgetId) async => [];
 
   @override
-  Future<List<dynamic>> findNearLimit({double threshold = 0.8}) async => [];
+  Future<int> addCarryover(BudgetCarryover carryover) async => 0;
+
+  @override
+  Future<List<ZeroBasedAllocation>> getAllocations(String budgetId) async => [];
+
+  @override
+  Future<int> addAllocation(ZeroBasedAllocation allocation) async => 0;
+
+  @override
+  Future<double> getTotalBudgetAmount({BudgetPeriod? period}) async => 0;
+
+  @override
+  Future<List<Budget>> findNearingLimit({double threshold = 0.8}) async => [];
 }
 
 /// TTS服务适配器
@@ -604,7 +676,7 @@ class _TTSServiceAdapter implements ITTSService {
   _TTSServiceAdapter(this._ttsService);
 
   @override
-  bool get isSpeaking => _ttsService.isPlaying;
+  bool get isSpeaking => _ttsService.isSpeaking;
 
   @override
   Future<void> speak(String text) async {

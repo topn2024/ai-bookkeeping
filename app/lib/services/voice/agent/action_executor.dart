@@ -17,6 +17,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 import 'action_registry.dart';
+import 'decomposed_intent.dart';
 import '../network_monitor.dart';
 
 /// 执行状态

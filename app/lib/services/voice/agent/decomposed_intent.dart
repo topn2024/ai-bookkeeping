@@ -11,6 +11,71 @@ library;
 
 import '../network_monitor.dart';
 
+/// 路由类型
+enum RouteType {
+  /// 聊天
+  chat,
+  /// 操作
+  action,
+  /// 混合
+  hybrid,
+}
+
+/// 识别来源
+enum RecognitionSource {
+  /// 规则
+  rule,
+  /// LLM
+  llm,
+  /// 混合
+  hybrid,
+}
+
+/// 意图结果（向后兼容类型）
+class IntentResult {
+  /// 路由类型
+  final RouteType type;
+
+  /// 置信度
+  final double confidence;
+
+  /// 分类
+  final String? category;
+
+  /// 操作
+  final String? action;
+
+  /// 实体
+  final Map<String, dynamic> entities;
+
+  /// 原始输入
+  final String rawInput;
+
+  /// 识别来源
+  final RecognitionSource source;
+
+  /// 情感
+  final String? emotion;
+
+  /// 聊天响应
+  final String? chatResponse;
+
+  const IntentResult({
+    required this.type,
+    required this.confidence,
+    this.category,
+    this.action,
+    this.entities = const {},
+    required this.rawInput,
+    required this.source,
+    this.emotion,
+    this.chatResponse,
+  });
+
+  /// 完整的意图ID
+  String get intentId => '${category ?? 'unknown'}.${action ?? 'unknown'}';
+}
+
 /// 分解意图结果
 class DecomposedIntentResult {
   /// 聊天意图（需要立即响应）

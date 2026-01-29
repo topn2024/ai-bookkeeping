@@ -8,6 +8,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../domain/repositories/repositories.dart';
 import '../../core/contracts/i_database_service.dart';
+import 'repositories/repositories.dart' as impl;
 
 /// 仓库工厂
 ///
@@ -134,75 +135,63 @@ class RepositoryFactory {
 
   // ==================== 工厂方法 ====================
 
+  /// 获取数据库 Provider 函数
+  Future<Database> Function() get _dbProvider => () async => _database;
+
   ITransactionRepository _createTransactionRepository() {
-    // TODO: 返回实际的 TransactionRepository 实现
-    // return TransactionRepository(_database);
-    throw UnimplementedError('TransactionRepository 实现待完成');
+    return impl.TransactionRepository(_dbProvider);
   }
 
   IAccountRepository _createAccountRepository() {
-    // TODO: 返回实际的 AccountRepository 实现
-    throw UnimplementedError('AccountRepository 实现待完成');
+    return impl.AccountRepository(_dbProvider);
   }
 
   ICategoryRepository _createCategoryRepository() {
-    // TODO: 返回实际的 CategoryRepository 实现
-    throw UnimplementedError('CategoryRepository 实现待完成');
+    return impl.CategoryRepository(_dbProvider);
   }
 
   ILedgerRepository _createLedgerRepository() {
-    // TODO: 返回实际的 LedgerRepository 实现
-    throw UnimplementedError('LedgerRepository 实现待完成');
+    return impl.LedgerRepository(_dbProvider);
   }
 
   IBudgetRepository _createBudgetRepository() {
-    // TODO: 返回实际的 BudgetRepository 实现
-    throw UnimplementedError('BudgetRepository 实现待完成');
+    return impl.BudgetRepository(_dbProvider);
   }
 
   ITemplateRepository _createTemplateRepository() {
-    // TODO: 返回实际的 TemplateRepository 实现
-    throw UnimplementedError('TemplateRepository 实现待完成');
+    return impl.TemplateRepository(_dbProvider);
   }
 
   IRecurringTransactionRepository _createRecurringTransactionRepository() {
-    // TODO: 返回实际的 RecurringTransactionRepository 实现
-    throw UnimplementedError('RecurringTransactionRepository 实现待完成');
+    return impl.RecurringTransactionRepository(_dbProvider);
   }
 
   ICreditCardRepository _createCreditCardRepository() {
-    // TODO: 返回实际的 CreditCardRepository 实现
-    throw UnimplementedError('CreditCardRepository 实现待完成');
+    return impl.CreditCardRepository(_dbProvider);
   }
 
   ISavingsGoalRepository _createSavingsGoalRepository() {
-    // TODO: 返回实际的 SavingsGoalRepository 实现
-    throw UnimplementedError('SavingsGoalRepository 实现待完成');
+    return impl.SavingsGoalRepository(_dbProvider);
   }
 
   IBillReminderRepository _createBillReminderRepository() {
-    // TODO: 返回实际的 BillReminderRepository 实现
-    throw UnimplementedError('BillReminderRepository 实现待完成');
+    return impl.BillReminderRepository(_dbProvider);
   }
 
   IDebtRepository _createDebtRepository() {
-    // TODO: 返回实际的 DebtRepository 实现
-    throw UnimplementedError('DebtRepository 实现待完成');
+    return impl.DebtRepository(_dbProvider);
   }
 
   IInvestmentRepository _createInvestmentRepository() {
-    // TODO: 返回实际的 InvestmentRepository 实现
-    throw UnimplementedError('InvestmentRepository 实现待完成');
+    return impl.InvestmentRepository(_dbProvider);
   }
 
   IVaultRepository _createVaultRepository() {
-    // TODO: 返回实际的 VaultRepository 实现
-    throw UnimplementedError('VaultRepository 实现待完成');
+    return impl.VaultRepository(_dbProvider);
   }
 
   IImportBatchRepository _createImportBatchRepository() {
-    // TODO: 返回实际的 ImportBatchRepository 实现
-    throw UnimplementedError('ImportBatchRepository 实现待完成');
+    return impl.ImportBatchRepository(_dbProvider);
   }
 
   // ==================== 辅助方法 ====================

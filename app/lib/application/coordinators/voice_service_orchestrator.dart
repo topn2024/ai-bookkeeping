@@ -11,6 +11,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
+import '../../models/transaction.dart' show TransactionType;
 import 'voice_recognition_coordinator.dart';
 import 'intent_processing_coordinator.dart';
 import 'transaction_operation_coordinator.dart';
@@ -464,6 +465,3 @@ class VoiceServiceOrchestrator extends ChangeNotifier {
     super.dispose();
   }
 }
-
-/// 交易类型（临时定义，应从 models 导入）
-enum TransactionType { expense, income, transfer }

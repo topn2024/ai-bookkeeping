@@ -5,7 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../theme/app_theme.dart';
 import '../../models/transaction.dart';
 import '../../services/duplicate_detection_service.dart';
-import '../../providers/database_provider.dart';
+import '../../providers/service_providers.dart';
 import 'transaction_comparison_page.dart';
 
 /// 去重检测页面
@@ -51,7 +51,7 @@ class _DuplicateDetectionPageState extends ConsumerState<DuplicateDetectionPage>
   /// 执行真实的去重检测
   Future<void> _performDuplicateDetection() async {
     try {
-      final db = ref.read(databaseProvider);
+      final db = ref.read(databaseServiceProvider);
 
       // 获取现有交易（最近3个月的数据用于去重检测）
       final existingTransactions = await db.getTransactions();

@@ -569,6 +569,14 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     }
   }
 
+  /// 结束语音会话
+  Future<void> endVoiceSession() async {
+    _cancelSessionTimeout();
+    _sessionState = VoiceSessionState.idle;
+    notifyListeners();
+    debugPrint('[VoiceCoordinator] 语音会话已结束');
+  }
+
   /// 处理单次语音命令
   Future<VoiceSessionResult> processVoiceCommand(String voiceInput) async {
     try {

@@ -43,6 +43,36 @@ class Category {
       isCustom: isCustom ?? this.isCustom,
     );
   }
+
+  /// 序列化为Map
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'iconCode': icon.codePoint,
+      'colorValue': color.toARGB32(),
+      'isExpense': isExpense ? 1 : 0,
+      'parentId': parentId,
+      'sortOrder': sortOrder,
+      'isCustom': isCustom ? 1 : 0,
+      'isSystem': isCustom ? 0 : 1,
+      'isDeleted': 0,
+    };
+  }
+
+  /// 从Map反序列化
+  factory Category.fromMap(Map<String, dynamic> map) {
+    return Category(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      icon: IconData(map['iconCode'] as int, fontFamily: 'MaterialIcons'),
+      color: Color(map['colorValue'] as int),
+      isExpense: map['isExpense'] == 1,
+      parentId: map['parentId'] as String?,
+      sortOrder: map['sortOrder'] as int? ?? 0,
+      isCustom: map['isCustom'] == 1 || map['isSystem'] == 0,
+    );
+  }
 }
 
 // Default expense categories

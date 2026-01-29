@@ -219,43 +219,41 @@ class GlobalVoiceAssistantFacade extends ChangeNotifier {
   Future<void> startRecording() async {
     if (!_isInitialized) return;
 
-    final hasPermission = await _audioManager.requestPermission();
-    if (!hasPermission) {
+    final permissionStatus = await _audioManager.requestPermission();
+    if (permissionStatus != MicrophonePermissionStatus.granted) {
       _emitEvent(VoiceAssistantEvent.error('没有麦克风权限'));
       return;
     }
 
     _updateState(VoiceAssistantState.recording);
-    await _audioManager.startRecording();
-    _vadManager.start();
+    final started = await _audioManager.startRecording();
+    if (started && _audioManager.audioStream != null) {
+      _vadManager.startListening(_audioManager.audioStream!);
+    }
   }
 
   /// 停止录音并处理
   Future<void> stopRecording() async {
     if (!isRecording) return;
 
-    _vadManager.stop();
-    final audioData = await _audioManager.stopRecording();
+    await _vadManager.stopListening();
+    await _audioManager.stopRecording();
 
-    if (audioData != null && audioData.isNotEmpty) {
-      _updateState(VoiceAssistantState.processing);
-      // 实际处理将由外部协调器完成
-      _emitEvent(VoiceAssistantEvent(
-        type: 'audioReady',
-        data: {'size': audioData.length},
-        timestamp: DateTime.now(),
-      ));
-    } else {
-      _updateState(VoiceAssistantState.idle);
-    }
+    _updateState(VoiceAssistantState.processing);
+    // 实际处理将由外部协调器完成
+    _emitEvent(VoiceAssistantEvent(
+      type: 'audioReady',
+      data: {},
+      timestamp: DateTime.now(),
+    ));
   }
 
   /// 取消录音
   Future<void> cancelRecording() async {
     if (!isRecording) return;
 
-    _vadManager.stop();
-    await _audioManager.cancelRecording();
+    await _vadManager.stopListening();
+    await _audioManager.stopRecording();
     _updateState(VoiceAssistantState.idle);
   }
 
@@ -267,19 +265,21 @@ class GlobalVoiceAssistantFacade extends ChangeNotifier {
     _historyManager.addAssistantMessage(text);
     _emitEvent(VoiceAssistantEvent.response(text));
 
-    // 启用打断检测
-    _bargeInManager.start();
+    // 启用打断检测（如果有音频流）
+    if (_audioManager.audioStream != null) {
+      _bargeInManager.enable(_audioManager.audioStream!);
+    }
 
     await _ttsManager.speak(text);
 
-    _bargeInManager.stop();
+    _bargeInManager.disable();
     _updateState(VoiceAssistantState.idle);
   }
 
   /// 停止播放
   Future<void> stopSpeaking() async {
     await _ttsManager.stop();
-    _bargeInManager.stop();
+    _bargeInManager.disable();
     _updateState(VoiceAssistantState.idle);
   }
 
@@ -323,8 +323,8 @@ class GlobalVoiceAssistantFacade extends ChangeNotifier {
 
     // 监听打断事件
     _subscriptions.add(_bargeInManager.events.listen((event) {
-      if (event.type == BargeInEventType.bargeInDetected && isPlaying) {
-        // 检测到打断，停止播放并开始录音
+      if (event.type == BargeInEventType.confirmed && isPlaying) {
+        // 检测到打断并确认，停止播放并开始录音
         stopSpeaking().then((_) => startRecording());
       }
     }));

@@ -1,3 +1,7 @@
+import 'package:flutter/material.dart';
+
+import '../theme/app_theme.dart';
+
 class SpendingInterceptDialog extends StatelessWidget {
   final String categoryName;
   final String merchantName;

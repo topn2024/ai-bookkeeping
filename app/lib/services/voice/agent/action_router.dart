@@ -17,6 +17,7 @@ import '../../voice_navigation_executor.dart';
 import '../entity_disambiguation_service.dart';
 import '../unified_intent_type.dart';
 import 'action_registry.dart';
+import 'decomposed_intent.dart';
 import 'actions/config_actions.dart';
 import 'actions/conversation_actions.dart';
 import 'actions/data_actions.dart';
