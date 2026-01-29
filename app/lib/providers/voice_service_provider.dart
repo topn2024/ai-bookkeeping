@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:riverpod/riverpod.dart';
 import '../models/transaction.dart';
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
+import '../core/feature_flags.dart';
 import '../services/voice/entity_disambiguation_service.dart';
 import '../services/voice/voice_delete_service.dart';
 import '../services/voice/voice_modify_service.dart';
@@ -13,6 +16,10 @@ import '../services/voice_recognition_engine.dart';
 import '../services/tts_service.dart';
 import '../services/voice_feedback_system.dart';
 import '../services/duplicate_detection_service.dart';
+import '../services/voice_service_coordinator.dart' as legacy;
+import '../application/coordinators/coordinators.dart';
+import '../application/facades/facades.dart';
+import '../domain/repositories/repositories.dart';
 
 /// 实体消歧服务Provider
 final entityDisambiguationServiceProvider = Provider<EntityDisambiguationService>((ref) {
@@ -56,6 +63,395 @@ final voiceFeedbackSystemProvider = Provider<VoiceFeedbackSystem>((ref) {
   final ttsService = ref.read(ttsServiceProvider);
   return VoiceFeedbackSystem(ttsService: ttsService);
 });
+
+// ==================== 新架构 Providers (Phase 1.4) ====================
+
+/// Feature Flags Provider
+final featureFlagsProvider = Provider<FeatureFlags>((ref) {
+  return FeatureFlags.instance;
+});
+
+/// 语音识别协调器 Provider
+final voiceRecognitionCoordinatorProvider = Provider<VoiceRecognitionCoordinator>((ref) {
+  final engine = ref.read(voiceRecognitionEngineProvider);
+  return VoiceRecognitionCoordinator(
+    engine: _VoiceRecognitionEngineAdapter(engine),
+  );
+});
+
+/// 意图处理协调器 Provider
+final intentProcessingCoordinatorProvider = Provider<IntentProcessingCoordinator>((ref) {
+  // TODO: 注入实际的 recognizer 和 decomposer
+  return IntentProcessingCoordinator(
+    recognizer: _DefaultIntentRecognizer(),
+  );
+});
+
+/// 交易操作协调器 Provider
+final transactionOperationCoordinatorProvider = Provider<TransactionOperationCoordinator>((ref) {
+  final dbService = ref.read(databaseServiceProvider);
+  return TransactionOperationCoordinator(
+    transactionRepository: _TransactionRepositoryAdapter(dbService),
+    accountRepository: _AccountRepositoryAdapter(dbService),
+  );
+});
+
+/// 导航协调器 Provider
+final navigationCoordinatorProvider = Provider<NavigationCoordinator>((ref) {
+  return NavigationCoordinator();
+});
+
+/// 对话协调器 Provider
+final conversationCoordinatorProvider = Provider<ConversationCoordinator>((ref) {
+  return ConversationCoordinator();
+});
+
+/// 反馈协调器 Provider
+final feedbackCoordinatorProvider = Provider<FeedbackCoordinator>((ref) {
+  final ttsService = ref.read(ttsServiceProvider);
+  return FeedbackCoordinator(
+    ttsService: _TTSServiceAdapter(ttsService),
+  );
+});
+
+/// 语音服务编排器 Provider (新架构)
+final voiceServiceOrchestratorProvider = Provider<VoiceServiceOrchestrator>((ref) {
+  return VoiceServiceOrchestrator(
+    recognitionCoordinator: ref.read(voiceRecognitionCoordinatorProvider),
+    intentCoordinator: ref.read(intentProcessingCoordinatorProvider),
+    transactionCoordinator: ref.read(transactionOperationCoordinatorProvider),
+    navigationCoordinator: ref.read(navigationCoordinatorProvider),
+    conversationCoordinator: ref.read(conversationCoordinatorProvider),
+    feedbackCoordinator: ref.read(feedbackCoordinatorProvider),
+  );
+});
+
+/// 旧版语音服务协调器 Provider
+final legacyVoiceServiceCoordinatorProvider = Provider<legacy.VoiceServiceCoordinator>((ref) {
+  return legacy.VoiceServiceCoordinator();
+});
+
+/// 语音服务 Facade Provider (统一入口)
+final voiceServiceFacadeProvider = Provider<VoiceServiceFacade>((ref) {
+  final featureFlags = ref.read(featureFlagsProvider);
+  final modernImpl = ref.read(voiceServiceOrchestratorProvider);
+  final legacyImpl = ref.read(legacyVoiceServiceCoordinatorProvider);
+
+  return VoiceServiceFacade(
+    modernImpl: modernImpl,
+    legacyImpl: legacyImpl,
+    featureFlags: featureFlags,
+  );
+});
+
+// ==================== 适配器类 ====================
+
+/// 语音识别引擎适配器
+class _VoiceRecognitionEngineAdapter implements IVoiceRecognitionEngine {
+  final VoiceRecognitionEngine _engine;
+
+  _VoiceRecognitionEngineAdapter(this._engine);
+
+  @override
+  bool get isRecognizing => _engine.isRecognizing;
+
+  @override
+  Future<RecognitionResult> transcribe(Uint8List audioData) async {
+    // 适配旧引擎的 transcribe 方法
+    // TODO: 实现完整的适配
+    return RecognitionResult.empty();
+  }
+
+  @override
+  Stream<RecognitionResult> transcribeStream(Stream<Uint8List> audioStream) {
+    // 适配旧引擎的流式识别
+    // TODO: 实现完整的适配
+    return Stream.empty();
+  }
+
+  @override
+  Future<void> cancel() async {
+    await _engine.cancelTranscription();
+  }
+}
+
+/// 默认意图识别器（临时实现）
+class _DefaultIntentRecognizer implements IIntentRecognizer {
+  @override
+  Future<ProcessedIntent> recognize(String input) async {
+    // 简单的关键词匹配
+    final lowerInput = input.toLowerCase();
+
+    if (lowerInput.contains('删除') || lowerInput.contains('删掉')) {
+      return ProcessedIntent(
+        type: IntentType.deleteTransaction,
+        confidence: 0.8,
+        entities: {},
+        originalText: input,
+      );
+    }
+
+    if (lowerInput.contains('修改') || lowerInput.contains('改')) {
+      return ProcessedIntent(
+        type: IntentType.modifyTransaction,
+        confidence: 0.8,
+        entities: {},
+        originalText: input,
+      );
+    }
+
+    if (lowerInput.contains('打开') || lowerInput.contains('进入')) {
+      return ProcessedIntent(
+        type: IntentType.navigation,
+        confidence: 0.8,
+        entities: {},
+        originalText: input,
+      );
+    }
+
+    // 检测金额 - 可能是记账
+    final amountMatch = RegExp(r'(\d+(?:\.\d+)?)\s*[元块钱]?').firstMatch(input);
+    if (amountMatch != null) {
+      return ProcessedIntent(
+        type: IntentType.addTransaction,
+        confidence: 0.7,
+        entities: {'amount': double.tryParse(amountMatch.group(1) ?? '0')},
+        originalText: input,
+      );
+    }
+
+    return ProcessedIntent(
+      type: IntentType.chat,
+      confidence: 0.5,
+      entities: {},
+      originalText: input,
+    );
+  }
+}
+
+/// 交易仓库适配器
+class _TransactionRepositoryAdapter implements ITransactionRepository {
+  final IDatabaseService _dbService;
+
+  _TransactionRepositoryAdapter(this._dbService);
+
+  @override
+  Future<Transaction?> findById(String id) async {
+    final transactions = await _dbService.getTransactions();
+    return transactions.where((t) => t.id == id).firstOrNull;
+  }
+
+  @override
+  Future<List<Transaction>> findAll({bool includeDeleted = false}) async {
+    return await _dbService.getTransactions();
+  }
+
+  @override
+  Future<int> insert(Transaction entity) async {
+    return await _dbService.insertTransaction(entity);
+  }
+
+  @override
+  Future<void> insertAll(List<Transaction> entities) async {
+    for (final entity in entities) {
+      await _dbService.insertTransaction(entity);
+    }
+  }
+
+  @override
+  Future<int> update(Transaction entity) async {
+    return await _dbService.updateTransaction(entity);
+  }
+
+  @override
+  Future<int> delete(String id) async {
+    return await _dbService.deleteTransaction(id);
+  }
+
+  @override
+  Future<int> softDelete(String id) async {
+    return await _dbService.deleteTransaction(id);
+  }
+
+  @override
+  Future<int> restore(String id) async {
+    return 0; // Not implemented in legacy
+  }
+
+  @override
+  Future<bool> exists(String id) async {
+    final t = await findById(id);
+    return t != null;
+  }
+
+  @override
+  Future<int> count() async {
+    final list = await findAll();
+    return list.length;
+  }
+
+  // 以下方法暂时返回空/默认值
+  @override
+  Future<List<Transaction>> findByDateRange(DateTime start, DateTime end) async {
+    final all = await findAll();
+    return all.where((t) => t.date.isAfter(start) && t.date.isBefore(end)).toList();
+  }
+
+  @override
+  Future<List<Transaction>> findByCategory(String category, {String? subcategory}) async {
+    final all = await findAll();
+    return all.where((t) => t.category == category).toList();
+  }
+
+  @override
+  Future<List<Transaction>> findByAccount(String accountId) async {
+    final all = await findAll();
+    return all.where((t) => t.accountId == accountId).toList();
+  }
+
+  @override
+  Future<List<Transaction>> findByVault(String vaultId) async {
+    return [];
+  }
+
+  @override
+  Future<List<Transaction>> query(TransactionQueryParams params) async {
+    return await findAll();
+  }
+
+  @override
+  Future<TransactionStatistics> getStatistics({DateTime? start, DateTime? end, String? category}) async {
+    return TransactionStatistics(
+      totalIncome: 0,
+      totalExpense: 0,
+      transactionCount: 0,
+      averageAmount: 0,
+      categoryBreakdown: {},
+    );
+  }
+
+  @override
+  Future<List<Transaction>> findRecent({int limit = 10}) async {
+    final all = await findAll();
+    all.sort((a, b) => b.date.compareTo(a.date));
+    return all.take(limit).toList();
+  }
+
+  @override
+  Future<double> getTotalByType(TransactionType type, {DateTime? start, DateTime? end}) async {
+    final all = await findAll();
+    return all.where((t) => t.type == type).fold(0.0, (sum, t) => sum + t.amount);
+  }
+}
+
+/// 账户仓库适配器
+class _AccountRepositoryAdapter implements IAccountRepository {
+  final IDatabaseService _dbService;
+
+  _AccountRepositoryAdapter(this._dbService);
+
+  @override
+  Future<void> increaseBalance(String accountId, double amount) async {
+    // TODO: 实现
+  }
+
+  @override
+  Future<void> decreaseBalance(String accountId, double amount) async {
+    // TODO: 实现
+  }
+
+  @override
+  Future<void> transfer(String fromAccountId, String toAccountId, double amount) async {
+    // TODO: 实现
+  }
+
+  // 其他方法暂时返回空/默认值
+  @override
+  Future<dynamic> findById(String id) async => null;
+
+  @override
+  Future<List<dynamic>> findAll({bool includeDeleted = false}) async => [];
+
+  @override
+  Future<int> insert(dynamic entity) async => 0;
+
+  @override
+  Future<void> insertAll(List<dynamic> entities) async {}
+
+  @override
+  Future<int> update(dynamic entity) async => 0;
+
+  @override
+  Future<int> delete(String id) async => 0;
+
+  @override
+  Future<int> softDelete(String id) async => 0;
+
+  @override
+  Future<int> restore(String id) async => 0;
+
+  @override
+  Future<bool> exists(String id) async => false;
+
+  @override
+  Future<int> count() async => 0;
+
+  @override
+  Future<dynamic> findDefault() async => null;
+
+  @override
+  Future<int> setDefault(String id) async => 0;
+
+  @override
+  Future<List<dynamic>> findByLedger(String ledgerId) async => [];
+
+  @override
+  Future<List<dynamic>> findByType(dynamic type) async => [];
+
+  @override
+  Future<double> getBalance(String accountId) async => 0;
+
+  @override
+  Future<double> getTotalBalance({String? ledgerId}) async => 0;
+
+  @override
+  Future<List<dynamic>> findActive() async => [];
+}
+
+/// TTS服务适配器
+class _TTSServiceAdapter implements ITTSService {
+  final TTSService _ttsService;
+
+  _TTSServiceAdapter(this._ttsService);
+
+  @override
+  bool get isSpeaking => _ttsService.isPlaying;
+
+  @override
+  Future<void> speak(String text) async {
+    await _ttsService.speak(text);
+  }
+
+  @override
+  Future<void> stop() async {
+    await _ttsService.stop();
+  }
+
+  @override
+  void setVolume(double volume) {
+    _ttsService.setVolume(volume);
+  }
+
+  @override
+  void setSpeechRate(double rate) {
+    _ttsService.setSpeechRate(rate);
+  }
+
+  @override
+  void setPitch(double pitch) {
+    _ttsService.setPitch(pitch);
+  }
+}
 
 /// 语音交互状态Provider
 final voiceInteractionStateProvider = StateNotifierProvider<VoiceInteractionNotifier, VoiceInteractionState>((ref) {

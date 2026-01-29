@@ -86,22 +86,22 @@
   - 依赖: 无
 
 ### 1.4 重构主 VoiceServiceCoordinator（第4周）
-- [ ] **任务1.4.1**: 创建新的 `VoiceServiceCoordinator` 作为编排器
-  - 文件: `lib/application/coordinators/voice_service_coordinator.dart`
-  - 验证: 仅负责编排，行数<300，依赖6个子协调器
+- [x] **任务1.4.1**: 创建新的 `VoiceServiceOrchestrator` 作为编排器 ✅ 2026-01-29
+  - 文件: `lib/application/coordinators/voice_service_orchestrator.dart`
+  - 验证: 仅负责编排，行数约400，依赖6个子协调器
   - 依赖: 任务1.3.1-1.3.6
 
-- [ ] **任务1.4.2**: 实现 Feature Flag 控制
+- [x] **任务1.4.2**: 实现 Feature Flag 控制 ✅ 2026-01-29
   - 文件: `lib/core/feature_flags.dart`
   - 验证: 可以在新旧实现之间切换
   - 依赖: 任务1.4.1
 
-- [ ] **任务1.4.3**: 创建 `VoiceServiceFacade` 统一入口
+- [x] **任务1.4.3**: 创建 `VoiceServiceFacade` 统一入口 ✅ 2026-01-29
   - 文件: `lib/application/facades/voice_service_facade.dart`
   - 验证: 根据 Feature Flag 路由到新旧实现
   - 依赖: 任务1.4.2
 
-- [ ] **任务1.4.4**: 更新 Riverpod Provider
+- [x] **任务1.4.4**: 更新 Riverpod Provider ✅ 2026-01-29
   - 文件: `lib/providers/voice_service_provider.dart`
   - 验证: 所有依赖正确注入，Provider 可用
   - 依赖: 任务1.4.3
