@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     MINIO_SECRET_KEY: str = ""  # Required: Set via environment variable
     MINIO_BUCKET: str = "ai-bookkeeping"
     MINIO_SECURE: bool = False
+    MINIO_PUBLIC_URL: str = ""  # Public URL for file downloads, e.g., https://39.105.12.124
 
     # AI APIs
     QWEN_API_KEY: str = ""  # Required: Set via environment variable
@@ -79,12 +80,6 @@ class Settings(BaseSettings):
     ALIYUN_SMS_SIGN_NAME: str = "AI智能记账"  # SMS signature name
     ALIYUN_SMS_TEMPLATE_CODE: str = ""  # SMS template code for verification
     ALIYUN_SMS_REGION: str = "cn-hangzhou"  # Default region
-
-    # Alibaba Cloud NLS (语音服务 - ASR/TTS)
-    ALIBABA_ACCESS_KEY_ID: str = ""  # For NLS token generation
-    ALIBABA_ACCESS_KEY_SECRET: str = ""  # For NLS token generation
-    ALIBABA_NLS_APP_KEY: str = ""  # NLS project AppKey
-    PICOVOICE_ACCESS_KEY: str = ""  # Optional: Picovoice wake word detection
 
     # Logging
     LOG_LEVEL: str = "INFO"

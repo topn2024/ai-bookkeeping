@@ -409,9 +409,12 @@ async def upload_apk(
         content_type="application/vnd.android.package-archive",
     )
 
-    # Build URL
-    protocol = "https" if settings.MINIO_SECURE else "http"
-    file_url = f"{protocol}://{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET}/{object_name}"
+    # Build URL - use public URL if configured, otherwise use internal URL
+    if settings.MINIO_PUBLIC_URL:
+        file_url = f"{settings.MINIO_PUBLIC_URL}/{settings.MINIO_BUCKET}/{object_name}"
+    else:
+        protocol = "https" if settings.MINIO_SECURE else "http"
+        file_url = f"{protocol}://{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET}/{object_name}"
 
     # Update version record
     version.file_url = file_url
@@ -518,9 +521,12 @@ async def upload_patch(
         content_type="application/octet-stream",
     )
 
-    # Build URL
-    protocol = "https" if settings.MINIO_SECURE else "http"
-    file_url = f"{protocol}://{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET}/{object_name}"
+    # Build URL - use public URL if configured, otherwise use internal URL
+    if settings.MINIO_PUBLIC_URL:
+        file_url = f"{settings.MINIO_PUBLIC_URL}/{settings.MINIO_BUCKET}/{object_name}"
+    else:
+        protocol = "https" if settings.MINIO_SECURE else "http"
+        file_url = f"{protocol}://{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET}/{object_name}"
 
     # Update version record
     version.patch_from_version = patch_from_version

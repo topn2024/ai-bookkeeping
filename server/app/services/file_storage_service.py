@@ -154,6 +154,8 @@ class FileStorageService:
 
     def _get_object_url(self, object_name: str) -> str:
         """Construct URL for stored object."""
+        if settings.MINIO_PUBLIC_URL:
+            return f"{settings.MINIO_PUBLIC_URL}/{settings.MINIO_BUCKET}/{object_name}"
         protocol = "https" if settings.MINIO_SECURE else "http"
         return f"{protocol}://{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET}/{object_name}"
 
