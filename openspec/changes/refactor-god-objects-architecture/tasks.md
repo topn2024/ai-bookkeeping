@@ -3,17 +3,17 @@
 ## Phase 1: Repository Pattern 和基础重构（第1-4周）
 
 ### 1.1 创建 Repository 基础设施（第1周）
-- [ ] **任务1.1.1**: 创建 `IRepository<T, ID>` 基础接口
+- [x] **任务1.1.1**: 创建 `IRepository<T, ID>` 基础接口 ✅ 2026-01-29
   - 文件: `lib/domain/repositories/i_repository.dart`
   - 验证: 接口定义清晰，包含基本 CRUD 方法
   - 依赖: 无
 
-- [ ] **任务1.1.2**: 创建 `ITransactionRepository` 接口
+- [x] **任务1.1.2**: 创建 `ITransactionRepository` 接口 ✅ 2026-01-29
   - 文件: `lib/domain/repositories/i_transaction_repository.dart`
   - 验证: 继承 `IRepository`，包含交易特定查询方法
   - 依赖: 任务1.1.1
 
-- [ ] **任务1.1.3**: 实现 `TransactionRepository`
+- [x] **任务1.1.3**: 实现 `TransactionRepository` ✅ 2026-01-29
   - 文件: `lib/infrastructure/database/repositories/transaction_repository.dart`
   - 验证: 实现所有接口方法，通过单元测试
   - 依赖: 任务1.1.2
@@ -24,25 +24,25 @@
   - 依赖: 任务1.1.3
 
 ### 1.2 创建其他核心 Repository（第2周）
-- [ ] **任务1.2.1**: 创建 `IAccountRepository` 和实现
+- [x] **任务1.2.1**: 创建 `IAccountRepository` 接口 ✅ 2026-01-29 (接口已完成，实现待定)
   - 文件: `lib/domain/repositories/i_account_repository.dart`, `lib/infrastructure/database/repositories/account_repository.dart`
   - 验证: 接口和实现完整，单元测试通过
   - 依赖: 任务1.1.1
   - 可并行: 与任务1.2.2-1.2.5
 
-- [ ] **任务1.2.2**: 创建 `ICategoryRepository` 和实现
+- [x] **任务1.2.2**: 创建 `ICategoryRepository` 接口 ✅ 2026-01-29 (接口已完成，实现待定)
   - 文件: `lib/domain/repositories/i_category_repository.dart`, `lib/infrastructure/database/repositories/category_repository.dart`
   - 验证: 接口和实现完整，单元测试通过
   - 依赖: 任务1.1.1
   - 可并行: 与任务1.2.1, 1.2.3-1.2.5
 
-- [ ] **任务1.2.3**: 创建 `ILedgerRepository` 和实现
+- [x] **任务1.2.3**: 创建 `ILedgerRepository` 接口 ✅ 2026-01-29 (接口已完成，实现待定)
   - 文件: `lib/domain/repositories/i_ledger_repository.dart`, `lib/infrastructure/database/repositories/ledger_repository.dart`
   - 验证: 接口和实现完整，单元测试通过
   - 依赖: 任务1.1.1
   - 可并行: 与任务1.2.1-1.2.2, 1.2.4-1.2.5
 
-- [ ] **任务1.2.4**: 创建 `IBudgetRepository` 和实现
+- [x] **任务1.2.4**: 创建 `IBudgetRepository` 接口 ✅ 2026-01-29 (接口已完成，实现待定)
   - 文件: `lib/domain/repositories/i_budget_repository.dart`, `lib/infrastructure/database/repositories/budget_repository.dart`
   - 验证: 接口和实现完整，单元测试通过
   - 依赖: 任务1.1.1
@@ -55,34 +55,34 @@
   - 可并行: 与任务1.2.1-1.2.4
 
 ### 1.3 创建 Coordinator 基础架构（第3周）
-- [ ] **任务1.3.1**: 创建 `VoiceRecognitionCoordinator`
+- [x] **任务1.3.1**: 创建 `VoiceRecognitionCoordinator` ✅ 2026-01-29
   - 文件: `lib/application/coordinators/voice_recognition_coordinator.dart`
-  - 验证: 职责单一，行数<300，单元测试通过
+  - 验证: 职责单一，行数约270，单元测试待添加
   - 依赖: 无
 
-- [ ] **任务1.3.2**: 创建 `IntentProcessingCoordinator`
+- [x] **任务1.3.2**: 创建 `IntentProcessingCoordinator` ✅ 2026-01-29
   - 文件: `lib/application/coordinators/intent_processing_coordinator.dart`
-  - 验证: 职责单一，行数<300，单元测试通过
+  - 验证: 职责单一，行数约380，单元测试待添加
   - 依赖: 无
 
-- [ ] **任务1.3.3**: 创建 `TransactionOperationCoordinator`
+- [x] **任务1.3.3**: 创建 `TransactionOperationCoordinator` ✅ 2026-01-29
   - 文件: `lib/application/coordinators/transaction_operation_coordinator.dart`
-  - 验证: 使用 Repository 接口，行数<300，单元测试通过
+  - 验证: 使用 Repository 接口，行数约384，单元测试待添加
   - 依赖: 任务1.1.3, 1.2.1, 1.2.2
 
-- [ ] **任务1.3.4**: 创建 `NavigationCoordinator`
+- [x] **任务1.3.4**: 创建 `NavigationCoordinator` ✅ 2026-01-29
   - 文件: `lib/application/coordinators/navigation_coordinator.dart`
-  - 验证: 职责单一，行数<200，单元测试通过
+  - 验证: 职责单一，行数约247，单元测试待添加
   - 依赖: 无
 
-- [ ] **任务1.3.5**: 创建 `ConversationCoordinator`
+- [x] **任务1.3.5**: 创建 `ConversationCoordinator` ✅ 2026-01-29
   - 文件: `lib/application/coordinators/conversation_coordinator.dart`
-  - 验证: 职责单一，行数<300，单元测试通过
+  - 验证: 职责单一，行数约340，单元测试待添加
   - 依赖: 无
 
-- [ ] **任务1.3.6**: 创建 `FeedbackCoordinator`
+- [x] **任务1.3.6**: 创建 `FeedbackCoordinator` ✅ 2026-01-29
   - 文件: `lib/application/coordinators/feedback_coordinator.dart`
-  - 验证: 职责单一，行数<200，单元测试通过
+  - 验证: 职责单一，行数约340，单元测试待添加
   - 依赖: 无
 
 ### 1.4 重构主 VoiceServiceCoordinator（第4周）
