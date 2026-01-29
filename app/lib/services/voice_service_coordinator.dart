@@ -142,6 +142,14 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   /// 待处理的多意图结果
   MultiIntentResult? _pendingMultiIntent;
 
+  /// 待补充金额的不完整意图（对话式金额补充）
+  /// 当只有一个不完整意图时，直接在对话中询问金额
+  IncompleteIntent? _pendingAmountIntent;
+
+  /// 待补充分类的不完整意图（对话式分类补充）
+  /// 当用户先说金额后说用途时使用
+  IncompleteIntent? _pendingCategoryIntent;
+
   /// 多意图处理配置
   MultiIntentConfig _multiIntentConfig = MultiIntentConfig.defaultConfig;
 
@@ -467,11 +475,21 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   ///
   /// 如果 _skipTTSPlayback 为 true，则跳过实际播放
   /// 用于流水线模式下由外部处理TTS的场景
-  Future<void> _speakWithSkipCheck(String text) async {
+  ///
+  /// [text] 要播放的文本
+  /// [recordToHistory] 是否记录到聊天历史（默认true）
+  Future<void> _speakWithSkipCheck(String text, {bool recordToHistory = true}) async {
     if (_skipTTSPlayback) {
       debugPrint('[VoiceCoordinator] TTS跳过（流水线模式）: ${text.length > 30 ? text.substring(0, 30) + "..." : text}');
+      // 流水线模式下，消息由外部（main.dart）记录，这里不需要记录
       return;
     }
+
+    // 非流水线模式下，记录消息到聊天历史
+    if (recordToHistory && text.isNotEmpty) {
+      GlobalVoiceAssistantManager.instance.addResultMessage(text);
+    }
+
     await _ttsService.speak(text);
   }
 
@@ -505,6 +523,12 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 是否有待处理的多意图
   bool get hasPendingMultiIntent => _pendingMultiIntent != null && !_pendingMultiIntent!.isEmpty;
+
+  /// 待补充金额的不完整意图
+  IncompleteIntent? get pendingAmountIntent => _pendingAmountIntent;
+
+  /// 是否有待补充金额的意图
+  bool get hasPendingAmountIntent => _pendingAmountIntent != null;
 
   /// 多意图处理配置
   MultiIntentConfig get multiIntentConfig => _multiIntentConfig;
@@ -559,6 +583,15 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         _sessionState = VoiceSessionState.idle;
         notifyListeners();
         return VoiceSessionResult.error(invalidReason);
+      }
+
+      // 检查是否有待补充金额的意图（对话式金额补充）
+      if (_pendingAmountIntent != null) {
+        final amountResult = await _handleAmountResponse(voiceInput);
+        if (amountResult != null) {
+          return amountResult;
+        }
+        // 如果不是金额回复，继续正常处理
       }
 
       // 对话式智能体模式：使用 IntelligenceEngine 处理
@@ -725,6 +758,36 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       _addToHistory(command);
 
       // ═══════════════════════════════════════════════════════════════
+      // 检查是否有待补充金额的意图（对话式金额补充）
+      // 如果用户刚才说的是金额，直接完成记账
+      // ═══════════════════════════════════════════════════════════════
+      if (_pendingAmountIntent != null) {
+        debugPrint('[VoiceCoordinator] 多意图处理 - 检测到待补充金额意图');
+        final amountResult = await _handleAmountResponse(voiceInput);
+        if (amountResult != null) {
+          debugPrint('[VoiceCoordinator] 多意图处理 - 金额回复处理成功');
+          return amountResult;
+        }
+        // 如果不是金额回复，继续正常处理
+        debugPrint('[VoiceCoordinator] 多意图处理 - 输入不是金额回复，继续正常处理');
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // 检查是否有待补充分类的意图（对话式分类补充）
+      // 如果用户刚才说的是分类/用途，直接完成记账
+      // ═══════════════════════════════════════════════════════════════
+      if (_pendingCategoryIntent != null) {
+        debugPrint('[VoiceCoordinator] 多意图处理 - 检测到待补充分类意图');
+        final categoryResult = await _handleCategoryResponse(voiceInput);
+        if (categoryResult != null) {
+          debugPrint('[VoiceCoordinator] 多意图处理 - 分类回复处理成功');
+          return categoryResult;
+        }
+        // 如果不是分类回复，继续正常处理
+        debugPrint('[VoiceCoordinator] 多意图处理 - 输入不是分类回复，继续正常处理');
+      }
+
+      // ═══════════════════════════════════════════════════════════════
       // 获取对话历史用于上下文理解（关键：让LLM知道之前记录了什么）
       // ═══════════════════════════════════════════════════════════════
       final conversationHistory = GlobalVoiceAssistantManager.instance.conversationHistory
@@ -808,6 +871,207 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       // 如果 LLM 返回需要澄清
       if (llmResult.needsClarify) {
         debugPrint('[VoiceCoordinator] LLM需要澄清: ${llmResult.clarifyQuestion}');
+        debugPrint('[VoiceCoordinator] LLM部分操作数量: ${llmResult.operations.length}');
+
+        // 检查是否有部分操作（有分类但没金额，或有金额但没分类）
+        for (final op in llmResult.operations) {
+          if (op.type == OperationType.addTransaction) {
+            final amount = op.params['amount'];
+            final category = op.params['category'] as String?;
+            final note = op.params['note'] as String?;
+
+            // 有分类/备注但没有金额 → 对话式金额补充
+            if ((category != null || note != null) && (amount == null || amount == 0)) {
+              debugPrint('[VoiceCoordinator] 检测到部分操作（有分类无金额），启用对话式金额补充');
+
+              // 判断是收入还是支出
+              final typeStr = op.params['type'] as String?;
+              const incomeCategoryIds = {
+                'salary', 'bonus', 'investment', 'parttime', 'redpacket',
+                'reimburse', 'business', 'other_income', '工资', '奖金', '投资收益',
+                '兼职', '红包', '报销', '经营所得', '其他收入',
+              };
+              final normalizedCategory = category != null
+                  ? CategoryLocalizationService.instance.normalizeCategoryId(category)
+                  : null;
+              final isIncome = typeStr == 'income' ||
+                  (normalizedCategory != null && incomeCategoryIds.contains(normalizedCategory));
+
+              // 创建待补充金额的意图
+              _pendingAmountIntent = IncompleteIntent(
+                type: isIncome ? TransactionIntentType.income : TransactionIntentType.expense,
+                category: normalizedCategory ?? category,
+                merchant: null,
+                description: note ?? category,
+                originalText: voiceInput,
+                missingSlots: const ['amount'],
+                confidence: llmResult.confidence,
+              );
+
+              _sessionState = VoiceSessionState.idle;
+              notifyListeners();
+
+              // 生成自然的对话式询问
+              final displayName = note ?? category ?? voiceInput;
+              final clarifyMsg = '$displayName多少钱？';
+              await _speakWithSkipCheck(clarifyMsg);
+
+              return VoiceSessionResult.success(clarifyMsg, {
+                'waitingForAmount': true,
+                'pendingAmountIntent': true,
+              });
+            }
+
+            // 有金额但没有分类/备注 → 对话式分类补充
+            if (amount != null && amount != 0 && category == null && note == null) {
+              debugPrint('[VoiceCoordinator] 检测到部分操作（有金额无分类），启用对话式分类补充');
+
+              final parsedAmount = (amount is num) ? amount.toDouble() : double.tryParse(amount.toString()) ?? 0.0;
+
+              // 创建待补充分类的意图
+              _pendingCategoryIntent = IncompleteIntent(
+                type: TransactionIntentType.expense,
+                category: null,
+                merchant: null,
+                description: null,
+                originalText: voiceInput,
+                missingSlots: const ['category'],
+                confidence: llmResult.confidence,
+                amount: parsedAmount,
+              );
+
+              _sessionState = VoiceSessionState.idle;
+              notifyListeners();
+
+              // 使用 LLM 返回的澄清问题
+              final clarifyMsg = llmResult.clarifyQuestion ?? '这${parsedAmount.toStringAsFixed(0)}元是什么消费？';
+              await _speakWithSkipCheck(clarifyMsg);
+
+              return VoiceSessionResult.success(clarifyMsg, {
+                'waitingForCategory': true,
+                'pendingCategoryIntent': true,
+              });
+            }
+          }
+        }
+
+        // 如果 operations 为空，但 clarifyQuestion 包含"多少钱"，
+        // 尝试从 clarifyQuestion 或用户输入中提取分类信息
+        final clarifyQuestion = llmResult.clarifyQuestion ?? '';
+        if (clarifyQuestion.contains('多少钱') && llmResult.operations.isEmpty) {
+          debugPrint('[VoiceCoordinator] 从澄清问题中提取分类信息');
+
+          // 尝试从澄清问题中提取分类（如"请说明这笔充电宝多少钱？"、"肠粉多少钱？"）
+          String? extractedNote;
+
+          // 模式1: "这笔XXX多少钱"
+          var noteMatch = RegExp(r'这笔(.+?)多少钱').firstMatch(clarifyQuestion);
+          if (noteMatch != null) {
+            extractedNote = noteMatch.group(1);
+          }
+
+          // 模式2: "XXX多少钱？" (直接以物品名开头)
+          if (extractedNote == null || extractedNote.isEmpty) {
+            noteMatch = RegExp(r'^(.+?)多少钱').firstMatch(clarifyQuestion);
+            if (noteMatch != null) {
+              extractedNote = noteMatch.group(1);
+            }
+          }
+
+          // 模式3: "请问XXX多少钱"
+          if (extractedNote == null || extractedNote.isEmpty) {
+            noteMatch = RegExp(r'请问(.+?)多少钱').firstMatch(clarifyQuestion);
+            if (noteMatch != null) {
+              extractedNote = noteMatch.group(1);
+            }
+          }
+
+          // 如果没从问题中提取到，使用用户原始输入
+          if (extractedNote == null || extractedNote.isEmpty) {
+            // 清理用户输入，移除常见的口语词
+            extractedNote = voiceInput
+                .replaceAll(RegExp(r'[。，！？、]'), '')
+                .replaceAll(RegExp(r'^(我|想|要|我想|我要|一个|买了|吃了|花了|还有|然后|想买|要买)'), '')
+                .trim();
+          }
+
+          if (extractedNote.isNotEmpty) {
+            debugPrint('[VoiceCoordinator] 提取到分类/备注: $extractedNote');
+
+            // 从备注推断分类
+            final inferredCategory = _inferCategoryFromNote(extractedNote);
+            debugPrint('[VoiceCoordinator] 推断分类: $inferredCategory');
+
+            // 创建待补充金额的意图
+            _pendingAmountIntent = IncompleteIntent(
+              type: TransactionIntentType.expense,
+              category: inferredCategory,
+              merchant: null,
+              description: extractedNote,
+              originalText: voiceInput,
+              missingSlots: const ['amount'],
+              confidence: llmResult.confidence,
+            );
+
+            _sessionState = VoiceSessionState.idle;
+            notifyListeners();
+
+            // 使用 LLM 返回的澄清问题（已经很自然了）
+            await _speakWithSkipCheck(clarifyQuestion);
+
+            return VoiceSessionResult.success(clarifyQuestion, {
+              'waitingForAmount': true,
+              'pendingAmountIntent': true,
+            });
+          }
+        }
+
+        // 如果 clarifyQuestion 包含"什么类型的消费"或类似表述，说明有金额但缺分类
+        if ((clarifyQuestion.contains('什么类型') || clarifyQuestion.contains('什么消费') ||
+             clarifyQuestion.contains('什么用途')) && llmResult.operations.isEmpty) {
+          debugPrint('[VoiceCoordinator] 从澄清问题中提取金额信息（有金额无分类）');
+
+          // 尝试从澄清问题中提取金额（如"请说明这笔8元是什么类型的消费"）
+          double? extractedAmount;
+          final amountMatch = RegExp(r'这笔?(\d+(?:\.\d+)?)\s*元').firstMatch(clarifyQuestion);
+          if (amountMatch != null) {
+            extractedAmount = double.tryParse(amountMatch.group(1)!);
+          }
+
+          // 也尝试从用户输入中提取金额
+          if (extractedAmount == null) {
+            extractedAmount = _extractAmountFromInput(voiceInput);
+          }
+
+          if (extractedAmount != null && extractedAmount > 0) {
+            debugPrint('[VoiceCoordinator] 提取到金额: $extractedAmount');
+
+            // 创建待补充分类的意图
+            _pendingCategoryIntent = IncompleteIntent(
+              type: TransactionIntentType.expense,
+              amount: extractedAmount,
+              category: null,
+              merchant: null,
+              description: null,
+              originalText: voiceInput,
+              missingSlots: const ['category'],
+              confidence: llmResult.confidence,
+            );
+
+            _sessionState = VoiceSessionState.idle;
+            notifyListeners();
+
+            // 使用 LLM 返回的澄清问题
+            await _speakWithSkipCheck(clarifyQuestion);
+
+            return VoiceSessionResult.success(clarifyQuestion, {
+              'waitingForCategory': true,
+              'pendingCategoryIntent': true,
+            });
+          }
+        }
+
+        // 没有部分操作，使用原来的澄清流程
         _sessionState = VoiceSessionState.idle;
         notifyListeners();
 
@@ -886,16 +1150,35 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       // 检查是否有不完整意图需要追问
       if (result.needsFollowUp) {
-        _sessionState = VoiceSessionState.waitingForAmountSupplement;
-        notifyListeners();
+        // 对话式金额补充：直接在对话中询问，不弹出输入页面
+        if (result.incompleteIntents.length == 1) {
+          // 单个不完整意图：存储待补充意图，使用对话式询问
+          _pendingAmountIntent = result.incompleteIntents.first;
+          _pendingMultiIntent = null;  // 清除多意图结果
+          _sessionState = VoiceSessionState.idle;  // 保持空闲状态，继续对话
+          notifyListeners();
 
-        final supplementPrompt = _generateAmountSupplementPrompt(result.incompleteIntents);
-        await _speakWithSkipCheck(supplementPrompt);
+          final supplementPrompt = _generateConversationalAmountPrompt(_pendingAmountIntent!);
+          await _speakWithSkipCheck(supplementPrompt);
 
-        return VoiceSessionResult.success(supplementPrompt, {
-          'executedCount': executedCount,
-          'pendingIncomplete': result.incompleteIntents.length,
-        });
+          return VoiceSessionResult.success(supplementPrompt, {
+            'executedCount': executedCount,
+            'pendingAmountIntent': true,
+            'waitingForAmount': true,
+          });
+        } else {
+          // 多个不完整意图：仍使用旧的列表式提示
+          _sessionState = VoiceSessionState.waitingForAmountSupplement;
+          notifyListeners();
+
+          final supplementPrompt = _generateAmountSupplementPrompt(result.incompleteIntents);
+          await _speakWithSkipCheck(supplementPrompt);
+
+          return VoiceSessionResult.success(supplementPrompt, {
+            'executedCount': executedCount,
+            'pendingIncomplete': result.incompleteIntents.length,
+          });
+        }
       }
 
       // 处理导航意图
@@ -1096,6 +1379,247 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     return buffer.toString();
   }
 
+  /// 生成对话式金额询问提示（单个不完整意图）
+  String _generateConversationalAmountPrompt(IncompleteIntent intent) {
+    final category = intent.category ?? intent.originalText;
+    // 使用更自然的对话方式询问
+    return '$category多少钱？';
+  }
+
+  /// 处理金额回复（对话式金额补充）
+  /// 返回 null 表示输入不是金额回复，需要继续正常处理
+  Future<VoiceSessionResult?> _handleAmountResponse(String input) async {
+    if (_pendingAmountIntent == null) return null;
+
+    // 尝试从输入中提取金额
+    final amount = _extractAmountFromInput(input);
+    if (amount == null) {
+      // 不是金额回复，清除待补充意图，继续正常处理
+      debugPrint('[VoiceCoordinator] 输入不是金额回复，继续正常处理: $input');
+      _pendingAmountIntent = null;
+      return null;
+    }
+
+    debugPrint('[VoiceCoordinator] 识别到金额回复: $amount');
+
+    // 使用金额完成意图
+    final incompleteIntent = _pendingAmountIntent!;
+    final completeIntent = incompleteIntent.completeWith(amount: amount);
+
+    // 清除待补充意图
+    _pendingAmountIntent = null;
+
+    // 执行交易记录
+    final executedCount = await _executeCompleteIntents([completeIntent]);
+
+    _sessionState = VoiceSessionState.idle;
+    notifyListeners();
+
+    // 生成成功回复
+    final llmGenerator = LLMResponseGenerator.instance;
+    final category = incompleteIntent.category ?? incompleteIntent.originalText;
+    final message = await llmGenerator.generateResponse(
+      action: '记账',
+      result: '成功记录$category ${amount.toStringAsFixed(2)}元',
+      success: true,
+      userInput: null,
+    );
+    await _speakWithSkipCheck(message);
+
+    return VoiceSessionResult.success(message, {
+      'executedCount': executedCount,
+      'amountSupplemented': true,
+    });
+  }
+
+  /// 处理分类回复（对话式分类补充）
+  /// 返回 null 表示输入不是有效的分类回复，需要继续正常处理
+  Future<VoiceSessionResult?> _handleCategoryResponse(String input) async {
+    if (_pendingCategoryIntent == null) return null;
+
+    // 尝试从输入中提取分类和备注
+    final (category, note) = _extractCategoryFromInput(input);
+    if (category == null) {
+      // 不是有效的分类回复，清除待补充意图，继续正常处理
+      debugPrint('[VoiceCoordinator] 输入不是分类回复，继续正常处理: $input');
+      _pendingCategoryIntent = null;
+      return null;
+    }
+
+    debugPrint('[VoiceCoordinator] 识别到分类回复: category=$category, note=$note');
+
+    // 使用分类完成意图
+    final incompleteIntent = _pendingCategoryIntent!;
+    final completeIntent = incompleteIntent.completeWithCategory(
+      category: category,
+      note: note,
+    );
+
+    // 清除待补充意图
+    _pendingCategoryIntent = null;
+
+    // 执行交易记录
+    final executedCount = await _executeCompleteIntents([completeIntent]);
+
+    _sessionState = VoiceSessionState.idle;
+    notifyListeners();
+
+    // 生成成功回复
+    final llmGenerator = LLMResponseGenerator.instance;
+    final amount = incompleteIntent.amount ?? 0;
+    final displayNote = note ?? category;
+    final message = await llmGenerator.generateResponse(
+      action: '记账',
+      result: '成功记录$displayNote ${amount.toStringAsFixed(2)}元',
+      success: true,
+      userInput: null,
+    );
+    await _speakWithSkipCheck(message);
+
+    return VoiceSessionResult.success(message, {
+      'executedCount': executedCount,
+      'categorySupplemented': true,
+    });
+  }
+
+  /// 从输入中提取分类和备注
+  /// 返回 (category, note)，如果无法识别分类则返回 (null, null)
+  (String?, String?) _extractCategoryFromInput(String input) {
+    // 清理输入
+    input = input.trim().replaceAll(RegExp(r'[。，！？、\.\,\!\?]'), '');
+
+    // 移除常见的口语词
+    final cleanedInput = input
+        .replaceAll(RegExp(r'^(我|是|这是|那是|就是|买了|吃了|花在|用于|用来)'), '')
+        .trim();
+
+    if (cleanedInput.isEmpty) return (null, null);
+
+    // 尝试推断分类
+    final category = _inferCategoryFromNote(cleanedInput);
+
+    // 如果能推断出分类，使用清理后的输入作为备注
+    if (category != null) {
+      return (category, cleanedInput);
+    }
+
+    // 如果无法推断分类，检查是否是常见的消费类型关键词
+    final categoryKeywords = <String, String>{
+      '餐饮': 'food', '吃饭': 'food', '吃的': 'food', '食物': 'food',
+      '交通': 'transport', '出行': 'transport',
+      '购物': 'shopping', '买东西': 'shopping',
+      '娱乐': 'entertainment', '玩': 'entertainment',
+      '其他': 'other_expense',
+    };
+
+    for (final entry in categoryKeywords.entries) {
+      if (cleanedInput.contains(entry.key)) {
+        return (entry.value, cleanedInput);
+      }
+    }
+
+    // 如果输入看起来像是具体的物品名称，默认使用 other_expense 分类
+    if (cleanedInput.length >= 2 && cleanedInput.length <= 20) {
+      return ('other_expense', cleanedInput);
+    }
+
+    return (null, null);
+  }
+
+  /// 从输入中提取金额
+  /// 支持多种格式：15、15块、15元、十五、十五块钱等
+  double? _extractAmountFromInput(String input) {
+    // 去除首尾空格和标点符号
+    input = input.trim().replaceAll(RegExp(r'[。，！？、\.\,\!\?]'), '');
+
+    // 尝试直接解析数字（包括小数）
+    final numMatch = RegExp(r'^(\d+(?:\.\d+)?)\s*(?:块|元|块钱|元钱|毛|分)?$').firstMatch(input);
+    if (numMatch != null) {
+      return double.tryParse(numMatch.group(1)!);
+    }
+
+    // 尝试解析中文数字
+    final chineseAmount = _parseChineseAmount(input);
+    if (chineseAmount != null) {
+      return chineseAmount;
+    }
+
+    // 尝试从较长的输入中提取金额（如"花了19块"、"是19元"）
+    final extractedMatch = RegExp(r'(\d+(?:\.\d+)?)\s*(?:块|元|块钱)?').firstMatch(input);
+    if (extractedMatch != null) {
+      return double.tryParse(extractedMatch.group(1)!);
+    }
+
+    // 尝试匹配口语化表达（如"就19"、"是19"、"大概19"）
+    final oralMatch = RegExp(r'(?:就|是|大概|差不多|有)?(\d+(?:\.\d+)?)').firstMatch(input);
+    if (oralMatch != null) {
+      return double.tryParse(oralMatch.group(1)!);
+    }
+
+    return null;
+  }
+
+  /// 解析中文金额
+  double? _parseChineseAmount(String input) {
+    // 移除"块"、"元"等后缀
+    input = input.replaceAll(RegExp(r'[块元钱毛分]'), '').trim();
+
+    const chineseDigits = {
+      '零': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4,
+      '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
+    };
+
+    // 简单的中文数字解析（支持到万）
+    double result = 0;
+    double current = 0;
+
+    for (var i = 0; i < input.length; i++) {
+      final char = input[i];
+
+      if (chineseDigits.containsKey(char)) {
+        current = chineseDigits[char]!.toDouble();
+      } else if (char == '十') {
+        if (current == 0 && i == 0) current = 1;  // "十五" = 15
+        result += current * 10;
+        current = 0;
+      } else if (char == '百') {
+        result += current * 100;
+        current = 0;
+      } else if (char == '千') {
+        result += current * 1000;
+        current = 0;
+      } else if (char == '万') {
+        result = (result + current) * 10000;
+        current = 0;
+      } else if (char == '点' || char == '.') {
+        // 处理小数点
+        result += current;
+        current = 0;
+        // 解析小数部分
+        final decimalPart = input.substring(i + 1);
+        double decimal = 0;
+        double factor = 0.1;
+        for (final c in decimalPart.runes) {
+          final ch = String.fromCharCode(c);
+          if (chineseDigits.containsKey(ch)) {
+            decimal += chineseDigits[ch]! * factor;
+            factor *= 0.1;
+          } else if (RegExp(r'\d').hasMatch(ch)) {
+            decimal += int.parse(ch) * factor;
+            factor *= 0.1;
+          }
+        }
+        return result + decimal;
+      } else {
+        // 不认识的字符，可能不是金额
+        return null;
+      }
+    }
+
+    result += current;
+    return result > 0 ? result : null;
+  }
+
   /// 将意图类型映射到交易类型
   model.TransactionType _mapIntentTypeToTransactionType(TransactionIntentType type) {
     switch (type) {
@@ -1106,6 +1630,48 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       case TransactionIntentType.expense:
         return model.TransactionType.expense;
     }
+  }
+
+  /// 从备注/描述推断分类
+  String? _inferCategoryFromNote(String note) {
+    final text = note.toLowerCase();
+
+    // 分类关键词映射（使用标准分类ID）
+    const categoryKeywords = <String, List<String>>{
+      // 餐饮
+      'food': ['吃', '餐', '饭', '菜', '喝', '咖啡', '茶', '早餐', '午餐', '晚餐', '外卖', '堂食',
+               '肠粉', '面', '粉', '粥', '包子', '馒头', '米饭', '盖饭', '快餐', '小吃', '奶茶', '饮料',
+               '零食', '水果', '蛋糕', '面包', '汉堡', '披萨', '烧烤', '火锅'],
+      // 交通
+      'transport': ['打车', '地铁', '公交', '出租车', '滴滴', '油费', '加油', '停车', '车费',
+                   '火车', '飞机', '高铁', '出行', '通勤', '骑车', '单车', '电动车'],
+      // 购物
+      'shopping': ['买', '购', '商场', '淘宝', '京东', '超市', '拼多多', '商城', '网购',
+                  '衣服', '鞋', '包', '化妆品', '日用品', '生活用品'],
+      // 数码/电子
+      'digital': ['充电宝', '手机', '电脑', '平板', '耳机', '数据线', '充电器', '电子产品',
+                 '数码', '配件', '键盘', '鼠标', '显示器'],
+      // 娱乐
+      'entertainment': ['电影', '游戏', 'ktv', '唱歌', '娱乐', '门票', '演出', '展览', '旅游', '景点'],
+      // 医疗
+      'medical': ['医院', '看病', '药', '体检', '医疗', '诊所', '药店', '挂号'],
+      // 居住
+      'housing': ['房租', '水电', '物业', '燃气', '宽带', '网费', '房贷', '租金'],
+      // 通讯
+      'communication': ['话费', '流量', '手机充值'],
+      // 教育
+      'education': ['学费', '培训', '课程', '书', '文具', '教材', '辅导'],
+    };
+
+    for (final entry in categoryKeywords.entries) {
+      for (final keyword in entry.value) {
+        if (text.contains(keyword)) {
+          return entry.key;
+        }
+      }
+    }
+
+    return null;
   }
 
   /// 处理删除意图
@@ -1409,10 +1975,26 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       debugPrint('[VoiceCoordinator] 解析结果: amount=$amount, rawCategory=$rawCategory, category=$category, merchant=$merchant, type=$typeStr, isIncome=$isIncome');
 
       if (amount == null || amount <= 0) {
-        debugPrint('[VoiceCoordinator] 金额无效，返回错误');
-        const message = '请告诉我金额是多少';
+        debugPrint('[VoiceCoordinator] 金额无效，使用对话式金额补充');
+        // 对话式金额补充：存储待补充意图，在对话中询问金额
+        _pendingAmountIntent = IncompleteIntent(
+          type: isIncome ? TransactionIntentType.income : TransactionIntentType.expense,
+          category: category,
+          merchant: merchant,
+          description: originalInput,
+          originalText: originalInput,
+          missingSlots: const ['amount'],
+          confidence: intentResult.confidence,
+        );
+
+        final displayCategory = rawCategory ?? merchant ?? originalInput;
+        final message = '$displayCategory多少钱？';
         await _speakWithSkipCheck(message);
-        return VoiceSessionResult.error(message);
+
+        return VoiceSessionResult.success(message, {
+          'waitingForAmount': true,
+          'pendingAmountIntent': true,
+        });
       }
 
       // 创建交易记录

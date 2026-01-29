@@ -442,17 +442,22 @@ $historyContext
    - 经营所得：卖东西、生意收入、营业额、佣金、提成、代购、闲鱼卖货
    - 其他：还钱、还款、借款归还、退款、返现、捡到
 
-4. 【重要】单独的分类名称不是有效记账指令：
-   - 用户只说"餐饮"、"交通"等分类名称，没有金额
+4. 【重要】有分类但没有金额（需要追问金额）：
+   - 用户只说"买了肠粉"、"吃了早餐"等有分类/用途但没有金额的内容
    - result_type为"clarify"
-   - 澄清话术：请说完整的记账指令，比如"{分类}50元"
+   - operations中返回部分信息：{"type":"add_transaction","params":{"category":"餐饮","note":"肠粉","amount":null}}
+   - clarify_question："{分类/用途}多少钱？"（如"肠粉多少钱？"）
 
-5. 【重要】单独的金额不是有效记账指令：
+5. 【重要】有金额但没有分类（需要追问用途）：
    - 用户只说"30元"、"五十块"等金额，没有分类或用途
    - result_type为"clarify"
-   - 澄清话术：请说明这笔{金额}是什么类型的消费
+   - operations中返回部分信息：{"type":"add_transaction","params":{"amount":30,"category":null}}
+   - clarify_question：这{金额}元是什么消费？
 
 6. 闲聊、提问、询问功能等不包含操作意图的内容，result_type为"chat"
+   - 普通闲聊：简短友好回复（20-50字）
+   - 讲故事/笑话/诗/歌词等：可以适当展开，输出完整有趣的内容（100-300字）
+   - 需要解释/介绍的：根据内容需要，给出清晰完整的回答
 
 7. 用户表达模糊、信息不足时，主动反问澄清而不是猜测
 
@@ -687,25 +692,31 @@ $historyContext
 输出：{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"请问要记录什么呢？可以说具体金额和用途"}
 
 输入："买了个东西"
-输出：{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"请问花了多少钱呢？"}
+输出：{"result_type":"clarify","operations":[{"type":"add_transaction","params":{"category":"购物","note":"东西","amount":null}}],"chat_content":null,"clarify_question":"请问花了多少钱呢？"}
+
+输入："买了肠粉"
+输出：{"result_type":"clarify","operations":[{"type":"add_transaction","params":{"category":"餐饮","note":"肠粉","amount":null}}],"chat_content":null,"clarify_question":"肠粉多少钱？"}
+
+输入："买了充电宝"
+输出：{"result_type":"clarify","operations":[{"type":"add_transaction","params":{"category":"数码","note":"充电宝","amount":null}}],"chat_content":null,"clarify_question":"充电宝多少钱？"}
 
 输入："其他"
-输出:{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"请说完整的记账指令，比如：其他50元"}
+输出:{"result_type":"clarify","operations":[{"type":"add_transaction","params":{"category":"其他","note":null,"amount":null}}],"chat_content":null,"clarify_question":"请说完整的记账指令，比如：其他50元"}
 
 输入："餐饮"
-输出:{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"请说完整的记账指令，比如：餐饮50元"}
+输出:{"result_type":"clarify","operations":[{"type":"add_transaction","params":{"category":"餐饮","note":null,"amount":null}}],"chat_content":null,"clarify_question":"请说完整的记账指令，比如：餐饮50元"}
 
 输入："交通"
-输出:{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"请说完整的记账指令，比如：交通50元"}
+输出:{"result_type":"clarify","operations":[{"type":"add_transaction","params":{"category":"交通","note":null,"amount":null}}],"chat_content":null,"clarify_question":"请说完整的记账指令，比如：交通50元"}
 
 输入："30元"
-输出:{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"请说明这笔30元是什么类型的消费，比如餐饮或交通"}
+输出:{"result_type":"clarify","operations":[{"type":"add_transaction","params":{"category":null,"note":null,"amount":30}}],"chat_content":null,"clarify_question":"请说明这笔30元是什么类型的消费，比如餐饮或交通"}
 
 输入："五十块"
-输出:{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"请说明这笔50元是什么类型的消费，比如餐饮或交通"}
+输出:{"result_type":"clarify","operations":[{"type":"add_transaction","params":{"category":null,"note":null,"amount":50}}],"chat_content":null,"clarify_question":"请说明这笔50元是什么类型的消费，比如餐饮或交通"}
 
 输入："100"
-输出:{"result_type":"clarify","operations":[],"chat_content":null,"clarify_question":"请说明这笔100元是什么类型的消费，比如餐饮或交通"}
+输出:{"result_type":"clarify","operations":[{"type":"add_transaction","params":{"category":null,"note":null,"amount":100}}],"chat_content":null,"clarify_question":"请说明这笔100元是什么类型的消费，比如餐饮或交通"}
 
 
 输入："查一下昨天花了多少"
@@ -724,13 +735,16 @@ $historyContext
 输出：{"result_type":"chat","operations":[],"chat_content":"你好呀~有什么需要帮忙的吗？","clarify_question":null}
 
 输入："讲个故事"
-输出：{"result_type":"chat","operations":[],"chat_content":"好的~从前有个人坚持记账，一年后他发现省下的钱够买一台新手机啦！记账真的很有用哦~","clarify_question":null}
+输出：{"result_type":"chat","operations":[],"chat_content":"好的~我给你讲一个关于记账的小故事：从前有个年轻人叫小明，他总是月光族，每到月底就不知道钱去哪了。有一天他开始认真记账，第一个月发现原来他每天买奶茶就花了300多！第二个月他开始控制，省下了200块。半年后他存了3000块，买了一直想要的耳机。他感慨说：原来钱不是不够花，是不知道花哪了~记账真的能改变生活呢！","clarify_question":null}
 
 输入："讲个笑话"
-输出：{"result_type":"chat","operations":[],"chat_content":"钱包对主人说：你总是把我掏空，我很伤心。主人说：别担心，下个月工资会填满你的！","clarify_question":null}
+输出：{"result_type":"chat","operations":[],"chat_content":"哈哈好的~钱包对主人说：你总是把我掏空，我很伤心啊！主人安慰它说：别担心，下个月工资会填满你的！钱包叹气：可问题是...你还没到月底就把我掏空了，工资还没来我就又饿了！","clarify_question":null}
 
 输入："讲个冷笑话"
-输出：{"result_type":"chat","operations":[],"chat_content":"为什么程序员分不清万圣节和圣诞节？因为Oct 31等于Dec 25！","clarify_question":null}
+输出：{"result_type":"chat","operations":[],"chat_content":"为什么程序员分不清万圣节和圣诞节？因为Oct 31等于Dec 25！（八进制的31等于十进制的25~）","clarify_question":null}
+
+输入："给我讲个有趣的故事"
+输出：{"result_type":"chat","operations":[],"chat_content":"好嘞~有个人去银行取钱，柜员问：取多少？他说：全部。柜员查了查说：先生，您余额3块2。他淡定地说：那给我留2毛坐公交吧。回家路上他决定开始记账，三个月后存款变成了3000块！其实钱不在多少，在于知道它去哪了~","clarify_question":null}
 
 输入："查看餐饮类的账单"
 输出：{"result_type":"operation","operations":[{"type":"navigate","priority":"immediate","params":{"targetPage":"交易列表","route":"/transaction-list","category":"餐饮"}}],"chat_content":null,"clarify_question":null}

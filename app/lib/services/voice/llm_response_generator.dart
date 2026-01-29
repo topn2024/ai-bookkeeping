@@ -120,6 +120,22 @@ class LLMResponseGenerator {
         timeContext = '晚上';
       }
 
+      // 检测是否是需要较长回复的请求
+      final needsLongResponse = userInput.contains('故事') ||
+          userInput.contains('笑话') ||
+          userInput.contains('讲个') ||
+          userInput.contains('说个') ||
+          userInput.contains('来个') ||
+          userInput.contains('诗') ||
+          userInput.contains('歌词') ||
+          userInput.contains('介绍') ||
+          userInput.contains('解释') ||
+          userInput.contains('详细');
+
+      final lengthGuidance = needsLongResponse
+          ? '可以适当展开，100-300字即可，内容完整有趣'
+          : '简短自然（15-30字，最多不超过50字）';
+
       final prompt = '''
 你是小记，一个可爱、活泼的记账助手。用户在和你闲聊，请用自然、亲切的方式回应。
 
@@ -129,7 +145,7 @@ ${chatHistory != null && chatHistory.isNotEmpty ? '\n$chatHistory\n' : ''}
 ${chatIntent != null ? '（检测到的意图：$chatIntent）' : ''}
 
 要求：
-1. 简短自然（15-30字，最多不超过50字）
+1. $lengthGuidance
 2. 口语化，像朋友聊天
 3. 可以用语气词如"嗯"、"哈哈"、"呀"、"~"等
 4. 保持积极友好的态度
@@ -138,13 +154,17 @@ ${chatIntent != null ? '（检测到的意图：$chatIntent）' : ''}
 7. 不要说"我是AI"或"我是机器人"
 8. 如果用户表达情绪，先共情再回应
 9. 如果用户想结束对话（说再见/拜拜），温馨告别
+10. 如果用户想听故事/笑话/诗等，大方地满足请求，内容要有趣完整
 
 直接输出回复内容，不要加引号：''';
 
-      final response = await _qwenService.chat(prompt).timeout(const Duration(seconds: 5));
+      // 需要长回复的场景给更多时间
+      final timeout = needsLongResponse ? const Duration(seconds: 10) : const Duration(seconds: 5);
+      final response = await _qwenService.chat(prompt).timeout(timeout);
       if (response != null && response.isNotEmpty) {
-        // 闲聊回复（包括故事、笑话）允许更长的内容，最多300字符
-        final cleaned = _cleanResponse(response, maxLength: 300);
+        // 闲聊回复：普通回复50字，故事/笑话等允许更长（最多500字）
+        final maxLen = needsLongResponse ? 500 : 100;
+        final cleaned = _cleanResponse(response, maxLength: maxLen);
         if (cleaned.isNotEmpty) {
           debugPrint('[LLMResponse] 闲聊回复: $cleaned');
           return cleaned;

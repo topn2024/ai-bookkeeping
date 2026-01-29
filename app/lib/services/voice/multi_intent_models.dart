@@ -219,6 +219,9 @@ class IncompleteIntent {
   /// 意图类型
   final TransactionIntentType type;
 
+  /// 已识别的金额（当有金额但缺分类时使用）
+  final double? amount;
+
   /// 已识别的分类
   final String? category;
 
@@ -242,6 +245,7 @@ class IncompleteIntent {
 
   const IncompleteIntent({
     required this.type,
+    this.amount,
     this.category,
     this.merchant,
     this.description,
@@ -290,6 +294,20 @@ class IncompleteIntent {
       category: category,
       merchant: merchant,
       description: description,
+      originalText: originalText,
+      dateTime: dateTime,
+      confidence: confidence,
+    );
+  }
+
+  /// 补充分类后转为完整意图（当有金额但缺分类时使用）
+  CompleteIntent completeWithCategory({required String category, String? note}) {
+    return CompleteIntent(
+      type: type,
+      amount: amount ?? 0,
+      category: category,
+      merchant: merchant,
+      description: note ?? description,
       originalText: originalText,
       dateTime: dateTime,
       confidence: confidence,
