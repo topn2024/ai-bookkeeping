@@ -4,6 +4,7 @@
 /// 支持撤销操作（恢复原始数据）。
 library;
 
+import '../../models/transaction.dart';
 import '../repositories/i_transaction_repository.dart';
 import '../repositories/i_account_repository.dart';
 import 'intent_command.dart';
@@ -16,8 +17,8 @@ class ModifyTransactionCommand extends UndoableCommand {
   /// 账户仓储（用于调整余额）
   final IAccountRepository? accountRepository;
 
-  /// 原始交易数据（用于撤销）
-  Map<String, dynamic>? _originalData;
+  /// 原始交易（用于撤销）
+  Transaction? _originalTransaction;
 
   ModifyTransactionCommand({
     required String id,
@@ -68,28 +69,27 @@ class ModifyTransactionCommand extends UndoableCommand {
       final transactionId = params['transactionId'] as String;
 
       // 获取原始交易数据
-      final originalTransaction = await transactionRepository.findById(transactionId);
-      if (originalTransaction == null) {
+      _originalTransaction = await transactionRepository.findById(transactionId);
+      if (_originalTransaction == null) {
         return CommandResult.failure('交易不存在: $transactionId');
       }
 
       // 保存原始数据用于撤销
-      _originalData = _transactionToMap(originalTransaction);
-      saveUndoState(_originalData!);
+      saveUndoState(_originalTransaction!.toMap());
 
-      // 构建更新数据
-      final updateData = _buildUpdateData();
+      // 构建更新后的交易实体
+      final updatedTransaction = _buildUpdatedTransaction(_originalTransaction!);
 
       // 处理金额变化对账户余额的影响
       if (accountRepository != null && params.containsKey('amount')) {
         await _adjustAccountBalance(
-          originalTransaction,
-          updateData['amount'] as double?,
+          _originalTransaction!,
+          updatedTransaction.amount,
         );
       }
 
       // 更新交易
-      await transactionRepository.update(transactionId, updateData);
+      await transactionRepository.update(updatedTransaction);
 
       stopwatch.stop();
 
@@ -97,7 +97,6 @@ class ModifyTransactionCommand extends UndoableCommand {
         data: {
           'transactionId': transactionId,
           'message': '已修改交易',
-          'changes': updateData,
         },
         durationMs: stopwatch.elapsedMilliseconds,
         canUndo: true,
@@ -113,29 +112,26 @@ class ModifyTransactionCommand extends UndoableCommand {
 
   @override
   Future<CommandResult> undo() async {
-    if (_originalData == null) {
+    if (_originalTransaction == null) {
       return CommandResult.failure('无法撤销：没有找到原始交易数据');
     }
 
     final stopwatch = Stopwatch()..start();
 
     try {
-      final transactionId = _originalData!['id'] as String;
+      final transactionId = _originalTransaction!.id;
 
       // 获取当前数据以计算余额差异
       final currentTransaction = await transactionRepository.findById(transactionId);
 
       // 恢复原始数据
-      final restoreData = Map<String, dynamic>.from(_originalData!);
-      restoreData.remove('id'); // ID 不需要更新
-
-      await transactionRepository.update(transactionId, restoreData);
+      await transactionRepository.update(_originalTransaction!);
 
       // 恢复账户余额
       if (accountRepository != null && currentTransaction != null) {
         await _adjustAccountBalance(
           currentTransaction,
-          _originalData!['amount'] as double?,
+          _originalTransaction!.amount,
         );
       }
 
@@ -157,48 +153,46 @@ class ModifyTransactionCommand extends UndoableCommand {
     }
   }
 
-  /// 构建更新数据
-  Map<String, dynamic> _buildUpdateData() {
-    final updateData = <String, dynamic>{};
-
-    if (params.containsKey('amount')) {
-      updateData['amount'] = (params['amount'] as num).toDouble();
-    }
-    if (params.containsKey('category')) {
-      updateData['category'] = params['category'];
-    }
-    if (params.containsKey('note')) {
-      updateData['note'] = params['note'];
-    }
-    if (params.containsKey('merchant')) {
-      updateData['merchant'] = params['merchant'];
-    }
-    if (params.containsKey('date')) {
-      updateData['transactionDate'] = params['date'];
-    }
+  /// 构建更新后的交易实体
+  Transaction _buildUpdatedTransaction(Transaction original) {
+    TransactionType? newType;
     if (params.containsKey('type')) {
-      updateData['type'] = params['type'];
+      final typeStr = params['type'] as String;
+      newType = typeStr == 'income'
+          ? TransactionType.income
+          : typeStr == 'transfer'
+              ? TransactionType.transfer
+              : TransactionType.expense;
     }
 
-    updateData['updatedAt'] = DateTime.now().toIso8601String();
+    DateTime? newDate;
+    if (params.containsKey('date')) {
+      newDate = DateTime.parse(params['date'] as String);
+    }
 
-    return updateData;
+    return original.copyWith(
+      amount: params.containsKey('amount')
+          ? (params['amount'] as num).toDouble()
+          : null,
+      category: params['category'] as String?,
+      note: params['note'] as String?,
+      type: newType,
+      date: newDate,
+    );
   }
 
   /// 调整账户余额
   Future<void> _adjustAccountBalance(
-    dynamic originalTransaction,
-    double? newAmount,
+    Transaction originalTransaction,
+    double newAmount,
   ) async {
     if (accountRepository == null) return;
 
-    final accountId = _getAccountId(originalTransaction);
-    if (accountId == null) return;
+    final accountId = originalTransaction.accountId;
+    final originalAmount = originalTransaction.amount;
+    final isExpense = originalTransaction.type == TransactionType.expense;
 
-    final originalAmount = _getAmount(originalTransaction);
-    final isExpense = _getType(originalTransaction) == 'expense';
-
-    if (newAmount != null && originalAmount != newAmount) {
+    if (originalAmount != newAmount) {
       final difference = newAmount - originalAmount;
 
       if (isExpense) {
@@ -208,56 +202,6 @@ class ModifyTransactionCommand extends UndoableCommand {
         // 收入增加，余额增加
         await accountRepository!.updateBalance(accountId, difference);
       }
-    }
-  }
-
-  /// 将交易对象转换为 Map
-  Map<String, dynamic> _transactionToMap(dynamic transaction) {
-    if (transaction is Map<String, dynamic>) {
-      return Map<String, dynamic>.from(transaction);
-    }
-
-    try {
-      return (transaction as dynamic).toJson() as Map<String, dynamic>;
-    } catch (_) {
-      return {
-        'id': transaction.id?.toString(),
-        'amount': transaction.amount,
-        'category': transaction.category,
-        'type': transaction.type,
-        'note': transaction.note,
-        'merchant': transaction.merchant,
-        'accountId': transaction.accountId,
-        'ledgerId': transaction.ledgerId,
-        'transactionDate': transaction.transactionDate?.toIso8601String(),
-      };
-    }
-  }
-
-  String? _getAccountId(dynamic transaction) {
-    if (transaction is Map) return transaction['accountId'] as String?;
-    try {
-      return transaction.accountId as String?;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  double _getAmount(dynamic transaction) {
-    if (transaction is Map) return (transaction['amount'] as num).toDouble();
-    try {
-      return (transaction.amount as num).toDouble();
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  String _getType(dynamic transaction) {
-    if (transaction is Map) return transaction['type'] as String? ?? 'expense';
-    try {
-      return transaction.type as String? ?? 'expense';
-    } catch (_) {
-      return 'expense';
     }
   }
 }

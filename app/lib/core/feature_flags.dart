@@ -25,21 +25,33 @@ class FeatureFlags {
   /// - NavigationCoordinator
   /// - ConversationCoordinator
   /// - FeedbackCoordinator
-  bool _useNewVoiceArchitecture = false;
+  ///
+  /// 默认启用 - 新架构已完成测试
+  bool _useNewVoiceArchitecture = true;
 
   /// 是否使用 Repository Pattern
   ///
   /// 启用后将使用新的 Repository 实现替代 DatabaseService
-  bool _useRepositoryPattern = false;
+  ///
+  /// 默认启用 - Repository Pattern 已实现
+  bool _useRepositoryPattern = true;
 
   /// 是否使用新的 GlobalVoiceAssistantManager 架构
-  bool _useNewAssistantManager = false;
+  ///
+  /// 默认启用 - 新架构已完成测试
+  bool _useNewAssistantManager = true;
+
+  // ==================== 调试相关 ====================
+
+  /// 是否启用详细日志
+  bool _enableVerboseLogging = false;
 
   // ==================== Getters ====================
 
   bool get useNewVoiceArchitecture => _useNewVoiceArchitecture;
   bool get useRepositoryPattern => _useRepositoryPattern;
   bool get useNewAssistantManager => _useNewAssistantManager;
+  bool get enableVerboseLogging => _enableVerboseLogging;
 
   // ==================== Setters ====================
 
@@ -79,6 +91,12 @@ class FeatureFlags {
     debugPrint('[FeatureFlags] 禁用新 Assistant Manager 架构');
   }
 
+  /// 设置详细日志
+  void setVerboseLogging(bool enabled) {
+    _enableVerboseLogging = enabled;
+    debugPrint('[FeatureFlags] 详细日志: ${enabled ? "启用" : "禁用"}');
+  }
+
   // ==================== 批量操作 ====================
 
   /// 启用所有新架构特性
@@ -97,11 +115,12 @@ class FeatureFlags {
     debugPrint('[FeatureFlags] 禁用所有新架构特性');
   }
 
-  /// 重置为默认值
+  /// 重置为默认值（新架构启用）
   void reset() {
-    _useNewVoiceArchitecture = false;
-    _useRepositoryPattern = false;
-    _useNewAssistantManager = false;
+    _useNewVoiceArchitecture = true;
+    _useRepositoryPattern = true;
+    _useNewAssistantManager = true;
+    _enableVerboseLogging = false;
     debugPrint('[FeatureFlags] 重置为默认值');
   }
 
@@ -112,6 +131,7 @@ class FeatureFlags {
         'useNewVoiceArchitecture': _useNewVoiceArchitecture,
         'useRepositoryPattern': _useRepositoryPattern,
         'useNewAssistantManager': _useNewAssistantManager,
+        'enableVerboseLogging': _enableVerboseLogging,
       };
 
   @override
@@ -119,7 +139,8 @@ class FeatureFlags {
     return 'FeatureFlags('
         'newVoiceArch: $_useNewVoiceArchitecture, '
         'repoPattern: $_useRepositoryPattern, '
-        'newAssistant: $_useNewAssistantManager)';
+        'newAssistant: $_useNewAssistantManager, '
+        'verbose: $_enableVerboseLogging)';
   }
 }
 

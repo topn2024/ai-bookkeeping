@@ -4,8 +4,12 @@
 /// 用于查询交易统计、趋势分析、分布查询等。
 library;
 
+import '../../models/transaction.dart' show TransactionType;
 import '../repositories/i_transaction_repository.dart';
 import 'intent_command.dart';
+
+/// 本地别名以避免与 TransactionTypeFilter 冲突
+typedef _TransactionType = TransactionType;
 
 /// 查询类型
 enum QueryType {
@@ -270,28 +274,19 @@ class QueryCommand extends IntentCommand {
 
   /// 执行汇总查询
   Future<QueryResult> _executeSummaryQuery(DateRange dateRange) async {
-    final total = await transactionRepository.getTotal(
+    final statistics = await transactionRepository.getStatistics(
       startDate: dateRange.start,
       endDate: dateRange.end,
-      type: transactionTypeFilter == TransactionTypeFilter.income
-          ? 'income'
-          : 'expense',
-      category: category,
     );
 
-    final count = await transactionRepository.count(
-      startDate: dateRange.start,
-      endDate: dateRange.end,
-      type: transactionTypeFilter == TransactionTypeFilter.income
-          ? 'income'
-          : 'expense',
-      category: category,
-    );
+    final total = transactionTypeFilter == TransactionTypeFilter.income
+        ? statistics.totalIncome
+        : statistics.totalExpense;
 
     return QueryResult(
       queryType: QueryType.summary,
       totalAmount: total,
-      count: count,
+      count: statistics.count,
       timeRange: timeRange,
     );
   }
@@ -299,7 +294,12 @@ class QueryCommand extends IntentCommand {
   /// 执行最近记录查询
   Future<QueryResult> _executeRecentQuery() async {
     final queryLimit = limit ?? 10;
-    final transactions = await transactionRepository.findRecent(queryLimit);
+    final transactions = await transactionRepository.query(
+      TransactionQueryParams(
+        limit: queryLimit,
+        offset: 0,
+      ),
+    );
 
     return QueryResult(
       queryType: QueryType.recent,
@@ -310,15 +310,36 @@ class QueryCommand extends IntentCommand {
 
   /// 执行趋势查询
   Future<QueryResult> _executeTrendQuery(DateRange dateRange) async {
-    final group = groupBy ?? GroupBy.month;
-    final trendData = await transactionRepository.getTrend(
+    // 获取日期范围内的交易
+    final transactions = await transactionRepository.findByDateRange(
       startDate: dateRange.start,
       endDate: dateRange.end,
-      groupBy: group.name,
-      type: transactionTypeFilter == TransactionTypeFilter.income
-          ? 'income'
-          : 'expense',
     );
+
+    // 按月分组统计
+    final trendData = <Map<String, dynamic>>[];
+    final monthlyData = <String, double>{};
+
+    for (final tx in transactions) {
+      final monthKey = '${tx.date.year}-${tx.date.month.toString().padLeft(2, '0')}';
+      final isExpense = tx.type == _TransactionType.expense;
+      final isIncome = tx.type == _TransactionType.income;
+
+      if (transactionTypeFilter == TransactionTypeFilter.expense && isExpense) {
+        monthlyData[monthKey] = (monthlyData[monthKey] ?? 0) + tx.amount;
+      } else if (transactionTypeFilter == TransactionTypeFilter.income && isIncome) {
+        monthlyData[monthKey] = (monthlyData[monthKey] ?? 0) + tx.amount;
+      } else if (transactionTypeFilter == TransactionTypeFilter.all) {
+        monthlyData[monthKey] = (monthlyData[monthKey] ?? 0) +
+            (isExpense ? -tx.amount : tx.amount);
+      }
+    }
+
+    monthlyData.forEach((month, amount) {
+      trendData.add({'month': month, 'amount': amount});
+    });
+
+    trendData.sort((a, b) => (a['month'] as String).compareTo(b['month'] as String));
 
     return QueryResult(
       queryType: QueryType.trend,
@@ -329,24 +350,34 @@ class QueryCommand extends IntentCommand {
 
   /// 执行分布查询
   Future<QueryResult> _executeDistributionQuery(DateRange dateRange) async {
-    final distributionData = await transactionRepository.getDistribution(
+    final statistics = await transactionRepository.getStatistics(
       startDate: dateRange.start,
       endDate: dateRange.end,
-      groupBy: groupBy?.name ?? 'category',
-      type: transactionTypeFilter == TransactionTypeFilter.income
-          ? 'income'
-          : 'expense',
-      limit: limit,
     );
 
+    final distributionData = <Map<String, dynamic>>[];
     double total = 0;
-    for (final item in distributionData) {
-      total += (item['amount'] as num?)?.toDouble() ?? 0;
-    }
+
+    statistics.byCategory.forEach((category, amount) {
+      distributionData.add({
+        'category': category,
+        'amount': amount,
+      });
+      total += amount;
+    });
+
+    // 按金额排序
+    distributionData.sort((a, b) =>
+        (b['amount'] as double).compareTo(a['amount'] as double));
+
+    // 应用限制
+    final limitedData = limit != null && distributionData.length > limit!
+        ? distributionData.take(limit!).toList()
+        : distributionData;
 
     return QueryResult(
       queryType: QueryType.distribution,
-      groupedData: {'items': distributionData},
+      groupedData: {'items': limitedData},
       totalAmount: total,
       timeRange: timeRange,
     );
@@ -359,17 +390,18 @@ class QueryCommand extends IntentCommand {
     final previousStart = dateRange.start.subtract(duration);
     final previousEnd = dateRange.start.subtract(const Duration(days: 1));
 
-    final currentTotal = await transactionRepository.getTotal(
+    final currentStats = await transactionRepository.getStatistics(
       startDate: dateRange.start,
       endDate: dateRange.end,
-      type: 'expense',
     );
 
-    final previousTotal = await transactionRepository.getTotal(
+    final previousStats = await transactionRepository.getStatistics(
       startDate: previousStart,
       endDate: previousEnd,
-      type: 'expense',
     );
+
+    final currentTotal = currentStats.totalExpense;
+    final previousTotal = previousStats.totalExpense;
 
     final difference = currentTotal - previousTotal;
     final changePercent = previousTotal > 0
@@ -394,9 +426,11 @@ class QueryCommand extends IntentCommand {
   /// 执行搜索查询
   Future<QueryResult> _executeSearchQuery() async {
     final keyword = params['keyword'] as String? ?? '';
-    final transactions = await transactionRepository.search(
-      keyword,
-      limit: limit ?? 20,
+    final transactions = await transactionRepository.query(
+      TransactionQueryParams(
+        note: keyword,
+        limit: limit ?? 20,
+      ),
     );
 
     return QueryResult(

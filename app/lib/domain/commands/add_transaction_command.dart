@@ -4,6 +4,9 @@
 /// 支持撤销操作（删除已添加的交易）。
 library;
 
+import 'package:uuid/uuid.dart';
+
+import '../../models/transaction.dart';
 import '../repositories/i_transaction_repository.dart';
 import '../repositories/i_account_repository.dart';
 import 'intent_command.dart';
@@ -72,14 +75,12 @@ class AddTransactionCommand extends UndoableCommand {
         return CommandResult.failure('参数验证失败：缺少金额或金额无效');
       }
 
-      // 构建交易数据
-      final transactionData = _buildTransactionData();
+      // 构建交易实体
+      final transaction = _buildTransaction();
+      _createdTransactionId = transaction.id;
 
-      // 创建交易
-      final transaction = await transactionRepository.create(transactionData);
-
-      // 保存交易 ID 用于撤销
-      _createdTransactionId = transaction.id.toString();
+      // 插入交易
+      await transactionRepository.insert(transaction);
 
       // 保存撤销状态
       saveUndoState({
@@ -166,18 +167,27 @@ class AddTransactionCommand extends UndoableCommand {
     }
   }
 
-  /// 构建交易数据
-  Map<String, dynamic> _buildTransactionData() {
-    return {
-      'amount': (params['amount'] as num).toDouble(),
-      'category': params['category'] ?? '其他',
-      'type': params['type'] ?? 'expense',
-      'note': params['note'] ?? '',
-      'merchant': params['merchant'],
-      'accountId': params['accountId'],
-      'ledgerId': context.ledgerId,
-      'transactionDate': params['date'] ?? DateTime.now().toIso8601String(),
-      'createdAt': DateTime.now().toIso8601String(),
-    };
+  /// 构建交易实体
+  Transaction _buildTransaction() {
+    final typeStr = params['type'] as String? ?? 'expense';
+    final transactionType = typeStr == 'income'
+        ? TransactionType.income
+        : typeStr == 'transfer'
+            ? TransactionType.transfer
+            : TransactionType.expense;
+
+    final dateStr = params['date'] as String?;
+    final date = dateStr != null ? DateTime.parse(dateStr) : DateTime.now();
+
+    return Transaction(
+      id: const Uuid().v4(),
+      type: transactionType,
+      amount: (params['amount'] as num).toDouble(),
+      category: params['category'] as String? ?? '其他',
+      note: params['note'] as String?,
+      date: date,
+      accountId: params['accountId'] as String? ?? 'default',
+      source: TransactionSource.voice,
+    );
   }
 }
