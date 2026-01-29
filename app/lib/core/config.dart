@@ -4,8 +4,10 @@
 // API keys are provided via compile-time environment variables for security.
 // Server only returns availability status, not actual keys.
 
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../services/http_service.dart';
+import '../services/secure_key_service.dart';
 import 'config/config.dart';
 import 'config/secrets.dart';
 
@@ -22,17 +24,24 @@ class AppConfig {
   bool _zhipuAvailable = false;
   bool _initialized = false;
 
+  // 从 Native 层预加载的密钥
+  String? _nativeQwenApiKey;
+
   /// Backend API URL - 使用集中化配置
   String get apiBaseUrl => ApiEndpoints.apiBaseUrl;
 
   /// Get Qwen API Key
-  /// 优先使用编译时环境变量，否则使用内置密钥
+  /// 优先使用编译时环境变量，然后是Native密钥，最后是内置密钥
   String get qwenApiKey {
     const envKey = String.fromEnvironment('QWEN_API_KEY', defaultValue: '');
     if (envKey.isNotEmpty) {
       return envKey;
     }
-    // 使用内置密钥（Release构建时会被混淆）
+    // Android平台使用Native安全存储的密钥
+    if (_nativeQwenApiKey != null && _nativeQwenApiKey!.isNotEmpty) {
+      return _nativeQwenApiKey!;
+    }
+    // 降级使用内置密钥
     return kQwenApiKey;
   }
 
@@ -60,6 +69,18 @@ class AppConfig {
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
+
+    // Android平台从Native层加载密钥
+    if (Platform.isAndroid) {
+      try {
+        debugPrint('AppConfig: Loading keys from Native layer...');
+        _nativeQwenApiKey = await SecureKeyService.instance.getQwenApiKey();
+        debugPrint('AppConfig: Native Qwen API Key loaded: ${_nativeQwenApiKey?.isNotEmpty == true ? "[SET]" : "[EMPTY]"}');
+      } catch (e) {
+        debugPrint('AppConfig: Failed to load Native keys: $e');
+      }
+    }
+
     debugPrint('AppConfig: Initialized, qwenApiKey=${qwenApiKey.isNotEmpty ? "[SET]" : "[EMPTY]"}');
   }
 

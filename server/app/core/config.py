@@ -80,6 +80,12 @@ class Settings(BaseSettings):
     ALIYUN_SMS_TEMPLATE_CODE: str = ""  # SMS template code for verification
     ALIYUN_SMS_REGION: str = "cn-hangzhou"  # Default region
 
+    # Alibaba Cloud NLS (语音服务 - ASR/TTS)
+    ALIBABA_ACCESS_KEY_ID: str = ""  # For NLS token generation
+    ALIBABA_ACCESS_KEY_SECRET: str = ""  # For NLS token generation
+    ALIBABA_NLS_APP_KEY: str = ""  # NLS project AppKey
+    PICOVOICE_ACCESS_KEY: str = ""  # Optional: Picovoice wake word detection
+
     # Logging
     LOG_LEVEL: str = "INFO"
 

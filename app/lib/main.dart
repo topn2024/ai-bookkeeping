@@ -21,6 +21,8 @@ import 'services/secure_storage_service.dart';
 import 'services/database_service.dart';
 import 'services/global_voice_assistant_manager.dart';
 import 'services/voice_token_service.dart';
+import 'services/voice_token_refresh_service.dart';
+import 'core/config.dart';
 import 'services/voice_context_route_observer.dart';
 import 'core/config/secrets.dart';
 import 'services/voice_service_coordinator.dart' show VoiceSessionResult, VoiceSessionStatus;
@@ -102,17 +104,32 @@ void main() async {
     logger.warning('Failed to initialize auto-sync service: $e', tag: 'App');
   }
 
-  // Configure voice token service with Alibaba Cloud credentials
+  // Initialize AppConfig to load Native keys (must be before voice services)
+  try {
+    await appConfig.initialize();
+    logger.info('AppConfig initialized with Native keys', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize AppConfig: $e', tag: 'App');
+  }
+
+  // Configure voice token service with automatic token refresh
   // IMPORTANT: This must be done BEFORE multimodal wake-up service and voice assistant
-  // 直接使用内置Token（secrets.dart中配置）
-  VoiceTokenService().configureDirectMode(
-    token: AliyunSpeechConfig.token,
-    appKey: AliyunSpeechConfig.appKey,
-    asrUrl: AliyunSpeechConfig.asrUrl,
-    asrRestUrl: AliyunSpeechConfig.asrRestUrl,
-    ttsUrl: AliyunSpeechConfig.ttsUrl,
-  );
-  logger.info('Voice token service configured with static token', tag: 'App');
+  // 使用动态Token刷新服务，每天自动从阿里云获取新Token
+  try {
+    await VoiceTokenRefreshService().initialize();
+    logger.info('Voice token service configured with auto-refresh', tag: 'App');
+  } catch (e) {
+    logger.warning('Voice token refresh service init failed: $e', tag: 'App');
+    // 降级方案：使用静态Token
+    VoiceTokenService().configureDirectMode(
+      token: AliyunSpeechConfig.token,
+      appKey: AliyunSpeechConfig.appKey,
+      asrUrl: AliyunSpeechConfig.asrUrl,
+      asrRestUrl: AliyunSpeechConfig.asrRestUrl,
+      ttsUrl: AliyunSpeechConfig.ttsUrl,
+    );
+    logger.info('Voice token service fallback to static token', tag: 'App');
+  }
 
   // Initialize multimodal wake-up service
   try {

@@ -37,6 +37,9 @@ class MainActivity : FlutterActivity() {
         gestureWakeHandler = GestureWakeHandler(this)
         gestureWakeHandler?.registerWith(flutterEngine)
 
+        // 注册安全密钥存储
+        SecureKeyStore.registerWith(flutterEngine)
+
         // 处理分享接收的MethodChannel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SHARE_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
