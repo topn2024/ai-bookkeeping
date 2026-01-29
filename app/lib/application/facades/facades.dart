@@ -9,3 +9,4 @@
 library;
 
 export 'voice_service_facade.dart';
+export 'global_voice_assistant_facade.dart';

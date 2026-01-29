@@ -1,0 +1,426 @@
+# Intent Recognition Examples
+# 意图识别示例
+#
+# 用于 LLM 的 few-shot learning
+
+version: "1.0"
+
+# ============================================
+# 记账示例 - 基础
+# ============================================
+add_transaction_basic:
+  - input: "打车35，吃饭50"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 35
+            category: "交通"
+            note: "打车"
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 50
+            category: "餐饮"
+            note: "吃饭"
+
+  - input: "早餐七块"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 7
+            category: "餐饮"
+            note: "早餐"
+
+  - input: "午餐十五，晚餐二十"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 15
+            category: "餐饮"
+            note: "午餐"
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 20
+            category: "餐饮"
+            note: "晚餐"
+
+# ============================================
+# 记账示例 - 语义关联
+# ============================================
+add_transaction_semantic:
+  - input: "花了15块钱吃了肠粉"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 15
+            category: "餐饮"
+            note: "肠粉"
+
+  - input: "中午花了30吃了外卖"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 30
+            category: "餐饮"
+            note: "午餐外卖"
+
+  - input: "今天的午餐呃是大概25块钱"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 25
+            category: "餐饮"
+            note: "午餐"
+
+  - input: "早餐呃七块"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 7
+            category: "餐饮"
+            note: "早餐"
+
+# ============================================
+# 记账示例 - 多笔交易
+# ============================================
+add_transaction_multiple:
+  - input: "今天早餐吃了七块然后中午又花了15块钱吃了一碗肠粉"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 7
+            category: "餐饮"
+            note: "早餐"
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 15
+            category: "餐饮"
+            note: "肠粉"
+
+  - input: "今天早餐花了7块吃了肠粉然后午餐花了18块吃了蛋包饭然后晚上吃云吞面嗯25"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 7
+            category: "餐饮"
+            note: "肠粉"
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 18
+            category: "餐饮"
+            note: "蛋包饭"
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 25
+            category: "餐饮"
+            note: "云吞面"
+
+  - input: "早餐7块午餐18块晚餐25"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 7
+            category: "餐饮"
+            note: "早餐"
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 18
+            category: "餐饮"
+            note: "午餐"
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 25
+            category: "餐饮"
+            note: "晚餐"
+
+# ============================================
+# 记账示例 - 交通
+# ============================================
+add_transaction_transport:
+  - input: "今天打车呃花了20块"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 20
+            category: "交通"
+            merchant: "滴滴出行"
+            note: "打车"
+
+  - input: "今天地铁去的时候三块回来的时候也是三块"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 3
+            category: "交通"
+            merchant: "{city_name}地铁"
+            note: "去程"
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 3
+            category: "交通"
+            merchant: "{city_name}地铁"
+            note: "返程"
+
+  - input: "坐地铁花了5块"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 5
+            category: "交通"
+            merchant: "{city_name}地铁"
+            note: "地铁"
+
+# ============================================
+# 记账示例 - 收入
+# ============================================
+add_transaction_income:
+  - input: "有人还给我2万块钱"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 20000
+            category: "其他"
+            type: "income"
+            note: "还款"
+
+  - input: "收到工资8000"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 8000
+            category: "工资"
+            type: "income"
+            note: "工资"
+
+  - input: "收到红包200"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 200
+            category: "红包"
+            type: "income"
+            note: "红包"
+
+  - input: "银行利息15.8元"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "add_transaction"
+          priority: "deferred"
+          params:
+            amount: 15.8
+            category: "投资收益"
+            type: "income"
+            note: "银行利息"
+
+# ============================================
+# 澄清示例
+# ============================================
+clarify_examples:
+  - input: "帮我记笔账"
+    output:
+      result_type: "clarify"
+      operations: []
+      clarify_question: "好的，请告诉我金额和用途，比如：午餐花了35块"
+
+  - input: "记一下"
+    output:
+      result_type: "clarify"
+      operations: []
+      clarify_question: "请问要记录什么呢？可以说具体金额和用途"
+
+  - input: "买了肠粉"
+    output:
+      result_type: "clarify"
+      operations:
+        - type: "add_transaction"
+          params:
+            category: "餐饮"
+            note: "肠粉"
+            amount: null
+      clarify_question: "肠粉多少钱？"
+
+  - input: "30元"
+    output:
+      result_type: "clarify"
+      operations:
+        - type: "add_transaction"
+          params:
+            category: null
+            note: null
+            amount: 30
+      clarify_question: "请说明这笔30元是什么类型的消费，比如餐饮或交通"
+
+  - input: "餐饮"
+    output:
+      result_type: "clarify"
+      operations:
+        - type: "add_transaction"
+          params:
+            category: "餐饮"
+            note: null
+            amount: null
+      clarify_question: "请说完整的记账指令，比如：餐饮50元"
+
+# ============================================
+# 查询示例
+# ============================================
+query_examples:
+  - input: "查一下昨天花了多少"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "query"
+          priority: "normal"
+          params:
+            queryType: "statistics"
+            time: "昨天"
+
+  - input: "今天花了多少钱"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "query"
+          priority: "normal"
+          params:
+            queryType: "statistics"
+            time: "今天"
+
+  - input: "最近三个月的消费趋势"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "query"
+          priority: "normal"
+          params:
+            queryType: "trend"
+            time: "最近3个月"
+            groupBy: "month"
+
+  - input: "这个月花钱最多的是哪一项"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "query"
+          priority: "normal"
+          params:
+            queryType: "distribution"
+            time: "本月"
+            groupBy: "category"
+            limit: 1
+
+  - input: "每个月收入分别是多少"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "query"
+          priority: "normal"
+          params:
+            queryType: "trend"
+            time: "今年"
+            groupBy: "month"
+            transactionType: "income"
+
+# ============================================
+# 导航示例
+# ============================================
+navigate_examples:
+  - input: "查看餐饮类的账单"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "navigate"
+          priority: "immediate"
+          params:
+            targetPage: "交易列表"
+            route: "/transaction-list"
+            category: "餐饮"
+
+  - input: "看看本周的交通消费"
+    output:
+      result_type: "operation"
+      operations:
+        - type: "navigate"
+          priority: "immediate"
+          params:
+            targetPage: "统计"
+            route: "/statistics"
+            category: "交通"
+            timeRange: "本周"
+
+# ============================================
+# 闲聊示例
+# ============================================
+chat_examples:
+  - input: "为什么要记账"
+    output:
+      result_type: "chat"
+      operations: []
+      chat_content: "记账能帮你了解钱都花哪儿了，还能发现省钱的机会呢~坚持记账的人往往能存下更多钱哦！"
+
+  - input: "你好"
+    output:
+      result_type: "chat"
+      operations: []
+      chat_content: "你好呀~有什么需要帮忙的吗？"
+
+  - input: "讲个笑话"
+    output:
+      result_type: "chat"
+      operations: []
+      chat_content: "哈哈好的~钱包对主人说：你总是把我掏空，我很伤心啊！主人安慰它说：别担心，下个月工资会填满你的！钱包叹气：可问题是...你还没到月底就把我掏空了，工资还没来我就又饿了！"
