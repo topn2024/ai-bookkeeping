@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
+import '../../utils/amount_validator.dart';
 import '../voice_service_coordinator.dart' show VoiceIntentType, VoiceSessionContext;
 import 'multi_intent_models.dart';
 import 'sentence_splitter.dart';
@@ -647,12 +648,23 @@ class VoiceIntentRouter {
   /// 从文本中提取金额（支持中文数字和阿拉伯数字）
   ///
   /// 公开静态方法，可供其他类使用（如 BatchIntentAnalyzer）
+  /// 会验证金额是否在合理范围内（0.01元 ~ 10亿元）
   static double? extractAmount(String input) {
+    double? amount;
+
     // 优先匹配阿拉伯数字金额
     final arabicMatch = RegExp(r'(\d+(?:\.\d+)?)\s*[元块钱]?').firstMatch(input);
     if (arabicMatch != null) {
-      final amount = double.tryParse(arabicMatch.group(1)!);
-      if (amount != null && amount > 0) return amount;
+      amount = double.tryParse(arabicMatch.group(1)!);
+      if (amount != null && amount > 0) {
+        // 验证金额范围
+        if (AmountValidator.validate(amount) == null) {
+          return amount;
+        } else {
+          debugPrint('[VoiceIntentRouter] 金额超出合理范围: $amount');
+          return null;
+        }
+      }
     }
 
     // 匹配中文数字金额
@@ -669,15 +681,26 @@ class VoiceIntentRouter {
     for (final pattern in chinesePatterns) {
       final match = pattern.firstMatch(input);
       if (match != null) {
-        final amount = _parseChineseNumber(match.group(1)!);
-        if (amount != null && amount > 0) return amount;
+        amount = _parseChineseNumber(match.group(1)!);
+        if (amount != null && amount > 0) {
+          // 验证金额范围
+          if (AmountValidator.validate(amount) == null) {
+            return amount;
+          } else {
+            debugPrint('[VoiceIntentRouter] 中文金额超出合理范围: $amount');
+            return null;
+          }
+        }
       }
     }
 
     // 最后尝试：查找任何数字（阿拉伯或中文）
     final anyNumberMatch = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(input);
     if (anyNumberMatch != null) {
-      return double.tryParse(anyNumberMatch.group(1)!);
+      amount = double.tryParse(anyNumberMatch.group(1)!);
+      if (amount != null && AmountValidator.validate(amount) == null) {
+        return amount;
+      }
     }
 
     return null;

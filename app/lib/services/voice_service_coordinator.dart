@@ -6,6 +6,7 @@ import '../models/transaction.dart' as model;
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
 import '../services/duplicate_detection_service.dart';
+import '../utils/amount_validator.dart';
 import 'voice/entity_disambiguation_service.dart';
 import 'voice/voice_delete_service.dart';
 import 'voice/voice_modify_service.dart';
@@ -1333,6 +1334,15 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
     for (final intent in intents) {
       try {
+        // 验证金额是否在合理范围内
+        final amountError = AmountValidator.validate(intent.amount);
+        if (amountError != null) {
+          debugPrint('[VoiceCoordinator] 金额异常，跳过: ${intent.amount} - $amountError');
+          // 对于异常金额，给出语音提示
+          await _speakWithSkipCheck('金额${intent.amount.toStringAsFixed(2)}元$amountError，请重新输入');
+          continue;
+        }
+
         final transaction = model.Transaction(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           type: _mapIntentTypeToTransactionType(intent.type),
