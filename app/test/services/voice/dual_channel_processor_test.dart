@@ -336,7 +336,7 @@ void main() {
         ],
         chatContent: '测试对话',
         confidence: 0.9,
-        source: RecognitionSource.llmFallback,
+        source: RecognitionSource.llm,
         originalInput: '打车35，测试对话',
       );
 

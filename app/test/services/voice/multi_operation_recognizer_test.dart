@@ -102,7 +102,7 @@ void main() {
         ],
         chatContent: null,
         confidence: 0.9,
-        source: RecognitionSource.llmFallback,
+        source: RecognitionSource.llm,
         originalInput: '打车35',
       );
 

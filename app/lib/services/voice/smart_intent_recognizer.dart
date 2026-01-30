@@ -132,7 +132,7 @@ class SmartIntentRecognizer {
 
     if (!shouldUseLLM) {
       debugPrint('[SmartIntent] 网络状态: 离线模式，跳过LLM直接使用规则');
-      return _fallbackToRules(normalizedInput, input, pageContext);
+      return _ruleFallback(normalizedInput, input, pageContext);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -141,7 +141,7 @@ class SmartIntentRecognizer {
     // ═══════════════════════════════════════════════════════════════
     if (!_qwenService.isAvailable) {
       debugPrint('[SmartIntent] LLM不可用（未配置API Key），使用规则兜底');
-      return _fallbackToRules(normalizedInput, input, pageContext);
+      return _ruleFallback(normalizedInput, input, pageContext);
     }
 
     debugPrint('[SmartIntent] LLM可用，开始智能识别...');
@@ -169,32 +169,12 @@ class SmartIntentRecognizer {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // LLM调用失败处理
-    // 只有在网络问题时才降级到规则兜底，其他失败返回错误
+    // LLM调用失败，降级到规则兜底
+    // 无论失败原因（网络、超时、服务异常），都降级到规则
     // ═══════════════════════════════════════════════════════════════
-    debugPrint('[SmartIntent] LLM调用失败，检查是否网络问题...');
-
-    // 检查网络状态，如果是网络问题导致的失败，降级到规则
-    final isNetworkIssue = networkStatus != null &&
-        (networkStatus.recommendedMode == RoutingMode.ruleOnly ||
-         networkStatus.recommendedMode == RoutingMode.offline);
-
-    if (isNetworkIssue) {
-      debugPrint('[SmartIntent] 检测到网络问题，降级到规则兜底');
-      onProgressiveFeedback?.call('切换到离线模式');
-      return _fallbackToRules(normalizedInput, input, pageContext);
-    }
-
-    // 非网络问题导致的失败，返回错误提示而非降级
-    debugPrint('[SmartIntent] LLM服务异常，返回错误提示');
-    return SmartIntentResult(
-      intentType: SmartIntentType.unknown,
-      confidence: 0.0,
-      entities: {'error': '语音识别服务暂时不可用，请稍后重试'},
-      source: RecognitionSource.error,
-      originalInput: input,
-      errorMessage: '语音识别服务暂时不可用，请稍后重试',
-    );
+    debugPrint('[SmartIntent] LLM调用失败，降级到规则兜底');
+    onProgressiveFeedback?.call('切换到离线模式');
+    return _ruleFallback(normalizedInput, input, pageContext);
   }
 
   /// 带超时的LLM调用
@@ -204,7 +184,7 @@ class SmartIntentRecognizer {
     List<Map<String, String>>? conversationHistory,
   ) async {
     try {
-      return await _layer5LLMFallback(input, pageContext, conversationHistory)
+      return await _llmRecognize(input, pageContext, conversationHistory)
           .timeout(Duration(milliseconds: _llmTimeoutMs));
     } catch (e) {
       debugPrint('[SmartIntent] LLM调用超时或失败: $e');
@@ -256,7 +236,7 @@ class SmartIntentRecognizer {
     // ═══════════════════════════════════════════════════════════════
     if (!_qwenService.isAvailable) {
       debugPrint('[SmartIntent] LLM不可用（未配置API Key），使用规则兜底');
-      return _multiOperationFallbackToRules(normalizedInput, input, pageContext);
+      return _multiOperationRuleFallback(normalizedInput, input, pageContext);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -275,41 +255,23 @@ class SmartIntentRecognizer {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // LLM调用失败处理
-    // 只有在网络问题时才降级到规则兜底，其他失败返回错误
+    // LLM调用失败，降级到规则兜底
+    // 无论失败原因（网络、超时、服务异常），都降级到规则
     // ═══════════════════════════════════════════════════════════════
-    final isNetworkIssue = networkStatus != null &&
-        (networkStatus.recommendedMode == RoutingMode.ruleOnly ||
-         networkStatus.recommendedMode == RoutingMode.offline);
-
-    if (isNetworkIssue) {
-      debugPrint('[SmartIntent] 检测到网络问题，降级到规则兜底');
-      return _multiOperationFallbackToRules(normalizedInput, input, pageContext);
-    }
-
-    // 非网络问题导致的失败，返回错误提示而非降级
-    debugPrint('[SmartIntent] LLM识别失败（非网络问题），返回错误');
-    return MultiOperationResult(
-      resultType: RecognitionResultType.chat,
-      operations: [],
-      chatContent: '语音识别服务暂时不可用，请稍后重试',
-      confidence: 0.0,
-      source: RecognitionSource.error,
-      originalInput: input,
-      isOfflineMode: false,
-    );
+    debugPrint('[SmartIntent] LLM调用失败，降级到规则兜底');
+    return _multiOperationRuleFallback(normalizedInput, input, pageContext);
   }
 
   /// 多操作规则兜底识别
   ///
-  /// 仅在离线模式下使用，当 LLM 不可用时作为兜底
-  Future<MultiOperationResult> _multiOperationFallbackToRules(
+  /// 当 LLM 不可用或调用失败时作为兜底
+  Future<MultiOperationResult> _multiOperationRuleFallback(
     String normalizedInput,
     String originalInput,
     String? pageContext,
   ) async {
     debugPrint('[SmartIntent] 使用规则兜底识别（离线模式）...');
-    final singleResult = await _fallbackToRules(normalizedInput, originalInput, pageContext);
+    final singleResult = await _ruleFallback(normalizedInput, originalInput, pageContext);
 
     if (singleResult.isSuccess) {
       debugPrint('[SmartIntent] 规则识别成功: ${singleResult.intentType}');
@@ -861,7 +823,7 @@ $historyContext
           // 闲聊模式：无需操作，返回 chat 类型结果
           return MultiOperationResult.chat(
             chatContent: chatContent ?? originalInput,
-            source: RecognitionSource.llmFallback,
+            source: RecognitionSource.llm,
             originalInput: originalInput,
           );
 
@@ -869,7 +831,7 @@ $historyContext
           // 澄清模式：需要反问用户
           return MultiOperationResult.clarify(
             clarifyQuestion: clarifyQuestion ?? '请问您具体想要做什么呢？',
-            source: RecognitionSource.llmFallback,
+            source: RecognitionSource.llm,
             originalInput: originalInput,
           );
 
@@ -898,7 +860,7 @@ $historyContext
             debugPrint('[SmartIntent] result_type=operation 但无操作，降级为 chat');
             return MultiOperationResult.chat(
               chatContent: chatContent ?? originalInput,
-              source: RecognitionSource.llmFallback,
+              source: RecognitionSource.llm,
               originalInput: originalInput,
             );
           }
@@ -907,7 +869,7 @@ $historyContext
             operations: operations,
             chatContent: chatContent,
             confidence: 0.9,
-            source: RecognitionSource.llmFallback,
+            source: RecognitionSource.llm,
             originalInput: originalInput,
           );
       }
@@ -996,7 +958,7 @@ $historyContext
   }
 
   /// 规则兜底识别
-  Future<SmartIntentResult> _fallbackToRules(
+  Future<SmartIntentResult> _ruleFallback(
     String normalizedInput,
     String originalInput,
     String? pageContext,
@@ -1694,10 +1656,10 @@ $historyContext
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Layer 5: LLM兜底
+  // LLM识别（主路径）
   // ═══════════════════════════════════════════════════════════════
 
-  Future<SmartIntentResult?> _layer5LLMFallback(
+  Future<SmartIntentResult?> _llmRecognize(
     String input,
     String? pageContext,
     List<Map<String, String>>? conversationHistory,
@@ -1902,7 +1864,7 @@ $historyContext
         intentType: _parseIntentType(intentStr),
         confidence: confidence,
         entities: entities,
-        source: RecognitionSource.llmFallback,
+        source: RecognitionSource.llm,
         originalInput: originalInput,
       );
     } catch (e) {
@@ -2288,7 +2250,7 @@ enum RecognitionSource {
   synonymExpansion, // 同义词扩展
   templateMatch,   // 模板匹配
   learnedCache,    // 学习缓存
-  llmFallback,     // LLM兜底
+  llm,             // LLM识别
   error,           // 错误
 }
 
