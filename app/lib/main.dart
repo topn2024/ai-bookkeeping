@@ -133,8 +133,15 @@ void main() async {
 
   // Initialize multimodal wake-up service
   try {
-    await MultimodalWakeUpService().initialize();
+    final wakeUpService = MultimodalWakeUpService();
+    await wakeUpService.initialize();
     logger.info('Multimodal wake-up service initialized', tag: 'App');
+
+    // 如果用户之前启用过语音唤醒，自动开始监听
+    if (wakeUpService.voiceWakeService.isEnabled) {
+      await wakeUpService.startListening();
+      logger.info('Voice wake-up listening started automatically', tag: 'App');
+    }
   } catch (e) {
     logger.warning('Failed to initialize multimodal wake-up service: $e', tag: 'App');
   }
