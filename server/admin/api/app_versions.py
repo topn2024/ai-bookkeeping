@@ -144,6 +144,8 @@ class AppVersionListResponse(BaseModel):
 async def list_versions(
     platform: str = Query("android", description="Platform filter"),
     status_filter: Optional[int] = Query(None, alias="status", description="Status filter: 0=draft, 1=published, 2=deprecated"),
+    version_name: Optional[str] = Query(None, description="Version name filter (exact match)"),
+    version_code: Optional[int] = Query(None, description="Version code filter (exact match)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     current_admin: AdminUser = Depends(get_current_admin),
@@ -151,13 +153,19 @@ async def list_versions(
 ):
     """List all app versions.
 
-    Supports filtering by platform and status.
+    Supports filtering by platform, status, version_name and version_code.
     Results are ordered by version_code descending.
     """
     query = select(AppVersion).where(AppVersion.platform == platform)
 
     if status_filter is not None:
         query = query.where(AppVersion.status == status_filter)
+
+    if version_name is not None:
+        query = query.where(AppVersion.version_name == version_name)
+
+    if version_code is not None:
+        query = query.where(AppVersion.version_code == version_code)
 
     # Get total count
     from sqlalchemy import func
