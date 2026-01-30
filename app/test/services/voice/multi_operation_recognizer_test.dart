@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import '../../../lib/services/voice/smart_intent_recognizer.dart';
+import '../../../lib/services/voice/intelligence_engine/models.dart';
 
 void main() {
   group('MultiOperationRecognizer Tests', () {
@@ -92,6 +93,7 @@ void main() {
   group('MultiOperationResult Tests', () {
     test('应该正确创建成功结果', () {
       final result = MultiOperationResult(
+        resultType: RecognitionResultType.operation,
         operations: [
           Operation(
             type: OperationType.addTransaction,

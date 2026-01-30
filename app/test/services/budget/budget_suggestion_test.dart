@@ -408,4 +408,7 @@ class TestBudgetStrategy implements BudgetSuggestionStrategy {
 
   @override
   Future<bool> isAvailable() async => true;
+
+  @override
+  Future<String?> getDataInsufficiencyReason() async => null;
 }

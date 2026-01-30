@@ -337,4 +337,7 @@ class MockStrategy implements BudgetSuggestionStrategy {
 
   @override
   Future<bool> isAvailable() async => _isAvailable;
+
+  @override
+  Future<String?> getDataInsufficiencyReason() async => null;
 }

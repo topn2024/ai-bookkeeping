@@ -76,7 +76,7 @@ void main() {
         final result = detector.handlePartialResult('再记一笔');
 
         if (result.triggered) {
-          expect(result.layer, equals(BargeInLayer.layer1VadAsr));
+          expect(result.layer, equals(BargeInLayer.vadBased));
         }
       });
 
@@ -86,8 +86,8 @@ void main() {
 
         if (result.triggered) {
           expect(result.layer, anyOf(
-            equals(BargeInLayer.layer1VadAsr),
-            equals(BargeInLayer.layer2Asr),
+            equals(BargeInLayer.vadBased),
+            equals(BargeInLayer.vadBased),
           ));
         }
       });
@@ -117,7 +117,7 @@ void main() {
         final result = detector.handleFinalResult('我要记一笔新的支出');
 
         if (result.triggered) {
-          expect(result.layer, equals(BargeInLayer.layer3Final));
+          expect(result.layer, equals(BargeInLayer.finalResult));
         }
       });
 
@@ -133,7 +133,7 @@ void main() {
         final result = detector.handleFinalResult('再记一笔50块买菜的支出');
 
         if (result.triggered) {
-          expect(result.layer, equals(BargeInLayer.layer3Final));
+          expect(result.layer, equals(BargeInLayer.finalResult));
           expect(result.text, contains('50'));
         }
       });
@@ -292,14 +292,14 @@ void main() {
       test('toString应该正确格式化', () {
         final result = BargeInResult(
           triggered: true,
-          layer: BargeInLayer.layer1VadAsr,
+          layer: BargeInLayer.vadBased,
           text: '测试',
-          similarity: 0.3,
+          reason: 'test',
         );
 
         final str = result.toString();
         expect(str, contains('triggered'));
-        expect(str, contains('layer1VadAsr'));
+        expect(str, contains('vadBased'));
       });
     });
   });

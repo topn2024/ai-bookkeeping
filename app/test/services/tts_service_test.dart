@@ -79,6 +79,7 @@ void main() {
       late TTSService service;
 
       setUp(() {
+        TTSService.resetInstance();
         mockEngine = MockTTSEngine();
         when(mockEngine.initialize()).thenAnswer((_) async {});
         when(mockEngine.setRate(any)).thenAnswer((_) async {});
@@ -88,11 +89,11 @@ void main() {
         when(mockEngine.speak(any)).thenAnswer((_) async {});
         when(mockEngine.stop()).thenAnswer((_) async {});
 
-        service = TTSService(engine: mockEngine);
+        service = TTSService.instanceWith(engine: mockEngine);
       });
 
       tearDown(() {
-        service.dispose();
+        TTSService.resetInstance();
       });
 
       test('初始状态应该是不在播放', () {
@@ -209,6 +210,7 @@ void main() {
       late TTSService service;
 
       setUp(() {
+        TTSService.resetInstance();
         mockEngine = MockTTSEngine();
         when(mockEngine.initialize()).thenAnswer((_) async {});
         when(mockEngine.setRate(any)).thenAnswer((_) async {});
@@ -218,11 +220,11 @@ void main() {
         when(mockEngine.speak(any)).thenAnswer((_) async {});
         when(mockEngine.stop()).thenAnswer((_) async {});
 
-        service = TTSService(engine: mockEngine);
+        service = TTSService.instanceWith(engine: mockEngine);
       });
 
       tearDown(() {
-        service.dispose();
+        TTSService.resetInstance();
       });
 
       test('speakTransactionResult 应该播报支出', () async {
@@ -287,6 +289,7 @@ void main() {
       late TTSBookkeepingHelper helper;
 
       setUp(() {
+        TTSService.resetInstance();
         mockEngine = MockTTSEngine();
         when(mockEngine.initialize()).thenAnswer((_) async {});
         when(mockEngine.setRate(any)).thenAnswer((_) async {});
@@ -296,12 +299,12 @@ void main() {
         when(mockEngine.speak(any)).thenAnswer((_) async {});
         when(mockEngine.stop()).thenAnswer((_) async {});
 
-        service = TTSService(engine: mockEngine);
+        service = TTSService.instanceWith(engine: mockEngine);
         helper = TTSBookkeepingHelper(service);
       });
 
       tearDown(() {
-        service.dispose();
+        TTSService.resetInstance();
       });
 
       test('speakWelcome 应该播报欢迎语', () async {

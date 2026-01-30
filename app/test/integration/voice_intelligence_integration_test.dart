@@ -51,6 +51,8 @@ class TestFeedbackAdapter implements FeedbackAdapter {
         return '已为您处理 $successCount 项操作';
       case ConversationMode.mixed:
         return '已记录 $successCount 笔${chatContent != null ? "，$chatContent" : ""}';
+      case ConversationMode.clarify:
+        return '请问您能再说清楚一些吗？';
     }
   }
 }

@@ -753,6 +753,9 @@ class MockDatabaseService implements IDatabaseService {
 
   // Raw SQL
   @override
+  Future<void> rawExecute(String sql, [List<Object?>? arguments]) async {}
+
+  @override
   Future<List<Map<String, Object?>>> rawQuery(String sql, [List<Object?>? arguments]) async => [];
 
   @override
