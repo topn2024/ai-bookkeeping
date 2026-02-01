@@ -412,10 +412,10 @@ $_categoryPrompt
   }
 
   /// 音频识别记账 - 直接从音频中提取记账信息
-  /// 使用 qwen-omni-turbo 全模态模型（支持音频理解）
+  /// 默认使用 qwen-audio-turbo（专业音频模型，识别准确度最高）
   ///
-  /// 注意: qwen-audio-turbo 为体验版本，免费额度用完后不可用
-  /// 推荐使用 qwen-omni-turbo 作为生产级替代方案
+  /// 备选方案: qwen-omni-turbo（全模态模型，稳定性更好）
+  /// 可通过配置切换模型
   Future<QwenRecognitionResult> recognizeAudio(Uint8List audioData,
       {String format = 'wav'}) async {
     _ensureInitialized();

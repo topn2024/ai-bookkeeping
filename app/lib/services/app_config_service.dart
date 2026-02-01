@@ -222,21 +222,21 @@ class AIModelConfig {
 
   factory AIModelConfig.defaults() {
     return AIModelConfig(
-      visionModel: 'qwen-vl-plus',
-      textModel: 'qwen-turbo',
-      audioModel: 'qwen-omni-turbo',
-      categoryModel: 'qwen-turbo',
-      billModel: 'qwen-plus',
+      visionModel: 'qwen-vl-max',          // 升级：视觉理解能力最强
+      textModel: 'qwen-max',               // 升级：文本理解能力最强
+      audioModel: 'qwen-audio-turbo',      // 升级：专业音频识别模型
+      categoryModel: 'qwen-max',           // 升级：分类准确度最高
+      billModel: 'qwen-max',               // 升级：账单解析能力最强
     );
   }
 
   factory AIModelConfig.fromJson(Map<String, dynamic> json) {
     return AIModelConfig(
-      visionModel: json['vision_model'] ?? 'qwen-vl-plus',
-      textModel: json['text_model'] ?? 'qwen-turbo',
-      audioModel: json['audio_model'] ?? 'qwen-omni-turbo',
-      categoryModel: json['category_model'] ?? 'qwen-turbo',
-      billModel: json['bill_model'] ?? 'qwen-plus',
+      visionModel: json['vision_model'] ?? 'qwen-vl-max',
+      textModel: json['text_model'] ?? 'qwen-max',
+      audioModel: json['audio_model'] ?? 'qwen-audio-turbo',
+      categoryModel: json['category_model'] ?? 'qwen-max',
+      billModel: json['bill_model'] ?? 'qwen-max',
     );
   }
 
