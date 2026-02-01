@@ -67,6 +67,10 @@ class VoicePipelineController {
   /// 累计等待时间（毫秒）- 用于最大等待时间兜底
   int _cumulativeWaitMs = 0;
 
+  /// 计时器恢复检查（安全网，防止计时器永久失效）
+  /// 当TTS播放完成或状态变化后，延迟5秒检查计时器是否正常恢复
+  Timer? _timerRecoveryCheck;
+
   /// 上次语音结束时间 - 用于计算停顿时长
   DateTime? _lastSpeechEndTime;
 
@@ -692,9 +696,10 @@ class VoicePipelineController {
     }
 
     // 输出完成后回到监听状态
-    if (_state == VoicePipelineState.speaking ||
-        _state == VoicePipelineState.processing) {
-      debugPrint('[VoicePipelineController] 状态符合条件，准备切换到listening并重启输入');
+    // 修复：放宽条件，只要不是idle或stopping状态就尝试恢复
+    if (_state != VoicePipelineState.idle &&
+        _state != VoicePipelineState.stopping) {
+      debugPrint('[VoicePipelineController] 输出完成，当前状态=$_state，准备切换到listening');
 
       // 先切换到listening状态，确保音频数据可以继续流入
       _setState(VoicePipelineState.listening);
@@ -721,6 +726,42 @@ class VoicePipelineController {
     } else {
       debugPrint('[VoicePipelineController] 状态不符合条件($_state)，跳过重启');
     }
+
+    // 安全网：延迟5秒检查计时器是否正常恢复
+    _scheduleTimerRecoveryCheck();
+  }
+
+  /// 调度计时器恢复检查（安全网机制）
+  ///
+  /// 目的：防止计时器因异常情况永久失效
+  /// 场景：
+  /// 1. TTS播放完成，但状态转换异常
+  /// 2. _restartInputPipeline执行过程中被打断
+  /// 3. isSoundPlaying检查误报导致监听未启动
+  ///
+  /// 策略：延迟5秒后检查，如果仍在listening状态但计时器未运行，强制恢复
+  void _scheduleTimerRecoveryCheck() {
+    _timerRecoveryCheck?.cancel();
+    _timerRecoveryCheck = Timer(const Duration(seconds: 5), () {
+      if (_isDisposed) {
+        debugPrint('[VoicePipelineController] [TimerRecovery] 已释放，跳过检查');
+        return;
+      }
+
+      // 只在listening状态下检查（其他状态下停止监听是正常的）
+      if (_state == VoicePipelineState.listening) {
+        final isMonitoring = _proactiveManager.state == ProactiveState.waiting;
+        if (!isMonitoring && !_proactiveManager.isDisabled) {
+          debugPrint('[VoicePipelineController] ⚠️ [TimerRecovery] 检测到计时器可能失效 (state=listening, proactiveState=${_proactiveManager.state})');
+          debugPrint('[VoicePipelineController] [TimerRecovery] 强制恢复静默监听');
+          _proactiveManager.startSilenceMonitoring();
+        } else {
+          debugPrint('[VoicePipelineController] [TimerRecovery] 计时器状态正常 (monitoring=$isMonitoring, disabled=${_proactiveManager.isDisabled})');
+        }
+      } else {
+        debugPrint('[VoicePipelineController] [TimerRecovery] 当前状态=$_state，无需检查');
+      }
+    });
   }
 
   /// 设置状态
@@ -780,6 +821,16 @@ class VoicePipelineController {
     if (newState == VoicePipelineState.idle) {
       debugPrint('[VoicePipelineController] 进入idle，重置主动对话会话');
       _proactiveManager.resetForNewSession();
+    }
+
+    // 离开 speaking/processing 状态时，调度安全网检查
+    // 这是最后防线，确保即使正常路径失败，计时器也能在5秒后恢复
+    if ((oldState == VoicePipelineState.speaking ||
+         oldState == VoicePipelineState.processing) &&
+        newState != VoicePipelineState.idle &&
+        newState != VoicePipelineState.stopping) {
+      debugPrint('[VoicePipelineController] 离开$oldState→$newState，调度计时器恢复检查');
+      _scheduleTimerRecoveryCheck();
     }
   }
 
@@ -1013,6 +1064,10 @@ class VoicePipelineController {
     await stop().catchError((e) {
       debugPrint('[VoicePipelineController] dispose 中 stop 失败: $e');
     });
+
+    // 清理计时器恢复检查
+    _timerRecoveryCheck?.cancel();
+    _timerRecoveryCheck = null;
 
     _proactiveManager.dispose();
     // 等待子流水线释放完成

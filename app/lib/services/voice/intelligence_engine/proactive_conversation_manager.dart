@@ -24,6 +24,10 @@ class ProactiveConversationManager {
   Timer? _silenceTimer; // 5秒静默计时器
   Timer? _totalSilenceTimer; // 30秒总计无响应计时器
 
+  // 计时器ID（用于防止重复触发）
+  int _currentSilenceTimerId = 0;
+  int _currentTotalTimerId = 0;
+
   // 状态
   ProactiveState _state = ProactiveState.idle;
 
@@ -64,9 +68,18 @@ class ProactiveConversationManager {
     // 启动5秒静默计时器
     // 注意：Timer 回调中的异步操作需要用 catchError 捕获错误
     _silenceTimer?.cancel();
+
+    // 生成新的计时器ID，防止旧计时器重复触发
+    final silenceTimerId = ++_currentSilenceTimerId;
+
     _silenceTimer = Timer(
       Duration(milliseconds: _silenceTimeoutMs),
       () {
+        // 检查计时器ID是否匹配（防止旧计时器触发）
+        if (silenceTimerId != _currentSilenceTimerId) {
+          debugPrint('[ProactiveConversationManager] 计时器已过期(ID不匹配: $silenceTimerId vs $_currentSilenceTimerId)，跳过');
+          return;
+        }
         // 检查是否已禁用或状态已改变（计时器回调可能在状态变化后触发）
         if (_proactiveDisabled) {
           debugPrint('[ProactiveConversationManager] 计时器触发时已禁用，跳过');
@@ -76,7 +89,7 @@ class ProactiveConversationManager {
           debugPrint('[ProactiveConversationManager] 计时器触发时状态非waiting($_state)，跳过');
           return;
         }
-        debugPrint('[ProactiveConversationManager] 5秒静默超时，触发主动对话');
+        debugPrint('[ProactiveConversationManager] 5秒静默超时，触发主动对话 (timerId=$silenceTimerId)');
         // 使用 catchError 确保异步错误被捕获
         _triggerProactiveMessage().catchError((e, s) {
           debugPrint('[ProactiveConversationManager] 触发主动对话失败: $e');
@@ -87,15 +100,24 @@ class ProactiveConversationManager {
     // 首次启动时，同时启动30秒总计无响应计时器
     if (_totalSilenceTimer == null) {
       debugPrint('[ProactiveConversationManager] 启动30秒总计无响应计时器');
+
+      // 生成新的30秒计时器ID
+      final totalTimerId = ++_currentTotalTimerId;
+
       _totalSilenceTimer = Timer(
         Duration(milliseconds: _maxTotalSilenceMs),
         () {
+          // 检查计时器ID是否匹配
+          if (totalTimerId != _currentTotalTimerId) {
+            debugPrint('[ProactiveConversationManager] 30秒计时器已过期(ID不匹配: $totalTimerId vs $_currentTotalTimerId)，跳过');
+            return;
+          }
           // 检查是否已禁用（计时器回调可能在禁用后触发）
           if (_proactiveDisabled) {
             debugPrint('[ProactiveConversationManager] 30秒计时器触发时已禁用，跳过');
             return;
           }
-          debugPrint('[ProactiveConversationManager] 30秒总计无响应，结束对话');
+          debugPrint('[ProactiveConversationManager] 30秒总计无响应，结束对话 (timerId=$totalTimerId)');
           _triggerSessionEnd();
         },
       );
