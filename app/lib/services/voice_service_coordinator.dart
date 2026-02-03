@@ -1094,7 +1094,17 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       // 如果 LLM 识别为闲聊
       if (llmResult.isChat) {
-        debugPrint('[VoiceCoordinator] LLM识别为闲聊');
+        debugPrint('[VoiceCoordinator] LLM识别为闲聊, isOfflineMode=${llmResult.isOfflineMode}');
+
+        // 如果是离线模式（LLM超时降级），直接返回友好提示，避免再次调用LLM
+        if (llmResult.isOfflineMode) {
+          const offlineResponse = '网络不太好，我现在只能帮你记账。有什么需要记录的吗？';
+          await _speakWithSkipCheck(offlineResponse);
+          return VoiceSessionResult.success(offlineResponse, {
+            'isOfflineMode': true,
+          });
+        }
+
         return await processVoiceCommand(voiceInput);
       }
 

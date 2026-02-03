@@ -235,6 +235,27 @@ class InputPipeline {
     onFinalResult?.call(text);
   }
 
+  /// 将当前中间结果提升为最终结果
+  ///
+  /// 用于ASR静默检测或手动停止时，将未完成的中间结果当作最终结果处理。
+  /// 这样状态管理集中在InputPipeline，保持层次边界清晰。
+  ///
+  /// 返回是否有内容被提升（用于调用方判断是否需要后续处理）
+  bool promotePartialToFinal() {
+    if (_currentPartialText.isEmpty) {
+      return false;
+    }
+
+    final text = _currentPartialText;
+    _currentPartialText = '';  // 清空状态，避免重复处理
+
+    debugPrint('[InputPipeline] 将中间结果提升为最终结果: "$text"');
+
+    // 通过 onFinalResult 回调传递，保持与 ASR 返回 isFinal=true 时相同的处理流程
+    onFinalResult?.call(text);
+    return true;
+  }
+
   /// 处理VAD事件
   void _handleVADEvent(VADEvent event) {
     switch (event.type) {

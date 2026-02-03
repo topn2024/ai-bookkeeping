@@ -9,16 +9,21 @@ import 'package:flutter/foundation.dart';
 
 import 'voice_token_service.dart';
 import 'iflytek_asr_service.dart';
+import 'iflytek_rtasr_service.dart';
 
 /// 语音识别引擎
 /// 支持在线（讯飞、阿里云）和离线（本地Whisper/Sherpa-ONNX）三种模式
-/// 优先级：讯飞 > 阿里云 > 本地Whisper
+/// 优先级：讯飞实时语音转写大模型 > 讯飞语音听写 > 阿里云 > 本地Whisper
 class VoiceRecognitionEngine {
+  final IFlytekRTASRService _iflytekRTASR;
   final IFlytekASRService _iflytekASR;
   final AliCloudASRService _aliASR;
   final LocalWhisperService _whisper;
   final NetworkChecker _networkChecker;
   final BookkeepingASROptimizer _optimizer;
+
+  /// 是否禁用实时语音转写大模型（余额不足时自动禁用）
+  bool _rtasrDisabled = false;
 
   /// 当前是否正在识别
   bool _isRecognizing = false;
@@ -28,11 +33,13 @@ class VoiceRecognitionEngine {
   bool _isCancelled = false;
 
   VoiceRecognitionEngine({
+    IFlytekRTASRService? iflytekRTASR,
     IFlytekASRService? iflytekASR,
     AliCloudASRService? aliASR,
     LocalWhisperService? whisper,
     NetworkChecker? networkChecker,
-  })  : _iflytekASR = iflytekASR ?? IFlytekASRService(),
+  })  : _iflytekRTASR = iflytekRTASR ?? IFlytekRTASRService(),
+        _iflytekASR = iflytekASR ?? IFlytekASRService(),
         _aliASR = aliASR ?? AliCloudASRService(),
         _whisper = whisper ?? LocalWhisperService(),
         _networkChecker = networkChecker ?? NetworkChecker(),
@@ -112,40 +119,30 @@ class VoiceRecognitionEngine {
       debugPrint('[VoiceRecognitionEngine] 网络状态: ${hasNetwork ? "在线" : "离线"}');
 
       if (hasNetwork) {
-        // 优先使用讯飞实时语音识别
-        debugPrint('[VoiceRecognitionEngine] 使用讯飞流式ASR');
-        bool iflytekSuccess = false;
+        bool success = false;
 
-        try {
-          await for (final partial in _iflytekASR.transcribeStream(audioStream)) {
-            if (_isCancelled) {
-              debugPrint('[VoiceRecognitionEngine] 已取消，停止yield');
-              break;
-            }
-
-            iflytekSuccess = true;
-            debugPrint('[VoiceRecognitionEngine] 收到讯飞ASR结果: "${partial.text}" (isFinal: ${partial.isFinal})');
-            yield ASRPartialResult(
-              text: _optimizer.postProcessNumbers(partial.text),
-              isFinal: partial.isFinal,
-              index: partial.index,
-              confidence: partial.confidence,
-            );
-          }
-          debugPrint('[VoiceRecognitionEngine] 讯飞流式ASR结束');
-        } catch (e) {
-          debugPrint('[VoiceRecognitionEngine] 讯飞流式ASR失败，降级到阿里云: $e');
-
-          // 讯飞失败，降级到阿里云
-          if (!iflytekSuccess) {
-            debugPrint('[VoiceRecognitionEngine] 使用阿里云流式ASR');
-            await for (final partial in _aliASR.transcribeStream(audioStream)) {
+        // 1. 优先使用讯飞实时语音转写大模型（如果未被禁用）
+        if (!_rtasrDisabled) {
+          debugPrint('[VoiceRecognitionEngine] 使用讯飞实时语音转写大模型');
+          try {
+            await for (final partial in _iflytekRTASR.transcribeStream(audioStream)) {
+              // 取消时，仍然处理最终结果（确保用户输入不丢失）
               if (_isCancelled) {
+                if (partial.isFinal && partial.text.isNotEmpty) {
+                  debugPrint('[VoiceRecognitionEngine] 已取消，但收到最终结果，仍然yield: "${partial.text}"');
+                  yield ASRPartialResult(
+                    text: _optimizer.postProcessNumbers(partial.text),
+                    isFinal: partial.isFinal,
+                    index: partial.index,
+                    confidence: partial.confidence,
+                  );
+                }
                 debugPrint('[VoiceRecognitionEngine] 已取消，停止yield');
                 break;
               }
 
-              debugPrint('[VoiceRecognitionEngine] 收到阿里云ASR结果: "${partial.text}" (isFinal: ${partial.isFinal})');
+              success = true;
+              debugPrint('[VoiceRecognitionEngine] 收到讯飞RTASR结果: "${partial.text}" (isFinal: ${partial.isFinal})');
               yield ASRPartialResult(
                 text: _optimizer.postProcessNumbers(partial.text),
                 isFinal: partial.isFinal,
@@ -153,10 +150,70 @@ class VoiceRecognitionEngine {
                 confidence: partial.confidence,
               );
             }
-            debugPrint('[VoiceRecognitionEngine] 阿里云流式ASR结束');
-          } else {
-            rethrow;
+            debugPrint('[VoiceRecognitionEngine] 讯飞实时语音转写大模型结束');
+          } catch (e) {
+            debugPrint('[VoiceRecognitionEngine] 讯飞实时语音转写大模型失败: $e');
+            // 检查是否是余额不足，如果是则禁用RTASR
+            if (e is ASRException && e.errorCode == ASRErrorCode.rateLimited) {
+              debugPrint('[VoiceRecognitionEngine] 讯飞RTASR余额不足，禁用并降级');
+              _rtasrDisabled = true;
+            }
           }
+        }
+
+        // 2. 降级到讯飞语音听写
+        if (!success && !_isCancelled) {
+          debugPrint('[VoiceRecognitionEngine] 使用讯飞语音听写');
+          try {
+            await for (final partial in _iflytekASR.transcribeStream(audioStream)) {
+              // 取消时，仍然处理最终结果（确保用户输入不丢失）
+              if (_isCancelled) {
+                if (partial.isFinal && partial.text.isNotEmpty) {
+                  debugPrint('[VoiceRecognitionEngine] 已取消，但收到最终结果，仍然yield: "${partial.text}"');
+                  yield ASRPartialResult(
+                    text: _optimizer.postProcessNumbers(partial.text),
+                    isFinal: partial.isFinal,
+                    index: partial.index,
+                    confidence: partial.confidence,
+                  );
+                }
+                debugPrint('[VoiceRecognitionEngine] 已取消，停止yield');
+                break;
+              }
+
+              success = true;
+              debugPrint('[VoiceRecognitionEngine] 收到讯飞ASR结果: "${partial.text}" (isFinal: ${partial.isFinal})');
+              yield ASRPartialResult(
+                text: _optimizer.postProcessNumbers(partial.text),
+                isFinal: partial.isFinal,
+                index: partial.index,
+                confidence: partial.confidence,
+              );
+            }
+            debugPrint('[VoiceRecognitionEngine] 讯飞语音听写结束');
+          } catch (e) {
+            debugPrint('[VoiceRecognitionEngine] 讯飞语音听写失败，降级到阿里云: $e');
+          }
+        }
+
+        // 3. 降级到阿里云ASR
+        if (!success && !_isCancelled) {
+          debugPrint('[VoiceRecognitionEngine] 使用阿里云流式ASR');
+          await for (final partial in _aliASR.transcribeStream(audioStream)) {
+            if (_isCancelled) {
+              debugPrint('[VoiceRecognitionEngine] 已取消，停止yield');
+              break;
+            }
+
+            debugPrint('[VoiceRecognitionEngine] 收到阿里云ASR结果: "${partial.text}" (isFinal: ${partial.isFinal})');
+            yield ASRPartialResult(
+              text: _optimizer.postProcessNumbers(partial.text),
+              isFinal: partial.isFinal,
+              index: partial.index,
+              confidence: partial.confidence,
+            );
+          }
+          debugPrint('[VoiceRecognitionEngine] 阿里云流式ASR结束');
         }
       } else {
         // 离线模式：收集音频后批量识别
@@ -201,8 +258,9 @@ class VoiceRecognitionEngine {
     _isCancelled = true;
     _isRecognizing = false;
 
-    // 立即取消讯飞和阿里云ASR（关闭WebSocket，不等待）
+    // 立即取消所有ASR服务（关闭WebSocket，不等待）
     await Future.wait([
+      _iflytekRTASR.cancelTranscription(),
       _iflytekASR.cancelTranscription(),
       _aliASR.cancelTranscription(),
     ]);
@@ -217,6 +275,22 @@ class VoiceRecognitionEngine {
   void resetCancelState() {
     _isCancelled = false;
   }
+
+  /// 预热ASR连接（提前建立WebSocket连接）
+  ///
+  /// 在用户点击麦克风按钮时调用，可节省100-300ms连接延迟
+  /// 目前只对讯飞RTASR有效
+  Future<void> warmupConnection() async {
+    debugPrint('[VoiceRecognitionEngine] 预热ASR连接...');
+
+    // 只预热RTASR（如果未被禁用）
+    if (!_rtasrDisabled) {
+      await _iflytekRTASR.warmupConnection();
+    }
+  }
+
+  /// 是否有预热的连接可用
+  bool get hasWarmupConnection => !_rtasrDisabled && _iflytekRTASR.hasValidWarmup;
 
   /// 后处理ASR结果
   ASRResult _postProcess(ASRResult result) {

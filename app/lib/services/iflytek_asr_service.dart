@@ -9,6 +9,9 @@ import 'package:web_socket_channel/io.dart';
 
 import 'voice_recognition_engine.dart';
 
+// 用于标记不等待的Future
+void unawaited(Future<void> future) {}
+
 /// 讯飞语音听写服务
 ///
 /// 使用WebSocket协议进行实时语音识别
@@ -137,6 +140,7 @@ class IFlytekASRService {
 
     bool isCompleted = false;
     int frameIndex = 0;
+    final resultSegments = <String>[]; // 存储识别结果的段落（按sn索引）
 
     void markCompleted() {
       if (!isCompleted) {
@@ -230,21 +234,62 @@ class IFlytekASRService {
                     }
                   }
 
-                  final text = texts.join('');
+                  final segmentText = texts.join('');
                   final isLast = resultData['status'] == 2;
+                  final sn = result['sn'] as int? ?? 0;
+                  final pgs = result['pgs'] as String?;
+                  final rg = result['rg'] as List?;
 
-                  debugPrint('[IFlytekASR] 识别结果: text="$text", isLast=$isLast');
+                  debugPrint('[IFlytekASR] 原始结果: sn=$sn, text="$segmentText", pgs=$pgs, rg=$rg, isLast=$isLast');
 
-                  if (text.isNotEmpty) {
-                    controller.add(ASRPartialResult(
-                      text: text,
-                      isFinal: isLast,
-                      index: frameIndex++,
-                      confidence: 0.9,
-                    ));
+                  // 组装识别结果（根据sn和pgs规则）
+                  if (segmentText.isNotEmpty) {
+                    // 确保列表足够大
+                    while (resultSegments.length < sn) {
+                      resultSegments.add('');
+                    }
 
-                    // 重置静音计时器
-                    resetSilenceTimer();
+                    if (pgs == 'rpl' && rg != null && rg.length == 2) {
+                      // 替换模式：清空rg指定范围，然后设置当前段落
+                      final startIdx = rg[0] as int; // 从1开始
+                      final endIdx = rg[1] as int;   // 从1开始
+
+                      // 确保列表足够大
+                      while (resultSegments.length <= endIdx) {
+                        resultSegments.add('');
+                      }
+
+                      // 清空替换范围（包含startIdx和endIdx）
+                      // 注意：rg是从1开始，数组索引是从0开始
+                      for (int i = startIdx - 1; i <= endIdx - 1; i++) {
+                        resultSegments[i] = '';
+                      }
+
+                      // 设置当前段落
+                      resultSegments[sn - 1] = segmentText;
+                    } else {
+                      // 追加模式（apd或默认）：直接设置当前段落
+                      resultSegments[sn - 1] = segmentText;
+                    }
+
+                    // 组装完整文本（过滤标点符号）
+                    final fullText = resultSegments
+                        .where((s) => s.isNotEmpty && s.trim() != '？' && s.trim() != '.' && s.trim() != ',' && s.trim() != '。')
+                        .join('');
+
+                    debugPrint('[IFlytekASR] 组装后文本: "$fullText"');
+
+                    if (fullText.isNotEmpty) {
+                      controller.add(ASRPartialResult(
+                        text: fullText,
+                        isFinal: isLast,
+                        index: frameIndex++,
+                        confidence: 0.9,
+                      ));
+
+                      // 重置静音计时器
+                      resetSilenceTimer();
+                    }
                   }
 
                   if (isLast) {
@@ -288,74 +333,94 @@ class IFlytekASRService {
         cancelOnError: true,
       );
 
-      // 等待WebSocket连接建立
-      await Future.delayed(const Duration(milliseconds: 200));
+      // 启动音频发送任务（异步执行，不阻塞结果输出）
+      Future<void> sendAudioTask() async {
+        try {
+          int status = 0; // 0: 首帧, 1: 中间帧, 2: 末帧
+          int frameCount = 0;
 
-      // 发送音频数据
-      int status = 0; // 0: 首帧, 1: 中间帧, 2: 末帧
-      await for (final audioChunk in audioStream) {
-        if (_isCancelled || sessionId != _currentSessionId) {
-          debugPrint('[IFlytekASR] 识别已取消');
-          break;
+          await for (final audioChunk in audioStream) {
+            if (_isCancelled || sessionId != _currentSessionId) {
+              debugPrint('[IFlytekASR] 识别已取消');
+              break;
+            }
+
+            // 构建数据帧
+            final frame = {
+              'common': {
+                'app_id': _appId,
+              },
+              'business': {
+                'language': 'zh_cn',
+                'domain': 'iat',
+                'accent': 'mandarin',
+                'vad_eos': 5000, // 静音检测超时5秒
+                'dwa': 'wpgs', // 动态修正
+              },
+              'data': {
+                'status': status,
+                'format': 'audio/L16;rate=16000',
+                'encoding': 'raw',
+                'audio': base64.encode(audioChunk),
+              },
+            };
+
+            if (status == 0) {
+              status = 1; // 后续为中间帧
+            }
+
+            _webSocketChannel?.sink.add(jsonEncode(frame));
+            frameCount++;
+
+            // 每50帧打印一次日志，减少日志量
+            if (frameCount <= 3 || frameCount % 50 == 0) {
+              debugPrint('[IFlytekASR] 发送音频帧 #$frameCount: ${audioChunk.length} bytes');
+            }
+
+            // 重置静音计时器
+            resetSilenceTimer();
+
+            // 无延迟直接发送，让网络层自己控制流量
+          }
+
+          // 发送结束帧
+          if (!_isCancelled && sessionId == _currentSessionId) {
+            final endFrame = {
+              'data': {
+                'status': 2,
+                'format': 'audio/L16;rate=16000',
+                'encoding': 'raw',
+                'audio': '',
+              },
+            };
+            _webSocketChannel?.sink.add(jsonEncode(endFrame));
+            debugPrint('[IFlytekASR] 发送结束帧');
+
+            // 等待服务器返回最终结果
+            await completer.future.timeout(
+              const Duration(seconds: 5),
+              onTimeout: () {
+                debugPrint('[IFlytekASR] 等待最终结果超时');
+                // 超时后关闭 controller
+                if (!controller.isClosed) {
+                  controller.close();
+                }
+              },
+            );
+          }
+        } catch (e) {
+          debugPrint('[IFlytekASR] 音频发送任务异常: $e');
+          if (!controller.isClosed) {
+            controller.addError(e);
+            controller.close();
+          }
         }
-
-        // 构建数据帧
-        final frame = {
-          'common': {
-            'app_id': _appId,
-          },
-          'business': {
-            'language': 'zh_cn',
-            'domain': 'iat',
-            'accent': 'mandarin',
-            'vad_eos': 5000, // 静音检测超时5秒
-            'dwa': 'wpgs', // 动态修正
-          },
-          'data': {
-            'status': status,
-            'format': 'audio/L16;rate=16000',
-            'encoding': 'raw',
-            'audio': base64.encode(audioChunk),
-          },
-        };
-
-        if (status == 0) {
-          status = 1; // 后续为中间帧
-        }
-
-        _webSocketChannel!.sink.add(jsonEncode(frame));
-        debugPrint('[IFlytekASR] 发送音频帧: ${audioChunk.length} bytes, status=$status');
-
-        // 重置静音计时器
-        resetSilenceTimer();
-
-        // 控制发送速率（避免过快）
-        await Future.delayed(const Duration(milliseconds: 40));
       }
 
-      // 发送结束帧
-      if (!_isCancelled && sessionId == _currentSessionId) {
-        final endFrame = {
-          'data': {
-            'status': 2,
-            'format': 'audio/L16;rate=16000',
-            'encoding': 'raw',
-            'audio': '',
-          },
-        };
-        _webSocketChannel!.sink.add(jsonEncode(endFrame));
-        debugPrint('[IFlytekASR] 发送结束帧');
+      // 启动音频发送任务（不等待）
+      unawaited(sendAudioTask());
 
-        // 等待服务器返回最终结果
-        await completer.future.timeout(
-          const Duration(seconds: 5),
-          onTimeout: () {
-            debugPrint('[IFlytekASR] 等待最终结果超时');
-          },
-        );
-      }
-
-      // 输出所有结果
+      // 立即开始输出结果（并行进行）
       await for (final result in controller.stream) {
         yield result;
       }

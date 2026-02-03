@@ -77,6 +77,13 @@ class VoicePipelineController {
   /// 是否正在说话（基于VAD）
   bool _isUserSpeaking = false;
 
+  /// ASR静默检测计时器
+  /// 当收到中间结果后启动，如果1秒内没有新结果，认为用户说完了
+  Timer? _asrSilenceTimer;
+
+  /// ASR静默超时时间（毫秒）
+  static const int _asrSilenceTimeoutMs = 1000;
+
   /// 主动对话管理器
   late final ProactiveConversationManager _proactiveManager;
 
@@ -220,9 +227,19 @@ class VoicePipelineController {
   void _handleSpeechEnd() {
     _isUserSpeaking = false;
     _lastSpeechEndTime = DateTime.now();
+
     debugPrint(
-      '[VoicePipelineController] VAD: 用户停止说话，缓冲区=${_sentenceBuffer.length}句',
+      '[VoicePipelineController] VAD: 用户停止说话，缓冲区=${_sentenceBuffer.length}句，当前中间结果="${_inputPipeline.currentPartialText}"',
     );
+
+    // 如果缓冲区为空，尝试将中间结果提升为最终结果
+    // 通过 InputPipeline.promotePartialToFinal() 统一处理，保持状态管理一致性
+    if (_sentenceBuffer.isEmpty) {
+      final promoted = _inputPipeline.promotePartialToFinal();
+      if (promoted) {
+        return; // onFinalResult 回调会触发 _handleFinalResult，启动聚合计时器
+      }
+    }
 
     if (_sentenceBuffer.isNotEmpty) {
       // 有缓存句子，启动聚合计时器
@@ -336,6 +353,15 @@ class VoicePipelineController {
     }
   }
 
+  /// 预热连接（在启动前调用，可节省100-300ms）
+  ///
+  /// 应在用户点击麦克风按钮时立即调用
+  /// 不需要等待完成，可以fire-and-forget
+  Future<void> warmup() async {
+    debugPrint('[VoicePipelineController] 预热ASR连接...');
+    await _asrEngine.warmupConnection();
+  }
+
   /// 启动流水线
   Future<void> start() async {
     if (_state != VoicePipelineState.idle) {
@@ -382,9 +408,19 @@ class VoicePipelineController {
       _sentenceAggregationTimer = null;
       _maxWaitTimer?.cancel();
       _maxWaitTimer = null;
+      _cancelASRSilenceTimer();
 
-      // 重要：停止前先处理缓冲区中未处理的句子
+      // 重要：停止前先处理未处理的内容
       // 这样用户说完话后即使流水线停止，内容也不会丢失
+
+      // 通过 InputPipeline.promotePartialToFinal() 统一处理中间结果
+      // 保持状态管理一致性，避免重复处理
+      if (_sentenceBuffer.isEmpty) {
+        _inputPipeline.promotePartialToFinal();
+        // onFinalResult 回调会触发 _handleFinalResult，将内容加入 _sentenceBuffer
+      }
+
+      // 处理缓冲区中的句子
       if (_sentenceBuffer.isNotEmpty) {
         debugPrint('[VoicePipelineController] 停止前处理缓冲区: $_sentenceBuffer');
         await _processAggregatedSentences();
@@ -428,6 +464,7 @@ class VoicePipelineController {
   /// 中间结果表示用户仍在说话，需要：
   /// 1. 暂停主动对话监听（防止用户说话时被打断）
   /// 2. 重置聚合计时器（滑动窗口机制）
+  /// 3. 启动ASR静默检测计时器（VAD的补充机制）
   void _handlePartialResult(String text) {
     onPartialResult?.call(text);
 
@@ -443,6 +480,33 @@ class VoicePipelineController {
       // 传入中间结果文本，用于连接词检测
       _startDynamicAggregationTimer(pendingPartialText: text);
     }
+
+    // 启动ASR静默检测计时器（VAD的补充机制）
+    // 如果1秒内没有新的ASR结果，认为用户说完了
+    _startASRSilenceTimer();
+  }
+
+  /// 启动ASR静默检测计时器
+  ///
+  /// 这是VAD speechEnd的补充机制：
+  /// - 讯飞RTASR不返回isFinal=true
+  /// - VAD可能没有正确检测到说话结束
+  /// - 通过检测ASR结果的间隔来判断用户是否说完
+  void _startASRSilenceTimer() {
+    _asrSilenceTimer?.cancel();
+    _asrSilenceTimer = Timer(
+      Duration(milliseconds: _asrSilenceTimeoutMs),
+      () {
+        debugPrint('[VoicePipelineController] ASR静默超时，触发说话结束处理');
+        _handleSpeechEnd();
+      },
+    );
+  }
+
+  /// 取消ASR静默检测计时器
+  void _cancelASRSilenceTimer() {
+    _asrSilenceTimer?.cancel();
+    _asrSilenceTimer = null;
   }
 
   /// 处理ASR最终结果
@@ -951,6 +1015,7 @@ class VoicePipelineController {
     _sentenceAggregationTimer = null;
     _maxWaitTimer?.cancel();
     _maxWaitTimer = null;
+    _cancelASRSilenceTimer();
     _sentenceBuffer.clear();
     _cumulativeWaitMs = 0;
     _lastSpeechEndTime = null;

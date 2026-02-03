@@ -160,10 +160,18 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
 
   @override
   Widget build(BuildContext context) {
-    final manager = ref.watch(globalVoiceAssistantProvider);
-    final position = ref.watch(floatingBallPositionProvider);
+    // 性能优化：先检查设置，如果悬浮球被禁用，不要 watch 其他 provider
     final settings = ref.watch(floatingBallSettingsProvider);
     final shouldHide = ref.watch(shouldHideFloatingBallProvider);
+
+    if (shouldHide || !settings.enabled) {
+      // 悬浮球隐藏时不 watch 其他 provider，避免不必要的 rebuild
+      return const SizedBox.shrink();
+    }
+
+    // 只有悬浮球显示时才 watch 这些 provider
+    final manager = ref.watch(globalVoiceAssistantProvider);
+    final position = ref.watch(floatingBallPositionProvider);
 
     // 初始化位置和网络状态订阅
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -176,11 +184,6 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
       _trySubscribeNetworkStatus(manager);
     });
 
-    debugPrint('[GlobalFloatingBall] build - settings.enabled=${settings.enabled}, shouldHide=$shouldHide');
-    if (shouldHide || !settings.enabled) {
-      debugPrint('[GlobalFloatingBall] 悬浮球被隐藏');
-      return const SizedBox.shrink();
-    }
     debugPrint('[GlobalFloatingBall] 悬浮球显示中');
 
     final currentSize = manager.ballState == FloatingBallState.recording
@@ -397,6 +400,10 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
     if (currentState == FloatingBallState.idle ||
         currentState == FloatingBallState.success ||
         currentState == FloatingBallState.error) {
+
+      // 立即开始预热ASR连接（fire-and-forget，不等待）
+      // 这样在检查LLM期间，WebSocket连接可以并行建立，节省100-300ms
+      manager.warmupASRConnection();
 
       // 主动检查LLM可用性
       setState(() => _isCheckingLLM = true);

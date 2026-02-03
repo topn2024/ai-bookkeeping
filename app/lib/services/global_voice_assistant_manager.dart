@@ -1475,6 +1475,28 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   /// 1. 音频流持续传输给ASR
   /// 2. ASR实时返回识别结果
   /// 3. VAD检测语音段落边界
+  /// 预热ASR连接（可在startRecording前调用，节省100-300ms）
+  ///
+  /// 应在用户点击麦克风按钮时立即调用
+  /// 不需要等待完成，可以fire-and-forget
+  /// 调用此方法后再调用startRecording，可以更快开始识别
+  Future<void> warmupASRConnection() async {
+    debugPrint('[GlobalVoiceAssistant] 预热ASR连接...');
+
+    // 确保服务已初始化
+    if (_pipelineController == null) {
+      try {
+        await _ensureVoiceServicesInitialized();
+      } catch (e) {
+        debugPrint('[GlobalVoiceAssistant] 预热失败(服务未初始化): $e');
+        return;
+      }
+    }
+
+    // 调用流水线的预热方法
+    await _pipelineController?.warmup();
+  }
+
   /// 4. 收到最终结果时处理命令
   /// 5. 录音流持续活跃，继续监听
   Future<void> startRecording() async {
