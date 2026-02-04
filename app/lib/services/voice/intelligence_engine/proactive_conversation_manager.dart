@@ -163,6 +163,11 @@ class ProactiveConversationManager {
 
   /// 停止监听
   void stopMonitoring() {
+    // 如果已经是 idle 状态，直接返回，避免重复日志
+    if (_state == ProactiveState.idle) {
+      return;
+    }
+
     debugPrint('[ProactiveConversationManager] 停止监听');
     _silenceTimer?.cancel();
     _totalSilenceTimer?.cancel();

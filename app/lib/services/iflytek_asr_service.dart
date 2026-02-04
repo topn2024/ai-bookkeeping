@@ -35,16 +35,6 @@ class IFlytekASRService {
   /// 会话ID（防止并发）
   int _currentSessionId = 0;
 
-  /// 超时计时器
-  Timer? _timeoutTimer;
-  Timer? _silenceTimer;
-
-  /// 静音超时时间（秒）
-  static const int _silenceTimeoutSeconds = 10;
-
-  /// 最大识别时间（秒）
-  static const int _maxRecognitionSeconds = 60;
-
   /// 生成WebSocket URL（带鉴权）
   String _generateUrl() {
     // 生成RFC1123格式的时间戳
@@ -145,43 +135,8 @@ class IFlytekASRService {
     void markCompleted() {
       if (!isCompleted) {
         isCompleted = true;
-        _cleanupTimers();
       }
     }
-
-    void resetSilenceTimer() {
-      _silenceTimer?.cancel();
-      _silenceTimer = Timer(
-        Duration(seconds: _silenceTimeoutSeconds),
-        () {
-          if (!isCompleted && !_isCancelled) {
-            debugPrint('[IFlytekASR] 静音超时，停止识别');
-            controller.addError(ASRException(
-              '检测到静音，识别自动停止',
-              errorCode: ASRErrorCode.recognitionTimeout,
-            ));
-            markCompleted();
-            _webSocketChannel?.sink.close();
-          }
-        },
-      );
-    }
-
-    // 启动总超时计时器
-    _timeoutTimer = Timer(
-      Duration(seconds: _maxRecognitionSeconds),
-      () {
-        if (!isCompleted && !_isCancelled) {
-          debugPrint('[IFlytekASR] 识别超时');
-          controller.addError(ASRException(
-            '识别超时，已达到最大时长限制',
-            errorCode: ASRErrorCode.recognitionTimeout,
-          ));
-          markCompleted();
-          _webSocketChannel?.sink.close();
-        }
-      },
-    );
 
     try {
       // 生成WebSocket URL
@@ -286,9 +241,6 @@ class IFlytekASRService {
                         index: frameIndex++,
                         confidence: 0.9,
                       ));
-
-                      // 重置静音计时器
-                      resetSilenceTimer();
                     }
                   }
 
@@ -377,9 +329,6 @@ class IFlytekASRService {
               debugPrint('[IFlytekASR] 发送音频帧 #$frameCount: ${audioChunk.length} bytes');
             }
 
-            // 重置静音计时器
-            resetSilenceTimer();
-
             // 无延迟直接发送，让网络层自己控制流量
           }
 
@@ -447,7 +396,6 @@ class IFlytekASRService {
   Future<void> cancelTranscription() async {
     debugPrint('[IFlytekASR] cancelTranscription');
     _isCancelled = true;
-    _cleanupTimers();
 
     await _webSocketChannel?.sink.close();
     _webSocketChannel = null;
@@ -456,14 +404,6 @@ class IFlytekASRService {
     _streamController = null;
 
     _isRecognizing = false;
-  }
-
-  /// 清理计时器
-  void _cleanupTimers() {
-    _timeoutTimer?.cancel();
-    _timeoutTimer = null;
-    _silenceTimer?.cancel();
-    _silenceTimer = null;
   }
 
   /// 释放资源

@@ -1419,6 +1419,19 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   Future<VoiceSessionResult?> _handleAmountResponse(String input) async {
     if (_pendingAmountIntent == null) return null;
 
+    // 检测是否包含多笔交易（多个时间段或多个金额）
+    // 如果是多笔交易，应该走正常的多意图识别流程，而不是简单的金额补充
+    final timeWords = ['早上', '中午', '晚上', '上午', '下午', '早晨', '傍晚', '夜里'];
+    final timeCount = timeWords.where((word) => input.contains(word)).length;
+    final amountMatches = RegExp(r'\d+(?:\.\d+)?\s*(?:块|元|块钱)?').allMatches(input).length;
+
+    if (timeCount >= 2 || amountMatches >= 2) {
+      // 包含多笔交易，清除待补充意图，走正常多意图流程
+      debugPrint('[VoiceCoordinator] 检测到多笔交易（时间段:$timeCount, 金额:$amountMatches），走正常多意图流程: $input');
+      _pendingAmountIntent = null;
+      return null;
+    }
+
     // 尝试从输入中提取金额
     final amount = _extractAmountFromInput(input);
     if (amount == null) {

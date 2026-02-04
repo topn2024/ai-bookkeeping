@@ -35,18 +35,17 @@ class IFlytekRTASRService {
   /// 最后的帧索引
   int _lastFrameIndex = 0;
 
+  /// 上一个处理的segId（用于检测segment跳变）
+  int _lastSegId = -1;
+
+  /// 上一个segment的文本（用于在segment切换时发送最终结果）
+  String _lastSegmentText = '';
+
   /// 是否已取消
   bool _isCancelled = false;
 
   /// 会话ID（防止并发）
   int _currentSessionId = 0;
-
-  /// 超时计时器
-  Timer? _timeoutTimer;
-  Timer? _silenceTimer;
-
-  /// 静音超时时间（秒）
-  static const int _silenceTimeoutSeconds = 10;
 
   // ==================== 预连接相关 ====================
 
@@ -67,9 +66,6 @@ class IFlytekRTASRService {
 
   /// 预连接超时计时器
   Timer? _warmupTimeoutTimer;
-
-  /// 最大识别时间（秒）
-  static const int _maxRecognitionSeconds = 60;
 
   /// 生成WebSocket URL（带鉴权）
   ///
@@ -280,6 +276,8 @@ class IFlytekRTASRService {
     _isCancelled = false;
     _lastAccumulatedText = '';
     _lastFrameIndex = 0;
+    _lastSegId = -1;  // 重置segment跟踪
+    _lastSegmentText = '';
 
     final controller = StreamController<ASRPartialResult>.broadcast();
     _streamController = controller;
@@ -293,43 +291,8 @@ class IFlytekRTASRService {
     void markCompleted() {
       if (!isCompleted) {
         isCompleted = true;
-        _cleanupTimers();
       }
     }
-
-    void resetSilenceTimer() {
-      _silenceTimer?.cancel();
-      _silenceTimer = Timer(
-        Duration(seconds: _silenceTimeoutSeconds),
-        () {
-          if (!isCompleted && !_isCancelled) {
-            debugPrint('[IFlytekRTASR] 静音超时，停止识别');
-            controller.addError(ASRException(
-              '检测到静音，识别自动停止',
-              errorCode: ASRErrorCode.recognitionTimeout,
-            ));
-            markCompleted();
-            _webSocketChannel?.sink.close();
-          }
-        },
-      );
-    }
-
-    // 启动总超时计时器
-    _timeoutTimer = Timer(
-      Duration(seconds: _maxRecognitionSeconds),
-      () {
-        if (!isCompleted && !_isCancelled) {
-          debugPrint('[IFlytekRTASR] 识别超时');
-          controller.addError(ASRException(
-            '识别超时，已达到最大时长限制',
-            errorCode: ASRErrorCode.recognitionTimeout,
-          ));
-          markCompleted();
-          _webSocketChannel?.sink.close();
-        }
-      },
-    );
 
     try {
       // 尝试复用预连接
@@ -435,17 +398,35 @@ class IFlytekRTASRService {
 
               debugPrint('[IFlytekRTASR] 原始结果: segId=$segId, text="$segmentText", isLast=$isLast');
 
+              // 去除开头的标点符号
+              final cleanText = segmentText.replaceFirst(RegExp(r'^[，。？！,.\?!]+'), '');
+
+              // 检测新句子开始（累积文本回退）
+              // 讯飞RTASR大模型的特点：每个segId包含累积文本，当开始新句子时，文本会变短
+              // 例如：segId=4是"早餐7块，中餐8块"，segId=5变成"挽"，说明新句子开始
+              if (_lastSegmentText.isNotEmpty && cleanText.length < _lastSegmentText.length) {
+                debugPrint('[IFlytekRTASR] 检测到累积文本回退 (${_lastSegmentText.length} → ${cleanText.length})，发送上一句的最终结果: "$_lastSegmentText"');
+                controller.add(ASRPartialResult(
+                  text: _lastSegmentText,
+                  isFinal: true,  // 标记为最终结果
+                  index: frameIndex++,
+                  confidence: 0.95,
+                ));
+                // 清空上一句的缓存
+                _lastSegmentText = '';
+              }
+
               // 大模型版：每个segId的内容是累积式的（包含之前所有内容）
               // 所以我们只需要使用最新的（最大segId的）文本
-              if (segmentText.isNotEmpty) {
-                // 去除开头的标点符号
-                final cleanText = segmentText.replaceFirst(RegExp(r'^[，。？！,.\?!]+'), '');
-
+              if (cleanText.isNotEmpty) {
                 // 更新当前segId的文本（同一segId的更新是替换）
                 while (resultSegments.length <= segId) {
                   resultSegments.add('');
                 }
                 resultSegments[segId] = cleanText;
+
+                // 记录当前segment信息
+                _lastSegId = segId;
 
                 // 大模型版返回的是累积式结果，只使用最大segId的文本
                 // 找到最大非空segId的文本
@@ -466,6 +447,7 @@ class IFlytekRTASRService {
                 if (fullText.isNotEmpty) {
                   lastText = fullText; // 记录最后的文本
                   _lastAccumulatedText = fullText; // 同时更新实例变量
+                  _lastSegmentText = fullText; // 记录当前segment的文本
                   _lastFrameIndex = frameIndex;
                   controller.add(ASRPartialResult(
                     text: fullText,
@@ -477,8 +459,6 @@ class IFlytekRTASRService {
                   if (isLast) {
                     hasSentFinal = true;
                   }
-
-                  resetSilenceTimer();
                 }
               }
 
@@ -540,8 +520,6 @@ class IFlytekRTASRService {
             if (frameCount <= 3 || frameCount % 50 == 0) {
               debugPrint('[IFlytekRTASR] 发送音频帧 #$frameCount: ${audioChunk.length} bytes');
             }
-
-            resetSilenceTimer();
           }
 
           // 发送结束标记（JSON格式）
@@ -620,7 +598,6 @@ class IFlytekRTASRService {
   Future<void> cancelTranscription() async {
     debugPrint('[IFlytekRTASR] cancelTranscription');
     _isCancelled = true;
-    _cleanupTimers();
 
     // 关闭WebSocket
     await _webSocketChannel?.sink.close();
@@ -648,14 +625,6 @@ class IFlytekRTASRService {
     _lastAccumulatedText = '';
     _lastFrameIndex = 0;
     _isRecognizing = false;
-  }
-
-  /// 清理计时器
-  void _cleanupTimers() {
-    _timeoutTimer?.cancel();
-    _timeoutTimer = null;
-    _silenceTimer?.cancel();
-    _silenceTimer = null;
   }
 
   /// 释放资源

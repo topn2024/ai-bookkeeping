@@ -82,7 +82,8 @@ class VoicePipelineController {
   Timer? _asrSilenceTimer;
 
   /// ASR静默超时时间（毫秒）
-  static const int _asrSilenceTimeoutMs = 1000;
+  /// 设置为2秒，给用户足够时间组织语言（如多笔交易场景）
+  static const int _asrSilenceTimeoutMs = 2000;
 
   /// 主动对话管理器
   late final ProactiveConversationManager _proactiveManager;
@@ -249,10 +250,9 @@ class VoicePipelineController {
       _startMaxWaitTimerFromSpeechEnd();
     }
 
-    // 用户停止说话，尝试启动静默监听
-    // 如果TTS正在播放，startSilenceMonitoring会自动跳过
-    debugPrint('[VoicePipelineController] 用户停止说话，尝试启动静默监听');
-    _proactiveManager.startSilenceMonitoring();
+    // 注意：不需要在此处手动启动静默监听
+    // 原因：句子处理最终会进入 _processAggregatedSentences
+    // 它会调用 resetTimer() 并通过状态管理自动处理监听的启停
   }
 
   /// 是否正在重启输入流水线（防止重复重启）
@@ -523,11 +523,6 @@ class VoicePipelineController {
       '[VoicePipelineController] 收到ASR句子: "$text", VAD说话中=$_isUserSpeaking',
     );
 
-    // 收到ASR最终结果说明用户刚说完一句话
-    // 重置主动对话计时器，确保用户不会在说话过程中被打断
-    // 这是VAD检测的补充机制（VAD可能没有正确检测到用户在说话）
-    _proactiveManager.resetTimer(isUserInitiated: true);
-
     // 将句子加入缓冲区
     _sentenceBuffer.add(text);
     debugPrint('[VoicePipelineController] 句子缓冲区: $_sentenceBuffer');
@@ -544,6 +539,8 @@ class VoicePipelineController {
     // 注意：最大等待计时器改为在 _handleSpeechEnd() 中启动
     // 这样确保只有在用户停止说话后才开始计算最大等待时间
     // 避免用户说话中被强制打断
+    // 注意：主动对话计时器的重置移到 _processAggregatedSentences() 中
+    // 避免在句子聚合阶段重复重置
   }
 
   /// 启动动态聚合计时器
@@ -781,10 +778,8 @@ class VoicePipelineController {
       // 输出完成后重启输入流水线（确保ASR正常运行）
       await _restartInputPipeline();
 
-      // TTS播放完成，尝试启动静默监听
-      // 如果用户正在说话，startSilenceMonitoring会自动跳过
-      debugPrint('[VoicePipelineController] TTS播放完成，尝试启动静默监听');
-      _proactiveManager.startSilenceMonitoring();
+      // 注意：静默监听已在 _setState(VoicePipelineState.listening) 中自动启动
+      // 无需手动调用 startSilenceMonitoring()，避免重复启动
 
       debugPrint('[VoicePipelineController] ========== 输出完成处理结束 ==========');
     } else {

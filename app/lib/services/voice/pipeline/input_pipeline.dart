@@ -187,6 +187,12 @@ class InputPipeline {
 
   /// 处理ASR结果
   void _handleASRResult(ASRPartialResult result) {
+    // 防止重复处理：如果正在停止，忽略所有ASR结果
+    if (_isStopping) {
+      debugPrint('[InputPipeline] 正在停止中，忽略ASR结果（防止重复处理）');
+      return;
+    }
+
     // 注意：不在日志中打印完整识别结果，避免泄露用户隐私
     debugPrint('[InputPipeline] 收到ASR结果，长度: ${result.text.length} (isFinal=${result.isFinal})');
 
@@ -219,6 +225,13 @@ class InputPipeline {
     // 跳过空结果
     if (text.trim().isEmpty) {
       debugPrint('[InputPipeline] 跳过空的最终结果');
+      return;
+    }
+
+    // 防止重复处理：如果正在停止，忽略 cancelTranscription 发送的最终结果
+    // 这些结果是旧会话的，不应该被新会话处理
+    if (_isStopping) {
+      debugPrint('[InputPipeline] 正在停止中，忽略ASR最终结果（防止重复处理）');
       return;
     }
 
