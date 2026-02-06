@@ -159,6 +159,16 @@ class DynamicAggregationWindow {
         'buffered=${context.bufferedSentenceCount}, '
         'cumulative=${context.cumulativeWaitMs}ms');
 
+    // 0. 用户正在说话时，使用最大等待时间
+    //    这是最重要的规则：用户还在说话，绝对不能提前触发处理
+    if (context.isUserSpeaking) {
+      debugPrint('[DynamicAggregationWindow] 用户正在说话，使用最大等待时间');
+      return const WaitTimeResult(
+        waitTimeMs: AggregationTiming.maxWaitMs,
+        reason: '用户正在说话',
+      );
+    }
+
     // 1. 最大等待时间兜底
     if (context.cumulativeWaitMs >= AggregationTiming.maxWaitMs) {
       debugPrint('[DynamicAggregationWindow] 超过最大等待时间，强制处理');

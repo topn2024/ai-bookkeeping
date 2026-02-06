@@ -294,7 +294,31 @@ class IFlytekIATParser {
         debugPrint('[IFlytekIATParser] 句子进行中: sn=$sn, rst=$rst (等待句子结束)');
       }
 
+      // 当isLast=true时，即使rst不是rlt，也应该输出累积的文本
       if (isLast) {
+        // 提取所有未输出的文本
+        final remainingSegments = <String>[];
+        for (int i = _lastFinalSn; i < _resultSegments.length; i++) {
+          final seg = _resultSegments[i];
+          if (seg.isNotEmpty &&
+              seg.trim() != '？' &&
+              seg.trim() != '.' &&
+              seg.trim() != ',' &&
+              seg.trim() != '。') {
+            remainingSegments.add(seg);
+          }
+        }
+
+        final remainingText = remainingSegments.join('');
+        if (remainingText.isNotEmpty) {
+          debugPrint('[IFlytekIATParser] isLast=true，输出剩余文本: "$remainingText"');
+          return IFlytekIATParsedResult.sentence(
+            text: remainingText,
+            isFinal: true,
+            isLast: true,
+          );
+        }
+
         return IFlytekIATParsedResult.completed();
       }
 
