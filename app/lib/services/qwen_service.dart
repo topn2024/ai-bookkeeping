@@ -198,6 +198,59 @@ other_income: 其他收入（无法归类的收入）
     _ensureInitialized();
   }
 
+  /// 预热连接（提前建立HTTP连接，减少首次调用延迟）
+  ///
+  /// 通过发送一个最小化的健康检查请求来预热：
+  /// - 初始化Dio客户端
+  /// - 建立TCP/SSL连接
+  /// - 验证API Key有效性
+  ///
+  /// 建议在应用启动时调用，可节省300-800ms首次延迟
+  /// 返回: true表示预热成功且LLM可用，false表示预热失败或LLM不可用
+  Future<bool> warmup() async {
+    if (!isAvailable) {
+      _logger.info('QwenService: 预热跳过（API Key未配置）');
+      return false;
+    }
+
+    final startTime = DateTime.now();
+    _logger.info('QwenService: 开始预热连接...');
+
+    try {
+      _ensureInitialized();
+
+      // 发送一个最小化请求来预热连接
+      // 使用 qwen-turbo（最快最轻量的模型）
+      final response = await _dio.post(
+        _textApiUrl,
+        data: {
+          'model': 'qwen-turbo',  // 预热使用最轻量的模型
+          'input': {
+            'messages': [
+              {'role': 'user', 'content': 'hi'},
+            ],
+          },
+          'parameters': {
+            'max_tokens': 1,  // 最小输出
+          },
+        },
+      );
+
+      final elapsed = DateTime.now().difference(startTime);
+      if (response.statusCode == 200) {
+        _logger.info('QwenService: 预热成功 (${elapsed.inMilliseconds}ms)');
+        return true;
+      } else {
+        _logger.warning('QwenService: 预热响应异常: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      final elapsed = DateTime.now().difference(startTime);
+      _logger.warning('QwenService: 预热失败 (${elapsed.inMilliseconds}ms): $e');
+      return false;
+    }
+  }
+
   /// 图片识别 - 识别小票/收据
   /// 使用 qwen-vl-plus 视觉模型
   Future<QwenRecognitionResult> recognizeReceipt(File imageFile) async {

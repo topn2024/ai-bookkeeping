@@ -1105,7 +1105,11 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           });
         }
 
-        return await processVoiceCommand(voiceInput);
+        // 直接使用第一次LLM返回的闲聊回复，避免重复调用LLM
+        final chatResponse = llmResult.chatContent ?? '有什么我能帮你的吗？';
+        debugPrint('[VoiceCoordinator] 直接使用LLM闲聊回复，跳过重复调用: ${chatResponse.length}字');
+        await _speakWithSkipCheck(chatResponse);
+        return VoiceSessionResult.success(chatResponse);
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -1376,18 +1380,19 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   }
 
   /// 执行导航意图
+  ///
+  /// 返回导航结果消息（包含页面上下文提示，用于后续对话理解）
   Future<String> _executeNavigationIntent(NavigationIntent intent) async {
     debugPrint('[VoiceServiceCoordinator] 执行导航意图: ${intent.originalText}');
     final result = _navigationService.parseNavigation(intent.originalText);
     if (result.success && result.route != null) {
       debugPrint('[VoiceServiceCoordinator] 导航解析成功: route=${result.route}, pageName=${result.pageName}');
-      // 实际执行导航
-      final executed = await VoiceNavigationExecutor.instance.navigateToRoute(result.route!);
-      if (executed) {
-        return '正在打开${result.pageName}';
-      } else {
-        return '抱歉，暂时无法打开${result.pageName}';
-      }
+      // 使用带上下文的导航方法，返回包含页面上下文提示的消息
+      final navResult = await VoiceNavigationExecutor.instance.navigateToRouteWithContext(
+        result.route!,
+        pageName: result.pageName,
+      );
+      return navResult.message;
     }
     debugPrint('[VoiceServiceCoordinator] 导航解析失败: ${result.errorMessage}');
     return result.errorMessage ?? '抱歉，我不知道您想去哪个页面';
@@ -2943,15 +2948,20 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
     if (result.success && result.route != null) {
       debugPrint('[VoiceServiceCoordinator] 导航解析成功: route=${result.route}, pageName=${result.pageName}');
-      // 实际执行导航
-      final executed = await VoiceNavigationExecutor.instance.navigateToRoute(result.route!);
-      final message = executed
-          ? '正在打开${result.pageName}'
-          : '抱歉，暂时无法打开${result.pageName}';
-      await _speakWithSkipCheck(message);
+      // 使用带上下文的导航方法
+      final navResult = await VoiceNavigationExecutor.instance.navigateToRouteWithContext(
+        result.route!,
+        pageName: result.pageName,
+      );
+      await _speakWithSkipCheck(navResult.message);
       return VoiceSessionResult.success(
-        message,
-        {'route': result.route, 'pageName': result.pageName, 'executed': executed},
+        navResult.message,
+        {
+          'route': result.route,
+          'pageName': result.pageName,
+          'executed': navResult.success,
+          'contextHint': navResult.contextHint,
+        },
       );
     }
 
@@ -3712,16 +3722,17 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
             final navResult = _navigationService.parseNavigation(originalInput);
             if (navResult.success && navResult.route != null) {
-              // 实际执行导航
-              final executed = await VoiceNavigationExecutor.instance.navigateToRoute(navResult.route!);
-              final message = executed
-                  ? '正在打开${navResult.pageName}'
-                  : '抱歉，暂时无法打开${navResult.pageName}';
-              await _speakWithSkipCheck(message);
-              return VoiceSessionResult.success(message, {
+              // 使用带上下文的导航方法
+              final execResult = await VoiceNavigationExecutor.instance.navigateToRouteWithContext(
+                navResult.route!,
+                pageName: navResult.pageName,
+              );
+              await _speakWithSkipCheck(execResult.message);
+              return VoiceSessionResult.success(execResult.message, {
                 'navigation': navResult.route,
                 'aiAssisted': true,
-                'executed': executed,
+                'executed': execResult.success,
+                'contextHint': execResult.contextHint,
               });
             }
           }

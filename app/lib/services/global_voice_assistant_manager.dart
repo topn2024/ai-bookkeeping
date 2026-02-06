@@ -590,28 +590,28 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       debugPrint('[GlobalVoiceAssistant] [预加载] 2/5 TTS服务已初始化');
 
       // 3. 预初始化流式TTS服务和音频播放器（用于流水线模式）
-      debugPrint('[GlobalVoiceAssistant] [预加载] 3/5 初始化流式TTS服务...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 3/9 初始化流式TTS服务...');
       _streamingTtsService = StreamingTTSService();
       await _streamingTtsService!.initialize();
-      debugPrint('[GlobalVoiceAssistant] [预加载] 3/5 流式TTS服务已初始化');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 3/9 流式TTS服务已初始化');
 
       // 4. 检查麦克风权限（不弹窗请求）
-      debugPrint('[GlobalVoiceAssistant] [预加载] 4/7 检查麦克风权限...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 4/9 检查麦克风权限...');
       final permissionStatus = await Permission.microphone.status;
-      debugPrint('[GlobalVoiceAssistant] [预加载] 4/7 麦克风权限状态: $permissionStatus');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 4/9 麦克风权限状态: $permissionStatus');
 
       // 5. 预初始化 WebRTC APM 音频处理器
-      debugPrint('[GlobalVoiceAssistant] [预加载] 5/7 初始化 WebRTC APM...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 5/9 初始化 WebRTC APM...');
       await AudioProcessorService.instance.initialize();
-      debugPrint('[GlobalVoiceAssistant] [预加载] 5/7 WebRTC APM 已初始化');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 5/9 WebRTC APM 已初始化');
 
       // 6. 预创建 AudioRecorder 实例
-      debugPrint('[GlobalVoiceAssistant] [预加载] 6/7 创建录音器实例...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 6/9 创建录音器实例...');
       _audioRecorder ??= AudioRecorder();
-      debugPrint('[GlobalVoiceAssistant] [预加载] 6/7 录音器实例已创建');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 6/9 录音器实例已创建');
 
       // 7. 预初始化 VAD 和识别引擎（不需要权限）
-      debugPrint('[GlobalVoiceAssistant] [预加载] 7/7 初始化 VAD 和识别引擎...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 7/9 初始化 VAD 和识别引擎...');
       _recognitionEngine ??= VoiceRecognitionEngine();
       if (_vadService == null) {
         // 创建VAD服务，能量阈值作为降级方案的配置
@@ -625,12 +625,31 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
             maxEnergyThreshold: 0.01,
           ),
         );
-        // 初始化Silero VAD（优先使用神经网络检测，失败时自动降级到能量检测）
+        // 初始化Silero VAD（本地模型，约0.8秒）
         await _vadService!.initializeSileroVAD();
         debugPrint('[GlobalVoiceAssistant] VAD模式: ${_vadService!.isUsingSileroVAD ? "Silero神经网络" : "能量检测"}');
         _vadSubscription = _vadService!.eventStream.listen(_handleVADEvent);
       }
-      debugPrint('[GlobalVoiceAssistant] [预加载] 7/7 VAD 和识别引擎已初始化');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 7/9 VAD 和识别引擎已初始化');
+
+      // 8. 预热TTS连接（提前建立HTTP连接，减少首次合成延迟）
+      debugPrint('[GlobalVoiceAssistant] [预加载] 8/9 预热TTS连接...');
+      try {
+        await _streamingTtsService!.warmup();
+        debugPrint('[GlobalVoiceAssistant] [预加载] 8/9 TTS连接预热完成');
+      } catch (e) {
+        debugPrint('[GlobalVoiceAssistant] [预加载] 8/9 TTS预热失败（不影响后续使用）: $e');
+      }
+
+      // 9. 预热ASR连接（在后台提前建立WebSocket连接）
+      // 注：LLM连接已在步骤0的 _checkLLMAvailability() 中预热
+      debugPrint('[GlobalVoiceAssistant] [预加载] 9/9 预热ASR连接...');
+      try {
+        _recognitionEngine?.warmupConnection();
+        debugPrint('[GlobalVoiceAssistant] [预加载] 9/9 ASR连接预热已启动');
+      } catch (e) {
+        debugPrint('[GlobalVoiceAssistant] [预加载] 9/9 ASR预热失败（不影响后续使用）: $e');
+      }
 
       final elapsed = DateTime.now().difference(_preloadStartTime!);
       _isPreloaded = true;
