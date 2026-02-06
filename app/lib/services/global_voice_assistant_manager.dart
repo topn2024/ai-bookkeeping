@@ -618,7 +618,6 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         _vadService = RealtimeVADService(
           config: RealtimeVADConfig.defaultConfig().copyWith(
             speechEndThresholdMs: 1200,
-            silenceTimeoutMs: 30000,
             // 降级时使用的能量阈值配置
             energyThreshold: 0.001,
             minEnergyThreshold: 0.0003,
@@ -753,7 +752,6 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       _vadService = RealtimeVADService(
         config: RealtimeVADConfig.defaultConfig().copyWith(
           speechEndThresholdMs: 1200,  // 静音1.2秒判定说完（折中方案）
-          silenceTimeoutMs: 30000,     // 30秒无声音自动结束对话
           // 降级时使用的能量阈值配置
           energyThreshold: 0.001,
           minEnergyThreshold: 0.0003,
@@ -1205,10 +1203,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _recordingStartTime = DateTime.now();
     setBallState(FloatingBallState.recording);
 
-    // 开始沉默超时检测（30秒无声音自动结束对话）
-    _vadService?.startSilenceTimeoutDetection();
-
-    debugPrint('[GlobalVoiceAssistant] 流水线模式录音已启动（沉默超时检测已开启）');
+    debugPrint('[GlobalVoiceAssistant] 流水线模式录音已启动');
   }
 
   /// 音频数据计数器（流水线模式）
@@ -1399,16 +1394,6 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         // 只记录状态，等待ASR返回最终结果
         _isProcessingUtterance = false;
         notifyListeners();
-        break;
-
-      case VADEventType.silenceTimeout:
-        // 【已废弃】VAD 的 silenceTimeout 不再使用
-        // 会话超时统一由 VoicePipelineController 中的 ProactiveConversationManager 管理
-        // 这样可以：
-        // 1. 在 TTS 播放期间正确暂停计时器
-        // 2. 支持智能主动对话（5秒追问，最多3次）
-        // 3. 避免两套计时器系统冲突
-        debugPrint('[GlobalVoiceAssistant] VAD: silenceTimeout 事件已忽略（由 ProactiveConversationManager 统一管理）');
         break;
 
       default:
@@ -1643,13 +1628,10 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       // 启动流式ASR
       _startStreamingASR();
 
-      // 开始沉默超时检测（用户打开助手但不说话时触发主动对话）
-      _vadService?.startSilenceTimeoutDetection();
-
       _recordingStartTime = DateTime.now();
       setBallState(FloatingBallState.recording);
 
-      debugPrint('[GlobalVoiceAssistant] 流式语音处理已启动（沉默超时检测已开启）');
+      debugPrint('[GlobalVoiceAssistant] 流式语音处理已启动');
     } catch (e) {
       debugPrint('[GlobalVoiceAssistant] 开始录音失败: $e');
       _handleError('无法开始录音，请检查麦克风权限');
@@ -1989,42 +1971,6 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 处理沉默超时自动结束对话
-  ///
-  /// 用户30秒无语音输入，自动结束本次对话
-  /// 对话有记忆，用户随时可以继续
-  Future<void> _handleSilenceTimeoutEnd() async {
-    debugPrint('[GlobalVoiceAssistant] 处理沉默超时，自动结束对话');
-
-    // 1. 立即停止TTS（如果正在播放）
-    try {
-      await _ttsService?.stop();
-    } catch (e) {
-      debugPrint('[GlobalVoiceAssistant] 停止TTS失败: $e');
-    }
-
-    // 2. 清除处理中标志
-    _isProcessingCommand = false;
-
-    // 3. 使用LLM生成沉默超时告别消息并播放
-    final farewell = await LLMResponseGenerator.instance.generateFarewellResponse(
-      farewellType: 'silenceTimeout',
-    );
-    _addAssistantMessage(farewell);
-
-    // 4. 播放告别语
-    try {
-      await _streamingTtsService?.speak(farewell);
-    } catch (e) {
-      debugPrint('[GlobalVoiceAssistant] 播放告别语失败: $e');
-    }
-
-    // 5. 停止录音
-    await stopRecording();
-
-    notifyListeners();
-  }
-
   /// 启用打断检测模式
   ///
   /// TTS开始播放时调用，保持录音和VAD运行，用于检测用户打断
@@ -2050,14 +1996,6 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     if (_asrResultSubscription != null && !_asrResultSubscription!.isPaused) {
       debugPrint('[GlobalVoiceAssistant] 暂停ASR订阅（防止回声）');
       _asrResultSubscription!.pause();
-    }
-  }
-
-  /// 恢复ASR订阅
-  void _resumeASRSubscription() {
-    if (_asrResultSubscription != null && _asrResultSubscription!.isPaused) {
-      debugPrint('[GlobalVoiceAssistant] 恢复ASR订阅');
-      _asrResultSubscription!.resume();
     }
   }
 
@@ -2431,8 +2369,6 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         !_audioStreamController!.isClosed) {
       debugPrint('[GlobalVoiceAssistant] TTS完成，重启ASR');
       _startStreamingASR();
-      // 重启沉默超时检测
-      _vadService?.startSilenceTimeoutDetection();
 
       // 重启5秒主动话题计时器（30秒计时器继续运行）
       if (_continuousMode) {

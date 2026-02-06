@@ -419,6 +419,12 @@ class SmartTopicGenerator implements ProactiveTopicGenerator {
   /// 上次使用的话题类型（避免连续重复）
   String? _lastTopicType;
 
+  /// 最近生成的话题（用于告诉LLM避免重复）
+  final List<String> _recentTopics = [];
+
+  /// 最多记录的最近话题数量
+  static const int _maxRecentTopics = 5;
+
   SmartTopicGenerator({
     ResultBuffer? resultBuffer,
     UserPreferencesProvider? preferencesProvider,
@@ -518,12 +524,17 @@ class SmartTopicGenerator implements ProactiveTopicGenerator {
         contextPart.writeln('对话背景：$contextSummary');
       }
 
+      // 构建避免重复的提示
+      final avoidRepeatPart = _recentTopics.isNotEmpty
+          ? '\n避免重复：以下话题刚说过，请不要重复类似的内容：\n${_recentTopics.map((t) => '- $t').join('\n')}'
+          : '';
+
       final prompt = '''你是一个智能记账助手"小白"，正在和用户进行语音对话。
 用户当前沉默了5秒，你需要主动发起一个话题。
 
 当前时间：$timeContext
 对话风格：$styleDesc
-${contextPart.isNotEmpty ? '\n$contextPart' : ''}
+${contextPart.isNotEmpty ? '\n$contextPart' : ''}$avoidRepeatPart
 请生成一句简短的主动对话（不超过15个字），用于引导用户继续对话。
 要求：
 - 简洁自然，像朋友聊天
@@ -531,6 +542,7 @@ ${contextPart.isNotEmpty ? '\n$contextPart' : ''}
 - 符合指定的对话风格
 - 不要使用表情符号
 - 如果有最近操作，可以基于此引导用户
+- 【重要】必须与之前说过的话题不同，不要重复
 
 直接输出话题文本，不要加引号或其他格式。''';
 
@@ -545,7 +557,10 @@ ${contextPart.isNotEmpty ? '\n$contextPart' : ''}
 
       // 验证结果
       if (result != null && result.isNotEmpty && result.length <= 30) {
-        return result.trim();
+        final topic = result.trim();
+        // 记录生成的话题，用于下次避免重复
+        _addRecentTopic(topic);
+        return topic;
       }
 
       return null;
@@ -690,10 +705,22 @@ ${contextPart.isNotEmpty ? '\n$contextPart' : ''}
     }
   }
 
+  /// 添加最近生成的话题（用于去重）
+  void _addRecentTopic(String topic) {
+    _recentTopics.add(topic);
+    // 保持列表不超过最大数量
+    while (_recentTopics.length > _maxRecentTopics) {
+      _recentTopics.removeAt(0);
+    }
+    debugPrint('[SmartTopicGenerator] 记录话题用于去重: "$topic" (共${_recentTopics.length}个)');
+  }
+
   /// 重置话题索引
   void reset() {
     _topicIndex = 0;
     _lastTopicType = null;
+    _recentTopics.clear();
+    debugPrint('[SmartTopicGenerator] 已重置，清除话题去重记录');
   }
 }
 

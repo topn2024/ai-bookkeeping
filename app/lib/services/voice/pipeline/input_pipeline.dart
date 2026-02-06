@@ -287,10 +287,6 @@ class InputPipeline {
         // 轮次结束停顿超时（无用户响应）
         onSpeechEnd?.call();
         break;
-      case VADEventType.silenceTimeout:
-        // 沉默超时
-        onSpeechEnd?.call();
-        break;
       case VADEventType.noiseFloorUpdated:
         // 噪音基底更新，忽略
         break;

@@ -1373,17 +1373,24 @@ class _NavigationAction extends Action {
     if (result.success && result.route != null) {
       debugPrint('[_NavigationAction] 解析成功: route=${result.route}, pageName=${result.pageName}');
 
-      // 直接调用导航执行器进行实际导航
-      final executed = await VoiceNavigationExecutor.instance.navigateToRoute(result.route!);
-      debugPrint('[_NavigationAction] 导航执行结果: $executed');
+      // 使用带上下文的导航方法
+      final navResult = await VoiceNavigationExecutor.instance.navigateToRouteWithContext(
+        result.route!,
+        pageName: result.pageName,
+      );
+      debugPrint('[_NavigationAction] 导航执行结果: ${navResult.success}');
 
       // 同时调用回调（如果设置了）
       _onNavigate?.call(result.route!);
 
-      if (executed) {
+      if (navResult.success) {
         return ActionResult.success(
-          data: {'route': result.route, 'executed': true},
-          responseText: '好的，正在打开${result.pageName ?? targetPage}',
+          data: {
+            'route': result.route,
+            'executed': true,
+            'contextHint': navResult.contextHint,
+          },
+          responseText: navResult.message,
           actionId: id,
         );
       } else {

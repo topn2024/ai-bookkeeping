@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'client_vad_service.dart';
 
@@ -39,10 +38,6 @@ class RealtimeVADConfig {
   /// 智能体说完后等待用户可能的响应
   final int turnEndPauseMs;
 
-  /// 用户沉默超时（毫秒）
-  /// 超过此时长触发主动话题
-  final int silenceTimeoutMs;
-
   const RealtimeVADConfig({
     this.speechStartThresholdMs = 200,
     this.speechEndThresholdMs = 800,  // 从500ms增加到800ms，适应自然停顿
@@ -52,7 +47,6 @@ class RealtimeVADConfig {
     this.minEnergyThreshold = 0.01,
     this.maxEnergyThreshold = 0.1,
     this.turnEndPauseMs = 1500,
-    this.silenceTimeoutMs = 5000,
   });
 
   /// 默认配置（适用于大多数场景）
@@ -87,7 +81,6 @@ class RealtimeVADConfig {
         speechStartThresholdMs: 200,
         speechEndThresholdMs: 1000,  // 1秒静音才判定说话结束
         turnEndPauseMs: 2000,        // 更长的轮次停顿等待
-        silenceTimeoutMs: 8000,      // 更长的沉默超时
       );
 
   RealtimeVADConfig copyWith({
@@ -99,7 +92,6 @@ class RealtimeVADConfig {
     double? minEnergyThreshold,
     double? maxEnergyThreshold,
     int? turnEndPauseMs,
-    int? silenceTimeoutMs,
   }) {
     return RealtimeVADConfig(
       speechStartThresholdMs: speechStartThresholdMs ?? this.speechStartThresholdMs,
@@ -110,7 +102,6 @@ class RealtimeVADConfig {
       minEnergyThreshold: minEnergyThreshold ?? this.minEnergyThreshold,
       maxEnergyThreshold: maxEnergyThreshold ?? this.maxEnergyThreshold,
       turnEndPauseMs: turnEndPauseMs ?? this.turnEndPauseMs,
-      silenceTimeoutMs: silenceTimeoutMs ?? this.silenceTimeoutMs,
     );
   }
 }
@@ -143,9 +134,6 @@ enum VADEventType {
 
   /// 轮次结束停顿结束（无用户响应）
   turnEndPauseTimeout,
-
-  /// 用户沉默超时
-  silenceTimeout,
 
   /// 环境噪音更新
   noiseFloorUpdated,
@@ -180,7 +168,6 @@ class VADEvent {
 /// - 自动降级到能量检测
 /// - 自适应噪音阈值
 /// - 轮次结束停顿检测
-/// - 用户沉默超时检测
 class RealtimeVADService {
   /// 配置
   final RealtimeVADConfig config;
@@ -200,26 +187,17 @@ class RealtimeVADService {
   /// 语音开始时间
   DateTime? _speechStartTime;
 
-  /// 静音开始时间
-  DateTime? _silenceStartTime;
-
   /// 事件流控制器
   final _eventController = StreamController<VADEvent>.broadcast();
 
   /// 轮次结束停顿计时器
   Timer? _turnEndPauseTimer;
 
-  /// 沉默超时计时器
-  Timer? _silenceTimeoutTimer;
-
   /// 噪音采样缓冲区
   final List<double> _noiseFloorSamples = [];
 
   /// 最大噪音采样数
   static const int _maxNoiseFloorSamples = 100;
-
-  /// 帧大小（30ms at 16kHz）
-  static const int _frameSizeBytes = 960; // 480 samples * 2 bytes
 
   /// 帧时长（毫秒）
   static const int _frameDurationMs = 30;
@@ -278,7 +256,6 @@ class RealtimeVADService {
       _transitionTo(VADState.speaking);
       _speechStartTime = DateTime.now();
       _emitEvent(VADEventType.speechStart);
-      _cancelSilenceTimeoutTimer();
       debugPrint('[RealtimeVAD] [Silero] 检测到语音开始');
     }
   }
@@ -294,7 +271,6 @@ class RealtimeVADService {
       _speechStartTime = null;
       _speechFrameCount = 0;
       _silenceFrameCount = 0;
-      startSilenceTimeoutDetection();
       debugPrint('[RealtimeVAD] [Silero] 检测到语音结束');
     }
   }
@@ -337,7 +313,6 @@ class RealtimeVADService {
             _transitionTo(VADState.speaking);
             _speechStartTime = DateTime.now();
             _emitEvent(VADEventType.speechStart);
-            _cancelSilenceTimeoutTimer();
           } else {
             _transitionTo(VADState.possibleSpeech);
           }
@@ -351,7 +326,6 @@ class RealtimeVADService {
             _transitionTo(VADState.speaking);
             _speechStartTime = DateTime.now();
             _emitEvent(VADEventType.speechStart);
-            _cancelSilenceTimeoutTimer();
           }
         } else {
           // 语音中断，重置计数
@@ -372,8 +346,6 @@ class RealtimeVADService {
             _speechStartTime = null;
             _speechFrameCount = 0;
             _silenceFrameCount = 0;
-            // 语音结束后自动启动沉默超时检测
-            startSilenceTimeoutDetection();
           } else {
             _transitionTo(VADState.possibleSilence);
           }
@@ -395,8 +367,6 @@ class RealtimeVADService {
             _speechStartTime = null;
             _speechFrameCount = 0;
             _silenceFrameCount = 0;
-            // 语音结束后自动启动沉默超时检测
-            startSilenceTimeoutDetection();
           }
         } else {
           // 语音恢复，重置静音计数
@@ -419,38 +389,9 @@ class RealtimeVADService {
       () {
         if (_state == VADState.silence) {
           _emitEvent(VADEventType.turnEndPauseTimeout);
-          startSilenceTimeoutDetection();
         }
       },
     );
-  }
-
-  /// 开始沉默超时检测（公开方法）
-  ///
-  /// 用户持续沉默时，触发主动话题
-  /// 在录音开始或用户说话结束后调用
-  void startSilenceTimeoutDetection() {
-    _cancelSilenceTimeoutTimer();
-
-    debugPrint('[RealtimeVAD] 启动沉默超时检测 (${config.silenceTimeoutMs}ms)');
-
-    _silenceTimeoutTimer = Timer(
-      Duration(milliseconds: config.silenceTimeoutMs),
-      () {
-        debugPrint('[RealtimeVAD] 沉默超时计时器触发，当前状态: $_state');
-        // 无论当前状态如何，都发送silenceTimeout事件
-        // 让上层根据是否有实际ASR结果来决定是否触发主动对话
-        _emitEvent(VADEventType.silenceTimeout);
-      },
-    );
-  }
-
-  /// 停止沉默超时检测（公开方法）
-  ///
-  /// TTS播放时调用，避免误触发
-  void stopSilenceTimeoutDetection() {
-    debugPrint('[RealtimeVAD] 停止沉默超时检测');
-    _cancelSilenceTimeoutTimer();
   }
 
   /// 重置状态
@@ -459,9 +400,7 @@ class RealtimeVADService {
     _speechFrameCount = 0;
     _silenceFrameCount = 0;
     _speechStartTime = null;
-    _silenceStartTime = null;
     _cancelTurnEndPauseTimer();
-    _cancelSilenceTimeoutTimer();
     _sileroVAD?.reset();
     debugPrint('[RealtimeVAD] 状态已重置${_usingSileroVAD ? " (Silero VAD)" : ""}');
   }
@@ -473,7 +412,6 @@ class RealtimeVADService {
     _usingSileroVAD = false;
     _eventController.close();
     _cancelTurnEndPauseTimer();
-    _cancelSilenceTimeoutTimer();
   }
 
   // ==================== 内部方法 ====================
@@ -543,12 +481,6 @@ class RealtimeVADService {
   void _cancelTurnEndPauseTimer() {
     _turnEndPauseTimer?.cancel();
     _turnEndPauseTimer = null;
-  }
-
-  /// 取消沉默超时计时器
-  void _cancelSilenceTimeoutTimer() {
-    _silenceTimeoutTimer?.cancel();
-    _silenceTimeoutTimer = null;
   }
 }
 

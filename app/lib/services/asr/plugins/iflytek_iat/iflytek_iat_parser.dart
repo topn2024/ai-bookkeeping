@@ -291,7 +291,20 @@ class IFlytekIATParser {
           );
         }
       } else {
-        debugPrint('[IFlytekIATParser] 句子进行中: sn=$sn, rst=$rst (等待句子结束)');
+        // 【关键修复】句子进行中时也要返回中间结果（isFinal=false）
+        // 这样 InputPipeline 会调用 onPartialResult 回调
+        // 然后 VoicePipelineController 会调用 _proactiveManager.stopMonitoring()
+        // 防止用户说话时被主动对话打断
+        final currentText = _resultSegments.join('');
+        debugPrint('[IFlytekIATParser] 句子进行中: sn=$sn, rst=$rst, 当前文本="$currentText"');
+
+        if (currentText.isNotEmpty) {
+          return IFlytekIATParsedResult.sentence(
+            text: currentText,
+            isFinal: false,  // 中间结果
+            isLast: false,
+          );
+        }
       }
 
       // 当isLast=true时，即使rst不是rlt，也应该输出累积的文本

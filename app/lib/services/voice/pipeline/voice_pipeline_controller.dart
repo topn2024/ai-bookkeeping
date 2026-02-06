@@ -55,6 +55,10 @@ class VoicePipelineController {
   /// 句子聚合缓冲区（用于连续对话）
   final List<String> _sentenceBuffer = [];
 
+  /// 上一次处理的原始文本（用于检测讯飞ASR的累积更新）
+  /// 当新句子是上一次处理文本的扩展时，说明是同一个语音会话的累积更新
+  String? _lastProcessedRawText;
+
   /// 句子聚合计时器
   Timer? _sentenceAggregationTimer;
 
@@ -290,6 +294,8 @@ class VoicePipelineController {
     }
 
     _isRestartingInput = true;
+    // 重置累积文本跟踪（新的ASR会话不受之前会话影响）
+    _lastProcessedRawText = null;
     debugPrint('[VoicePipelineController] ===== 开始重启输入流水线 =====');
     debugPrint(
       '[VoicePipelineController] 当前状态: controller=$_state, input=${_inputPipeline.state}',
@@ -472,6 +478,14 @@ class VoicePipelineController {
     // 这是 VAD speechStart 的补充机制，确保即使 VAD 没检测到也能正确暂停
     _proactiveManager.stopMonitoring();
 
+    // 【关键修复】收到中间结果说明用户还在说话，取消最大等待计时器
+    // 防止用户说长句时被 5 秒最大等待计时器打断
+    if (_maxWaitTimer != null) {
+      debugPrint('[VoicePipelineController] 收到中间结果，取消最大等待计时器');
+      _maxWaitTimer?.cancel();
+      _maxWaitTimer = null;
+    }
+
     // 如果有聚合计时器在运行且缓冲区有内容，收到中间结果说明用户还在说话
     // 重置计时器，等待用户说完（滑动窗口机制的关键）
     if (_sentenceAggregationTimer != null && _sentenceBuffer.isNotEmpty) {
@@ -523,6 +537,57 @@ class VoicePipelineController {
       '[VoicePipelineController] 收到ASR句子: "$text", VAD说话中=$_isUserSpeaking',
     );
 
+    // 【关键修复】收到用户输入时立即停止主动对话监听
+    // 防止在聚合等待期间（1200ms）触发主动话题，导致两个回复
+    _proactiveManager.stopMonitoring();
+    debugPrint('[VoicePipelineController] 收到ASR句子，停止主动对话监听');
+
+    // 【关键修复】检测讯飞ASR的累积文本更新，避免重复处理
+    // 讯飞ASR的onFinalResult是累积的，每次返回从会话开始到目前为止的所有内容
+    // 场景1：buffer未清空，新句子是buffer中最后一句的扩展
+    // 场景2：buffer已清空（前一个已开始处理），新句子是已处理文本的扩展
+
+    // 场景1：检查buffer中是否有可替换的句子
+    if (_sentenceBuffer.isNotEmpty) {
+      final lastSentence = _sentenceBuffer.last;
+      if (text.startsWith(lastSentence) && text.length > lastSentence.length) {
+        debugPrint('[VoicePipelineController] 检测到累积文本更新（buffer内），替换而非追加');
+        debugPrint('[VoicePipelineController] 旧: "$lastSentence"');
+        debugPrint('[VoicePipelineController] 新: "$text"');
+        _sentenceBuffer.removeLast();
+      }
+    }
+
+    // 场景2：检查是否是已处理文本的扩展（buffer已清空的情况）
+    // 如果新文本是上一次处理文本的扩展，说明是同一个语音会话的续接
+    // 此时应该跳过，因为前一个处理可能已经在执行LLM调用
+    if (_lastProcessedRawText != null &&
+        text.startsWith(_lastProcessedRawText!) &&
+        _sentenceBuffer.isEmpty) {
+      // 新文本是已处理文本的扩展，提取增量部分
+      final incrementalText = text.substring(_lastProcessedRawText!.length).trim();
+      if (incrementalText.isEmpty) {
+        debugPrint('[VoicePipelineController] 检测到重复文本，跳过: "$text"');
+        return;
+      }
+      // 只处理增量部分（如"就这些吧"）
+      debugPrint('[VoicePipelineController] 检测到累积文本更新（已处理后续），提取增量');
+      debugPrint('[VoicePipelineController] 已处理: "$_lastProcessedRawText"');
+      debugPrint('[VoicePipelineController] 增量: "$incrementalText"');
+      // 增量内容如果只是确认词（就这些、好了、完了等），可以跳过
+      if (_isConfirmationOnly(incrementalText)) {
+        debugPrint('[VoicePipelineController] 增量只是确认词，跳过处理');
+        return;
+      }
+      // 否则将增量加入buffer
+      _sentenceBuffer.add(incrementalText);
+      debugPrint('[VoicePipelineController] 句子缓冲区（增量）: $_sentenceBuffer');
+      onFinalResult?.call(text);
+      _sentenceAggregationTimer?.cancel();
+      _startDynamicAggregationTimer();
+      return;
+    }
+
     // 将句子加入缓冲区
     _sentenceBuffer.add(text);
     debugPrint('[VoicePipelineController] 句子缓冲区: $_sentenceBuffer');
@@ -539,8 +604,6 @@ class VoicePipelineController {
     // 注意：最大等待计时器改为在 _handleSpeechEnd() 中启动
     // 这样确保只有在用户停止说话后才开始计算最大等待时间
     // 避免用户说话中被强制打断
-    // 注意：主动对话计时器的重置移到 _processAggregatedSentences() 中
-    // 避免在句子聚合阶段重复重置
   }
 
   /// 启动动态聚合计时器
@@ -653,12 +716,17 @@ class VoicePipelineController {
     // 重置累计等待时间
     _cumulativeWaitMs = 0;
 
+    // 【重要】保存最后一个句子作为原始文本，用于检测后续的累积更新
+    // 讯飞ASR返回的是累积文本，如果用户继续说话，新的onFinalResult会包含这个文本
+    _lastProcessedRawText = _sentenceBuffer.last;
+
     // 合并所有缓存的句子
     // 使用逗号分隔，帮助LLM理解句子边界
     final aggregatedText = _sentenceBuffer.join('，');
     _sentenceBuffer.clear();
 
     debugPrint('[VoicePipelineController] 句子聚合完成，开始处理: "$aggregatedText"');
+    debugPrint('[VoicePipelineController] 已记录原始文本用于去重: "$_lastProcessedRawText"');
 
     // 用户有输入，重置主动对话计时器和计数
     _proactiveManager.resetTimer();
@@ -983,6 +1051,34 @@ class VoicePipelineController {
     }
   }
 
+  /// 检查文本是否只是确认词
+  ///
+  /// 确认词包括：就这些、好了、完了、没了、行了、可以了等
+  /// 这些词不需要单独处理，因为它们只是对前一个请求的确认
+  bool _isConfirmationOnly(String text) {
+    final confirmationPatterns = [
+      '就这些',
+      '就这样',
+      '就这么多',
+      '好了',
+      '完了',
+      '没了',
+      '行了',
+      '可以了',
+      '够了',
+      '就这些吧',
+      '就这样吧',
+      '好吧',
+      '结束',
+      '没有了',
+    ];
+
+    final trimmedText = text.trim();
+    return confirmationPatterns.any(
+      (pattern) => trimmedText == pattern || trimmedText.endsWith(pattern),
+    );
+  }
+
   /// 处理振幅触发的打断
   void _handleAmplitudeBargeIn() {
     if (_state != VoicePipelineState.speaking) return;
@@ -1017,6 +1113,7 @@ class VoicePipelineController {
     _cumulativeWaitMs = 0;
     _lastSpeechEndTime = null;
     _isUserSpeaking = false;
+    _lastProcessedRawText = null;  // 重置累积文本跟踪
 
     _inputPipeline.reset();
     _outputPipeline.reset();
