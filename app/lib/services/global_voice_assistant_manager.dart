@@ -863,17 +863,26 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       _handlePipelineStateChanged(state);
     };
 
-    // 中间结果回调（显示用户说的话）
+    // 中间结果回调（实时显示用户说的话）
     _pipelineController!.onPartialResult = (text) {
       _partialText = text;
+
+      // 在对话记录中实时显示识别中的文字（临时消息）
+      if (text.trim().isNotEmpty) {
+        _updateOrCreateTemporaryUserMessage(text);
+      }
+
       notifyListeners();
     };
 
-    // 最终结果回调（添加用户消息到历史）
+    // 最终结果回调（将临时消息转为正式消息）
     _pipelineController!.onFinalResult = (text) {
       debugPrint('[GlobalVoiceAssistant] [PIPELINE] onFinalResult 收到: "$text"');
       _partialText = '';
-      _addUserMessage(text);
+
+      // 将临时消息转为正式消息
+      _finalizeTemporaryUserMessage(text);
+
       notifyListeners();
     };
 
@@ -1340,6 +1349,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 重置状态
     _partialText = '';
     _amplitude = 0.0;
+
+    // 清理未完成的临时消息
+    _conversationHistory.removeWhere((msg) => msg.id == _temporaryUserMessageId);
 
     setBallState(FloatingBallState.idle);
     debugPrint('[GlobalVoiceAssistant] 流水线模式录音已停止');
@@ -2577,6 +2589,50 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         }
       }
     });
+  }
+
+  /// 临时用户消息的固定ID
+  static const String _temporaryUserMessageId = '__temporary_user_message__';
+
+  /// 更新或创建临时用户消息（用于实时显示ASR识别中的文字）
+  void _updateOrCreateTemporaryUserMessage(String content) {
+    if (content.trim().isEmpty) return;
+
+    // 查找是否已存在临时消息
+    final existingIndex = _conversationHistory.indexWhere(
+      (msg) => msg.id == _temporaryUserMessageId,
+    );
+
+    if (existingIndex != -1) {
+      // 更新现有临时消息
+      _conversationHistory[existingIndex] = ChatMessage(
+        id: _temporaryUserMessageId,
+        type: ChatMessageType.user,
+        content: content,
+        timestamp: _conversationHistory[existingIndex].timestamp,
+        isLoading: true, // 标记为临时消息
+      );
+    } else {
+      // 创建新的临时消息
+      _conversationHistory.add(ChatMessage(
+        id: _temporaryUserMessageId,
+        type: ChatMessageType.user,
+        content: content,
+        timestamp: DateTime.now(),
+        isLoading: true, // 标记为临时消息
+      ));
+    }
+  }
+
+  /// 将临时用户消息转为正式消息
+  void _finalizeTemporaryUserMessage(String content) {
+    if (content.trim().isEmpty) return;
+
+    // 移除临时消息
+    _conversationHistory.removeWhere((msg) => msg.id == _temporaryUserMessageId);
+
+    // 添加正式消息
+    _addUserMessage(content);
   }
 
   /// 添加用户消息

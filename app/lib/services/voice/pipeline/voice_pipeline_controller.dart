@@ -558,7 +558,8 @@ class VoicePipelineController {
 
     // 合并所有缓存的句子用于语义分析
     // 如果有中间结果，也要加入分析（用于检测连接词）
-    String aggregatedText = _sentenceBuffer.join('');
+    // 使用逗号分隔，帮助LLM理解句子边界
+    String aggregatedText = _sentenceBuffer.join('，');
     if (pendingPartialText != null && pendingPartialText.isNotEmpty) {
       aggregatedText += pendingPartialText;
       debugPrint('[VoicePipelineController] 包含中间结果进行语义分析: "$aggregatedText"');
@@ -653,7 +654,8 @@ class VoicePipelineController {
     _cumulativeWaitMs = 0;
 
     // 合并所有缓存的句子
-    final aggregatedText = _sentenceBuffer.join('');
+    // 使用逗号分隔，帮助LLM理解句子边界
+    final aggregatedText = _sentenceBuffer.join('，');
     _sentenceBuffer.clear();
 
     debugPrint('[VoicePipelineController] 句子聚合完成，开始处理: "$aggregatedText"');

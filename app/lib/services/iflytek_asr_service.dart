@@ -131,6 +131,7 @@ class IFlytekASRService {
     bool isCompleted = false;
     int frameIndex = 0;
     final resultSegments = <String>[]; // 存储识别结果的段落（按sn索引）
+    int lastFinalSn = 0; // 记录上次输出的最后一个sn（用于句子边界检测）
 
     void markCompleted() {
       if (!isCompleted) {
@@ -194,8 +195,9 @@ class IFlytekASRService {
                   final sn = result['sn'] as int? ?? 0;
                   final pgs = result['pgs'] as String?;
                   final rg = result['rg'] as List?;
+                  final rst = result['rst'] as String?; // pgs=processing, rlt=result
 
-                  debugPrint('[IFlytekASR] 原始结果: sn=$sn, text="$segmentText", pgs=$pgs, rg=$rg, isLast=$isLast');
+                  debugPrint('[IFlytekASR] 原始结果: sn=$sn, text="$segmentText", pgs=$pgs, rg=$rg, rst=$rst, isLast=$isLast');
 
                   // 组装识别结果（根据sn和pgs规则）
                   if (segmentText.isNotEmpty) {
@@ -227,20 +229,36 @@ class IFlytekASRService {
                       resultSegments[sn - 1] = segmentText;
                     }
 
-                    // 组装完整文本（过滤标点符号）
-                    final fullText = resultSegments
-                        .where((s) => s.isNotEmpty && s.trim() != '？' && s.trim() != '.' && s.trim() != ',' && s.trim() != '。')
-                        .join('');
+                    // 检测句子边界（rst=rlt表示句子结束）
+                    final isSentenceEnd = rst == 'rlt';
 
-                    debugPrint('[IFlytekASR] 组装后文本: "$fullText"');
+                    if (isSentenceEnd) {
+                      // 句子结束，提取从上次输出位置到当前sn的文本
+                      final sentenceSegments = <String>[];
+                      for (int i = lastFinalSn; i < sn && i < resultSegments.length; i++) {
+                        final seg = resultSegments[i];
+                        if (seg.isNotEmpty && seg.trim() != '？' && seg.trim() != '.' && seg.trim() != ',' && seg.trim() != '。') {
+                          sentenceSegments.add(seg);
+                        }
+                      }
 
-                    if (fullText.isNotEmpty) {
-                      controller.add(ASRPartialResult(
-                        text: fullText,
-                        isFinal: isLast,
-                        index: frameIndex++,
-                        confidence: 0.9,
-                      ));
+                      final sentenceText = sentenceSegments.join('');
+                      debugPrint('[IFlytekASR] 句子结束: sn=$sn, text="$sentenceText" (范围${lastFinalSn+1}-$sn)');
+
+                      if (sentenceText.isNotEmpty) {
+                        controller.add(ASRPartialResult(
+                          text: sentenceText,
+                          isFinal: true, // 句子结束，标记为final
+                          index: frameIndex++,
+                          confidence: 0.9,
+                        ));
+
+                        // 更新已输出的位置
+                        lastFinalSn = sn;
+                      }
+                    } else {
+                      // 句子还在进行中（rst=pgs或null），不输出
+                      debugPrint('[IFlytekASR] 句子进行中: sn=$sn, rst=$rst (等待句子结束)');
                     }
                   }
 
