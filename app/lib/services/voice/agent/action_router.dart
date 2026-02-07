@@ -15,6 +15,7 @@ import '../../../models/transaction.dart';
 import '../../voice_navigation_service.dart';
 import '../../voice_navigation_executor.dart';
 import '../entity_disambiguation_service.dart';
+import '../knowledge_base_service.dart';
 import '../unified_intent_type.dart';
 import 'action_registry.dart';
 import 'decomposed_intent.dart';
@@ -51,6 +52,9 @@ class ActionRouter {
   /// 实体消歧服务
   final EntityDisambiguationService _disambiguationService;
 
+  /// 知识库服务
+  final KnowledgeBaseService _knowledgeBase;
+
   /// 页面导航回调
   void Function(String route)? onNavigate;
 
@@ -65,14 +69,18 @@ class ActionRouter {
     VoiceNavigationService? navigationService,
     ActionRegistry? registry,
     EntityDisambiguationService? disambiguationService,
+    KnowledgeBaseService? knowledgeBase,
     bool useAutoRegistry = false,
   })  : _databaseService = databaseService ?? sl<IDatabaseService>(),
         _navigationService = navigationService ?? VoiceNavigationService(),
         _registry = registry ?? ActionRegistry.instance,
         _disambiguationService = disambiguationService ?? EntityDisambiguationService(),
+        _knowledgeBase = knowledgeBase ?? KnowledgeBaseService(),
         _useAutoRegistry = useAutoRegistry {
     // 注册所有内置行为
     _registerBuiltInActions();
+    // 异步初始化知识库（加载FAQ数据）
+    _knowledgeBase.initialize();
   }
 
   /// 使用自动注册创建ActionRouter
@@ -190,7 +198,7 @@ class ActionRouter {
       ConversationCancelAction(),
       ConversationClarifyAction(),
       ConversationGreetingAction(),
-      ConversationHelpAction(),
+      ConversationHelpAction(knowledgeBase: _knowledgeBase),
       UnknownIntentAction(),
     ]);
 
@@ -1373,17 +1381,24 @@ class _NavigationAction extends Action {
     if (result.success && result.route != null) {
       debugPrint('[_NavigationAction] 解析成功: route=${result.route}, pageName=${result.pageName}');
 
-      // 直接调用导航执行器进行实际导航
-      final executed = await VoiceNavigationExecutor.instance.navigateToRoute(result.route!);
-      debugPrint('[_NavigationAction] 导航执行结果: $executed');
+      // 使用带上下文的导航方法
+      final navResult = await VoiceNavigationExecutor.instance.navigateToRouteWithContext(
+        result.route!,
+        pageName: result.pageName,
+      );
+      debugPrint('[_NavigationAction] 导航执行结果: ${navResult.success}');
 
       // 同时调用回调（如果设置了）
       _onNavigate?.call(result.route!);
 
-      if (executed) {
+      if (navResult.success) {
         return ActionResult.success(
-          data: {'route': result.route, 'executed': true},
-          responseText: '好的，正在打开${result.pageName ?? targetPage}',
+          data: {
+            'route': result.route,
+            'executed': true,
+            'contextHint': navResult.contextHint,
+          },
+          responseText: navResult.message,
           actionId: id,
         );
       } else {

@@ -5,11 +5,15 @@ import 'package:mockito/annotations.dart';
 
 import 'package:ai_bookkeeping/services/voice_recognition_engine.dart';
 import 'package:ai_bookkeeping/services/voice_token_service.dart';
+import 'package:ai_bookkeeping/services/asr/plugins/alicloud/alicloud_asr_plugin.dart';
+import 'package:ai_bookkeeping/services/asr/plugins/offline/offline_asr_plugin.dart';
+import 'package:ai_bookkeeping/services/asr/utils/network_checker.dart' as asr_utils;
+import 'package:ai_bookkeeping/services/asr/utils/audio_buffer.dart' as asr_buffer;
 
 @GenerateNiceMocks([
-  MockSpec<AliCloudASRService>(),
+  MockSpec<AliCloudASRPlugin>(),
+  MockSpec<OfflineASRPlugin>(),
   MockSpec<LocalWhisperService>(),
-  MockSpec<NetworkChecker>(),
   MockSpec<VoiceTokenService>(),
 ])
 
@@ -321,9 +325,9 @@ void main() {
       });
     });
 
-    group('AudioCircularBuffer', () {
+    group('asr_buffer.AudioCircularBuffer', () {
       test('应该正确写入和读取数据', () {
-        final buffer = AudioCircularBuffer(maxSize: 100);
+        final buffer = asr_buffer.AudioCircularBuffer(maxSize: 100);
 
         buffer.write(Uint8List.fromList([1, 2, 3, 4, 5]));
 
@@ -336,7 +340,7 @@ void main() {
       });
 
       test('缓冲区满时应该覆盖最旧数据', () {
-        final buffer = AudioCircularBuffer(maxSize: 5);
+        final buffer = asr_buffer.AudioCircularBuffer(maxSize: 5);
 
         buffer.write(Uint8List.fromList([1, 2, 3, 4, 5]));
         expect(buffer.isFull, isTrue);
@@ -349,7 +353,7 @@ void main() {
       });
 
       test('peek 不应该移动读取位置', () {
-        final buffer = AudioCircularBuffer(maxSize: 100);
+        final buffer = asr_buffer.AudioCircularBuffer(maxSize: 100);
 
         buffer.write(Uint8List.fromList([1, 2, 3, 4, 5]));
 
@@ -363,7 +367,7 @@ void main() {
       });
 
       test('clear 应该清空缓冲区', () {
-        final buffer = AudioCircularBuffer(maxSize: 100);
+        final buffer = asr_buffer.AudioCircularBuffer(maxSize: 100);
 
         buffer.write(Uint8List.fromList([1, 2, 3]));
         buffer.clear();
@@ -373,7 +377,7 @@ void main() {
       });
 
       test('读取超过可用数据时应该返回实际可用的数据', () {
-        final buffer = AudioCircularBuffer(maxSize: 100);
+        final buffer = asr_buffer.AudioCircularBuffer(maxSize: 100);
 
         buffer.write(Uint8List.fromList([1, 2, 3]));
 

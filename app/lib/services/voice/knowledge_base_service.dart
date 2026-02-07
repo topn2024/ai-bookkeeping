@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 知识库服务
 ///
 /// 提供 FAQ 自动问答、帮助引导和问题收集功能
-/// - FAQ知识库：100+ 问答对，关键词匹配 + 相似度计算
+/// - FAQ知识库：从 assets/help/faq.json 加载
 /// - 帮助引导：功能说明、操作指引
 /// - 问题收集：用户反馈分类和上报
 class KnowledgeBaseService {
@@ -21,251 +22,48 @@ class KnowledgeBaseService {
   /// 是否已初始化
   bool _initialized = false;
 
-  KnowledgeBaseService() {
-    _initializeKnowledgeBase();
+  /// 是否正在初始化
+  bool _initializing = false;
+
+  KnowledgeBaseService();
+
+  /// 异步初始化知识库
+  ///
+  /// 从 assets/help/faq.json 加载FAQ数据
+  Future<void> initialize() async {
+    if (_initialized || _initializing) return;
+    _initializing = true;
+
+    try {
+      await _loadFAQFromAsset();
+      _initializeFeatureHelps();
+      _initialized = true;
+      debugPrint('[KnowledgeBaseService] 初始化完成，加载了 ${_faqEntries.length} 条FAQ');
+    } catch (e) {
+      debugPrint('[KnowledgeBaseService] 初始化失败: $e');
+    } finally {
+      _initializing = false;
+    }
   }
 
-  /// 初始化知识库
-  void _initializeKnowledgeBase() {
-    if (_initialized) return;
+  /// 从asset加载FAQ
+  Future<void> _loadFAQFromAsset() async {
+    try {
+      final jsonString = await rootBundle.loadString('assets/help/faq.json');
+      final jsonData = json.decode(jsonString) as Map<String, dynamic>;
+      final entries = jsonData['entries'] as List<dynamic>;
 
-    _initializeFAQ();
-    _initializeFeatureHelps();
-    _initialized = true;
-  }
+      _faqEntries.clear();
+      for (final item in entries) {
+        final entry = FAQEntry.fromJson(item as Map<String, dynamic>);
+        _faqEntries.add(entry);
+      }
 
-  /// 初始化 FAQ 知识库
-  void _initializeFAQ() {
-    _faqEntries.addAll([
-      // ===== 记账相关 =====
-      FAQEntry(
-        id: 'faq_record_basic',
-        category: FAQCategory.recording,
-        question: '怎么记账',
-        keywords: ['记账', '怎么记', '如何记', '记一笔'],
-        answer: '您可以说"记一笔餐饮30块"，或者说"花了50块吃饭"。我会自动识别金额和分类帮您记录。',
-        voiceGuide: '您可以说"记一笔餐饮30块"，系统会自动为您记录',
-        relatedQuestions: ['faq_record_category', 'faq_record_voice'],
-      ),
-      FAQEntry(
-        id: 'faq_record_voice',
-        category: FAQCategory.recording,
-        question: '怎么用语音记账',
-        keywords: ['语音记账', '说话记账', '语音输入'],
-        answer: '点击首页的麦克风按钮，然后说出消费信息，比如"今天午餐花了35块"。',
-        voiceGuide: '点击麦克风，说出您的消费，比如"午餐35块"',
-      ),
-      FAQEntry(
-        id: 'faq_record_category',
-        category: FAQCategory.recording,
-        question: '怎么选择分类',
-        keywords: ['分类', '选分类', '类别'],
-        answer: '记账时系统会自动识别分类，您也可以说"记一笔交通50块"来指定分类。',
-        voiceGuide: '说"记一笔交通50块"可以指定分类',
-      ),
-      FAQEntry(
-        id: 'faq_record_modify',
-        category: FAQCategory.recording,
-        question: '怎么修改记录',
-        keywords: ['修改', '改记录', '改金额', '改错了'],
-        answer: '您可以说"把上一笔改成50块"，或者说"刚才那笔改成交通"来修改。',
-        voiceGuide: '说"把上一笔改成50块"可以修改金额',
-      ),
-      FAQEntry(
-        id: 'faq_record_delete',
-        category: FAQCategory.recording,
-        question: '怎么删除记录',
-        keywords: ['删除', '删掉', '去掉', '不要'],
-        answer: '您可以说"删掉上一笔"或"删除今天的餐饮记录"来删除。',
-        voiceGuide: '说"删掉上一笔"可以删除刚才的记录',
-      ),
-
-      // ===== 预算相关 =====
-      FAQEntry(
-        id: 'faq_budget_set',
-        category: FAQCategory.budget,
-        question: '怎么设置预算',
-        keywords: ['设置预算', '预算设置', '定预算'],
-        answer: '您可以说"设置餐饮预算2000"，或者打开预算管理页面手动设置。',
-        voiceGuide: '您可以说"设置餐饮预算2000"，或说"打开预算管理"进行设置',
-      ),
-      FAQEntry(
-        id: 'faq_budget_query',
-        category: FAQCategory.budget,
-        question: '怎么查看预算',
-        keywords: ['查预算', '预算多少', '还能花多少', '剩余预算'],
-        answer: '您可以说"还能花多少"或"查看预算"，系统会告诉您各分类的预算使用情况。',
-        voiceGuide: '说"还能花多少"可以查看剩余预算',
-      ),
-      FAQEntry(
-        id: 'faq_budget_alert',
-        category: FAQCategory.budget,
-        question: '预算超支会提醒吗',
-        keywords: ['预算提醒', '超支提醒', '预算警告'],
-        answer: '会的，当您的消费接近或超过预算时，系统会自动提醒您。您可以在设置中调整提醒阈值。',
-        voiceGuide: '预算快用完时系统会提醒您',
-      ),
-
-      // ===== 统计相关 =====
-      FAQEntry(
-        id: 'faq_stats_query',
-        category: FAQCategory.statistics,
-        question: '怎么看消费统计',
-        keywords: ['消费统计', '花了多少', '统计', '支出'],
-        answer: '您可以说"这个月花了多少"或"查看本月统计"，也可以打开统计页面查看详细图表。',
-        voiceGuide: '说"这个月花了多少"可以查看消费统计',
-      ),
-      FAQEntry(
-        id: 'faq_stats_category',
-        category: FAQCategory.statistics,
-        question: '怎么看分类统计',
-        keywords: ['分类统计', '餐饮花了多少', '交通消费'],
-        answer: '您可以说"餐饮花了多少"或"查看交通消费"来查看特定分类的统计。',
-        voiceGuide: '说"餐饮花了多少"可以查看分类统计',
-      ),
-
-      // ===== 小金库相关 =====
-      FAQEntry(
-        id: 'faq_vault_what',
-        category: FAQCategory.vault,
-        question: '什么是小金库',
-        keywords: ['小金库', '什么是小金库', '小金库是什么'],
-        answer: '小金库是一个储蓄目标管理功能，帮您为旅游、购物等目标存钱。您可以创建多个小金库，分别存入资金。',
-        voiceGuide: '小金库帮您为特定目标存钱，比如旅游或购物',
-      ),
-      FAQEntry(
-        id: 'faq_vault_create',
-        category: FAQCategory.vault,
-        question: '怎么创建小金库',
-        keywords: ['创建小金库', '新建小金库', '添加小金库'],
-        answer: '打开小金库页面，点击添加按钮，输入名称和目标金额即可创建。',
-        voiceGuide: '说"打开小金库"进入页面后点击添加',
-      ),
-      FAQEntry(
-        id: 'faq_vault_deposit',
-        category: FAQCategory.vault,
-        question: '怎么往小金库存钱',
-        keywords: ['存入小金库', '分配小金库', '存钱'],
-        answer: '您可以说"分配1000到旅游小金库"，系统会自动帮您存入。',
-        voiceGuide: '说"分配1000到旅游"可以往小金库存钱',
-      ),
-
-      // ===== 钱龄相关 =====
-      FAQEntry(
-        id: 'faq_moneyage_what',
-        category: FAQCategory.moneyAge,
-        question: '什么是钱龄',
-        keywords: ['钱龄', '什么是钱龄', '钱龄是什么', '资金健康'],
-        answer: '钱龄是衡量您资金流动健康度的指标。钱龄越长说明资金持有时间越久，财务越稳健。',
-        voiceGuide: '钱龄越长说明您的财务越稳健',
-      ),
-      FAQEntry(
-        id: 'faq_moneyage_query',
-        category: FAQCategory.moneyAge,
-        question: '怎么查看钱龄',
-        keywords: ['查看钱龄', '我的钱龄', '钱龄多少'],
-        answer: '您可以说"查看钱龄"或打开钱龄分析页面查看详细数据。',
-        voiceGuide: '说"查看钱龄"可以查看您的资金健康度',
-      ),
-
-      // ===== 习惯相关 =====
-      FAQEntry(
-        id: 'faq_habit_checkin',
-        category: FAQCategory.habit,
-        question: '怎么打卡',
-        keywords: ['打卡', '签到', '记账打卡'],
-        answer: '您可以说"打卡"或点击首页的打卡按钮。连续打卡可以获得积分奖励。',
-        voiceGuide: '说"打卡"就可以完成今日签到',
-      ),
-      FAQEntry(
-        id: 'faq_habit_challenge',
-        category: FAQCategory.habit,
-        question: '什么是挑战',
-        keywords: ['挑战', '省钱挑战', '记账挑战'],
-        answer: '挑战是帮助您养成良好记账习惯的小目标，比如连续记账7天、一周省下100元等。',
-        voiceGuide: '挑战帮您养成良好的记账习惯',
-      ),
-
-      // ===== 数据相关 =====
-      FAQEntry(
-        id: 'faq_data_backup',
-        category: FAQCategory.data,
-        question: '怎么备份数据',
-        keywords: ['备份', '数据备份', '保存数据'],
-        answer: '您可以说"立即备份"，或在设置页面开启自动备份功能。',
-        voiceGuide: '说"立即备份"可以马上备份数据',
-      ),
-      FAQEntry(
-        id: 'faq_data_export',
-        category: FAQCategory.data,
-        question: '怎么导出数据',
-        keywords: ['导出', '导出数据', '下载记录'],
-        answer: '您可以说"导出本月数据"，系统会生成Excel文件供您下载。',
-        voiceGuide: '说"导出本月数据"可以导出消费记录',
-      ),
-      FAQEntry(
-        id: 'faq_data_sync',
-        category: FAQCategory.data,
-        question: '怎么同步数据',
-        keywords: ['同步', '数据同步', '多设备'],
-        answer: '登录账号后数据会自动同步到云端，您也可以说"同步数据"手动触发。',
-        voiceGuide: '说"同步数据"可以手动同步',
-      ),
-
-      // ===== 账户相关 =====
-      FAQEntry(
-        id: 'faq_account_add',
-        category: FAQCategory.account,
-        question: '怎么添加账户',
-        keywords: ['添加账户', '新建账户', '创建账户'],
-        answer: '打开账户管理页面，点击添加按钮，选择账户类型并填写信息即可。',
-        voiceGuide: '说"打开账户管理"进入页面后点击添加',
-      ),
-      FAQEntry(
-        id: 'faq_account_creditcard',
-        category: FAQCategory.account,
-        question: '怎么设置信用卡',
-        keywords: ['信用卡', '设置信用卡', '信用卡账单日'],
-        answer: '添加信用卡账户时可以设置账单日和还款日，系统会自动提醒您还款。',
-        voiceGuide: '添加信用卡时设置账单日和还款日即可',
-      ),
-
-      // ===== 设置相关 =====
-      FAQEntry(
-        id: 'faq_setting_theme',
-        category: FAQCategory.settings,
-        question: '怎么换主题',
-        keywords: ['主题', '换主题', '深色模式', '夜间模式'],
-        answer: '您可以说"开启深色模式"，或在设置页面的外观设置中切换主题。',
-        voiceGuide: '说"开启深色模式"可以切换主题',
-      ),
-      FAQEntry(
-        id: 'faq_setting_reminder',
-        category: FAQCategory.settings,
-        question: '怎么设置提醒',
-        keywords: ['提醒', '设置提醒', '记账提醒'],
-        answer: '在设置页面的提醒设置中，可以配置每日记账提醒、预算提醒等。',
-        voiceGuide: '说"打开提醒设置"可以配置各种提醒',
-      ),
-
-      // ===== 语音相关 =====
-      FAQEntry(
-        id: 'faq_voice_commands',
-        category: FAQCategory.voice,
-        question: '有哪些语音命令',
-        keywords: ['语音命令', '可以说什么', '支持哪些语音'],
-        answer: '支持记账（"花了30块吃饭"）、查询（"这个月花了多少"）、导航（"打开设置"）、操作（"打卡"、"备份"）等。',
-        voiceGuide: '您可以说记账、查询、导航、操作等各类指令',
-      ),
-      FAQEntry(
-        id: 'faq_voice_not_recognized',
-        category: FAQCategory.voice,
-        question: '语音识别不准怎么办',
-        keywords: ['识别不准', '听不懂', '识别错误'],
-        answer: '请在安静环境中使用，说话时靠近麦克风。如果仍有问题，可以尝试换一种表达方式。',
-        voiceGuide: '请在安静环境中清晰说话',
-      ),
-    ]);
+      debugPrint('[KnowledgeBaseService] 从faq.json加载了 ${_faqEntries.length} 条FAQ');
+    } catch (e) {
+      debugPrint('[KnowledgeBaseService] 加载FAQ失败: $e');
+      rethrow;
+    }
   }
 
   /// 初始化功能帮助库
@@ -341,9 +139,14 @@ class KnowledgeBaseService {
   /// 搜索 FAQ
   ///
   /// 返回匹配的 FAQ 列表，按相关度排序
-  /// 优化：使用预计算的小写版本，支持早期终止
   List<FAQSearchResult> searchFAQ(String query) {
     if (query.trim().isEmpty) return [];
+
+    // 同步检查，如果未初始化则返回空
+    if (!_initialized) {
+      debugPrint('[KnowledgeBaseService] 警告：知识库未初始化');
+      return [];
+    }
 
     final results = <FAQSearchResult>[];
     final normalizedQuery = query.toLowerCase();
@@ -411,16 +214,14 @@ class KnowledgeBaseService {
   }
 
   /// 计算匹配分数
-  ///
-  /// 使用预计算的小写版本提高效率
   double _calculateMatchScore(String query, FAQEntry entry) {
     double score = 0.0;
 
-    // 问题精确匹配（使用预计算的小写版本）
+    // 问题精确匹配
     if (entry.questionLower.contains(query)) {
       score = 0.9;
     }
-    // 关键词匹配（使用预计算的小写版本）
+    // 关键词匹配
     else {
       int matchedKeywords = 0;
       for (final keyword in entry.keywordsLower) {
@@ -558,6 +359,9 @@ class KnowledgeBaseService {
   void addFAQ(FAQEntry entry) {
     _faqEntries.add(entry);
   }
+
+  /// 是否已初始化
+  bool get isInitialized => _initialized;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -576,10 +380,20 @@ enum FAQCategory {
   account('账户'),
   settings('设置'),
   voice('语音'),
+  navigation('导航'),
+  general('通用'),
   other('其他');
 
   final String displayName;
   const FAQCategory(this.displayName);
+
+  /// 从字符串解析分类
+  static FAQCategory fromString(String value) {
+    return FAQCategory.values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => FAQCategory.other,
+    );
+  }
 }
 
 /// FAQ 条目
@@ -608,6 +422,21 @@ class FAQEntry {
     // 预计算小写版本，避免每次搜索都转换
     _questionLower = question.toLowerCase();
     _keywordsLower = keywords.map((k) => k.toLowerCase()).toList();
+  }
+
+  /// 从JSON创建FAQEntry
+  factory FAQEntry.fromJson(Map<String, dynamic> json) {
+    return FAQEntry(
+      id: json['id'] as String,
+      category: FAQCategory.fromString(json['category'] as String),
+      question: json['question'] as String,
+      keywords: (json['keywords'] as List<dynamic>).cast<String>(),
+      answer: json['answer'] as String,
+      voiceGuide: json['voiceGuide'] as String?,
+      relatedQuestions: json['relatedQuestions'] != null
+          ? (json['relatedQuestions'] as List<dynamic>).cast<String>()
+          : const [],
+    );
   }
 
   /// 获取预计算的小写问题

@@ -89,6 +89,64 @@ class StreamingTTSService {
     debugPrint('StreamingTTSService: PCM mode = $usePCM');
   }
 
+  /// 预热连接（提前建立HTTP连接，减少首次合成延迟）
+  ///
+  /// 通过发送一个静默请求来预热：
+  /// - 获取并缓存Token
+  /// - 建立TCP/SSL连接
+  /// - 触发服务端缓存
+  ///
+  /// 建议在应用启动时调用，可节省200-500ms首次延迟
+  Future<void> warmup() async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+
+    final startTime = DateTime.now();
+    debugPrint('StreamingTTSService: 开始预热连接...');
+
+    try {
+      // 1. 预获取Token（触发Token缓存）
+      final tokenInfo = await _tokenService.getToken();
+
+      // 2. 发送一个最小化请求预热连接（使用一个标点符号，不产生实际音频）
+      String ttsRestUrl = tokenInfo.ttsUrl;
+      if (ttsRestUrl.startsWith('wss://')) {
+        ttsRestUrl = ttsRestUrl
+            .replaceFirst('wss://', 'https://')
+            .replaceFirst('/ws/v1', '/stream/v1/tts');
+      } else if (ttsRestUrl.startsWith('ws://')) {
+        ttsRestUrl = ttsRestUrl
+            .replaceFirst('ws://', 'http://')
+            .replaceFirst('/ws/v1', '/stream/v1/tts');
+      }
+
+      final uri = Uri.parse(ttsRestUrl).replace(
+        queryParameters: {
+          'appkey': tokenInfo.appKey,
+          'text': '。',  // 最短文本，最小化服务端处理
+          'format': 'pcm',
+          'sample_rate': '16000',
+          'voice': _voice,
+        },
+      );
+
+      // 发送请求但不处理响应（仅预热连接）
+      await _dio.getUri<List<int>>(
+        uri,
+        options: Options(
+          headers: {'X-NLS-Token': tokenInfo.token},
+          responseType: ResponseType.bytes,
+        ),
+      );
+
+      final elapsed = DateTime.now().difference(startTime);
+      debugPrint('StreamingTTSService: 预热完成 (${elapsed.inMilliseconds}ms)');
+    } catch (e) {
+      debugPrint('StreamingTTSService: 预热失败（不影响后续使用）: $e');
+    }
+  }
+
   /// 流式朗读文本
   ///
   /// 将文本分割成句子，并行合成，边合成边播放

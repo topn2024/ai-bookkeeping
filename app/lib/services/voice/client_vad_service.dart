@@ -135,12 +135,14 @@ class ClientVADService {
         });
 
         // 启动VAD监听，使用自定义音频流
+        // 使用本地bundled模型，避免每次从CDN下载
         await _vadHandler!.startListening(
           positiveSpeechThreshold: config.vadThreshold,
           negativeSpeechThreshold: config.vadThreshold - 0.15,
           frameSamples: config.frameSamples,
           minSpeechFrames: config.minSpeechFrames,
           model: 'v5', // 使用v5模型，更适合实时场景
+          baseAssetPath: 'assets/models/', // 使用本地模型，避免网络下载
           audioStream: _audioStreamController!.stream,
         );
 

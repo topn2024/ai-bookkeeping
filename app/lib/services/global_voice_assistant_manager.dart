@@ -590,47 +590,65 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       debugPrint('[GlobalVoiceAssistant] [预加载] 2/5 TTS服务已初始化');
 
       // 3. 预初始化流式TTS服务和音频播放器（用于流水线模式）
-      debugPrint('[GlobalVoiceAssistant] [预加载] 3/5 初始化流式TTS服务...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 3/9 初始化流式TTS服务...');
       _streamingTtsService = StreamingTTSService();
       await _streamingTtsService!.initialize();
-      debugPrint('[GlobalVoiceAssistant] [预加载] 3/5 流式TTS服务已初始化');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 3/9 流式TTS服务已初始化');
 
       // 4. 检查麦克风权限（不弹窗请求）
-      debugPrint('[GlobalVoiceAssistant] [预加载] 4/7 检查麦克风权限...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 4/9 检查麦克风权限...');
       final permissionStatus = await Permission.microphone.status;
-      debugPrint('[GlobalVoiceAssistant] [预加载] 4/7 麦克风权限状态: $permissionStatus');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 4/9 麦克风权限状态: $permissionStatus');
 
       // 5. 预初始化 WebRTC APM 音频处理器
-      debugPrint('[GlobalVoiceAssistant] [预加载] 5/7 初始化 WebRTC APM...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 5/9 初始化 WebRTC APM...');
       await AudioProcessorService.instance.initialize();
-      debugPrint('[GlobalVoiceAssistant] [预加载] 5/7 WebRTC APM 已初始化');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 5/9 WebRTC APM 已初始化');
 
       // 6. 预创建 AudioRecorder 实例
-      debugPrint('[GlobalVoiceAssistant] [预加载] 6/7 创建录音器实例...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 6/9 创建录音器实例...');
       _audioRecorder ??= AudioRecorder();
-      debugPrint('[GlobalVoiceAssistant] [预加载] 6/7 录音器实例已创建');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 6/9 录音器实例已创建');
 
       // 7. 预初始化 VAD 和识别引擎（不需要权限）
-      debugPrint('[GlobalVoiceAssistant] [预加载] 7/7 初始化 VAD 和识别引擎...');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 7/9 初始化 VAD 和识别引擎...');
       _recognitionEngine ??= VoiceRecognitionEngine();
       if (_vadService == null) {
         // 创建VAD服务，能量阈值作为降级方案的配置
         _vadService = RealtimeVADService(
           config: RealtimeVADConfig.defaultConfig().copyWith(
             speechEndThresholdMs: 1200,
-            silenceTimeoutMs: 30000,
             // 降级时使用的能量阈值配置
             energyThreshold: 0.001,
             minEnergyThreshold: 0.0003,
             maxEnergyThreshold: 0.01,
           ),
         );
-        // 初始化Silero VAD（优先使用神经网络检测，失败时自动降级到能量检测）
+        // 初始化Silero VAD（本地模型，约0.8秒）
         await _vadService!.initializeSileroVAD();
         debugPrint('[GlobalVoiceAssistant] VAD模式: ${_vadService!.isUsingSileroVAD ? "Silero神经网络" : "能量检测"}');
         _vadSubscription = _vadService!.eventStream.listen(_handleVADEvent);
       }
-      debugPrint('[GlobalVoiceAssistant] [预加载] 7/7 VAD 和识别引擎已初始化');
+      debugPrint('[GlobalVoiceAssistant] [预加载] 7/9 VAD 和识别引擎已初始化');
+
+      // 8. 预热TTS连接（提前建立HTTP连接，减少首次合成延迟）
+      debugPrint('[GlobalVoiceAssistant] [预加载] 8/9 预热TTS连接...');
+      try {
+        await _streamingTtsService!.warmup();
+        debugPrint('[GlobalVoiceAssistant] [预加载] 8/9 TTS连接预热完成');
+      } catch (e) {
+        debugPrint('[GlobalVoiceAssistant] [预加载] 8/9 TTS预热失败（不影响后续使用）: $e');
+      }
+
+      // 9. 预热ASR连接（在后台提前建立WebSocket连接）
+      // 注：LLM连接已在步骤0的 _checkLLMAvailability() 中预热
+      debugPrint('[GlobalVoiceAssistant] [预加载] 9/9 预热ASR连接...');
+      try {
+        _recognitionEngine?.warmupConnection();
+        debugPrint('[GlobalVoiceAssistant] [预加载] 9/9 ASR连接预热已启动');
+      } catch (e) {
+        debugPrint('[GlobalVoiceAssistant] [预加载] 9/9 ASR预热失败（不影响后续使用）: $e');
+      }
 
       final elapsed = DateTime.now().difference(_preloadStartTime!);
       _isPreloaded = true;
@@ -734,7 +752,6 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       _vadService = RealtimeVADService(
         config: RealtimeVADConfig.defaultConfig().copyWith(
           speechEndThresholdMs: 1200,  // 静音1.2秒判定说完（折中方案）
-          silenceTimeoutMs: 30000,     // 30秒无声音自动结束对话
           // 降级时使用的能量阈值配置
           energyThreshold: 0.001,
           minEnergyThreshold: 0.0003,
@@ -863,17 +880,26 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       _handlePipelineStateChanged(state);
     };
 
-    // 中间结果回调（显示用户说的话）
+    // 中间结果回调（实时显示用户说的话）
     _pipelineController!.onPartialResult = (text) {
       _partialText = text;
+
+      // 在对话记录中实时显示识别中的文字（临时消息）
+      if (text.trim().isNotEmpty) {
+        _updateOrCreateTemporaryUserMessage(text);
+      }
+
       notifyListeners();
     };
 
-    // 最终结果回调（添加用户消息到历史）
+    // 最终结果回调（将临时消息转为正式消息）
     _pipelineController!.onFinalResult = (text) {
       debugPrint('[GlobalVoiceAssistant] [PIPELINE] onFinalResult 收到: "$text"');
       _partialText = '';
-      _addUserMessage(text);
+
+      // 将临时消息转为正式消息
+      _finalizeTemporaryUserMessage(text);
+
       notifyListeners();
     };
 
@@ -1177,10 +1203,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _recordingStartTime = DateTime.now();
     setBallState(FloatingBallState.recording);
 
-    // 开始沉默超时检测（30秒无声音自动结束对话）
-    _vadService?.startSilenceTimeoutDetection();
-
-    debugPrint('[GlobalVoiceAssistant] 流水线模式录音已启动（沉默超时检测已开启）');
+    debugPrint('[GlobalVoiceAssistant] 流水线模式录音已启动');
   }
 
   /// 音频数据计数器（流水线模式）
@@ -1341,6 +1364,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _partialText = '';
     _amplitude = 0.0;
 
+    // 清理未完成的临时消息
+    _conversationHistory.removeWhere((msg) => msg.id == _temporaryUserMessageId);
+
     setBallState(FloatingBallState.idle);
     debugPrint('[GlobalVoiceAssistant] 流水线模式录音已停止');
   }
@@ -1368,16 +1394,6 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         // 只记录状态，等待ASR返回最终结果
         _isProcessingUtterance = false;
         notifyListeners();
-        break;
-
-      case VADEventType.silenceTimeout:
-        // 【已废弃】VAD 的 silenceTimeout 不再使用
-        // 会话超时统一由 VoicePipelineController 中的 ProactiveConversationManager 管理
-        // 这样可以：
-        // 1. 在 TTS 播放期间正确暂停计时器
-        // 2. 支持智能主动对话（5秒追问，最多3次）
-        // 3. 避免两套计时器系统冲突
-        debugPrint('[GlobalVoiceAssistant] VAD: silenceTimeout 事件已忽略（由 ProactiveConversationManager 统一管理）');
         break;
 
       default:
@@ -1612,13 +1628,10 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       // 启动流式ASR
       _startStreamingASR();
 
-      // 开始沉默超时检测（用户打开助手但不说话时触发主动对话）
-      _vadService?.startSilenceTimeoutDetection();
-
       _recordingStartTime = DateTime.now();
       setBallState(FloatingBallState.recording);
 
-      debugPrint('[GlobalVoiceAssistant] 流式语音处理已启动（沉默超时检测已开启）');
+      debugPrint('[GlobalVoiceAssistant] 流式语音处理已启动');
     } catch (e) {
       debugPrint('[GlobalVoiceAssistant] 开始录音失败: $e');
       _handleError('无法开始录音，请检查麦克风权限');
@@ -1958,42 +1971,6 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 处理沉默超时自动结束对话
-  ///
-  /// 用户30秒无语音输入，自动结束本次对话
-  /// 对话有记忆，用户随时可以继续
-  Future<void> _handleSilenceTimeoutEnd() async {
-    debugPrint('[GlobalVoiceAssistant] 处理沉默超时，自动结束对话');
-
-    // 1. 立即停止TTS（如果正在播放）
-    try {
-      await _ttsService?.stop();
-    } catch (e) {
-      debugPrint('[GlobalVoiceAssistant] 停止TTS失败: $e');
-    }
-
-    // 2. 清除处理中标志
-    _isProcessingCommand = false;
-
-    // 3. 使用LLM生成沉默超时告别消息并播放
-    final farewell = await LLMResponseGenerator.instance.generateFarewellResponse(
-      farewellType: 'silenceTimeout',
-    );
-    _addAssistantMessage(farewell);
-
-    // 4. 播放告别语
-    try {
-      await _streamingTtsService?.speak(farewell);
-    } catch (e) {
-      debugPrint('[GlobalVoiceAssistant] 播放告别语失败: $e');
-    }
-
-    // 5. 停止录音
-    await stopRecording();
-
-    notifyListeners();
-  }
-
   /// 启用打断检测模式
   ///
   /// TTS开始播放时调用，保持录音和VAD运行，用于检测用户打断
@@ -2019,14 +1996,6 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     if (_asrResultSubscription != null && !_asrResultSubscription!.isPaused) {
       debugPrint('[GlobalVoiceAssistant] 暂停ASR订阅（防止回声）');
       _asrResultSubscription!.pause();
-    }
-  }
-
-  /// 恢复ASR订阅
-  void _resumeASRSubscription() {
-    if (_asrResultSubscription != null && _asrResultSubscription!.isPaused) {
-      debugPrint('[GlobalVoiceAssistant] 恢复ASR订阅');
-      _asrResultSubscription!.resume();
     }
   }
 
@@ -2400,8 +2369,6 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         !_audioStreamController!.isClosed) {
       debugPrint('[GlobalVoiceAssistant] TTS完成，重启ASR');
       _startStreamingASR();
-      // 重启沉默超时检测
-      _vadService?.startSilenceTimeoutDetection();
 
       // 重启5秒主动话题计时器（30秒计时器继续运行）
       if (_continuousMode) {
@@ -2577,6 +2544,50 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         }
       }
     });
+  }
+
+  /// 临时用户消息的固定ID
+  static const String _temporaryUserMessageId = '__temporary_user_message__';
+
+  /// 更新或创建临时用户消息（用于实时显示ASR识别中的文字）
+  void _updateOrCreateTemporaryUserMessage(String content) {
+    if (content.trim().isEmpty) return;
+
+    // 查找是否已存在临时消息
+    final existingIndex = _conversationHistory.indexWhere(
+      (msg) => msg.id == _temporaryUserMessageId,
+    );
+
+    if (existingIndex != -1) {
+      // 更新现有临时消息
+      _conversationHistory[existingIndex] = ChatMessage(
+        id: _temporaryUserMessageId,
+        type: ChatMessageType.user,
+        content: content,
+        timestamp: _conversationHistory[existingIndex].timestamp,
+        isLoading: true, // 标记为临时消息
+      );
+    } else {
+      // 创建新的临时消息
+      _conversationHistory.add(ChatMessage(
+        id: _temporaryUserMessageId,
+        type: ChatMessageType.user,
+        content: content,
+        timestamp: DateTime.now(),
+        isLoading: true, // 标记为临时消息
+      ));
+    }
+  }
+
+  /// 将临时用户消息转为正式消息
+  void _finalizeTemporaryUserMessage(String content) {
+    if (content.trim().isEmpty) return;
+
+    // 移除临时消息
+    _conversationHistory.removeWhere((msg) => msg.id == _temporaryUserMessageId);
+
+    // 添加正式消息
+    _addUserMessage(content);
   }
 
   /// 添加用户消息

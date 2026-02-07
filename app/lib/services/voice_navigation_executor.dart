@@ -57,9 +57,15 @@ class VoiceNavigationExecutor {
     _tabSwitcher = switcher;
   }
 
+  /// 当前页面上下文（导航后更新）
+  String? _currentPageContext;
+
+  /// 获取当前页面上下文
+  String? get currentPageContext => _currentPageContext;
+
   /// 执行语音导航
   ///
-  /// 返回导航结果消息
+  /// 返回导航结果消息（包含页面上下文提示）
   Future<String> executeNavigation(String voiceInput) async {
     debugPrint('[VoiceNavigationExecutor] executeNavigation: $voiceInput');
     final result = _navigationService.parseNavigation(voiceInput);
@@ -80,10 +86,60 @@ class VoiceNavigationExecutor {
     debugPrint('[VoiceNavigationExecutor] 导航执行结果: $executed');
 
     if (executed) {
+      // 更新当前页面上下文
+      _currentPageContext = _buildPageContext(route, result.pageName ?? '');
+
+      // 返回包含上下文提示的消息
+      final contextHint = _getPageContextHint(route);
+      if (contextHint != null) {
+        return '正在打开${result.pageName}。$contextHint';
+      }
       return '正在打开${result.pageName}';
     } else {
       return '抱歉，暂时无法打开${result.pageName}';
     }
+  }
+
+  /// 构建页面上下文字符串
+  String _buildPageContext(String route, String pageName) {
+    return '当前页面: $pageName (路由: $route)';
+  }
+
+  /// 获取页面上下文提示
+  ///
+  /// 返回适合在语音对话中使用的上下文提示，帮助用户了解当前页面可以做什么
+  String? _getPageContextHint(String route) {
+    const pageContextHints = <String, String>{
+      // 统计报表模块
+      '/statistics/trend': '您可以说"看本月趋势"、"看上月数据"、"按餐饮分类查看"等来切换数据维度',
+      '/statistics/expense': '您可以说"看本月支出"、"看上周消费"、"看餐饮分类"等来查看不同维度的支出统计',
+      '/statistics/income': '您可以说"看本月收入"、"看上月收入"等来查看不同时间段的收入',
+      '/statistics': '您可以说"看支出统计"、"看收入统计"、"看消费趋势"等来查看详细数据',
+      '/statistics/category': '您可以说"看餐饮"、"看交通"等来查看具体分类的消费详情',
+      '/statistics/comparison': '您可以说"和上月对比"、"和去年同期对比"等来查看不同时期的数据对比',
+
+      // 预算模块
+      '/budget': '您可以说"看预算执行"、"看本月预算"、"设置餐饮预算"等来管理预算',
+      '/budget/vault-list': '您可以说"创建小金库"、"查看餐饮金库"等来管理您的小金库',
+
+      // 账户模块
+      '/accounts': '您可以说"看资产总览"、"添加账户"、"转账"等来管理账户',
+
+      // 交易列表
+      '/transaction-list': '您可以说"看本月账单"、"看餐饮消费"、"搜索星巴克"等来筛选查看交易',
+      '/transactions': '您可以说"看本月账单"、"看餐饮消费"、"搜索星巴克"等来筛选查看交易',
+
+      // 钱龄分析
+      '/money-age': '您可以说"看钱龄趋势"、"看健康等级"、"看优化建议"等来了解您的资金健康状况',
+
+      // 储蓄目标
+      '/savings': '您可以说"添加储蓄目标"、"看目标进度"等来管理您的储蓄计划',
+
+      // 账单提醒
+      '/bills': '您可以说"看即将到期账单"、"添加账单提醒"等来管理您的账单',
+    };
+
+    return pageContextHints[route];
   }
 
   /// 根据路由导航到对应页面
@@ -119,9 +175,16 @@ class VoiceNavigationExecutor {
     }
 
     // 执行导航
+    // 注意：不使用 await，否则会阻塞直到页面关闭
+    // 这会导致语音处理回调无法及时返回，影响后续交互
     try {
-      await navigator.push(
-        MaterialPageRoute(builder: (_) => page),
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => page,
+          // 设置路由名称，让 VoiceContextRouteObserver 能正确检测路由变化
+          // 这样导航后悬浮球能正确显示（因为新页面不在 excludedRoutes 中）
+          settings: RouteSettings(name: route, arguments: params),
+        ),
       );
       return true;
     } catch (e) {
@@ -149,6 +212,14 @@ class VoiceNavigationExecutor {
     final tabIndex = tabRoutes[route];
     if (tabIndex != null) {
       debugPrint('[VoiceNavigationExecutor] 切换到标签: $tabIndex');
+
+      // 如果当前在子页面（如趋势分析页面），先 pop 回主导航
+      final navigator = navigatorKey.currentState;
+      if (navigator != null && navigator.canPop()) {
+        debugPrint('[VoiceNavigationExecutor] 先 pop 回主导航');
+        navigator.popUntil((route) => route.isFirst);
+      }
+
       _tabSwitcher!(tabIndex);
       return true;
     }
@@ -402,7 +473,82 @@ class VoiceNavigationExecutor {
   /// [params] 可选的导航参数，如 category、timeRange、source 等
   Future<bool> navigateToRoute(String route, {Map<String, dynamic>? params}) async {
     debugPrint('[VoiceNavigationExecutor] navigateToRoute: $route, params: $params');
-    return await _navigateToRoute(route, params: params);
+    final success = await _navigateToRoute(route, params: params);
+
+    // 导航成功后更新页面上下文
+    if (success) {
+      final pageName = _getPageNameForRoute(route);
+      _currentPageContext = _buildPageContext(route, pageName);
+    }
+
+    return success;
+  }
+
+  /// 直接导航到指定路由，并返回包含上下文的消息
+  ///
+  /// 返回导航结果消息（包含页面上下文提示）
+  Future<NavigationResultWithContext> navigateToRouteWithContext(
+    String route, {
+    Map<String, dynamic>? params,
+    String? pageName,
+  }) async {
+    debugPrint('[VoiceNavigationExecutor] navigateToRouteWithContext: $route, params: $params');
+    final success = await _navigateToRoute(route, params: params);
+
+    final resolvedPageName = pageName ?? _getPageNameForRoute(route);
+
+    if (success) {
+      // 更新当前页面上下文
+      _currentPageContext = _buildPageContext(route, resolvedPageName);
+
+      // 构建包含上下文提示的消息
+      final contextHint = _getPageContextHint(route);
+      final message = contextHint != null
+          ? '正在打开$resolvedPageName。$contextHint'
+          : '正在打开$resolvedPageName';
+
+      return NavigationResultWithContext(
+        success: true,
+        message: message,
+        route: route,
+        pageName: resolvedPageName,
+        contextHint: contextHint,
+      );
+    } else {
+      return NavigationResultWithContext(
+        success: false,
+        message: '抱歉，暂时无法打开$resolvedPageName',
+        route: route,
+        pageName: resolvedPageName,
+      );
+    }
+  }
+
+  /// 根据路由获取页面名称
+  String _getPageNameForRoute(String route) {
+    // 常见路由到页面名称的映射
+    const routeNames = <String, String>{
+      '/': '首页',
+      '/home': '首页',
+      '/statistics': '统计报表',
+      '/statistics/trend': '消费趋势',
+      '/statistics/expense': '支出统计',
+      '/statistics/income': '收入统计',
+      '/statistics/category': '分类统计',
+      '/statistics/comparison': '对比分析',
+      '/budget': '预算',
+      '/budget/vault-list': '小金库列表',
+      '/accounts': '账户管理',
+      '/transaction-list': '交易列表',
+      '/transactions': '交易列表',
+      '/money-age': '钱龄分析',
+      '/savings': '储蓄目标',
+      '/bills': '账单提醒',
+      '/settings': '设置',
+      '/quick-add': '快速记账',
+    };
+
+    return routeNames[route] ?? route.split('/').last;
   }
 
   /// 返回上一页
@@ -410,6 +556,8 @@ class VoiceNavigationExecutor {
     final navigator = navigatorKey.currentState;
     if (navigator != null && navigator.canPop()) {
       navigator.pop();
+      // 清除页面上下文（因为我们不知道返回后是哪个页面）
+      _currentPageContext = null;
       return true;
     }
     return false;
@@ -418,5 +566,32 @@ class VoiceNavigationExecutor {
   /// 返回首页
   void goHome() {
     _tabSwitcher?.call(0);
+    _currentPageContext = _buildPageContext('/home', '首页');
   }
+}
+
+/// 带上下文的导航结果
+class NavigationResultWithContext {
+  /// 是否成功
+  final bool success;
+
+  /// 导航结果消息（用于语音播报和保存到聊天历史）
+  final String message;
+
+  /// 路由路径
+  final String route;
+
+  /// 页面名称
+  final String pageName;
+
+  /// 上下文提示（可选）
+  final String? contextHint;
+
+  const NavigationResultWithContext({
+    required this.success,
+    required this.message,
+    required this.route,
+    required this.pageName,
+    this.contextHint,
+  });
 }

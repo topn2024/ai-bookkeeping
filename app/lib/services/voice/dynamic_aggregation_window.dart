@@ -159,6 +159,29 @@ class DynamicAggregationWindow {
         'buffered=${context.bufferedSentenceCount}, '
         'cumulative=${context.cumulativeWaitMs}ms');
 
+    // 0. 用户正在说话时的等待策略
+    //    - 记账相关意图（有金额、分类词、记账请求）：延迟等待，收集后续内容
+    //    - 导航/闲聊/查询等非记账意图：立即响应，使用最小等待时间
+    if (context.isUserSpeaking) {
+      // 检查是否可能是记账意图
+      final hasBookkeepingSignal = _hasBookkeepingIntent(text);
+
+      if (hasBookkeepingSignal) {
+        debugPrint('[DynamicAggregationWindow] 用户正在说话+记账意图，使用最大等待时间');
+        return const WaitTimeResult(
+          waitTimeMs: AggregationTiming.maxWaitMs,
+          reason: '用户正在说话（记账意图）',
+        );
+      } else {
+        // 非记账意图（导航/闲聊/查询），立即响应
+        debugPrint('[DynamicAggregationWindow] 用户正在说话但非记账意图，立即响应');
+        return const WaitTimeResult(
+          waitTimeMs: AggregationTiming.minWaitMs,
+          reason: '用户正在说话（非记账意图，立即响应）',
+        );
+      }
+    }
+
     // 1. 最大等待时间兜底
     if (context.cumulativeWaitMs >= AggregationTiming.maxWaitMs) {
       debugPrint('[DynamicAggregationWindow] 超过最大等待时间，强制处理');

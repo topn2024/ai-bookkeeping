@@ -663,10 +663,6 @@ class VoiceSessionController {
         _onUserSpeechEnd();
         break;
 
-      case VADEventType.silenceTimeout:
-        _onSilenceTimeout();
-        break;
-
       default:
         break;
     }
