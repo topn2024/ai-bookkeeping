@@ -409,8 +409,8 @@ class AppSettingsConfig(BaseModel):
     min_app_version: str = "1.1.0"  # 最低支持的客户端版本
 
     # API 配置
-    api_base_url: str = "https://39.105.12.124/api/v1"
-    skip_certificate_verification: bool = True  # 服务器使用 IP + 自签名证书
+    api_base_url: str = ""  # Will be set from environment variable
+    skip_certificate_verification: bool = False  # 生产环境应使用正规证书，禁止跳过验证
 
     # AI 配置
     ai_models: AIModelConfig = AIModelConfig()
@@ -489,11 +489,12 @@ async def get_app_settings(
     Does not require authentication (for initial app setup).
     Sensitive data (API keys) requires authentication via /config/ai endpoint.
     """
+    settings = get_settings()
     return AppSettingsConfig(
         config_version="1.0.0",
         min_app_version="1.1.0",
-        api_base_url="https://39.105.12.124/api/v1",
-        skip_certificate_verification=True,  # 服务器使用 IP + 自签名证书
+        api_base_url=f"{settings.APP_BASE_URL}/api/v1",
+        skip_certificate_verification=False,
         ai_models=AIModelConfig(),
         network=NetworkConfig(),
         duplicate_detection=DuplicateDetectionConfig(),

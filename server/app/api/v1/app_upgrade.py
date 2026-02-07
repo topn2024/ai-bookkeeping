@@ -2,7 +2,9 @@
 import logging
 import hashlib
 import json
-from fastapi import APIRouter, Depends, Query, Request, Header
+import time
+from collections import defaultdict
+from fastapi import APIRouter, Depends, Query, Request, Header, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
@@ -10,7 +12,8 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user
+from app.models.user import User
 from app.models.app_version import AppVersion
 from app.models.upgrade_analytics import UpgradeAnalytics
 from app.services.signed_url_service import create_download_url
@@ -354,10 +357,31 @@ class UpgradeStatsResponse(BaseModel):
     events_by_type: Dict[str, int]
 
 
+# ============== Analytics Rate Limiting ==============
+# Simple in-memory rate limit for unauthenticated analytics endpoint
+_analytics_ip_window: dict[str, list] = defaultdict(list)
+_ANALYTICS_RATE_LIMIT = 30  # max 30 requests per IP per minute
+_ANALYTICS_WINDOW = 60  # 1 minute
+
+
+def _check_analytics_rate_limit(request: Request) -> bool:
+    """Check analytics endpoint rate limit by IP."""
+    forwarded = request.headers.get("x-forwarded-for")
+    ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+    now = time.time()
+    cutoff = now - _ANALYTICS_WINDOW
+    _analytics_ip_window[ip] = [t for t in _analytics_ip_window[ip] if t > cutoff]
+    if len(_analytics_ip_window[ip]) >= _ANALYTICS_RATE_LIMIT:
+        return False
+    _analytics_ip_window[ip].append(now)
+    return True
+
+
 # ============== Analytics Endpoints ==============
 
 @router.post("/analytics", response_model=AnalyticsResponse)
 async def submit_analytics(
+    request: Request,
     event: AnalyticsEventRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -366,8 +390,14 @@ async def submit_analytics(
     This endpoint receives analytics events from client apps
     to track upgrade behavior and diagnose issues.
 
-    No authentication required.
+    No authentication required, but rate limited per IP.
     """
+    # Rate limit check
+    if not _check_analytics_rate_limit(request):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests, please try again later",
+        )
     try:
         # Create analytics record
         analytics = UpgradeAnalytics(
@@ -414,12 +444,15 @@ async def submit_analytics(
 async def get_upgrade_stats(
     version: str,
     platform: str = Query("android", description="Platform"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get upgrade statistics for a specific version.
 
     Returns metrics about how many users have checked for,
     downloaded, and installed this version.
+
+    Requires authentication.
     """
     # Count events by type
     result = await db.execute(

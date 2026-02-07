@@ -103,12 +103,14 @@ app = FastAPI(
 
 # CORS middleware
 cors_origins = settings.CORS_ORIGINS.split(",") if settings.CORS_ORIGINS != "*" else ["*"]
+if cors_origins == ["*"]:
+    logger.warning("CORS_ORIGINS is set to '*'. This is insecure for production!")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-API-Version", "X-Idempotency-Key"],
 )
 
 # Logging middleware (order matters: last added = first executed)
