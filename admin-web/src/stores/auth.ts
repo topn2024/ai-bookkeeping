@@ -5,8 +5,10 @@ import * as authApi from '@/api/auth'
 
 export const useAuthStore = defineStore('auth', () => {
   // State
-  const token = ref<string | null>(localStorage.getItem('admin_token'))
-  const refreshToken = ref<string | null>(localStorage.getItem('admin_refresh_token'))
+  // NOTE: Token 存储在 sessionStorage 中（而非 localStorage），关闭浏览器标签页后自动清除
+  // 生产环境建议进一步迁移到 httpOnly Cookie 方案以防御 XSS
+  const token = ref<string | null>(sessionStorage.getItem('admin_token'))
+  const refreshToken = ref<string | null>(sessionStorage.getItem('admin_refresh_token'))
   const admin = ref<AdminUser | null>(null)
 
   // Getters
@@ -17,12 +19,12 @@ export const useAuthStore = defineStore('auth', () => {
   // Actions
   const setToken = (newToken: string) => {
     token.value = newToken
-    localStorage.setItem('admin_token', newToken)
+    sessionStorage.setItem('admin_token', newToken)
   }
 
   const setRefreshToken = (newRefreshToken: string) => {
     refreshToken.value = newRefreshToken
-    localStorage.setItem('admin_refresh_token', newRefreshToken)
+    sessionStorage.setItem('admin_refresh_token', newRefreshToken)
   }
 
   const refreshAccessToken = async (): Promise<boolean> => {
@@ -60,8 +62,8 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     refreshToken.value = null
     admin.value = null
-    localStorage.removeItem('admin_token')
-    localStorage.removeItem('admin_refresh_token')
+    sessionStorage.removeItem('admin_token')
+    sessionStorage.removeItem('admin_refresh_token')
   }
 
   const fetchCurrentAdmin = async () => {

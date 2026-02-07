@@ -529,21 +529,28 @@ async def get_security_settings(
     }
 
 
+class SecuritySettingsUpdateRequest(BaseModel):
+    """安全配置更新请求 - 使用强类型替代 Dict[str, Any]"""
+    login_security: Optional[LoginSecurityConfig] = None
+    ip_whitelist: Optional[IPWhitelistConfig] = None
+    operation_confirm: Optional[OperationConfirmConfig] = None
+
+
 @router.put("/security")
 async def update_security_settings(
     request: Request,
-    data: Dict[str, Any],
+    data: SecuritySettingsUpdateRequest,
     current_admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(has_permission("setting:edit")),
 ):
     """更新安全配置汇总"""
-    if "login_security" in data:
-        _settings_store["login_security"].update(data["login_security"])
-    if "ip_whitelist" in data:
-        _settings_store["ip_whitelist"].update(data["ip_whitelist"])
-    if "operation_confirm" in data:
-        _settings_store["operation_confirm"].update(data["operation_confirm"])
+    if data.login_security is not None:
+        _settings_store["login_security"] = data.login_security.dict()
+    if data.ip_whitelist is not None:
+        _settings_store["ip_whitelist"] = data.ip_whitelist.dict()
+    if data.operation_confirm is not None:
+        _settings_store["operation_confirm"] = data.operation_confirm.dict()
 
     await create_audit_log(
         db=db,

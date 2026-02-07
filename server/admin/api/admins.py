@@ -286,10 +286,12 @@ async def change_my_password(
         )
 
     # Validate new password
-    if len(password_data.new_password) < 8:
+    from admin.core.security import validate_password_complexity
+    complexity_errors = validate_password_complexity(password_data.new_password)
+    if complexity_errors:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="新密码长度至少8位",
+            detail="密码不符合要求: " + "; ".join(complexity_errors),
         )
 
     # Update password
@@ -312,6 +314,11 @@ async def change_my_password(
     await db.commit()
 
     return {"message": "密码已修改"}
+
+
+class MFADisableRequest(BaseModel):
+    """MFA禁用请求"""
+    password: str
 
 
 # ============ MFA Management (GF-002) ============
@@ -420,13 +427,13 @@ async def verify_mfa_setup(
 @router.delete("/me/mfa")
 async def disable_mfa(
     request: Request,
-    password: str = Query(..., description="确认密码"),
+    body: MFADisableRequest,
     current_admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """禁用MFA (GF-002)"""
-    # Verify password
-    if not verify_password(password, current_admin.password_hash):
+    # Verify password (from request body, not query parameter)
+    if not verify_password(body.password, current_admin.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="密码错误",
