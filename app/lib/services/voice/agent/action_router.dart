@@ -15,6 +15,7 @@ import '../../../models/transaction.dart';
 import '../../voice_navigation_service.dart';
 import '../../voice_navigation_executor.dart';
 import '../entity_disambiguation_service.dart';
+import '../knowledge_base_service.dart';
 import '../unified_intent_type.dart';
 import 'action_registry.dart';
 import 'decomposed_intent.dart';
@@ -51,6 +52,9 @@ class ActionRouter {
   /// 实体消歧服务
   final EntityDisambiguationService _disambiguationService;
 
+  /// 知识库服务
+  final KnowledgeBaseService _knowledgeBase;
+
   /// 页面导航回调
   void Function(String route)? onNavigate;
 
@@ -65,14 +69,18 @@ class ActionRouter {
     VoiceNavigationService? navigationService,
     ActionRegistry? registry,
     EntityDisambiguationService? disambiguationService,
+    KnowledgeBaseService? knowledgeBase,
     bool useAutoRegistry = false,
   })  : _databaseService = databaseService ?? sl<IDatabaseService>(),
         _navigationService = navigationService ?? VoiceNavigationService(),
         _registry = registry ?? ActionRegistry.instance,
         _disambiguationService = disambiguationService ?? EntityDisambiguationService(),
+        _knowledgeBase = knowledgeBase ?? KnowledgeBaseService(),
         _useAutoRegistry = useAutoRegistry {
     // 注册所有内置行为
     _registerBuiltInActions();
+    // 异步初始化知识库（加载FAQ数据）
+    _knowledgeBase.initialize();
   }
 
   /// 使用自动注册创建ActionRouter
@@ -190,7 +198,7 @@ class ActionRouter {
       ConversationCancelAction(),
       ConversationClarifyAction(),
       ConversationGreetingAction(),
-      ConversationHelpAction(),
+      ConversationHelpAction(knowledgeBase: _knowledgeBase),
       UnknownIntentAction(),
     ]);
 

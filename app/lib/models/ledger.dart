@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 /// 账本类型枚举
@@ -369,21 +371,57 @@ class Ledger {
       'icon': icon.codePoint,
       'iconFontFamily': icon.fontFamily,
       'color': color.toARGB32(),
-      'isDefault': isDefault,
+      'isDefault': isDefault ? 1 : 0,  // SQLite: bool → int
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
-      'memberIds': memberIds,
+      'memberIds': jsonEncode(memberIds),  // SQLite: List → JSON string
       'ownerId': ownerId,
       'visibility': visibility.name,
       'inviteCode': inviteCode,
       'inviteCodeExpiry': inviteCodeExpiry?.toIso8601String(),
-      'isArchived': isArchived,
-      'settings': settings.toMap(),
+      'isArchived': isArchived ? 1 : 0,  // SQLite: bool → int
+      'settings': jsonEncode(settings.toMap()),  // SQLite: Map → JSON string
       'coverImage': coverImage,
     };
   }
 
   factory Ledger.fromMap(Map<String, dynamic> map) {
+    // 解析 memberIds：支持 JSON 字符串或 List
+    List<String> parseMemberIds() {
+      final raw = map['memberIds'];
+      if (raw == null) return [];
+      if (raw is String) {
+        try {
+          return List<String>.from(jsonDecode(raw));
+        } catch (_) {
+          return [];
+        }
+      }
+      return List<String>.from(raw);
+    }
+
+    // 解析 settings：支持 JSON 字符串或 Map
+    LedgerSettings parseSettings() {
+      final raw = map['settings'];
+      if (raw == null) return const LedgerSettings();
+      if (raw is String) {
+        try {
+          return LedgerSettings.fromMap(jsonDecode(raw) as Map<String, dynamic>);
+        } catch (_) {
+          return const LedgerSettings();
+        }
+      }
+      return LedgerSettings.fromMap(raw as Map<String, dynamic>);
+    }
+
+    // 解析 bool：支持 int (0/1) 或 bool
+    bool parseBool(dynamic value, {bool defaultValue = false}) {
+      if (value == null) return defaultValue;
+      if (value is bool) return value;
+      if (value is int) return value != 0;
+      return defaultValue;
+    }
+
     return Ledger(
       id: map['id'] as String,
       name: map['name'] as String,
@@ -397,12 +435,12 @@ class Ledger {
         fontFamily: map['iconFontFamily'] as String?,
       ),
       color: Color(map['color'] as int),
-      isDefault: map['isDefault'] as bool? ?? false,
+      isDefault: parseBool(map['isDefault']),
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: map['updatedAt'] != null
           ? DateTime.parse(map['updatedAt'] as String)
           : null,
-      memberIds: List<String>.from(map['memberIds'] ?? []),
+      memberIds: parseMemberIds(),
       ownerId: map['ownerId'] as String,
       visibility: LedgerVisibility.values.firstWhere(
         (e) => e.name == map['visibility'],
@@ -412,10 +450,8 @@ class Ledger {
       inviteCodeExpiry: map['inviteCodeExpiry'] != null
           ? DateTime.parse(map['inviteCodeExpiry'] as String)
           : null,
-      isArchived: map['isArchived'] as bool? ?? false,
-      settings: map['settings'] != null
-          ? LedgerSettings.fromMap(map['settings'] as Map<String, dynamic>)
-          : const LedgerSettings(),
+      isArchived: parseBool(map['isArchived']),
+      settings: parseSettings(),
       coverImage: map['coverImage'] as String?,
     );
   }

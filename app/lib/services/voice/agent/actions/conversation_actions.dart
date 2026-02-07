@@ -1,4 +1,5 @@
 import '../action_registry.dart';
+import '../../knowledge_base_service.dart';
 
 /// 会话确认操作
 ///
@@ -214,8 +215,14 @@ class ConversationGreetingAction extends Action {
 
 /// 帮助操作
 ///
-/// 提供使用帮助
+/// 提供使用帮助，集成知识库进行智能问答
 class ConversationHelpAction extends Action {
+  /// 知识库服务
+  final KnowledgeBaseService? _knowledgeBase;
+
+  ConversationHelpAction({KnowledgeBaseService? knowledgeBase})
+      : _knowledgeBase = knowledgeBase;
+
   @override
   String get id => 'conversation.help';
 
@@ -230,6 +237,9 @@ class ConversationHelpAction extends Action {
     '帮助', '怎么用', '如何使用', '使用说明',
     '功能', '能做什么', '有什么功能',
     'help', '教我', '指导',
+    // 系统相关问题触发词
+    '什么是', '怎么', '如何', '为什么',
+    '是什么', '干什么', '做什么',
   ];
 
   @override
@@ -243,24 +253,54 @@ class ConversationHelpAction extends Action {
       required: false,
       description: '帮助主题',
     ),
+    const ActionParam(
+      name: 'rawInput',
+      type: ActionParamType.string,
+      required: false,
+      description: '用户原始输入',
+    ),
   ];
 
   @override
   Future<ActionResult> execute(Map<String, dynamic> params) async {
     final topic = params['topic'] as String?;
+    final rawInput = params['rawInput'] as String?;
 
     String helpText;
     Map<String, dynamic> helpData;
 
+    // 优先从知识库查找答案
+    final knowledgeBase = _knowledgeBase;
+    if (knowledgeBase != null) {
+      final query = rawInput ?? topic;
+      if (query != null && query.isNotEmpty) {
+        final kbAnswer = knowledgeBase.getVoiceAnswer(query);
+        // 如果知识库有答案且不是默认的"抱歉"回复
+        if (!kbAnswer.startsWith('抱歉')) {
+          return ActionResult.success(
+            responseText: kbAnswer,
+            data: {
+              'source': 'knowledge_base',
+              'query': query,
+              'answer': kbAnswer,
+            },
+            actionId: id,
+          );
+        }
+      }
+    }
+
+    // 知识库没有答案，使用内置帮助
     if (topic != null) {
       // 特定主题帮助
       helpText = _getTopicHelp(topic);
-      helpData = {'topic': topic, 'help': helpText};
+      helpData = {'topic': topic, 'help': helpText, 'source': 'builtin'};
     } else {
       // 通用帮助
       helpText = '我可以帮您：记账（如"午餐30"）、查询（如"今天花了多少"）、'
           '设置预算、导出数据等。直接说出您想做的事情即可。';
       helpData = {
+        'source': 'builtin',
         'categories': [
           {'name': '记账', 'examples': ['午餐30', '打车15', '工资5000']},
           {'name': '查询', 'examples': ['今天花了多少', '本月支出', '餐饮消费']},
@@ -278,6 +318,16 @@ class ConversationHelpAction extends Action {
   }
 
   String _getTopicHelp(String topic) {
+    // 先尝试从知识库获取
+    final knowledgeBase = _knowledgeBase;
+    if (knowledgeBase != null) {
+      final kbAnswer = knowledgeBase.getVoiceAnswer(topic);
+      if (!kbAnswer.startsWith('抱歉')) {
+        return kbAnswer;
+      }
+    }
+
+    // 内置帮助作为备选
     switch (topic.toLowerCase()) {
       case '记账':
       case 'transaction':
@@ -291,6 +341,12 @@ class ConversationHelpAction extends Action {
       case '导出':
       case 'export':
         return '数据导出：说"导出本月数据"或"导出CSV"来导出交易记录。';
+      case '小金库':
+      case 'vault':
+        return '小金库是一个储蓄目标管理功能，帮您为旅游、购物等目标存钱。说"打开小金库"可以查看。';
+      case '钱龄':
+      case 'money_age':
+        return '钱龄是衡量您资金流动健康度的指标。钱龄越长说明财务越稳健。说"查看钱龄"可以查看详情。';
       default:
         return '我可以帮您记账、查询、设置预算、导出数据等。请说出具体需求。';
     }

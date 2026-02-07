@@ -875,6 +875,46 @@ class VoiceServiceCoordinator extends ChangeNotifier {
             'navigation': null,
           });
         }
+
+        // 处理导航操作
+        for (final op in llmResult.operations) {
+          if (op.type == OperationType.navigate) {
+            final route = op.params['route'] as String?;
+            final targetPage = op.params['targetPage'] as String?;
+            debugPrint('[VoiceCoordinator] 处理导航操作: route=$route, targetPage=$targetPage');
+
+            if (route != null) {
+              _sessionState = VoiceSessionState.idle;
+              notifyListeners();
+
+              final navResult = await VoiceNavigationExecutor.instance.navigateToRouteWithContext(
+                route,
+                pageName: targetPage,
+              );
+              await _speakWithSkipCheck(navResult.message);
+
+              return VoiceSessionResult.success(navResult.message, {
+                'navigation': route,
+                'targetPage': targetPage,
+              });
+            }
+          }
+        }
+
+        // 处理查询操作
+        for (final op in llmResult.operations) {
+          if (op.type == OperationType.query) {
+            final queryType = op.params['queryType'] as String?;
+            final time = op.params['time'] as String?;
+            debugPrint('[VoiceCoordinator] 处理查询操作: queryType=$queryType, time=$time');
+
+            _sessionState = VoiceSessionState.idle;
+            notifyListeners();
+
+            // 将查询转发到普通处理流程
+            return await processVoiceCommand(voiceInput);
+          }
+        }
       }
 
       // 如果 LLM 返回需要澄清
