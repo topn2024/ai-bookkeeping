@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, literal
 
 from app.core.database import get_db
 from app.core.timezone import beijing_now_naive
@@ -520,9 +520,19 @@ async def _handle_create(
             )
             category = default_category.scalar_one_or_none()
             if not category:
-                category = Category(name="其他", category_type=tx_type, is_system=True)
-                db.add(category)
-                await db.flush()
+                # Check if "其他" system category already exists for this type
+                existing = await db.execute(
+                    select(Category).where(
+                        Category.name == "其他",
+                        Category.category_type == tx_type,
+                        Category.is_system == True,
+                    ).limit(1)
+                )
+                category = existing.scalar_one_or_none()
+                if not category:
+                    category = Category(name="其他", category_type=tx_type, is_system=True)
+                    db.add(category)
+                    await db.flush()
             category_id = category.id
 
         # Verify optional FK references
@@ -1041,6 +1051,7 @@ async def _handle_delete(
         entity_type=entity_type,
         operation="delete",
         success=True,
+        error="Entity already deleted or not found" if not entity else None,
     )
 
 
@@ -1113,6 +1124,7 @@ async def pull_changes(
     limit = getattr(request, 'limit', None) or 500
     changes: Dict[str, List[EntityData]] = {}
     has_more = False
+    has_more_types: Dict[str, bool] = {}
 
     for entity_type, last_sync_time in request.last_sync_times.items():
         model = ENTITY_MODELS.get(entity_type)
@@ -1130,9 +1142,11 @@ async def pull_changes(
         result = await db.execute(query)
         entities = list(result.scalars().all())
 
-        if len(entities) > limit:
+        entity_has_more = len(entities) > limit
+        if entity_has_more:
             has_more = True
             entities = entities[:limit]
+        has_more_types[entity_type] = entity_has_more
 
         changes[entity_type] = [
             EntityData(
@@ -1150,6 +1164,7 @@ async def pull_changes(
         changes=changes,
         server_time=beijing_now_naive(),
         has_more=has_more,
+        has_more_types=has_more_types,
     )
 
 
@@ -1440,12 +1455,23 @@ async def get_sync_status(
     """Get current sync status for the user."""
     entity_counts: Dict[str, int] = {}
 
+    # Build a single UNION ALL query for all entity counts
+    count_queries = []
     for entity_type, model in ENTITY_MODELS.items():
-        query = select(func.count()).select_from(model)
+        query = select(literal(entity_type).label("entity_type"), func.count().label("cnt")).select_from(model)
         query = _apply_user_filter(query, model, entity_type, current_user)
+        count_queries.append(query)
 
-        result = await db.execute(query)
-        entity_counts[entity_type] = result.scalar() or 0
+    if count_queries:
+        union_query = count_queries[0].union_all(*count_queries[1:])
+        result = await db.execute(union_query)
+        for row in result.all():
+            entity_counts[row[0]] = row[1]
+
+    # Ensure all entity types are present (even if 0)
+    for entity_type in ENTITY_MODELS:
+        if entity_type not in entity_counts:
+            entity_counts[entity_type] = 0
 
     return SyncStatusResponse(
         server_time=beijing_now_naive(),

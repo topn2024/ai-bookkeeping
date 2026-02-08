@@ -19,7 +19,7 @@ class EntityChange(BaseModel):
 
 class SyncPushRequest(BaseModel):
     """Request schema for pushing local changes to server."""
-    changes: List[EntityChange] = Field(..., description="List of entity changes")
+    changes: List[EntityChange] = Field(..., description="List of entity changes", max_length=500)
     client_version: str = Field(default="1.0.0", description="Client app version")
     device_id: str = Field(..., description="Unique device identifier")
 
@@ -80,7 +80,11 @@ class SyncPullResponse(BaseModel):
         description="Changes grouped by entity type"
     )
     server_time: datetime
-    has_more: bool = Field(default=False, description="More changes available")
+    has_more: bool = Field(default=False, description="More changes available (any entity type)")
+    has_more_types: Dict[str, bool] = Field(
+        default_factory=dict,
+        description="Per-entity-type has_more flags"
+    )
 
 
 class SyncStatusResponse(BaseModel):
