@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../providers/global_voice_assistant_provider.dart';
+import '../services/streaming_tts_service.dart';
 import 'voice_learning_report_page.dart';
 
 /// 语音助手设置页面
@@ -67,6 +68,25 @@ class _VoiceAssistantSettingsPageState extends ConsumerState<VoiceAssistantSetti
                           ref.read(floatingBallSettingsProvider.notifier).setSize(value);
                         }
                       : null,
+                ),
+              ],
+            ),
+            _buildSectionHeader('语音播报'),
+            _buildSettingsCard(
+              children: [
+                _buildSliderItem(
+                  icon: Icons.volume_up,
+                  iconColor: const Color(0xFFE91E63),
+                  title: 'TTS播报音量',
+                  subtitle: '${(settings.ttsVolume * 100).round()}%',
+                  value: settings.ttsVolume,
+                  min: 0.0,
+                  max: 1.0,
+                  onChanged: (value) {
+                    ref.read(floatingBallSettingsProvider.notifier).setTtsVolume(value);
+                    // 同步更新TTS服务音量
+                    StreamingTTSService().setVolume(value);
+                  },
                 ),
               ],
             ),

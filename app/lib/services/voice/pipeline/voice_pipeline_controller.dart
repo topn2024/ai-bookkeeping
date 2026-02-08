@@ -845,8 +845,15 @@ class VoicePipelineController {
         return;
       }
 
-      // 输出完成后重启输入流水线（确保ASR正常运行）
-      await _restartInputPipeline();
+      // 优化：只有当输入流水线不在listening状态时才重启
+      // 避免不必要的ASR会话重建和音频录制重启，减少API调用和延迟
+      if (_inputPipeline.state != InputPipelineState.listening) {
+        debugPrint('[VoicePipelineController] 输入流水线状态=${_inputPipeline.state}，需要重启');
+        await _restartInputPipeline();
+      } else {
+        // 流水线已在listening状态，无需重启（音频录制也无需重启）
+        debugPrint('[VoicePipelineController] 输入流水线已在listening，跳过重启（保持现有音频流）');
+      }
 
       // 注意：静默监听已在 _setState(VoicePipelineState.listening) 中自动启动
       // 无需手动调用 startSilenceMonitoring()，避免重复启动
@@ -879,14 +886,17 @@ class VoicePipelineController {
 
       // 只在listening状态下检查（其他状态下停止监听是正常的）
       if (_state == VoicePipelineState.listening) {
-        final isMonitoring = _proactiveManager.state == ProactiveState.waiting;
-        if (!isMonitoring && !_proactiveManager.isDisabled) {
-          debugPrint('[VoicePipelineController] ⚠️ [TimerRecovery] 检测到计时器可能失效 (state=listening, proactiveState=${_proactiveManager.state})');
+        final proactiveState = _proactiveManager.state;
+        // waiting/generating/speaking 都是活跃状态，说明系统正常工作
+        final isActive = proactiveState == ProactiveState.waiting ||
+            proactiveState == ProactiveState.generating ||
+            proactiveState == ProactiveState.speaking;
+        if (!isActive && !_proactiveManager.isDisabled) {
+          debugPrint('[VoicePipelineController] ⚠️ [TimerRecovery] 检测到计时器失效 (state=listening, proactiveState=$proactiveState)');
           debugPrint('[VoicePipelineController] [TimerRecovery] 强制恢复静默监听');
           _proactiveManager.startSilenceMonitoring();
-        } else {
-          debugPrint('[VoicePipelineController] [TimerRecovery] 计时器状态正常 (monitoring=$isMonitoring, disabled=${_proactiveManager.isDisabled})');
         }
+        // 移除正常状态的日志，减少日志噪音
       } else {
         debugPrint('[VoicePipelineController] [TimerRecovery] 当前状态=$_state，无需检查');
       }
@@ -1006,11 +1016,9 @@ class VoicePipelineController {
 
       // speaking 状态下检测高振幅打断
       _checkAmplitudeBargeIn(audioData);
-    } else if (shouldLog) {
-      debugPrint(
-        '[VoicePipelineController] 状态=$_state，跳过feedAudioData（等待状态变为listening或speaking）',
-      );
     }
+    // 注意：idle/stopping/processing状态时静默跳过，减少日志噪音
+    // 这些状态下收到音频是正常的（音频录制清理有延迟）
   }
 
   /// 检测基于振幅的打断
@@ -1171,12 +1179,11 @@ class VoicePipelineController {
 
   /// 处理会话超时（连续3次无回应或30秒无响应）
   ///
-  /// 注意：先启动 stop() 再触发回调，确保：
-  /// 1. 状态同步更新为 stopping（stop() 开始时立即设置）
-  /// 2. 回调触发时外部可以正确读取状态
-  /// 3. 清理工作在后台继续进行
+  /// 流程：
+  /// 1. 先通知外部（播放告别消息）
+  /// 2. 外部完成后调用 stopAfterFarewell() 来停止流水线
   void _handleSessionTimeout() {
-    debugPrint('[VoicePipelineController] 会话超时，自动结束');
+    debugPrint('[VoicePipelineController] 会话超时，准备结束');
 
     // 检查是否已释放
     if (_isDisposed) {
@@ -1184,17 +1191,33 @@ class VoicePipelineController {
       return;
     }
 
-    // 先启动停止流程（同步设置状态为 stopping）
-    // 使用 fire-and-forget 模式，清理在后台进行
-    stop().catchError((e, s) {
-      debugPrint('[VoicePipelineController] 超时停止时出错: $e');
-    });
+    // 先停止主动对话监听，防止继续触发
+    _proactiveManager.stopMonitoring();
 
-    // 状态已更新，通知外部（保护回调异常不影响内部流程）
+    // 通知外部处理（播放告别消息），外部完成后调用 stopAfterFarewell()
     try {
       onSessionTimeout?.call();
     } catch (e) {
       debugPrint('[VoicePipelineController] 会话超时回调异常: $e');
+      // 回调失败时直接停止
+      _stopAfterFarewellInternal();
+    }
+  }
+
+  /// 告别消息播放完成后停止流水线
+  ///
+  /// 供外部调用，在告别消息播放完成后调用此方法完成停止
+  Future<void> stopAfterFarewell() async {
+    await _stopAfterFarewellInternal();
+  }
+
+  /// 内部停止方法
+  Future<void> _stopAfterFarewellInternal() async {
+    debugPrint('[VoicePipelineController] 告别完成，执行停止');
+    try {
+      await stop();
+    } catch (e) {
+      debugPrint('[VoicePipelineController] 停止时出错: $e');
     }
   }
 

@@ -112,22 +112,26 @@ class FloatingBallSettings {
   final bool enabled;
   final double size;
   final double opacity;
+  final double ttsVolume;  // TTS音量 (0.0 - 1.0)
 
   const FloatingBallSettings({
     this.enabled = false,  // 默认隐藏，需要手动打开
     this.size = 50.0,
     this.opacity = 1.0,
+    this.ttsVolume = 1.0,  // 默认最大音量
   });
 
   FloatingBallSettings copyWith({
     bool? enabled,
     double? size,
     double? opacity,
+    double? ttsVolume,
   }) {
     return FloatingBallSettings(
       enabled: enabled ?? this.enabled,
       size: size ?? this.size,
       opacity: opacity ?? this.opacity,
+      ttsVolume: ttsVolume ?? this.ttsVolume,
     );
   }
 }
@@ -146,5 +150,9 @@ class FloatingBallSettingsNotifier extends StateNotifier<FloatingBallSettings> {
 
   void setOpacity(double opacity) {
     state = state.copyWith(opacity: opacity.clamp(0.5, 1.0));
+  }
+
+  void setTtsVolume(double volume) {
+    state = state.copyWith(ttsVolume: volume.clamp(0.0, 1.0));
   }
 }

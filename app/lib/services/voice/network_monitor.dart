@@ -278,13 +278,41 @@ class ProactiveNetworkMonitor {
     return RoutingMode.llmPreferred;
   }
 
+  /// 是否已暂停
+  bool _isPaused = false;
+
   /// 启动定时刷新
   void _startPeriodicRefresh() {
     _refreshTimer?.cancel();
     _refreshTimer = Timer.periodic(
       Duration(seconds: _refreshIntervalSeconds),
-      (_) => _quickRefresh(),
+      (_) {
+        // 暂停时跳过刷新
+        if (!_isPaused) {
+          _quickRefresh();
+        }
+      },
     );
+  }
+
+  /// 暂停网络监控（应用进入后台时调用）
+  ///
+  /// 停止定时检测，节省电量和网络流量
+  void pause() {
+    if (_isPaused) return;
+    _isPaused = true;
+    debugPrint('[NetworkMonitor] 已暂停（应用进入后台）');
+  }
+
+  /// 恢复网络监控（应用回到前台时调用）
+  ///
+  /// 恢复定时检测，并立即执行一次检测
+  void resume() {
+    if (!_isPaused) return;
+    _isPaused = false;
+    debugPrint('[NetworkMonitor] 已恢复（应用回到前台）');
+    // 恢复时立即检测一次
+    _quickRefresh();
   }
 
   /// 监听网络变化

@@ -629,6 +629,9 @@ class StreamingTTSService {
   /// 设置音量 (0.0 - 1.0)
   void setVolume(double volume) {
     _volume = (volume * 100).clamp(0, 100);
+    // 同时设置播放器音量
+    _streamPlayer.setVolume(volume);
+    _pcmPlayer.setVolume(volume);
   }
 
   /// 设置音调 (0.5 - 2.0)
