@@ -120,7 +120,7 @@ class TTSQueueWorker {
 
   /// 处理队列
   Future<void> _processQueue() async {
-    while (_queue.isNotEmpty && !_isStopped) {
+    while (_queue.isNotEmpty && !_isStopped && _state != TTSQueueState.paused) {
       final task = _queue.removeFirst();
 
       // 检查响应ID是否过期

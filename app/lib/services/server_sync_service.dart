@@ -558,10 +558,13 @@ class ServerSyncService {
     return result;
   }
 
+  /// 缓存的设备ID（应用生命周期内保持一致）
+  static String? _cachedDeviceId;
+
   /// Get or generate device ID
   Future<String> _getDeviceId() async {
-    // In a real app, this would be stored persistently
-    return 'flutter_app_${DateTime.now().millisecondsSinceEpoch}';
+    _cachedDeviceId ??= 'flutter_app_${DateTime.now().millisecondsSinceEpoch}';
+    return _cachedDeviceId!;
   }
 
   /// Emit sync progress

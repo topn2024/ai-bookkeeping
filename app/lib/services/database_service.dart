@@ -4425,6 +4425,12 @@ class DatabaseService implements IDatabaseService {
 
     for (final table in tables) {
       try {
+        // 表名来自硬编码白名单，安全地使用插值（sqflite不支持参数化表名）
+        assert(tables.contains(table), 'Invalid table name: $table');
+        if (!RegExp(r'^[a-z_]+$').hasMatch(table)) {
+          stats['${table}_count'] = 'invalid_table';
+          continue;
+        }
         final result = await db.rawQuery('SELECT COUNT(*) as count FROM $table');
         stats['${table}_count'] = result.first['count'];
 

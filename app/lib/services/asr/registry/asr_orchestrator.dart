@@ -198,6 +198,9 @@ class ASROrchestrator {
         debugPrint('[ASROrchestrator] 尝试流式插件: ${plugin.pluginId}');
 
         try {
+          // 注意：audioStream 是单订阅流，只能被一个插件消费
+          // 如果当前插件失败，后续插件无法重新读取已消费的数据
+          // 因此流式识别不支持跨插件降级，失败后直接退出循环
           await for (final partial in plugin.transcribeStream(audioStream)) {
             if (!_sessionManager.isSessionValid(sessionId)) {
               // 已取消，但仍然处理最终结果
@@ -243,6 +246,12 @@ class ASROrchestrator {
           if (e is ASRException && !e.shouldFallback) {
             rethrow;
           }
+
+          // 流式识别不支持跨插件降级：audioStream 是单订阅流，
+          // 已被当前插件消费的数据无法重放给下一个插件。
+          // 直接退出循环，抛出错误。
+          debugPrint('[ASROrchestrator] 流式识别不支持降级（单订阅流已消费），停止尝试');
+          break;
         }
       }
 

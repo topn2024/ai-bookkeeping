@@ -145,15 +145,19 @@ class LedgerRepository implements ILedgerRepository {
   @override
   Future<int> setDefault(String id) async {
     final db = await _db;
-    // 先清除所有默认标记
-    await db.update('ledgers', {'isDefault': 0});
-    // 设置新的默认账本
-    return await db.update(
-      'ledgers',
-      {'isDefault': 1},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    int result = 0;
+    await db.transaction((txn) async {
+      // 先清除所有默认标记
+      await txn.update('ledgers', {'isDefault': 0});
+      // 设置新的默认账本
+      result = await txn.update(
+        'ledgers',
+        {'isDefault': 1},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    });
+    return result;
   }
 
   @override
@@ -162,7 +166,7 @@ class LedgerRepository implements ILedgerRepository {
     final maps = await db.query(
       'ledgers',
       where: 'type = ? AND isDeleted = 0',
-      whereArgs: [type.index],
+      whereArgs: [type.name],
     );
     return maps.map((m) => Ledger.fromMap(m)).toList();
   }
@@ -199,7 +203,7 @@ class LedgerRepository implements ILedgerRepository {
     final maps = await db.query(
       'ledgers',
       where: 'type != ? AND isDeleted = 0',
-      whereArgs: [LedgerType.personal.index],
+      whereArgs: [LedgerType.personal.name],
     );
     return maps.map((m) => Ledger.fromMap(m)).toList();
   }

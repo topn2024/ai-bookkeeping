@@ -136,6 +136,8 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
     _successController.dispose();
     _pulseController.stop();
     _pulseController.dispose();
+    // 确保录音已停止再释放资源
+    _audioRecorder.stop().catchError((_) {});
     _audioRecorder.dispose();
     _amountController.dispose();
     _descriptionController.dispose();

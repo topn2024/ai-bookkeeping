@@ -124,6 +124,7 @@ class AppConfigService {
     await prefs.remove(_cacheKey);
     await prefs.remove(_cacheTimeKey);
     _cachedConfig = null;
+    _initialized = false;
   }
 }
 

@@ -41,7 +41,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   String? _activeItemId;
 
   // GlobalKey for feature guide
-  static final GlobalKey appContentKey = GlobalKey();
+  final GlobalKey appContentKey = GlobalKey();
 
   @override
   void initState() {
@@ -876,7 +876,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
             child: FractionallySizedBox(
               alignment: Alignment.centerLeft,
-              widthFactor: percent / 100,
+              widthFactor: (percent / 100).clamp(0.0, 1.0),
               child: Container(
                 decoration: BoxDecoration(
                   color: progressColor,
@@ -975,21 +975,22 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// 确认删除交易
   void _confirmDelete(Transaction transaction) {
     setState(() => _activeItemId = null);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('确认删除'),
         content: const Text('确定要删除这笔记录吗？'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('取消'),
           ),
           TextButton(
             onPressed: () {
               ref.read(transactionProvider.notifier).deleteTransaction(transaction.id);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
+              Navigator.pop(dialogContext);
+              scaffoldMessenger.showSnackBar(
                 const SnackBar(content: Text('已删除')),
               );
             },

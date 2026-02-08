@@ -532,6 +532,7 @@ class VoicePipelineController {
   /// 3. 动态计算等待时间（根据语义分析）
   /// 4. 最大等待时间兜底（5秒）
   Future<void> _handleFinalResult(String text) async {
+    if (_isDisposed) return;
     if (text.trim().isEmpty) return;
 
     debugPrint(
@@ -710,6 +711,10 @@ class VoicePipelineController {
   Future<void> _processAggregatedSentences() async {
     if (_sentenceBuffer.isEmpty) return;
 
+    // 记录是否在停止过程中被调用（stop()中会先设置stopping状态再调用此方法）
+    // 停止过程中只做数据处理，不改变流水线状态，避免与stop()的finally块冲突
+    final isStopping = _state == VoicePipelineState.stopping;
+
     // 取消所有计时器
     _sentenceAggregationTimer?.cancel();
     _sentenceAggregationTimer = null;
@@ -728,14 +733,20 @@ class VoicePipelineController {
     final aggregatedText = _sentenceBuffer.join('，');
     _sentenceBuffer.clear();
 
-    debugPrint('[VoicePipelineController] 句子聚合完成，开始处理: "$aggregatedText"');
+    debugPrint('[VoicePipelineController] 句子聚合完成，开始处理: "$aggregatedText" (isStopping=$isStopping)');
     debugPrint('[VoicePipelineController] 已记录原始文本用于去重: "$_lastProcessedRawText"');
 
     // 用户有输入，重置主动对话计时器和计数
-    _proactiveManager.resetTimer();
+    if (!isStopping) {
+      _proactiveManager.resetTimer();
+    }
 
-    // 开始处理
-    _setState(VoicePipelineState.processing);
+    // 停止过程中不改变流水线状态，避免与stop()的finally块（设置idle）冲突
+    // stop()中调用时：stopping → _processAggregatedSentences → 保持stopping → finally设置idle
+    if (!isStopping) {
+      // 开始处理
+      _setState(VoicePipelineState.processing);
+    }
 
     // 启动新响应
     final responseId = _responseTracker.startNewResponse();
@@ -750,8 +761,8 @@ class VoicePipelineController {
             // LLM输出块 → 输出流水线
             _outputPipeline.addChunk(chunk);
 
-            // 首次收到输出，切换到speaking状态
-            if (_state == VoicePipelineState.processing) {
+            // 首次收到输出，切换到speaking状态（停止过程中不切换）
+            if (!isStopping && _state == VoicePipelineState.processing) {
               _setState(VoicePipelineState.speaking);
             }
           },
@@ -763,7 +774,8 @@ class VoicePipelineController {
 
         // 安全检查：如果 onProcessInput 完成后状态仍然是 processing
         // 说明 onChunk 回调没有被调用（可能响应为空），需要手动转换状态
-        if (_state == VoicePipelineState.processing) {
+        // 停止过程中跳过状态切换
+        if (!isStopping && _state == VoicePipelineState.processing) {
           debugPrint(
             '[VoicePipelineController] onProcessInput完成后状态仍为processing，手动切换到listening',
           );
@@ -772,11 +784,15 @@ class VoicePipelineController {
       } catch (e) {
         debugPrint('[VoicePipelineController] 处理失败: $e');
         onError?.call(e);
-        _setState(VoicePipelineState.listening);
+        if (!isStopping) {
+          _setState(VoicePipelineState.listening);
+        }
       }
     } else {
       debugPrint('[VoicePipelineController] 未设置onProcessInput回调');
-      _setState(VoicePipelineState.listening);
+      if (!isStopping) {
+        _setState(VoicePipelineState.listening);
+      }
     }
   }
 
@@ -1104,7 +1120,10 @@ class VoicePipelineController {
       reason: '持续高振幅检测',
     );
 
-    _handleBargeIn(result);
+    // 使用 unawaited 标记异步调用，确保异常被捕获
+    _handleBargeIn(result).catchError((e) {
+      debugPrint('[VoicePipelineController] 振幅打断处理异常: $e');
+    });
   }
 
   /// 手动触发处理（用于测试或非语音输入）

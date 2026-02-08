@@ -48,7 +48,7 @@ class BudgetCarryover {
       budgetId: map['budgetId'] as String,
       year: map['year'] as int,
       month: map['month'] as int,
-      carryoverAmount: map['carryoverAmount'] as double,
+      carryoverAmount: (map['carryoverAmount'] as num).toDouble(),
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
     );
   }
@@ -87,7 +87,7 @@ class ZeroBasedAllocation {
     return ZeroBasedAllocation(
       id: map['id'] as String,
       budgetId: map['budgetId'] as String,
-      allocatedAmount: map['allocatedAmount'] as double,
+      allocatedAmount: (map['allocatedAmount'] as num).toDouble(),
       year: map['year'] as int,
       month: map['month'] as int,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),

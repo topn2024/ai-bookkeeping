@@ -111,7 +111,11 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
   @override
   void dispose() {
     // 清理权限回调和网络状态订阅
-    ref.read(globalVoiceAssistantProvider).onPermissionRequired = null;
+    try {
+      ref.read(globalVoiceAssistantProvider).onPermissionRequired = null;
+    } catch (_) {
+      // Provider可能已被销毁，忽略清理错误
+    }
     _networkStatusSubscription?.cancel();
     _snapController.dispose();
     super.dispose();

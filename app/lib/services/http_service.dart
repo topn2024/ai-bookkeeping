@@ -139,17 +139,20 @@ class HttpService implements IHttpService {
   /// 配置 SSL 证书验证
   void _configureSslVerification() {
     if (kDebugMode) {
-      debugPrint('[HttpService] SSL verification disabled (skipCert=$_skipCertificateVerification)');
+      debugPrint('[HttpService] SSL verification: skipCert=$_skipCertificateVerification');
     }
 
-    // 始终配置跳过证书验证（服务器使用 IP 地址 + 自签名证书）
-    _dio.httpClientAdapter = IOHttpClientAdapter(
-      createHttpClient: () {
-        final client = HttpClient();
-        client.badCertificateCallback = (cert, host, port) => true;
-        return client;
-      },
-    );
+    if (_skipCertificateVerification) {
+      // 仅在配置明确要求时跳过证书验证（如开发环境或自签名证书）
+      _dio.httpClientAdapter = IOHttpClientAdapter(
+        createHttpClient: () {
+          final client = HttpClient();
+          client.badCertificateCallback = (cert, host, port) => true;
+          return client;
+        },
+      );
+    }
+    // 未跳过时使用系统默认的证书验证
   }
 
   /// 初始化：从安全存储加载Token

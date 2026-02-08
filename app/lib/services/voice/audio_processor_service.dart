@@ -81,6 +81,7 @@ class AudioProcessorService {
     try {
       await _processor.dispose();
       _isInitialized = false;
+      _instance = null; // 重置单例，允许重新初始化
       debugPrint('[AudioProcessorService] 已释放');
     } catch (e) {
       debugPrint('[AudioProcessorService] 释放异常: $e');

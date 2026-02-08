@@ -7,8 +7,16 @@
 -keep class io.flutter.plugins.**  { *; }
 -dontwarn io.flutter.embedding.**
 
-# Keep custom classes
--keep class com.example.ai_bookkeeping.** { *; }
+# Only keep classes that need JNI/reflection access (not all app classes)
+-keep class com.example.ai_bookkeeping.SecureKeyStore { *; }
+-keep class com.example.ai_bookkeeping.MainActivity { *; }
+-keep class com.example.ai_bookkeeping.BsPatchHelper { *; }
+-keep class com.example.ai_bookkeeping.GestureWakeHandler { *; }
+-keep class com.example.ai_bookkeeping.PaymentNotificationListenerService { *; }
+-keep class com.example.ai_bookkeeping.ScreenReaderService { *; }
+-keep class com.example.ai_bookkeeping.VoiceWakeupService { *; }
+-keep class com.example.ai_bookkeeping.QuickAddWidgetProvider { *; }
+-keep class com.example.ai_bookkeeping.TodayStatsWidgetProvider { *; }
 
 # Gson (if used)
 -keepattributes Signature

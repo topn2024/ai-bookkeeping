@@ -16,6 +16,11 @@ import UIKit
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
 
+    // 注册安全密钥存储
+    if let controller = window?.rootViewController as? FlutterViewController {
+      SecureKeyStore.register(with: controller.registrar(forPlugin: "SecureKeyStore")!)
+    }
+
     // 设置分享处理的 MethodChannel
     setupShareChannel()
 

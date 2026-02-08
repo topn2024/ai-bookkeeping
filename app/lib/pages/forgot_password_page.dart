@@ -472,6 +472,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
         email: _emailController.text.trim(),
       );
 
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -491,11 +492,13 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           });
         }
       } else {
+        if (!mounted) return;
         setState(() {
           _error = '发送验证码失败，请稍后重试';
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _error = e.toString().replaceAll('Exception: ', '');
@@ -525,6 +528,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
         email: _emailController.text.trim(),
       );
 
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -538,6 +542,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _error = e.toString().replaceAll('Exception: ', '');
@@ -561,6 +566,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
         newPassword: _passwordController.text,
       );
 
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -573,6 +579,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
             password: _passwordController.text,
           );
 
+          if (!mounted) return;
           setState(() {
             _isLoading = false;
           });
@@ -595,18 +602,21 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
             }
           } else {
             // 自动登录失败，显示成功页面让用户手动登录
+            if (!mounted) return;
             setState(() {
               _currentStep = ResetStep.success;
             });
           }
         } catch (e) {
           // 自动登录失败，显示成功页面让用户手动登录
+          if (!mounted) return;
           setState(() {
             _isLoading = false;
             _currentStep = ResetStep.success;
           });
         }
       } else {
+        if (!mounted) return;
         setState(() {
           _error = '密码重置失败，请稍后再试';
         });
@@ -632,6 +642,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
         errorMessage = '密码重置失败，请检查网络连接后重试';
       }
 
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _error = errorMessage;

@@ -72,10 +72,9 @@ class AppConfig {
   /// Initialize config
   Future<void> initialize() async {
     if (_initialized) return;
-    _initialized = true;
 
-    // Android平台从Native层加载密钥
-    if (Platform.isAndroid) {
+    // Android/iOS平台从Native层加载密钥
+    if (Platform.isAndroid || Platform.isIOS) {
       try {
         debugPrint('AppConfig: Loading keys from Native layer...');
         _nativeQwenApiKey = await SecureKeyService.instance.getQwenApiKey();
@@ -85,6 +84,7 @@ class AppConfig {
       }
     }
 
+    _initialized = true;
     debugPrint('AppConfig: Initialized, qwenApiKey=${qwenApiKey.isNotEmpty ? "[SET]" : "[EMPTY]"}');
   }
 
@@ -120,6 +120,7 @@ class AppConfig {
   Future<void> clearCache() async {
     _qwenAvailable = false;
     _zhipuAvailable = false;
+    _initialized = false;
   }
 
   /// Validate configuration and return missing items

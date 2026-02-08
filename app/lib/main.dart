@@ -66,7 +66,8 @@ void main() async {
     await initServiceLocator();
     logger.info('Service locator initialized', tag: 'App');
   } catch (e) {
-    logger.warning('Failed to initialize service locator: $e', tag: 'App');
+    logger.error('Failed to initialize service locator: $e', tag: 'App');
+    rethrow; // 服务定位器是核心依赖，初始化失败应终止启动
   }
 
   // Initialize app configuration from server
@@ -360,7 +361,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             GlobalVoiceAssistantManager.instance.addResultMessage('⏳ $confirmMsg');
           }
           // 延迟让 TTS 播放完成，然后自动开始录音
+          // TODO: 应使用TTS完成回调替代固定延时，当前为临时方案
           await Future.delayed(const Duration(milliseconds: 2500));
+          if (!mounted) return '';
           debugPrint('[App] 自动开始录音等待确认');
           GlobalVoiceAssistantManager.instance.startRecording();
         } else if (result.status == VoiceSessionStatus.success) {
@@ -527,8 +530,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void dispose() {
     // 清除命令处理器
     GlobalVoiceAssistantManager.instance.setCommandProcessor(null);
+    // 清理事件总线订阅，避免内存泄漏
+    _eventBus.clear();
     WidgetsBinding.instance.removeObserver(this);
-    logger.dispose();
+    // logger.dispose() 移除：全局logger不应随widget生命周期销毁
     super.dispose();
   }
 

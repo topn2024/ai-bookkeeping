@@ -81,16 +81,19 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     final isRecording = voiceManager.ballState == FloatingBallState.recording;
     final isProcessing = voiceManager.ballState == FloatingBallState.processing;
 
-    // 根据录音状态控制动画
-    if (isRecording && !_pulseController.isAnimating) {
-      _pulseController.repeat();
-      _waveController.repeat();
-    } else if (!isRecording && _pulseController.isAnimating) {
-      _pulseController.stop();
-      _pulseController.reset();
-      _waveController.stop();
-      _waveController.reset();
-    }
+    // 根据录音状态控制动画（使用 addPostFrameCallback 避免 build 中的副作用）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (isRecording && !_pulseController.isAnimating) {
+        _pulseController.repeat();
+        _waveController.repeat();
+      } else if (!isRecording && _pulseController.isAnimating) {
+        _pulseController.stop();
+        _pulseController.reset();
+        _waveController.stop();
+        _waveController.reset();
+      }
+    });
 
     return Scaffold(
       

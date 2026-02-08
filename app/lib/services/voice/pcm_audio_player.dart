@@ -70,11 +70,15 @@ class PCMAudioPlayer {
     if (_volume >= 0.99) return pcmData; // 接近最大音量，无需处理
 
     // PCM16是小端格式，每个样本2字节
+    // 确保只处理完整的样本（忽略可能的尾部奇数字节）
+    final validLength = pcmData.length & ~1; // 向下取偶数
+    if (validLength == 0) return pcmData;
+
     final byteData = ByteData.view(pcmData.buffer, pcmData.offsetInBytes, pcmData.length);
     final result = Uint8List(pcmData.length);
     final resultData = ByteData.view(result.buffer);
 
-    for (int i = 0; i < pcmData.length; i += 2) {
+    for (int i = 0; i < validLength; i += 2) {
       final sample = byteData.getInt16(i, Endian.little);
       final adjusted = (sample * _volume).round().clamp(-32768, 32767);
       resultData.setInt16(i, adjusted, Endian.little);
@@ -191,8 +195,12 @@ class PCMAudioPlayer {
     _isPlaying = true;
     _stateController.add(PCMPlayerState.playing);
 
+    // 如果有正在等待的Completer，先完成它（防止永久挂起）
+    if (_playCompleter != null && !_playCompleter!.isCompleted) {
+      _playCompleter!.complete();
+    }
+
     // 创建完成Completer并保存本地引用
-    // 防止在异步等待期间被其他调用覆盖
     final completer = Completer<void>();
     _playCompleter = completer;
 
@@ -287,12 +295,7 @@ class PCMAudioPlayer {
     await stop();
     await _stateController.close();
 
-    try {
-      await FlutterPcmSound.release();
-    } catch (e) {
-      debugPrint('[PCMAudioPlayer] 释放异常: $e');
-    }
-
+    // stop() 已调用 FlutterPcmSound.release()，无需重复释放
     _isInitialized = false;
   }
 }

@@ -514,6 +514,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ),
         ],
       ),
-    );
+    ).then((_) => codeController.dispose()); // 对话框关闭时释放
   }
 }

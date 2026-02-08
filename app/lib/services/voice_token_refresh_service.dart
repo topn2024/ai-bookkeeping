@@ -66,8 +66,8 @@ class VoiceTokenRefreshService {
     String asrRestUrl;
     String ttsUrl;
 
-    // Android 平台使用 Native 安全存储的密钥
-    if (Platform.isAndroid) {
+    // Android/iOS 平台使用 Native 安全存储的密钥
+    if (Platform.isAndroid || Platform.isIOS) {
       debugPrint('[VoiceTokenRefresh] 使用 Native 安全密钥...');
       final keys = await SecureKeyService.instance.getAllKeys();
       if (keys.isEmpty) {

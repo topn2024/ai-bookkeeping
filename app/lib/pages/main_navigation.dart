@@ -29,14 +29,19 @@ class MainNavigation extends ConsumerStatefulWidget {
   const MainNavigation({super.key});
 
   /// 获取FAB按钮的GlobalKey（用于功能引导）
-  static GlobalKey get fabKey => _MainNavigationState._fabKey;
+  static GlobalKey get fabKey => _mainNavFabKey;
 
   /// 获取小记导航栏的GlobalKey（用于功能引导）
-  static GlobalKey get xiaojiNavKey => _MainNavigationState._xiaojiNavKey;
+  static GlobalKey get xiaojiNavKey => _mainNavXiaojiNavKey;
 
   @override
   ConsumerState<MainNavigation> createState() => _MainNavigationState();
 }
+
+// 文件级 GlobalKey，避免 static final 在 State 上导致的
+// "Multiple widgets used the same GlobalKey" 问题
+final GlobalKey _mainNavFabKey = GlobalKey();
+final GlobalKey _mainNavXiaojiNavKey = GlobalKey();
 
 class _MainNavigationState extends ConsumerState<MainNavigation>
     with SingleTickerProviderStateMixin {
@@ -49,10 +54,6 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
 
   // 双击退出相关
   DateTime? _lastBackPressTime;
-
-  // GlobalKey for feature guide
-  static final GlobalKey _fabKey = GlobalKey();
-  static final GlobalKey _xiaojiNavKey = GlobalKey();
 
   // 录音自动停止配置
   static const int _maxRecordingSeconds = 15;  // 最大录音时长
@@ -269,7 +270,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
     return Transform.translate(
       offset: const Offset(0, 8),  // 向下偏移
       child: Container(
-        key: _fabKey,  // Add key for feature guide
+        key: _mainNavFabKey,  // Add key for feature guide
         child: GestureDetector(
           onTap: () {
           // 单击进入手动记账
@@ -494,7 +495,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
   /// 底部导航栏
   Widget _buildBottomNavBar(BuildContext context) {
     return Container(
-      key: _xiaojiNavKey,  // Add key for the navigation bar (targeting xiaoji tab)
+      key: _mainNavXiaojiNavKey,  // Add key for the navigation bar (targeting xiaoji tab)
       child: GlassBottomNavigation(
       currentIndex: _currentIndex,
       onTap: (index) {

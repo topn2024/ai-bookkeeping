@@ -342,7 +342,7 @@ class ClientVADService {
       }
     }
     _vadHandler = null;
-    _eventController.close();
+    await _eventController.close();
     _isInitialized = false;
     debugPrint('[ClientVAD] 资源已释放');
   }

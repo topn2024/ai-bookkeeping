@@ -26,7 +26,6 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
   }
 
   @override
-  @override
   void dispose() {
     _textController.dispose();
     super.dispose();
