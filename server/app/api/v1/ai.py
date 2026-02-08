@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app.models.user import User
 from app.api.deps import get_current_user
-from app.services.ai_service import AIService
+from app.services.ai_service import get_ai_service
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ async def recognize_image(
     logger.debug(f"Image loaded | user_id={user_id} | size={file_size} bytes")
 
     # Use AI service to recognize
-    ai_service = AIService()
+    ai_service = get_ai_service()
     result = await ai_service.recognize_image(content)
 
     elapsed = time.time() - start_time
@@ -101,7 +101,7 @@ async def recognize_image_batch(
     logger.debug(f"Image loaded | user_id={user_id} | size={file_size} bytes")
 
     # Use AI service to recognize batch
-    ai_service = AIService()
+    ai_service = get_ai_service()
     transactions = await ai_service.recognize_image_batch(content)
 
     elapsed = time.time() - start_time
@@ -128,7 +128,7 @@ async def recognize_voice(
     logger.info(f"Voice text parsing started | user_id={user_id} | text_len={len(text)}")
     logger.debug(f"Voice text preview | user_id={user_id} | text={text_preview}")
 
-    ai_service = AIService()
+    ai_service = get_ai_service()
     result = await ai_service.parse_voice_text(text)
 
     elapsed = time.time() - start_time
@@ -154,7 +154,7 @@ async def parse_text(
     logger.info(f"Text parsing started | user_id={user_id} | text_len={len(text)}")
     logger.debug(f"Text preview | user_id={user_id} | text={text_preview}")
 
-    ai_service = AIService()
+    ai_service = get_ai_service()
     result = await ai_service.parse_voice_text(text)
 
     elapsed = time.time() - start_time
@@ -228,7 +228,7 @@ async def recognize_audio(
         )
 
     # Use AI service to recognize
-    ai_service = AIService()
+    ai_service = get_ai_service()
     result = await ai_service.recognize_voice_audio(content, audio_format)
 
     elapsed = time.time() - start_time
@@ -296,7 +296,7 @@ async def parse_bill(
         f"subject={subject_preview} | sender={sender} | content_len={len(content)}"
     )
 
-    ai_service = AIService()
+    ai_service = get_ai_service()
     result = await ai_service.parse_bill_email(
         email_content=content,
         email_subject=subject,

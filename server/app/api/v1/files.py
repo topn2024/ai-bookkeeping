@@ -23,6 +23,12 @@ router = APIRouter(prefix="/files", tags=["Files"])
 
 def _verify_file_ownership(user_id_str: str, object_name: str):
     """Verify that the file belongs to the user using exact path prefix matching."""
+    # Reject path traversal attempts
+    if '..' in object_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path",
+        )
     valid_prefixes = [f"source-images/{user_id_str}/", f"source-audio/{user_id_str}/"]
     if not any(object_name.startswith(p) for p in valid_prefixes):
         raise HTTPException(

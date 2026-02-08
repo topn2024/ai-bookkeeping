@@ -165,14 +165,14 @@ class TransactionNotifier extends SimpleCrudNotifier<Transaction, String> {
 
   /// 删除交易（保持原有方法名兼容）
   Future<void> deleteTransaction(String id) async {
-    // 先获取交易，恢复余额
+    // 先获取交易信息
     final transaction = state.firstWhere(
       (t) => t.id == id,
       orElse: () => throw Exception('Transaction not found: $id'),
     );
-    await _updateAccountBalance(transaction, isReverse: true);
-    // 执行删除
+    // 先删除数据库，成功后再恢复余额
     await delete(id);
+    await _updateAccountBalance(transaction, isReverse: true);
   }
 
   // ==================== 重复检测方法 ====================

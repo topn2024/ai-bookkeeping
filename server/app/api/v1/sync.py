@@ -107,15 +107,20 @@ async def push_changes(
 
                 # Use savepoint to isolate each entity's changes
                 # Failed entities rollback to savepoint, successful ones are preserved
-                async with db.begin_nested():  # savepoint
+                savepoint = await db.begin_nested()
+                try:
                     result = await _process_change(
                         db, current_user, change, entity_type
                     )
                     if result.success:
-                        accepted.append(result)
+                        await savepoint.commit()
                     else:
-                        # Failed but not a conflict - add to accepted with error
-                        accepted.append(result)
+                        # Failed but not a conflict - rollback partial writes
+                        await savepoint.rollback()
+                    accepted.append(result)
+                except Exception:
+                    await savepoint.rollback()
+                    raise
             except Exception as e:
                 accepted.append(EntitySyncResult(
                     local_id=change.local_id,

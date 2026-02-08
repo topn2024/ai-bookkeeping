@@ -642,5 +642,14 @@ class AIService:
             return None
 
 
-# Singleton instance
-ai_service = AIService()
+# Lazy singleton instance — created on first access to avoid
+# constructing httpx.AsyncClient at module import time.
+_ai_service_instance: Optional[AIService] = None
+
+
+def get_ai_service() -> AIService:
+    """Get or create the AI service singleton."""
+    global _ai_service_instance
+    if _ai_service_instance is None:
+        _ai_service_instance = AIService()
+    return _ai_service_instance

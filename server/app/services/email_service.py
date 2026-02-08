@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decrypt_sensitive_data
 from app.models.email_binding import EmailBinding, EmailType
-from app.services.ai_service import AIService
+from app.services.ai_service import get_ai_service
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class EmailService:
     """Service for fetching and parsing bill emails."""
 
     def __init__(self):
-        self.ai_service = AIService()
+        self.ai_service = get_ai_service()
 
     async def sync_and_parse_bills(self, binding: EmailBinding, db: AsyncSession) -> dict:
         """Sync emails and parse bills for a binding.

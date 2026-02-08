@@ -77,9 +77,10 @@ async def lifespan(app: FastAPI):
 
     # Close AI service httpx client
     try:
-        from app.services.ai_service import ai_service
-        await ai_service.close()
-        logger.info("AI service client closed")
+        from app.services.ai_service import get_ai_service, _ai_service_instance
+        if _ai_service_instance is not None:
+            await get_ai_service().close()
+            logger.info("AI service client closed")
     except Exception as e:
         logger.warning(f"Error closing AI service: {e}")
 
