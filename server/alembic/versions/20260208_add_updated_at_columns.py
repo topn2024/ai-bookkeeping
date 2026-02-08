@@ -21,38 +21,41 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # 新增 updated_at 列的表（8个模型）
-    tables_to_add = [
+    # 有 created_at 的表：用 created_at 回填
+    tables_with_created_at = [
         'categories',
-        'book_members',
         'family_saving_goals',
         'goal_contributions',
         'transaction_splits',
-        'split_participants',
         'consumption_records',
         'money_age_snapshots',
     ]
-    for table in tables_to_add:
+    for table in tables_with_created_at:
         op.add_column(table, sa.Column('updated_at', sa.DateTime(), nullable=True))
-        # 用 created_at 回填已有记录（如果有 created_at）
         op.execute(
             f"UPDATE {table} SET updated_at = created_at WHERE updated_at IS NULL AND created_at IS NOT NULL"
         )
-        # book_members 没有 created_at，用 joined_at
-        if table == 'book_members':
-            op.execute(
-                "UPDATE book_members SET updated_at = joined_at WHERE updated_at IS NULL AND joined_at IS NOT NULL"
-            )
-        # split_participants 没有 created_at，用 CURRENT_TIMESTAMP
-        if table == 'split_participants':
-            op.execute(
-                "UPDATE split_participants SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL"
-            )
-        # 确保所有记录都有值
         op.execute(
             f"UPDATE {table} SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL"
         )
         op.alter_column(table, 'updated_at', nullable=False)
+
+    # book_members: 没有 created_at，用 joined_at 回填
+    op.add_column('book_members', sa.Column('updated_at', sa.DateTime(), nullable=True))
+    op.execute(
+        "UPDATE book_members SET updated_at = joined_at WHERE updated_at IS NULL AND joined_at IS NOT NULL"
+    )
+    op.execute(
+        "UPDATE book_members SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL"
+    )
+    op.alter_column('book_members', 'updated_at', nullable=False)
+
+    # split_participants: 没有 created_at，直接用 CURRENT_TIMESTAMP
+    op.add_column('split_participants', sa.Column('updated_at', sa.DateTime(), nullable=True))
+    op.execute(
+        "UPDATE split_participants SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL"
+    )
+    op.alter_column('split_participants', 'updated_at', nullable=False)
 
     # 修复 family_budgets 和 member_budgets 的 updated_at（已存在但 nullable 且无默认值）
     for table in ['family_budgets', 'member_budgets']:
