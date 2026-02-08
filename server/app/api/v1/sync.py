@@ -59,6 +59,174 @@ ENTITY_MODELS = {
 }
 
 
+# ============== Ownership Verification Helpers ==============
+
+def _to_uuid(value) -> Optional[UUID]:
+    """Convert a value to UUID, handling str or UUID input."""
+    if value is None:
+        return None
+    return UUID(value) if isinstance(value, str) else value
+
+
+async def _verify_book_ownership(db: AsyncSession, user: User, book_id) -> Optional[UUID]:
+    """Verify that the book belongs to the user (owner or member). Returns UUID."""
+    book_id = _to_uuid(book_id)
+    if book_id is None:
+        return None
+    result = await db.execute(
+        select(Book.id).where(
+            Book.id == book_id,
+            or_(
+                Book.user_id == user.id,
+                Book.id.in_(
+                    select(BookMember.book_id).where(BookMember.user_id == user.id)
+                ),
+            ),
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise ValueError(f"Book {book_id} does not belong to user")
+    return book_id
+
+
+async def _verify_account_ownership(db: AsyncSession, user: User, account_id) -> Optional[UUID]:
+    """Verify that the account belongs to the user. Returns UUID."""
+    account_id = _to_uuid(account_id)
+    if account_id is None:
+        return None
+    result = await db.execute(
+        select(Account.id).where(Account.id == account_id, Account.user_id == user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise ValueError(f"Account {account_id} does not belong to user")
+    return account_id
+
+
+async def _verify_category_ownership(db: AsyncSession, user: User, category_id) -> Optional[UUID]:
+    """Verify that the category belongs to the user or is a system category. Returns UUID."""
+    category_id = _to_uuid(category_id)
+    if category_id is None:
+        return None
+    result = await db.execute(
+        select(Category.id).where(
+            Category.id == category_id,
+            or_(Category.user_id == user.id, Category.is_system == True),
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise ValueError(f"Category {category_id} does not belong to user")
+    return category_id
+
+
+async def _verify_transaction_ownership(db: AsyncSession, user: User, txn_id) -> Optional[UUID]:
+    """Verify that the transaction belongs to the user. Returns UUID."""
+    txn_id = _to_uuid(txn_id)
+    if txn_id is None:
+        return None
+    result = await db.execute(
+        select(Transaction.id).where(Transaction.id == txn_id, Transaction.user_id == user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise ValueError(f"Transaction {txn_id} does not belong to user")
+    return txn_id
+
+
+async def _verify_family_budget_ownership(db: AsyncSession, user: User, fb_id) -> Optional[UUID]:
+    """Verify that the family budget's book belongs to the user. Returns UUID."""
+    fb_id = _to_uuid(fb_id)
+    if fb_id is None:
+        return None
+    result = await db.execute(
+        select(FamilyBudget.id)
+        .join(Book, FamilyBudget.book_id == Book.id)
+        .where(
+            FamilyBudget.id == fb_id,
+            or_(
+                Book.user_id == user.id,
+                Book.id.in_(
+                    select(BookMember.book_id).where(BookMember.user_id == user.id)
+                ),
+            ),
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise ValueError(f"FamilyBudget {fb_id} does not belong to user")
+    return fb_id
+
+
+async def _verify_saving_goal_ownership(db: AsyncSession, user: User, goal_id) -> Optional[UUID]:
+    """Verify that the saving goal's book belongs to the user. Returns UUID."""
+    goal_id = _to_uuid(goal_id)
+    if goal_id is None:
+        return None
+    result = await db.execute(
+        select(FamilySavingGoal.id)
+        .join(Book, FamilySavingGoal.book_id == Book.id)
+        .where(
+            FamilySavingGoal.id == goal_id,
+            or_(
+                Book.user_id == user.id,
+                Book.id.in_(
+                    select(BookMember.book_id).where(BookMember.user_id == user.id)
+                ),
+            ),
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise ValueError(f"FamilySavingGoal {goal_id} does not belong to user")
+    return goal_id
+
+
+async def _verify_split_ownership(db: AsyncSession, user: User, split_id) -> Optional[UUID]:
+    """Verify that the split's transaction belongs to the user. Returns UUID."""
+    split_id = _to_uuid(split_id)
+    if split_id is None:
+        return None
+    result = await db.execute(
+        select(TransactionSplit.id)
+        .join(Transaction, TransactionSplit.transaction_id == Transaction.id)
+        .where(TransactionSplit.id == split_id, Transaction.user_id == user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise ValueError(f"TransactionSplit {split_id} does not belong to user")
+    return split_id
+
+
+async def _verify_resource_pool_ownership(db: AsyncSession, user: User, pool_id) -> Optional[UUID]:
+    """Verify that the resource pool belongs to the user. Returns UUID."""
+    pool_id = _to_uuid(pool_id)
+    if pool_id is None:
+        return None
+    result = await db.execute(
+        select(ResourcePool.id).where(ResourcePool.id == pool_id, ResourcePool.user_id == user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise ValueError(f"ResourcePool {pool_id} does not belong to user")
+    return pool_id
+
+
+def _user_book_ids_subquery(user: User):
+    """Subquery returning all book IDs the user owns or is a member of."""
+    return select(Book.id).where(Book.user_id == user.id).union(
+        select(BookMember.book_id).where(BookMember.user_id == user.id)
+    )
+
+
+def _apply_ownership_filter(query, model, entity_type: str, user: User):
+    """Apply ownership filtering for entities without user_id."""
+    if entity_type == "family_budget":
+        query = query.where(model.book_id.in_(_user_book_ids_subquery(user)))
+    elif entity_type == "transaction_split":
+        query = query.where(
+            model.transaction_id.in_(
+                select(Transaction.id).where(Transaction.user_id == user.id)
+            )
+        )
+    elif entity_type == "family_saving_goal":
+        query = query.where(model.book_id.in_(_user_book_ids_subquery(user)))
+    return query
+
+
 @router.post("/push", response_model=SyncPushResponse)
 async def push_changes(
     request: SyncPushRequest,
@@ -169,6 +337,8 @@ async def _check_conflict(
     query = select(model).where(model.id == change.server_id)
     if hasattr(model, 'user_id'):
         query = query.where(model.user_id == user.id)
+    else:
+        query = _apply_ownership_filter(query, model, entity_type, user)
 
     result = await db.execute(query)
     entity = result.scalar_one_or_none()
@@ -261,7 +431,7 @@ async def _handle_create(
         book_id = None
         if data.get("book_id"):
             try:
-                book_id = UUID(data["book_id"]) if isinstance(data["book_id"], str) else data["book_id"]
+                book_id = await _verify_book_ownership(db, user, data["book_id"])
             except ValueError as e:
                 logger.debug(f"Invalid book_id UUID format: {e}")
         if not book_id:
@@ -286,7 +456,7 @@ async def _handle_create(
         account_id = None
         if data.get("account_id"):
             try:
-                account_id = UUID(data["account_id"]) if isinstance(data["account_id"], str) else data["account_id"]
+                account_id = await _verify_account_ownership(db, user, data["account_id"])
             except ValueError as e:
                 logger.debug(f"Invalid account_id UUID format: {e}")
         if not account_id:
@@ -309,7 +479,7 @@ async def _handle_create(
         category_id = None
         if data.get("category_id"):
             try:
-                category_id = UUID(data["category_id"]) if isinstance(data["category_id"], str) else data["category_id"]
+                category_id = await _verify_category_ownership(db, user, data["category_id"])
             except ValueError as e:
                 logger.debug(f"Invalid category_id UUID format: {e}")
         if not category_id:
@@ -327,11 +497,15 @@ async def _handle_create(
                 await db.flush()
             category_id = category.id
 
+        # Verify optional FK references
+        target_account_id = await _verify_account_ownership(db, user, data.get("target_account_id"))
+        resource_pool_id = await _verify_resource_pool_ownership(db, user, data.get("resource_pool_id"))
+
         entity = Transaction(
             user_id=user.id,
             book_id=book_id,
             account_id=account_id,
-            target_account_id=UUID(data["target_account_id"]) if data.get("target_account_id") else None,
+            target_account_id=target_account_id,
             category_id=category_id,
             transaction_type=data.get("transaction_type", 1),
             amount=Decimal(str(data.get("amount", 0))),
@@ -356,7 +530,7 @@ async def _handle_create(
             # Money Age fields
             money_age=data.get("money_age"),
             money_age_level=data.get("money_age_level"),
-            resource_pool_id=UUID(data["resource_pool_id"]) if data.get("resource_pool_id") else None,
+            resource_pool_id=resource_pool_id,
             # Reimbursement and stats
             is_reimbursable=data.get("is_reimbursable", False),
             is_reimbursed=data.get("is_reimbursed", False),
@@ -397,14 +571,17 @@ async def _handle_create(
         await db.flush()
 
     elif entity_type == "category":
+        # Verify parent_id FK if provided
+        parent_id = await _verify_category_ownership(db, user, data.get("parent_id"))
+        # Clients cannot create system categories
         entity = Category(
-            user_id=user.id if not data.get("is_system") else None,
-            parent_id=UUID(data["parent_id"]) if data.get("parent_id") else None,
+            user_id=user.id,
+            parent_id=parent_id,
             name=data["name"],
             icon=data.get("icon"),
             category_type=data.get("category_type", 1),
             sort_order=data.get("sort_order", 0),
-            is_system=data.get("is_system", False),
+            is_system=False,
         )
         db.add(entity)
         await db.flush()
@@ -426,10 +603,13 @@ async def _handle_create(
         await db.flush()
 
     elif entity_type == "budget":
+        # Verify FK ownership
+        verified_book_id = await _verify_book_ownership(db, user, data.get("book_id"))
+        verified_category_id = await _verify_category_ownership(db, user, data.get("category_id"))
         entity = Budget(
             user_id=user.id,
-            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data.get("book_id"),
-            category_id=UUID(data["category_id"]) if data.get("category_id") else None,
+            book_id=verified_book_id,
+            category_id=verified_category_id,
             name=data["name"],
             amount=Decimal(str(data.get("amount", 0))),
             budget_type=data.get("budget_type", 1),
@@ -442,19 +622,23 @@ async def _handle_create(
 
     # ============== Family Book Entities ==============
     elif entity_type == "book_member":
+        # Verify book FK ownership
+        verified_book_id = await _verify_book_ownership(db, user, data.get("book_id"))
         entity = BookMember(
-            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+            book_id=verified_book_id,
             user_id=user.id,
             role=data.get("role", 1),
             nickname=data.get("nickname"),
-            invited_by=UUID(data["invited_by"]) if data.get("invited_by") else None,
+            invited_by=None,  # Clients cannot specify invited_by
         )
         db.add(entity)
         await db.flush()
 
     elif entity_type == "family_budget":
+        # Verify book FK ownership
+        verified_book_id = await _verify_book_ownership(db, user, data.get("book_id"))
         entity = FamilyBudget(
-            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+            book_id=verified_book_id,
             period=data["period"],
             strategy=data.get("strategy", 0),
             total_budget=Decimal(str(data.get("total_budget", 0))),
@@ -464,8 +648,10 @@ async def _handle_create(
         await db.flush()
 
     elif entity_type == "member_budget":
+        # Verify family_budget FK ownership
+        verified_fb_id = await _verify_family_budget_ownership(db, user, data.get("family_budget_id"))
         entity = MemberBudget(
-            family_budget_id=UUID(data["family_budget_id"]) if isinstance(data.get("family_budget_id"), str) else data["family_budget_id"],
+            family_budget_id=verified_fb_id,
             user_id=user.id,
             allocated=Decimal(str(data.get("allocated", 0))),
             spent=Decimal(str(data.get("spent", 0))),
@@ -475,8 +661,10 @@ async def _handle_create(
         await db.flush()
 
     elif entity_type == "family_saving_goal":
+        # Verify book FK ownership
+        verified_book_id = await _verify_book_ownership(db, user, data.get("book_id"))
         entity = FamilySavingGoal(
-            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+            book_id=verified_book_id,
             name=data["name"],
             description=data.get("description"),
             icon=data.get("icon"),
@@ -490,8 +678,10 @@ async def _handle_create(
         await db.flush()
 
     elif entity_type == "goal_contribution":
+        # Verify goal FK ownership
+        verified_goal_id = await _verify_saving_goal_ownership(db, user, data.get("goal_id"))
         entity = GoalContribution(
-            goal_id=UUID(data["goal_id"]) if isinstance(data.get("goal_id"), str) else data["goal_id"],
+            goal_id=verified_goal_id,
             user_id=user.id,
             amount=Decimal(str(data.get("amount", 0))),
             note=data.get("note"),
@@ -500,8 +690,10 @@ async def _handle_create(
         await db.flush()
 
     elif entity_type == "transaction_split":
+        # Verify transaction FK ownership
+        verified_txn_id = await _verify_transaction_ownership(db, user, data.get("transaction_id"))
         entity = TransactionSplit(
-            transaction_id=UUID(data["transaction_id"]) if isinstance(data.get("transaction_id"), str) else data["transaction_id"],
+            transaction_id=verified_txn_id,
             split_type=data.get("split_type", 0),
             status=data.get("status", 0),
         )
@@ -509,8 +701,10 @@ async def _handle_create(
         await db.flush()
 
     elif entity_type == "split_participant":
+        # Verify split FK ownership
+        verified_split_id = await _verify_split_ownership(db, user, data.get("split_id"))
         entity = SplitParticipant(
-            split_id=UUID(data["split_id"]) if isinstance(data.get("split_id"), str) else data["split_id"],
+            split_id=verified_split_id,
             user_id=user.id,
             amount=Decimal(str(data.get("amount", 0))),
             percentage=Decimal(str(data["percentage"])) if data.get("percentage") else None,
@@ -523,10 +717,15 @@ async def _handle_create(
 
     # ============== Money Age Entities ==============
     elif entity_type == "resource_pool":
+        # Verify FK ownership
+        verified_book_id = await _verify_book_ownership(db, user, data.get("book_id"))
+        verified_txn_id = await _verify_transaction_ownership(db, user, data.get("income_transaction_id"))
+        verified_account_id = await _verify_account_ownership(db, user, data.get("account_id"))
+        verified_category_id = await _verify_category_ownership(db, user, data.get("income_category_id"))
         entity = ResourcePool(
             user_id=user.id,
-            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
-            income_transaction_id=UUID(data["income_transaction_id"]) if isinstance(data.get("income_transaction_id"), str) else data["income_transaction_id"],
+            book_id=verified_book_id,
+            income_transaction_id=verified_txn_id,
             original_amount=Decimal(str(data.get("original_amount", 0))),
             remaining_amount=Decimal(str(data.get("remaining_amount", 0))),
             consumed_amount=Decimal(str(data.get("consumed_amount", 0))),
@@ -536,29 +735,35 @@ async def _handle_create(
             fully_consumed_date=date.fromisoformat(data["fully_consumed_date"]) if data.get("fully_consumed_date") else None,
             is_fully_consumed=data.get("is_fully_consumed", False),
             consumption_count=data.get("consumption_count", 0),
-            account_id=UUID(data["account_id"]) if isinstance(data.get("account_id"), str) else data["account_id"],
-            income_category_id=UUID(data["income_category_id"]) if isinstance(data.get("income_category_id"), str) else data["income_category_id"],
+            account_id=verified_account_id,
+            income_category_id=verified_category_id,
         )
         db.add(entity)
         await db.flush()
 
     elif entity_type == "consumption_record":
+        # Verify FK ownership
+        verified_pool_id = await _verify_resource_pool_ownership(db, user, data.get("resource_pool_id"))
+        verified_txn_id = await _verify_transaction_ownership(db, user, data.get("expense_transaction_id"))
+        verified_book_id = await _verify_book_ownership(db, user, data.get("book_id"))
         entity = ConsumptionRecord(
-            resource_pool_id=UUID(data["resource_pool_id"]) if isinstance(data.get("resource_pool_id"), str) else data["resource_pool_id"],
-            expense_transaction_id=UUID(data["expense_transaction_id"]) if isinstance(data.get("expense_transaction_id"), str) else data["expense_transaction_id"],
+            resource_pool_id=verified_pool_id,
+            expense_transaction_id=verified_txn_id,
             consumed_amount=Decimal(str(data.get("consumed_amount", 0))),
             consumption_date=date.fromisoformat(data["consumption_date"]) if isinstance(data.get("consumption_date"), str) else data.get("consumption_date", date.today()),
             money_age_days=data.get("money_age_days", 0),
             user_id=user.id,
-            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+            book_id=verified_book_id,
         )
         db.add(entity)
         await db.flush()
 
     elif entity_type == "money_age_snapshot":
+        # Verify book FK ownership
+        verified_book_id = await _verify_book_ownership(db, user, data.get("book_id"))
         entity = MoneyAgeSnapshot(
             user_id=user.id,
-            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+            book_id=verified_book_id,
             snapshot_date=date.fromisoformat(data["snapshot_date"]) if isinstance(data.get("snapshot_date"), str) else data.get("snapshot_date", date.today()),
             snapshot_type=data.get("snapshot_type", "daily"),
             avg_money_age=Decimal(str(data.get("avg_money_age", 0))),
@@ -582,9 +787,11 @@ async def _handle_create(
         await db.flush()
 
     elif entity_type == "money_age_config":
+        # Verify book FK ownership
+        verified_book_id = await _verify_book_ownership(db, user, data.get("book_id"))
         entity = MoneyAgeConfig(
             user_id=user.id,
-            book_id=UUID(data["book_id"]) if isinstance(data.get("book_id"), str) else data["book_id"],
+            book_id=verified_book_id,
             consumption_strategy=data.get("consumption_strategy", "fifo"),
             health_threshold=data.get("health_threshold", 30),
             warning_threshold=data.get("warning_threshold", 60),
@@ -600,6 +807,8 @@ async def _handle_create(
 
     # ============== Location Entities ==============
     elif entity_type == "geo_fence":
+        # Verify category FK ownership
+        verified_category_id = await _verify_category_ownership(db, user, data.get("linked_category_id"))
         entity = GeoFence(
             user_id=user.id,
             name=data["name"],
@@ -608,7 +817,7 @@ async def _handle_create(
             radius_meters=data.get("radius_meters", 100.0),
             place_name=data.get("place_name"),
             action=data.get("action", 4),
-            linked_category_id=UUID(data["linked_category_id"]) if data.get("linked_category_id") else None,
+            linked_category_id=verified_category_id,
             linked_vault_id=data.get("linked_vault_id"),
             budget_limit=Decimal(str(data["budget_limit"])) if data.get("budget_limit") else None,
             is_enabled=data.get("is_enabled", True),
@@ -617,6 +826,8 @@ async def _handle_create(
         await db.flush()
 
     elif entity_type == "frequent_location":
+        # Verify category FK ownership
+        verified_category_id = await _verify_category_ownership(db, user, data.get("default_category_id"))
         entity = FrequentLocation(
             user_id=user.id,
             latitude=Decimal(str(data["latitude"])),
@@ -629,7 +840,7 @@ async def _handle_create(
             poi_id=data.get("poi_id"),
             visit_count=data.get("visit_count", 1),
             total_spent=Decimal(str(data.get("total_spent", 0))),
-            default_category_id=UUID(data["default_category_id"]) if data.get("default_category_id") else None,
+            default_category_id=verified_category_id,
             default_vault_id=data.get("default_vault_id"),
         )
         db.add(entity)
@@ -680,6 +891,8 @@ async def _handle_update(
     query = select(model).where(model.id == change.server_id)
     if hasattr(model, 'user_id'):
         query = query.where(model.user_id == user.id)
+    else:
+        query = _apply_ownership_filter(query, model, entity_type, user)
 
     result = await db.execute(query)
     entity = result.scalar_one_or_none()
@@ -693,16 +906,38 @@ async def _handle_update(
 
     # Apply updates (Local-first: always use client data)
     data = change.data
+    # Map FK field names to their verification functions
+    _fk_verifiers = {
+        'book_id': _verify_book_ownership,
+        'account_id': _verify_account_ownership,
+        'target_account_id': _verify_account_ownership,
+        'category_id': _verify_category_ownership,
+        'parent_id': _verify_category_ownership,
+        'resource_pool_id': _verify_resource_pool_ownership,
+        'income_transaction_id': _verify_transaction_ownership,
+        'expense_transaction_id': _verify_transaction_ownership,
+        'family_budget_id': _verify_family_budget_ownership,
+        'goal_id': _verify_saving_goal_ownership,
+        'transaction_id': _verify_transaction_ownership,
+        'split_id': _verify_split_ownership,
+        'linked_category_id': _verify_category_ownership,
+        'default_category_id': _verify_category_ownership,
+        'income_category_id': _verify_category_ownership,
+    }
     for key, value in data.items():
-        if hasattr(entity, key) and key not in ['id', 'user_id', 'created_at']:
+        if hasattr(entity, key) and key not in ['id', 'user_id', 'created_at', 'updated_at', 'is_system', 'created_by']:
             # Handle special types
-            # UUID fields
+            # UUID fields - verify FK ownership
             if key in ['book_id', 'account_id', 'target_account_id', 'category_id', 'parent_id',
                        'resource_pool_id', 'income_transaction_id', 'expense_transaction_id',
                        'family_budget_id', 'goal_id', 'transaction_id', 'split_id',
                        'linked_category_id', 'default_category_id', 'income_category_id',
-                       'invited_by', 'created_by'] and value:
-                value = UUID(value) if isinstance(value, str) else value
+                       'invited_by'] and value:
+                verifier = _fk_verifiers.get(key)
+                if verifier:
+                    value = await verifier(db, user, value)
+                else:
+                    value = UUID(value) if isinstance(value, str) else value
             # Decimal fields
             elif key in ['amount', 'fee', 'balance', 'credit_limit', 'location_latitude', 'location_longitude',
                          'ai_confidence', 'original_amount', 'remaining_amount', 'consumed_amount',
@@ -754,6 +989,8 @@ async def _handle_delete(
     query = select(model).where(model.id == change.server_id)
     if hasattr(model, 'user_id'):
         query = query.where(model.user_id == user.id)
+    else:
+        query = _apply_ownership_filter(query, model, entity_type, user)
 
     result = await db.execute(query)
     entity = result.scalar_one_or_none()
@@ -852,6 +1089,8 @@ async def pull_changes(
         query = select(model)
         if hasattr(model, 'user_id'):
             query = query.where(model.user_id == current_user.id)
+        else:
+            query = _apply_ownership_filter(query, model, entity_type, current_user)
 
         if last_sync_time:
             query = query.where(model.updated_at > last_sync_time)
@@ -1161,6 +1400,8 @@ async def get_sync_status(
         query = select(func.count()).select_from(model)
         if hasattr(model, 'user_id'):
             query = query.where(model.user_id == current_user.id)
+        else:
+            query = _apply_ownership_filter(query, model, entity_type, current_user)
 
         result = await db.execute(query)
         entity_counts[entity_type] = result.scalar() or 0
