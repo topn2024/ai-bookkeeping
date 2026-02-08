@@ -239,11 +239,12 @@ abstract class CrudNotifier<T, ID> extends Notifier<CrudState<T>> {
   /// 批量添加
   Future<Result<List<T>>> addAll(List<T> entities) async {
     try {
-      for (final entity in entities) {
+      // 使用Future.wait并行执行所有插入操作，避免串行阻塞
+      await Future.wait(entities.map((entity) async {
         await insertOne(entity);
         // 同步钩子
         await _markForSync(getId(entity).toString(), QueueOperation.create, entity);
-      }
+      }));
       state = state.copyWith(
         items: [...state.items, ...entities],
         lastUpdated: DateTime.now(),
@@ -395,11 +396,12 @@ abstract class SimpleCrudNotifier<T, ID> extends Notifier<List<T>> {
 
   /// 批量添加
   Future<void> addAll(List<T> entities) async {
-    for (final entity in entities) {
+    // 使用Future.wait并行执行所有插入操作，避免串行阻塞
+    await Future.wait(entities.map((entity) async {
       await insertOne(entity);
       // 同步钩子
       await _markForSync(getId(entity).toString(), QueueOperation.create, entity);
-    }
+    }));
     state = [...state, ...entities];
     // 触发自动同步
     if (entities.isNotEmpty) _autoSync.markDataChanged();

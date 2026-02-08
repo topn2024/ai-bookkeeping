@@ -241,7 +241,11 @@ class SentenceSplitter {
 
     for (final pattern in patterns) {
       var index = 0;
+      int iterations = 0; // Safety counter
       while (true) {
+        // Safety limit: max 10000 iterations
+        if (iterations++ > 10000) break;
+
         final pos = text.indexOf(pattern, index);
         if (pos == -1) break;
 

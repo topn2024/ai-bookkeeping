@@ -86,6 +86,7 @@ class RetryPolicy {
   /// 执行带重试的操作
   Future<T> execute<T>(Future<T> Function() operation) async {
     int retryCount = 0;
+    const int absoluteMaxRetries = 20; // Safety limit
 
     while (true) {
       try {
@@ -93,7 +94,8 @@ class RetryPolicy {
       } catch (e) {
         retryCount++;
 
-        if (!shouldRetry(retryCount, e)) {
+        // Safety check: absolute max retries regardless of shouldRetry()
+        if (retryCount >= absoluteMaxRetries || !shouldRetry(retryCount, e)) {
           rethrow;
         }
 
@@ -157,6 +159,7 @@ class RetryExecutor {
     void Function(int retryCount, Object error, Duration delay)? onRetry,
   }) async {
     reset();
+    const int absoluteMaxRetries = 20; // Safety limit
 
     while (true) {
       try {
@@ -165,6 +168,11 @@ class RetryExecutor {
         return result;
       } catch (e) {
         if (!recordErrorAndCheckRetry(e)) {
+          rethrow;
+        }
+
+        // Safety check: absolute max retries
+        if (_retryCount >= absoluteMaxRetries) {
           rethrow;
         }
 

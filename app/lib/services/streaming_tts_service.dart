@@ -407,7 +407,7 @@ class StreamingTTSService {
         await _playAudioFile(audioFile);
 
         // 立即删除已播放的临时文件
-        _safeDeleteFile(audioFile);
+        await _safeDeleteFile(audioFile);
         tempFiles.remove(audioFile);
       }
 
@@ -418,7 +418,7 @@ class StreamingTTSService {
     } finally {
       // 确保清理所有临时文件（即使发生异常或取消）
       for (final file in tempFiles) {
-        _safeDeleteFile(file);
+        await _safeDeleteFile(file);
       }
     }
   }
@@ -518,10 +518,10 @@ class StreamingTTSService {
   }
 
   /// 安全删除文件
-  void _safeDeleteFile(File file) {
+  Future<void> _safeDeleteFile(File file) async {
     try {
-      if (file.existsSync()) {
-        file.deleteSync();
+      if (await file.exists()) {
+        await file.delete();
       }
     } catch (e) {
       debugPrint('StreamingTTSService: failed to delete temp file - $e');

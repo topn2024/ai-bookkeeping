@@ -439,7 +439,7 @@ class _SourceAudioPlayerState extends State<SourceAudioPlayer> {
 }
 
 /// Compact audio indicator button for transaction list items
-class SourceAudioButton extends StatelessWidget {
+class SourceAudioButton extends StatefulWidget {
   final String audioPath;
   final DateTime? expiresAt;
   final int? fileSize;
@@ -454,13 +454,34 @@ class SourceAudioButton extends StatelessWidget {
   });
 
   @override
+  State<SourceAudioButton> createState() => _SourceAudioButtonState();
+}
+
+class _SourceAudioButtonState extends State<SourceAudioButton> {
+  bool _fileExists = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFileExists();
+  }
+
+  Future<void> _checkFileExists() async {
+    final file = File(widget.audioPath);
+    final exists = await file.exists();
+    if (mounted) {
+      setState(() {
+        _fileExists = exists;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final file = File(audioPath);
-    final fileExists = file.existsSync();
-    final isExpired = expiresAt != null && DateTime.now().isAfter(expiresAt!);
+    final isExpired = widget.expiresAt != null && DateTime.now().isAfter(widget.expiresAt!);
 
     return GestureDetector(
-      onTap: fileExists && !isExpired ? onTap : null,
+      onTap: _fileExists && !isExpired ? widget.onTap : null,
       child: Container(
         width: 48,
         height: 48,
@@ -474,10 +495,10 @@ class SourceAudioButton extends StatelessWidget {
           child: Icon(
             isExpired
                 ? Icons.mic_off
-                : (fileExists ? Icons.mic : Icons.mic_none),
+                : (_fileExists ? Icons.mic : Icons.mic_none),
             color: isExpired
                 ? Colors.grey[400]
-                : (fileExists
+                : (_fileExists
                     ? Theme.of(context).primaryColor
                     : Colors.grey[400]),
             size: 24,

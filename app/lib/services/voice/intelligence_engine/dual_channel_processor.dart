@@ -302,9 +302,9 @@ class ExecutionChannel {
       // 注意：可能在超时瞬间被 _releaseExecutionLock 移除并完成
       final removed = _executionWaitQueue.remove(completer);
       if (!removed) {
-        // 我们已被移除并获得了锁，需要释放它
-        debugPrint('[ExecutionChannel] 超时但已获得锁，释放锁');
-        _releaseExecutionLock();
+        // 我们已被移除并获得了锁，直接返回true继续使用锁
+        debugPrint('[ExecutionChannel] 超时但已获得锁，继续使用');
+        return true;
       }
       return false;
     }

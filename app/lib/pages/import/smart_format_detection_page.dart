@@ -44,6 +44,9 @@ class _SmartFormatDetectionPageState extends ConsumerState<SmartFormatDetectionP
   bool _needsFieldMapping = false;
   String? _errorMessage;
 
+  // Cache file info to avoid sync I/O in build()
+  int _fileSize = 0;
+
   // 检测步骤状态
   final List<DetectionStep> _steps = [
     DetectionStep(title: '编码检测', description: '检测文件编码...', status: StepStatus.pending),
@@ -55,7 +58,24 @@ class _SmartFormatDetectionPageState extends ConsumerState<SmartFormatDetectionP
   @override
   void initState() {
     super.initState();
+    _loadFileInfo();
     _startDetection();
+  }
+
+  Future<void> _loadFileInfo() async {
+    try {
+      final file = File(widget.filePath);
+      if (await file.exists()) {
+        final size = await file.length();
+        if (mounted) {
+          setState(() {
+            _fileSize = size;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to load file info: $e');
+    }
   }
 
   Future<void> _startDetection() async {
@@ -250,11 +270,9 @@ class _SmartFormatDetectionPageState extends ConsumerState<SmartFormatDetectionP
   }
 
   Widget _buildFileInfoCard(BuildContext context, ThemeData theme) {
-    final file = File(widget.filePath);
-    final fileSize = file.existsSync() ? file.lengthSync() : 0;
-    final sizeStr = fileSize > 1024 * 1024
-        ? '${(fileSize / 1024 / 1024).toStringAsFixed(1)} MB'
-        : '${(fileSize / 1024).toStringAsFixed(0)} KB';
+    final sizeStr = _fileSize > 1024 * 1024
+        ? '${(_fileSize / 1024 / 1024).toStringAsFixed(1)} MB'
+        : '${(_fileSize / 1024).toStringAsFixed(0)} KB';
 
     return Container(
       margin: const EdgeInsets.all(16),

@@ -131,11 +131,9 @@ class LockingSessionManager extends SessionManager {
     if (_lockCompleter != null && !_lockCompleter!.isCompleted) {
       debugPrint('[LockingSessionManager] 等待旧会话完成...');
       try {
-        if (waitTimeout != null) {
-          await _lockCompleter!.future.timeout(waitTimeout);
-        } else {
-          await _lockCompleter!.future;
-        }
+        // 使用提供的waitTimeout，如果为null则使用默认30秒超时防止永久挂起
+        final effectiveTimeout = waitTimeout ?? const Duration(seconds: 30);
+        await _lockCompleter!.future.timeout(effectiveTimeout);
       } on TimeoutException {
         debugPrint('[LockingSessionManager] 等待超时，强制获取锁');
       }

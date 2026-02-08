@@ -51,6 +51,7 @@ class HomePageTextState {
 class HomePageTextNotifier extends StateNotifier<HomePageTextState> {
   Timer? _refreshTimer;
   String? _userId;
+  bool _isRefreshing = false; // Prevent overlapping refreshes
 
   // 当前数据上下文（用于生成文案）
   double _currentGrowth = 0;
@@ -133,26 +134,33 @@ class HomePageTextNotifier extends StateNotifier<HomePageTextState> {
   }
 
   void _refreshAllTexts() {
-    state = HomePageTextState(
-      greeting: HomePageTextService.getTimeGreeting(userId: _userId),
-      balanceGrowthText: _currentGrowth != 0
-          ? HomePageTextService.getBalanceGrowthText(_currentGrowth, userId: _userId)
-          : HomePageTextService.getNoGrowthDataText(userId: _userId),
-      streakCelebrationText: _currentStreakDays > 0
-          ? HomePageTextService.getStreakCelebrationText(_currentStreakDays, userId: _userId)
-          : '',
-      streakEncouragementText: _currentStreakDays > 0
-          ? HomePageTextService.getStreakEncouragementText(_currentStreakDays, userId: _userId)
-          : '',
-      moneyAgeTrendText: HomePageTextService.getMoneyAgeTrendText(
-        _currentTrendDays,
-        _currentTrend,
-        userId: _userId,
-        moneyAgeDays: _currentMoneyAgeDays,
-      ),
-      lastRefreshedAt: DateTime.now(),
-      refreshCount: state.refreshCount + 1,
-    );
+    if (_isRefreshing) return; // Skip if already refreshing
+    _isRefreshing = true;
+
+    try {
+      state = HomePageTextState(
+        greeting: HomePageTextService.getTimeGreeting(userId: _userId),
+        balanceGrowthText: _currentGrowth != 0
+            ? HomePageTextService.getBalanceGrowthText(_currentGrowth, userId: _userId)
+            : HomePageTextService.getNoGrowthDataText(userId: _userId),
+        streakCelebrationText: _currentStreakDays > 0
+            ? HomePageTextService.getStreakCelebrationText(_currentStreakDays, userId: _userId)
+            : '',
+        streakEncouragementText: _currentStreakDays > 0
+            ? HomePageTextService.getStreakEncouragementText(_currentStreakDays, userId: _userId)
+            : '',
+        moneyAgeTrendText: HomePageTextService.getMoneyAgeTrendText(
+          _currentTrendDays,
+          _currentTrend,
+          userId: _userId,
+          moneyAgeDays: _currentMoneyAgeDays,
+        ),
+        lastRefreshedAt: DateTime.now(),
+        refreshCount: state.refreshCount + 1,
+      );
+    } finally {
+      _isRefreshing = false;
+    }
   }
 
   void _startAutoRefresh() {

@@ -8,7 +8,7 @@ import '../theme/app_theme.dart';
 /// - Full screen image view with zoom support
 /// - Displays file metadata (size, capture time)
 /// - Shows expiry status
-class SourceImageViewer extends StatelessWidget {
+class SourceImageViewer extends StatefulWidget {
   final String imagePath;
   final DateTime? expiresAt;
   final int? fileSize;
@@ -42,9 +42,31 @@ class SourceImageViewer extends StatelessWidget {
   }
 
   @override
+  State<SourceImageViewer> createState() => _SourceImageViewerState();
+}
+
+class _SourceImageViewerState extends State<SourceImageViewer> {
+  bool _fileExists = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFileExists();
+  }
+
+  Future<void> _checkFileExists() async {
+    final file = File(widget.imagePath);
+    final exists = await file.exists();
+    if (mounted) {
+      setState(() {
+        _fileExists = exists;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final file = File(imagePath);
-    final fileExists = file.existsSync();
+    final file = File(widget.imagePath);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -53,12 +75,12 @@ class SourceImageViewer extends StatelessWidget {
         foregroundColor: Colors.white,
         title: const Text('原始图片'),
         actions: [
-          if (fileSize != null)
+          if (widget.fileSize != null)
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Center(
                 child: Text(
-                  _formatFileSize(fileSize!),
+                  _formatFileSize(widget.fileSize!),
                   style: const TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ),
@@ -69,7 +91,7 @@ class SourceImageViewer extends StatelessWidget {
         children: [
           // Image view
           Expanded(
-            child: fileExists
+            child: _fileExists
                 ? InteractiveViewer(
                     minScale: 0.5,
                     maxScale: 4.0,
@@ -86,7 +108,7 @@ class SourceImageViewer extends StatelessWidget {
                 : _buildErrorWidget('图片文件不存在'),
           ),
           // Bottom info bar
-          if (expiresAt != null)
+          if (widget.expiresAt != null)
             Container(
               padding: const EdgeInsets.all(16),
               color: Colors.black87,
@@ -135,16 +157,16 @@ class SourceImageViewer extends StatelessWidget {
   }
 
   bool _isExpired() {
-    if (expiresAt == null) return false;
-    return DateTime.now().isAfter(expiresAt!);
+    if (widget.expiresAt == null) return false;
+    return DateTime.now().isAfter(widget.expiresAt!);
   }
 
   String _getExpiryText() {
-    if (expiresAt == null) return '';
+    if (widget.expiresAt == null) return '';
     if (_isExpired()) {
       return '已过期';
     }
-    final remaining = expiresAt!.difference(DateTime.now());
+    final remaining = widget.expiresAt!.difference(DateTime.now());
     if (remaining.inDays > 0) {
       return '${remaining.inDays}天后过期';
     } else if (remaining.inHours > 0) {
@@ -162,7 +184,7 @@ class SourceImageViewer extends StatelessWidget {
 }
 
 /// Thumbnail widget for showing image preview in transaction list
-class SourceImageThumbnail extends StatelessWidget {
+class SourceImageThumbnail extends StatefulWidget {
   final String imagePath;
   final double size;
   final VoidCallback? onTap;
@@ -179,16 +201,38 @@ class SourceImageThumbnail extends StatelessWidget {
   });
 
   @override
+  State<SourceImageThumbnail> createState() => _SourceImageThumbnailState();
+}
+
+class _SourceImageThumbnailState extends State<SourceImageThumbnail> {
+  bool _fileExists = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFileExists();
+  }
+
+  Future<void> _checkFileExists() async {
+    final file = File(widget.imagePath);
+    final exists = await file.exists();
+    if (mounted) {
+      setState(() {
+        _fileExists = exists;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final file = File(imagePath);
-    final fileExists = file.existsSync();
-    final isExpired = expiresAt != null && DateTime.now().isAfter(expiresAt!);
+    final file = File(widget.imagePath);
+    final isExpired = widget.expiresAt != null && DateTime.now().isAfter(widget.expiresAt!);
 
     return GestureDetector(
-      onTap: fileExists && !isExpired ? onTap : null,
+      onTap: _fileExists && !isExpired ? widget.onTap : null,
       child: Container(
-        width: size,
-        height: size,
+        width: widget.size,
+        height: widget.size,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
           color: Colors.grey[200],
@@ -197,7 +241,7 @@ class SourceImageThumbnail extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (fileExists)
+            if (_fileExists)
               Image.file(
                 file,
                 fit: BoxFit.cover,
@@ -208,7 +252,7 @@ class SourceImageThumbnail extends StatelessWidget {
             else
               _buildPlaceholder(Icons.image_not_supported),
             // Expired overlay
-            if (showExpiredOverlay && isExpired)
+            if (widget.showExpiredOverlay && isExpired)
               Container(
                 color: Colors.black54,
                 child: const Center(
@@ -220,7 +264,7 @@ class SourceImageThumbnail extends StatelessWidget {
                 ),
               ),
             // Tap indicator
-            if (fileExists && !isExpired)
+            if (_fileExists && !isExpired)
               Positioned(
                 right: 2,
                 bottom: 2,
@@ -248,7 +292,7 @@ class SourceImageThumbnail extends StatelessWidget {
       child: Icon(
         icon,
         color: Colors.grey[400],
-        size: size * 0.5,
+        size: widget.size * 0.5,
       ),
     );
   }

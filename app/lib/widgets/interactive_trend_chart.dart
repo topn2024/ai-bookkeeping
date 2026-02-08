@@ -240,6 +240,9 @@ class _InteractiveTrendChartState extends State<InteractiveTrendChart>
   /// 数据范围
   late double _minX, _maxX, _minY, _maxY;
 
+  /// 拖拽节流计数器 - 只处理每3帧中的1帧
+  int _dragFrameCounter = 0;
+
   @override
   void initState() {
     super.initState();
@@ -508,6 +511,10 @@ class _InteractiveTrendChartState extends State<InteractiveTrendChart>
   void _onPanUpdate(DragUpdateDetails details) {
     if (!widget.config.enableTouch) return;
 
+    // 节流：只处理每3帧中的1帧，减少setState和计算频率
+    _dragFrameCounter++;
+    if (_dragFrameCounter % 3 != 0) return;
+
     setState(() {
       _touchPosition = details.localPosition;
     });
@@ -516,6 +523,8 @@ class _InteractiveTrendChartState extends State<InteractiveTrendChart>
 
   /// 拖拽结束
   void _onPanEnd(DragEndDetails details) {
+    // 重置节流计数器
+    _dragFrameCounter = 0;
     setState(() {
       _touchPosition = null;
     });

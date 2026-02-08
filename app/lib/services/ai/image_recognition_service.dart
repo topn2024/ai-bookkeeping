@@ -74,9 +74,9 @@ class ImageRecognitionService {
   ///
   /// 通过图片尺寸和内容特征判断是否为长截图
   /// 用于自动选择单张或批量识别模式
-  bool isLikelyBatchImage(File imageFile) {
+  Future<bool> isLikelyBatchImage(File imageFile) async {
     // 简单的启发式判断：文件较大可能是长截图
-    final fileSize = imageFile.lengthSync();
+    final fileSize = await imageFile.length();
     return fileSize > 500 * 1024; // 大于500KB
   }
 
@@ -84,7 +84,7 @@ class ImageRecognitionService {
   ///
   /// 自动判断并选择单张或批量识别模式
   Future<MultiAIRecognitionResult> smartRecognize(File imageFile) async {
-    if (isLikelyBatchImage(imageFile)) {
+    if (await isLikelyBatchImage(imageFile)) {
       return recognizeImageBatch(imageFile);
     } else {
       final result = await recognizeImage(imageFile);

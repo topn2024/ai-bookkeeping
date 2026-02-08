@@ -249,6 +249,9 @@ class _HabitCalendarHeatmapState extends State<HabitCalendarHeatmap>
     }
 
     while (true) {
+      // Safety limit: max 10 years (3650 days)
+      if (streak > 3650) break;
+
       final record = _getRecord(date);
       if (record != null && record.checked) {
         streak++;

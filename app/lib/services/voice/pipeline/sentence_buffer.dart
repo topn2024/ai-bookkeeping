@@ -50,7 +50,11 @@ class SentenceBuffer {
     final sentences = <String>[];
 
     // 持续检测句子，直到没有更多完整句子
+    // Safety limit: max 1000 iterations
+    int iterations = 0;
     while (true) {
+      if (iterations++ > 1000) break;
+
       final sentence = _extractSentence();
       if (sentence == null) break;
       sentences.add(sentence);
