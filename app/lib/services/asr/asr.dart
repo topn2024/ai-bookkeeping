@@ -20,10 +20,7 @@ export 'registry/asr_plugin_registry.dart';
 export 'registry/asr_orchestrator.dart';
 export 'postprocess/asr_postprocessor.dart';
 
-// 插件
-export 'plugins/iflytek_iat/iflytek_iat_plugin.dart';
-export 'plugins/alicloud/alicloud_asr_plugin.dart';
-export 'plugins/offline/offline_asr_plugin.dart';
+// 插件（离线模型管理）
 export 'plugins/offline/sherpa_engine_wrapper.dart'
     show
         OfflineModelType,

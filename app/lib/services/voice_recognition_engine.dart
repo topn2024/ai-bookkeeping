@@ -52,21 +52,6 @@ class VoiceRecognitionEngine {
 
   /// 注册默认插件
   void _registerDefaultPlugins() {
-    // 讯飞语音听写（优先级10）
-    if (!_registry.hasPlugin('iflytek_iat')) {
-      _registry.register(IFlytekIATPlugin());
-    }
-
-    // 阿里云ASR（优先级20）
-    if (!_registry.hasPlugin('alicloud_asr')) {
-      _registry.register(AliCloudASRPlugin());
-    }
-
-    // 离线ASR（优先级100）
-    if (!_registry.hasPlugin('offline_sherpa')) {
-      _registry.register(OfflineASRPlugin());
-    }
-
     debugPrint('[VoiceRecognitionEngine] 已注册 ${_registry.pluginCount} 个插件');
   }
 
@@ -133,11 +118,8 @@ class VoiceRecognitionEngine {
 
   /// 初始化离线模型
   Future<void> initializeOfflineModel() async {
-    final offlinePlugin =
-        _registry.getPlugin('offline_sherpa') as OfflineASRPlugin?;
-    if (offlinePlugin != null) {
-      await offlinePlugin.initialize();
-    }
+    // 离线ASR插件已移除，此方法保留为空操作以保持API兼容
+    debugPrint('[VoiceRecognitionEngine] initializeOfflineModel: no offline plugin registered');
   }
 
   /// 设置热词表（用于提高特定词汇的识别准确率）
@@ -285,27 +267,21 @@ class NetworkChecker {
 }
 
 /// 本地Whisper服务（向后兼容）
-/// 实际实现已移至 OfflineASRPlugin
+/// 离线ASR插件已移除，此类保留为空操作以保持API兼容
 class LocalWhisperService {
-  final OfflineASRPlugin _plugin = OfflineASRPlugin();
   bool _isInitialized = false;
 
   Future<void> initialize() async {
     if (_isInitialized) return;
-    await _plugin.initialize();
     _isInitialized = true;
-    debugPrint('Local Sherpa-ONNX model initialized');
+    debugPrint('LocalWhisperService: offline ASR plugin not available');
   }
 
   Future<ASRResult> transcribe(ProcessedAudio audio) async {
-    if (!_isInitialized) {
-      await initialize();
-    }
-    return await _plugin.transcribe(audio);
+    throw ASRException('Offline ASR plugin not available');
   }
 
   void dispose() {
-    _plugin.dispose();
     _isInitialized = false;
   }
 }
