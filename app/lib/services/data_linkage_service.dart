@@ -542,6 +542,7 @@ class DataLinkageService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _subscriptions.clear();
     for (final sub in _subscriptions) {
       sub.cancel();
     }

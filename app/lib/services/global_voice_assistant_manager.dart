@@ -297,6 +297,14 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     debugPrint('[GlobalVoiceAssistant] 命令处理器已${processor != null ? "设置" : "清除"}');
   }
 
+  /// 清除所有回调，防止内存泄漏
+  /// 应在 widget dispose 时调用
+  void clearCallbacks() {
+    onPermissionRequired = null;
+    _commandProcessor = null;
+    debugPrint('[GlobalVoiceAssistant] 所有回调已清除');
+  }
+
   // 结果缓冲区（用于查询结果通知）
   ResultBuffer? _resultBuffer;
 
@@ -2826,6 +2834,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
   @override
   void dispose() {
+    // 清除回调，防止内存泄漏
+    clearCallbacks();
+
     // 流水线相关
     _pipelineStateSubscription?.cancel();
     _pipelineController?.dispose();

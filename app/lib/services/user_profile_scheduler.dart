@@ -428,6 +428,7 @@ class UserProfileScheduler {
   void dispose() {
     stop();
     _listeners.clear();
+    debugPrint('[UserProfileScheduler] Disposed');
   }
 }
 

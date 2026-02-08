@@ -114,6 +114,7 @@ class CompanionEventBus {
     _messageController.close();
     _pendingEvents.clear();
     _eventHandlers.clear();
+    _frequencyController._history.clear();
   }
 }
 

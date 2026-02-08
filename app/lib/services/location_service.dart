@@ -235,6 +235,11 @@ class PreciseLocationService implements LocationService {
     debugPrint('[LocationService] 位置流监听已停止');
   }
 
+  /// 释放资源
+  void dispose() {
+    stopLocationStream();
+  }
+
   /// 反向地理编码
   Future<Map<String, String>> _reverseGeocode(Position position) async {
     // 实际实现需要调用高德或百度地图API

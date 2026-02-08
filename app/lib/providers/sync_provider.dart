@@ -145,6 +145,10 @@ class SyncNotifier extends Notifier<SyncState> {
       conflicts: _syncManager.conflicts,
     );
 
+    // 取消现有订阅，防止内存泄漏
+    _connectivitySubscription?.cancel();
+    _progressSubscription?.cancel();
+
     // 监听网络变化
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(_onConnectivityChanged);
 

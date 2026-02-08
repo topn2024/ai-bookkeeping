@@ -295,7 +295,7 @@ class BackgroundDownloadService {
 
   /// 释放资源
   void dispose() {
-    _cancelToken?.cancel();
+    cancelDownload();
     _statusController.close();
     _progressController.close();
   }

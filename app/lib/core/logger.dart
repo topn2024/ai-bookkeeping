@@ -531,11 +531,21 @@ class Logger {
     }
   }
 
-  /// Dispose resources
-  Future<void> dispose() async {
+  /// Shutdown the logger and release all resources
+  /// Call this when the app is closing or the logger is no longer needed
+  Future<void> shutdown() async {
     _flushTimer?.cancel();
+    _flushTimer = null;
     _cleanupTimer?.cancel();
+    _cleanupTimer = null;
     await _flushBuffer();
+    _initialized = false;
+    debugPrint('Logger shutdown complete');
+  }
+
+  /// Dispose resources (alias for shutdown for compatibility)
+  Future<void> dispose() async {
+    await shutdown();
   }
 
   int _levelToInt(LogLevel level) {
