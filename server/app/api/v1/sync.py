@@ -7,7 +7,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_, literal
+from sqlalchemy import select, func, or_, literal, Numeric, Date, DateTime, Time
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.core.database import get_db
 from app.core.timezone import beijing_now_naive
@@ -69,6 +70,19 @@ def _to_uuid(value) -> Optional[UUID]:
     return UUID(value) if isinstance(value, str) else value
 
 
+async def _verify_simple_ownership(db: AsyncSession, user: User, model, entity_id, label: str) -> Optional[UUID]:
+    """Verify that an entity with user_id belongs to the user. Returns UUID."""
+    entity_id = _to_uuid(entity_id)
+    if entity_id is None:
+        return None
+    result = await db.execute(
+        select(model.id).where(model.id == entity_id, model.user_id == user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise ValueError(f"{label} {entity_id} does not belong to user")
+    return entity_id
+
+
 async def _verify_book_ownership(db: AsyncSession, user: User, book_id) -> Optional[UUID]:
     """Verify that the book belongs to the user (owner or member). Returns UUID."""
     book_id = _to_uuid(book_id)
@@ -90,17 +104,27 @@ async def _verify_book_ownership(db: AsyncSession, user: User, book_id) -> Optio
     return book_id
 
 
-async def _verify_account_ownership(db: AsyncSession, user: User, account_id) -> Optional[UUID]:
-    """Verify that the account belongs to the user. Returns UUID."""
-    account_id = _to_uuid(account_id)
-    if account_id is None:
+async def _verify_book_based_ownership(db: AsyncSession, user: User, model, entity_id, label: str) -> Optional[UUID]:
+    """Verify that an entity's book belongs to the user (owner or member). Returns UUID."""
+    entity_id = _to_uuid(entity_id)
+    if entity_id is None:
         return None
     result = await db.execute(
-        select(Account.id).where(Account.id == account_id, Account.user_id == user.id)
+        select(model.id)
+        .join(Book, model.book_id == Book.id)
+        .where(
+            model.id == entity_id,
+            or_(
+                Book.user_id == user.id,
+                Book.id.in_(
+                    select(BookMember.book_id).where(BookMember.user_id == user.id)
+                ),
+            ),
+        )
     )
     if not result.scalar_one_or_none():
-        raise ValueError(f"Account {account_id} does not belong to user")
-    return account_id
+        raise ValueError(f"{label} {entity_id} does not belong to user")
+    return entity_id
 
 
 async def _verify_category_ownership(db: AsyncSession, user: User, category_id) -> Optional[UUID]:
@@ -119,65 +143,6 @@ async def _verify_category_ownership(db: AsyncSession, user: User, category_id) 
     return category_id
 
 
-async def _verify_transaction_ownership(db: AsyncSession, user: User, txn_id) -> Optional[UUID]:
-    """Verify that the transaction belongs to the user. Returns UUID."""
-    txn_id = _to_uuid(txn_id)
-    if txn_id is None:
-        return None
-    result = await db.execute(
-        select(Transaction.id).where(Transaction.id == txn_id, Transaction.user_id == user.id)
-    )
-    if not result.scalar_one_or_none():
-        raise ValueError(f"Transaction {txn_id} does not belong to user")
-    return txn_id
-
-
-async def _verify_family_budget_ownership(db: AsyncSession, user: User, fb_id) -> Optional[UUID]:
-    """Verify that the family budget's book belongs to the user. Returns UUID."""
-    fb_id = _to_uuid(fb_id)
-    if fb_id is None:
-        return None
-    result = await db.execute(
-        select(FamilyBudget.id)
-        .join(Book, FamilyBudget.book_id == Book.id)
-        .where(
-            FamilyBudget.id == fb_id,
-            or_(
-                Book.user_id == user.id,
-                Book.id.in_(
-                    select(BookMember.book_id).where(BookMember.user_id == user.id)
-                ),
-            ),
-        )
-    )
-    if not result.scalar_one_or_none():
-        raise ValueError(f"FamilyBudget {fb_id} does not belong to user")
-    return fb_id
-
-
-async def _verify_saving_goal_ownership(db: AsyncSession, user: User, goal_id) -> Optional[UUID]:
-    """Verify that the saving goal's book belongs to the user. Returns UUID."""
-    goal_id = _to_uuid(goal_id)
-    if goal_id is None:
-        return None
-    result = await db.execute(
-        select(FamilySavingGoal.id)
-        .join(Book, FamilySavingGoal.book_id == Book.id)
-        .where(
-            FamilySavingGoal.id == goal_id,
-            or_(
-                Book.user_id == user.id,
-                Book.id.in_(
-                    select(BookMember.book_id).where(BookMember.user_id == user.id)
-                ),
-            ),
-        )
-    )
-    if not result.scalar_one_or_none():
-        raise ValueError(f"FamilySavingGoal {goal_id} does not belong to user")
-    return goal_id
-
-
 async def _verify_split_ownership(db: AsyncSession, user: User, split_id) -> Optional[UUID]:
     """Verify that the split's transaction belongs to the user. Returns UUID."""
     split_id = _to_uuid(split_id)
@@ -193,17 +158,21 @@ async def _verify_split_ownership(db: AsyncSession, user: User, split_id) -> Opt
     return split_id
 
 
-async def _verify_resource_pool_ownership(db: AsyncSession, user: User, pool_id) -> Optional[UUID]:
-    """Verify that the resource pool belongs to the user. Returns UUID."""
-    pool_id = _to_uuid(pool_id)
-    if pool_id is None:
-        return None
-    result = await db.execute(
-        select(ResourcePool.id).where(ResourcePool.id == pool_id, ResourcePool.user_id == user.id)
-    )
-    if not result.scalar_one_or_none():
-        raise ValueError(f"ResourcePool {pool_id} does not belong to user")
-    return pool_id
+# Convenience wrappers using generic functions
+async def _verify_account_ownership(db, user, account_id):
+    return await _verify_simple_ownership(db, user, Account, account_id, "Account")
+
+async def _verify_transaction_ownership(db, user, txn_id):
+    return await _verify_simple_ownership(db, user, Transaction, txn_id, "Transaction")
+
+async def _verify_resource_pool_ownership(db, user, pool_id):
+    return await _verify_simple_ownership(db, user, ResourcePool, pool_id, "ResourcePool")
+
+async def _verify_family_budget_ownership(db, user, fb_id):
+    return await _verify_book_based_ownership(db, user, FamilyBudget, fb_id, "FamilyBudget")
+
+async def _verify_saving_goal_ownership(db, user, goal_id):
+    return await _verify_book_based_ownership(db, user, FamilySavingGoal, goal_id, "FamilySavingGoal")
 
 
 def _user_book_ids_subquery(user: User):
@@ -589,7 +558,7 @@ async def _handle_create(
         await db.flush()
 
         # Update account balance
-        await _update_account_balance_on_create(db, user, entity)
+        await _adjust_account_balance(db, entity, direction=1)
 
     elif entity_type == "account":
         entity = Account(
@@ -939,7 +908,7 @@ async def _handle_update(
 
     # Handle balance update for transactions
     if entity_type == "transaction":
-        await _revert_account_balance(db, user, entity)
+        await _adjust_account_balance(db, entity, direction=-1)
 
     # Apply updates (Local-first: always use client data)
     data = change.data
@@ -973,41 +942,28 @@ async def _handle_update(
     }
     for key, value in data.items():
         if hasattr(entity, key) and key not in _protected_fields:
-            # Handle special types
-            # UUID fields - verify FK ownership
-            if key in ['book_id', 'account_id', 'target_account_id', 'category_id', 'parent_id',
-                       'resource_pool_id', 'income_transaction_id', 'expense_transaction_id',
-                       'family_budget_id', 'goal_id', 'transaction_id', 'split_id',
-                       'linked_category_id', 'default_category_id', 'income_category_id'] and value:
-                verifier = _fk_verifiers.get(key)
-                if verifier:
-                    value = await verifier(db, user, value)
-                else:
-                    value = UUID(value) if isinstance(value, str) else value
-            # Decimal fields
-            elif key in ['amount', 'fee', 'balance', 'credit_limit', 'location_latitude', 'location_longitude',
-                         'ai_confidence', 'original_amount', 'remaining_amount', 'consumed_amount',
-                         'target_amount', 'current_amount', 'total_budget', 'allocated', 'spent',
-                         'percentage', 'avg_money_age', 'total_remaining_amount', 'total_spent',
-                         'center_latitude', 'center_longitude', 'latitude', 'longitude',
-                         'budget_limit'] and value is not None:
+            column = entity.__table__.columns.get(key)
+            if column is None:
+                continue
+            # FK UUID fields - verify ownership
+            verifier = _fk_verifiers.get(key)
+            if verifier and value:
+                value = await verifier(db, user, value)
+            elif isinstance(column.type, PG_UUID) and value:
+                value = UUID(value) if isinstance(value, str) else value
+            elif isinstance(column.type, Numeric) and value is not None:
                 value = Decimal(str(value))
-            # Date fields
-            elif key in ['transaction_date', 'income_date', 'first_consumed_date', 'last_consumed_date',
-                         'fully_consumed_date', 'consumption_date', 'snapshot_date'] and value:
+            elif isinstance(column.type, Date) and not isinstance(column.type, DateTime) and value:
                 value = date.fromisoformat(value) if isinstance(value, str) else value
-            # Time fields
-            elif key == 'transaction_time' and value:
+            elif isinstance(column.type, Time) and value:
                 value = time.fromisoformat(value) if isinstance(value, str) else value
-            # Datetime fields
-            elif key in ['recognition_timestamp', 'source_file_expires_at', 'deadline', 'completed_at',
-                         'settled_at', 'joined_at', 'last_visit_at', 'updated_at'] and value:
+            elif isinstance(column.type, DateTime) and value:
                 value = datetime.fromisoformat(value) if isinstance(value, str) else value
             setattr(entity, key, value)
 
     # Re-apply balance for transactions
     if entity_type == "transaction":
-        await _update_account_balance_on_create(db, user, entity)
+        await _adjust_account_balance(db, entity, direction=1)
 
     return EntitySyncResult(
         local_id=change.local_id,
@@ -1041,7 +997,7 @@ async def _handle_delete(
     if entity:
         # Revert balance for transactions
         if entity_type == "transaction":
-            await _revert_account_balance(db, user, entity)
+            await _adjust_account_balance(db, entity, direction=-1)
 
         await db.delete(entity)
 
@@ -1055,12 +1011,16 @@ async def _handle_delete(
     )
 
 
-async def _update_account_balance_on_create(
+async def _adjust_account_balance(
     db: AsyncSession,
-    user: User,
     transaction: Transaction,
+    direction: int = 1,
 ):
-    """Update account balance when creating a transaction."""
+    """Adjust account balance for a transaction.
+
+    direction=1: apply transaction (create)
+    direction=-1: revert transaction (update/delete)
+    """
     result = await db.execute(
         select(Account).where(Account.id == transaction.account_id).with_for_update()
     )
@@ -1068,45 +1028,18 @@ async def _update_account_balance_on_create(
 
     if account:
         if transaction.transaction_type == 1:  # Expense
-            account.balance -= transaction.amount + transaction.fee
+            account.balance -= direction * (transaction.amount + transaction.fee)
         elif transaction.transaction_type == 2:  # Income
-            account.balance += transaction.amount - transaction.fee
+            account.balance += direction * (transaction.amount - transaction.fee)
         elif transaction.transaction_type == 3:  # Transfer
-            account.balance -= transaction.amount + transaction.fee
+            account.balance -= direction * (transaction.amount + transaction.fee)
             if transaction.target_account_id:
                 result = await db.execute(
                     select(Account).where(Account.id == transaction.target_account_id).with_for_update()
                 )
                 target_account = result.scalar_one_or_none()
                 if target_account:
-                    target_account.balance += transaction.amount
-
-
-async def _revert_account_balance(
-    db: AsyncSession,
-    user: User,
-    transaction: Transaction,
-):
-    """Revert account balance when updating/deleting a transaction."""
-    result = await db.execute(
-        select(Account).where(Account.id == transaction.account_id).with_for_update()
-    )
-    account = result.scalar_one_or_none()
-
-    if account:
-        if transaction.transaction_type == 1:  # Expense
-            account.balance += transaction.amount + transaction.fee
-        elif transaction.transaction_type == 2:  # Income
-            account.balance -= transaction.amount - transaction.fee
-        elif transaction.transaction_type == 3:  # Transfer
-            account.balance += transaction.amount + transaction.fee
-            if transaction.target_account_id:
-                result = await db.execute(
-                    select(Account).where(Account.id == transaction.target_account_id).with_for_update()
-                )
-                target_account = result.scalar_one_or_none()
-                if target_account:
-                    target_account.balance -= transaction.amount
+                    target_account.balance += direction * transaction.amount
 
 
 @router.post("/pull", response_model=SyncPullResponse)
@@ -1169,281 +1102,25 @@ async def pull_changes(
 
 
 def _entity_to_dict(entity, entity_type: str) -> Dict[str, Any]:
-    """Convert entity to dictionary for sync response."""
+    """Convert entity to dictionary for sync response.
+
+    Uses column reflection to automatically serialize all fields,
+    excluding metadata fields (id, user_id, created_at, updated_at).
+    """
+    _exclude_fields = {'id', 'user_id', 'created_at', 'updated_at'}
     data = {}
-
-    if entity_type == "transaction":
-        data = {
-            "book_id": str(entity.book_id),
-            "account_id": str(entity.account_id),
-            "target_account_id": str(entity.target_account_id) if entity.target_account_id else None,
-            "category_id": str(entity.category_id),
-            "transaction_type": entity.transaction_type,
-            "amount": str(entity.amount),
-            "fee": str(entity.fee),
-            "transaction_date": entity.transaction_date.isoformat() if entity.transaction_date else None,
-            "transaction_time": entity.transaction_time.isoformat() if entity.transaction_time else None,
-            "note": entity.note,
-            "tags": entity.tags,
-            "images": entity.images,
-            "location": entity.location,
-            # Structured location fields (Chapter 14)
-            "location_latitude": str(entity.location_latitude) if entity.location_latitude else None,
-            "location_longitude": str(entity.location_longitude) if entity.location_longitude else None,
-            "location_place_name": entity.location_place_name if hasattr(entity, 'location_place_name') else None,
-            "location_address": entity.location_address if hasattr(entity, 'location_address') else None,
-            "location_city": entity.location_city if hasattr(entity, 'location_city') else None,
-            "location_district": entity.location_district if hasattr(entity, 'location_district') else None,
-            "location_type": entity.location_type if hasattr(entity, 'location_type') else None,
-            "location_poi_id": entity.location_poi_id if hasattr(entity, 'location_poi_id') else None,
-            "geofence_region": entity.geofence_region if hasattr(entity, 'geofence_region') else None,
-            "is_cross_region": entity.is_cross_region if hasattr(entity, 'is_cross_region') else False,
-            # Money Age fields
-            "money_age": entity.money_age if hasattr(entity, 'money_age') else None,
-            "money_age_level": entity.money_age_level if hasattr(entity, 'money_age_level') else None,
-            "resource_pool_id": str(entity.resource_pool_id) if hasattr(entity, 'resource_pool_id') and entity.resource_pool_id else None,
-            # Reimbursement and stats
-            "is_reimbursable": entity.is_reimbursable,
-            "is_reimbursed": entity.is_reimbursed,
-            "is_exclude_stats": entity.is_exclude_stats,
-            "source": entity.source,
-            "ai_confidence": str(entity.ai_confidence) if entity.ai_confidence else None,
-            # Source file fields
-            "source_file_url": entity.source_file_url if hasattr(entity, 'source_file_url') else None,
-            "source_file_type": entity.source_file_type if hasattr(entity, 'source_file_type') else None,
-            "source_file_size": entity.source_file_size if hasattr(entity, 'source_file_size') else None,
-            "recognition_raw_response": entity.recognition_raw_response if hasattr(entity, 'recognition_raw_response') else None,
-            "recognition_timestamp": entity.recognition_timestamp.isoformat() if hasattr(entity, 'recognition_timestamp') and entity.recognition_timestamp else None,
-            "source_file_expires_at": entity.source_file_expires_at.isoformat() if hasattr(entity, 'source_file_expires_at') and entity.source_file_expires_at else None,
-            # Visibility
-            "visibility": entity.visibility if hasattr(entity, 'visibility') else 1,
-        }
-    elif entity_type == "account":
-        data = {
-            "name": entity.name,
-            "account_type": entity.account_type,
-            "icon": entity.icon,
-            "balance": str(entity.balance),
-            "currency": entity.currency if hasattr(entity, 'currency') else "CNY",
-            "credit_limit": str(entity.credit_limit) if entity.credit_limit else None,
-            "bill_day": entity.bill_day,
-            "repay_day": entity.repay_day,
-            "is_default": entity.is_default,
-            "is_active": entity.is_active,
-        }
-    elif entity_type == "category":
-        data = {
-            "parent_id": str(entity.parent_id) if entity.parent_id else None,
-            "name": entity.name,
-            "icon": entity.icon,
-            "category_type": entity.category_type,
-            "sort_order": entity.sort_order if hasattr(entity, 'sort_order') else 0,
-            "is_system": entity.is_system if hasattr(entity, 'is_system') else False,
-        }
-    elif entity_type == "book":
-        data = {
-            "name": entity.name,
-            "description": entity.description if hasattr(entity, 'description') else None,
-            "book_type": entity.book_type,
-            "icon": entity.icon if hasattr(entity, 'icon') else None,
-            "cover_image": entity.cover_image if hasattr(entity, 'cover_image') else None,
-            "currency": entity.currency if hasattr(entity, 'currency') else "CNY",
-            "is_default": entity.is_default,
-            "is_archived": entity.is_archived if hasattr(entity, 'is_archived') else False,
-            "settings": entity.settings if hasattr(entity, 'settings') else None,
-        }
-    elif entity_type == "budget":
-        data = {
-            "book_id": str(entity.book_id),
-            "category_id": str(entity.category_id) if entity.category_id else None,
-            "name": entity.name,
-            "amount": str(entity.amount),
-            "budget_type": entity.budget_type if hasattr(entity, 'budget_type') else 1,
-            "year": entity.year if hasattr(entity, 'year') else datetime.now().year,
-            "month": entity.month if hasattr(entity, 'month') else None,
-            "is_active": entity.is_active if hasattr(entity, 'is_active') else True,
-        }
-
-    # ============== Family Book Entities ==============
-    elif entity_type == "book_member":
-        data = {
-            "book_id": str(entity.book_id),
-            "role": entity.role,
-            "nickname": entity.nickname,
-            "invited_by": str(entity.invited_by) if entity.invited_by else None,
-            "joined_at": entity.joined_at.isoformat() if entity.joined_at else None,
-            "settings": entity.settings,
-        }
-    elif entity_type == "family_budget":
-        data = {
-            "book_id": str(entity.book_id),
-            "period": entity.period,
-            "strategy": entity.strategy,
-            "total_budget": str(entity.total_budget),
-            "rules": entity.rules,
-        }
-    elif entity_type == "member_budget":
-        data = {
-            "family_budget_id": str(entity.family_budget_id),
-            "allocated": str(entity.allocated),
-            "spent": str(entity.spent),
-            "category_spent": entity.category_spent,
-        }
-    elif entity_type == "family_saving_goal":
-        data = {
-            "book_id": str(entity.book_id),
-            "name": entity.name,
-            "description": entity.description,
-            "icon": entity.icon,
-            "target_amount": str(entity.target_amount),
-            "current_amount": str(entity.current_amount),
-            "deadline": entity.deadline.isoformat() if entity.deadline else None,
-            "status": entity.status,
-            "created_by": str(entity.created_by),
-            "completed_at": entity.completed_at.isoformat() if entity.completed_at else None,
-        }
-    elif entity_type == "goal_contribution":
-        data = {
-            "goal_id": str(entity.goal_id),
-            "amount": str(entity.amount),
-            "note": entity.note,
-        }
-    elif entity_type == "transaction_split":
-        data = {
-            "transaction_id": str(entity.transaction_id),
-            "split_type": entity.split_type,
-            "status": entity.status,
-            "settled_at": entity.settled_at.isoformat() if entity.settled_at else None,
-        }
-    elif entity_type == "split_participant":
-        data = {
-            "split_id": str(entity.split_id),
-            "amount": str(entity.amount),
-            "percentage": str(entity.percentage) if entity.percentage else None,
-            "shares": entity.shares,
-            "is_payer": entity.is_payer,
-            "is_settled": entity.is_settled,
-            "settled_at": entity.settled_at.isoformat() if entity.settled_at else None,
-        }
-
-    # ============== Money Age Entities ==============
-    elif entity_type == "resource_pool":
-        data = {
-            "book_id": str(entity.book_id),
-            "income_transaction_id": str(entity.income_transaction_id),
-            "original_amount": str(entity.original_amount),
-            "remaining_amount": str(entity.remaining_amount),
-            "consumed_amount": str(entity.consumed_amount),
-            "income_date": entity.income_date.isoformat() if entity.income_date else None,
-            "first_consumed_date": entity.first_consumed_date.isoformat() if entity.first_consumed_date else None,
-            "last_consumed_date": entity.last_consumed_date.isoformat() if entity.last_consumed_date else None,
-            "fully_consumed_date": entity.fully_consumed_date.isoformat() if entity.fully_consumed_date else None,
-            "is_fully_consumed": entity.is_fully_consumed,
-            "consumption_count": entity.consumption_count,
-            "account_id": str(entity.account_id),
-            "income_category_id": str(entity.income_category_id),
-        }
-    elif entity_type == "consumption_record":
-        data = {
-            "resource_pool_id": str(entity.resource_pool_id),
-            "expense_transaction_id": str(entity.expense_transaction_id),
-            "consumed_amount": str(entity.consumed_amount),
-            "consumption_date": entity.consumption_date.isoformat() if entity.consumption_date else None,
-            "money_age_days": entity.money_age_days,
-            "book_id": str(entity.book_id),
-        }
-    elif entity_type == "money_age_snapshot":
-        data = {
-            "book_id": str(entity.book_id),
-            "snapshot_date": entity.snapshot_date.isoformat() if entity.snapshot_date else None,
-            "snapshot_type": entity.snapshot_type,
-            "avg_money_age": str(entity.avg_money_age),
-            "median_money_age": entity.median_money_age,
-            "min_money_age": entity.min_money_age,
-            "max_money_age": entity.max_money_age,
-            "health_level": entity.health_level,
-            "health_count": entity.health_count,
-            "warning_count": entity.warning_count,
-            "danger_count": entity.danger_count,
-            "total_resource_pools": entity.total_resource_pools,
-            "active_resource_pools": entity.active_resource_pools,
-            "total_remaining_amount": str(entity.total_remaining_amount),
-            "total_transactions": entity.total_transactions,
-            "expense_transactions": entity.expense_transactions,
-            "income_transactions": entity.income_transactions,
-            "category_breakdown": entity.category_breakdown,
-            "monthly_trend": entity.monthly_trend,
-        }
-    elif entity_type == "money_age_config":
-        data = {
-            "book_id": str(entity.book_id),
-            "consumption_strategy": entity.consumption_strategy,
-            "health_threshold": entity.health_threshold,
-            "warning_threshold": entity.warning_threshold,
-            "enable_daily_snapshot": entity.enable_daily_snapshot,
-            "enable_weekly_snapshot": entity.enable_weekly_snapshot,
-            "enable_monthly_snapshot": entity.enable_monthly_snapshot,
-            "enable_notifications": entity.enable_notifications,
-            "notify_on_warning": entity.notify_on_warning,
-            "notify_on_danger": entity.notify_on_danger,
-        }
-
-    # ============== Location Entities ==============
-    elif entity_type == "geo_fence":
-        data = {
-            "name": entity.name,
-            "center_latitude": str(entity.center_latitude),
-            "center_longitude": str(entity.center_longitude),
-            "radius_meters": entity.radius_meters,
-            "place_name": entity.place_name,
-            "action": entity.action,
-            "linked_category_id": str(entity.linked_category_id) if entity.linked_category_id else None,
-            "linked_vault_id": entity.linked_vault_id,
-            "budget_limit": str(entity.budget_limit) if entity.budget_limit else None,
-            "is_enabled": entity.is_enabled,
-        }
-    elif entity_type == "frequent_location":
-        data = {
-            "latitude": str(entity.latitude),
-            "longitude": str(entity.longitude),
-            "place_name": entity.place_name,
-            "address": entity.address,
-            "city": entity.city,
-            "district": entity.district,
-            "location_type": entity.location_type,
-            "poi_id": entity.poi_id,
-            "visit_count": entity.visit_count,
-            "total_spent": str(entity.total_spent),
-            "default_category_id": str(entity.default_category_id) if entity.default_category_id else None,
-            "default_vault_id": entity.default_vault_id,
-            "last_visit_at": entity.last_visit_at.isoformat() if entity.last_visit_at else None,
-        }
-    elif entity_type == "user_home_location":
-        data = {
-            "location_role": entity.location_role,
-            "name": entity.name,
-            "latitude": str(entity.latitude),
-            "longitude": str(entity.longitude),
-            "city": entity.city,
-            "radius_meters": entity.radius_meters,
-            "is_primary": entity.is_primary,
-            "is_enabled": entity.is_enabled,
-        }
-    else:
-        # Generic fallback: serialize all columns for unknown entity types
-        for column in entity.__table__.columns:
-            if column.name in ('id', 'user_id'):
-                continue
-            value = getattr(entity, column.name)
-            if value is not None:
-                if isinstance(value, UUID):
-                    value = str(value)
-                elif isinstance(value, Decimal):
-                    value = str(value)
-                elif hasattr(value, 'isoformat'):
-                    value = value.isoformat()
-            data[column.name] = value
-
+    for column in entity.__table__.columns:
+        if column.name in _exclude_fields:
+            continue
+        value = getattr(entity, column.name)
+        if value is not None:
+            if isinstance(value, UUID):
+                value = str(value)
+            elif isinstance(value, Decimal):
+                value = str(value)
+            elif hasattr(value, 'isoformat'):
+                value = value.isoformat()
+        data[column.name] = value
     return data
 
 
