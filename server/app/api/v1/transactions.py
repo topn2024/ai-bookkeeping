@@ -291,11 +291,11 @@ async def create_transaction(
     else:
         # Saga failed, rollback was applied
         await db.rollback()
-        error_msg = result.error or "Transaction creation failed"
+        error_msg = result.error or "Unknown error"
         logger.error(f"Transaction Saga failed: {error_msg}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Transaction creation failed: {error_msg}",
+            detail="交易创建失败，请稍后重试",
         )
 
 
@@ -526,7 +526,7 @@ async def update_transaction(
         logger.error(f"Transaction update saga failed: {saga_result.error}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update transaction: {saga_result.error or 'Unknown error'}",
+            detail="交易更新失败，请稍后重试",
         )
 
     await db.commit()
@@ -629,14 +629,34 @@ async def delete_transaction(
 
     # Step 3: Delete transaction record
     async def delete_record(ctx: SagaContext):
-        ctx.set("deleted_transaction", transaction)
+        # Save full transaction data for potential compensation
+        ctx.set("deleted_transaction_data", {
+            "id": transaction.id,
+            "user_id": transaction.user_id,
+            "book_id": transaction.book_id,
+            "account_id": transaction.account_id,
+            "target_account_id": transaction.target_account_id,
+            "category_id": transaction.category_id,
+            "transaction_type": transaction.transaction_type,
+            "amount": transaction.amount,
+            "fee": transaction.fee,
+            "transaction_date": transaction.transaction_date,
+            "transaction_time": transaction.transaction_time,
+            "note": transaction.note,
+            "tags": transaction.tags,
+            "source": transaction.source,
+        })
         await db.delete(transaction)
         return {"deleted_id": str(txn_data["id"])}
 
     async def compensate_delete(ctx: SagaContext):
-        # Cannot easily restore deleted record in compensation
-        # This is a limitation - in production, use soft delete first
-        logger.warning(f"Cannot compensate delete for transaction {txn_data['id']}")
+        data = ctx.get("deleted_transaction_data")
+        if data:
+            restored = Transaction(**data)
+            db.add(restored)
+            logger.info(f"Compensated: restored deleted transaction {data['id']}")
+        else:
+            logger.warning(f"Cannot compensate delete for transaction {txn_data['id']}: no saved data")
 
     # ==================== Execute Saga ====================
 
@@ -659,9 +679,9 @@ async def delete_transaction(
         logger.info(f"Transaction deleted: {transaction_id} via Saga")
     else:
         await db.rollback()
-        error_msg = saga_result.error or "Transaction deletion failed"
+        error_msg = saga_result.error or "Unknown error"
         logger.error(f"Delete Saga failed: {error_msg}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Transaction deletion failed: {error_msg}",
+            detail="交易删除失败，请稍后重试",
         )

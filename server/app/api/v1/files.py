@@ -21,6 +21,37 @@ from app.services.file_storage_service import file_storage_service
 router = APIRouter(prefix="/files", tags=["Files"])
 
 
+# ==================== Magic Bytes Validation ====================
+
+IMAGE_MAGIC = {
+    b'\xff\xd8\xff': 'image/jpeg',
+    b'\x89PNG\r\n\x1a\n': 'image/png',
+    b'\x00\x00\x00': 'image/heic',  # ftyp box (HEIC/HEIF)
+}
+AUDIO_MAGIC = {
+    b'ID3': 'audio/mpeg',        # MP3 with ID3 tag
+    b'\xff\xfb': 'audio/mpeg',   # MP3 without ID3
+    b'\xff\xf3': 'audio/mpeg',   # MP3 without ID3
+    b'RIFF': 'audio/wav',
+    b'fLaC': 'audio/flac',
+}
+
+
+def _validate_file_magic(content: bytes, file_type: str):
+    """Validate file content matches expected type via magic bytes."""
+    magic_map = IMAGE_MAGIC if file_type == "image" else AUDIO_MAGIC
+    for magic, _ in magic_map.items():
+        if content[:len(magic)] == magic:
+            return  # Valid
+    # For M4A/AAC/HEIC: check for 'ftyp' box at offset 4
+    if len(content) >= 8 and content[4:8] == b'ftyp':
+        return  # Valid container format (M4A, HEIC, etc.)
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"File content does not match expected {file_type} format",
+    )
+
+
 def _verify_file_ownership(user_id_str: str, object_name: str):
     """Verify that the file belongs to the user using exact path prefix matching."""
     # Reject path traversal attempts
@@ -102,6 +133,9 @@ async def upload_file(
             )
     content = bytes(content)
 
+    # Validate file content via magic bytes
+    _validate_file_magic(content, file_type)
+
     # Upload to MinIO
     url, content_type, file_size = await file_storage_service.upload_file(
         user_id=str(current_user.id),
@@ -162,6 +196,9 @@ async def upload_file_base64(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"File too large. Max size: {size_mb}MB",
         )
+
+    # Validate file content via magic bytes
+    _validate_file_magic(content, file_type)
 
     # Upload to MinIO
     url, content_type, file_size = await file_storage_service.upload_file(

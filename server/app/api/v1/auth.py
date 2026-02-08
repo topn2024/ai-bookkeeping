@@ -1,5 +1,6 @@
 """Authentication endpoints."""
 import asyncio
+import hmac
 from datetime import datetime
 from uuid import UUID
 
@@ -280,10 +281,6 @@ async def request_password_reset(
     if redis:
         reset_key = f"password_reset:{request.email}"
         await redis.setex(reset_key, 600, code)  # 600 seconds = 10 minutes
-        # Log code in debug mode for testing (REMOVE IN PRODUCTION)
-        from app.core.config import settings
-        if settings.DEBUG:
-            logger.info(f"[DEV] Password reset code for {_mask_email(request.email)}: {code}")
     else:
         logger.error("Redis not available for password reset")
         raise HTTPException(
@@ -345,7 +342,7 @@ async def confirm_password_reset(
     if isinstance(stored_code, bytes):
         stored_code = stored_code.decode('utf-8')
 
-    if request.code != stored_code:
+    if not hmac.compare_digest(request.code, stored_code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid reset code",
@@ -454,11 +451,6 @@ async def send_sms_code(
     sms_key = f"sms_code:{request.scene}:{request.phone}"
     await redis.setex(sms_key, 600, code)  # 600秒 = 10分钟
 
-    # 调试模式下记录验证码（生产环境移除）
-    from app.core.config import settings
-    if settings.DEBUG:
-        logger.info(f"[DEV] SMS code for {_mask_phone(request.phone)} ({request.scene}): {code}")
-
     # 发送短信
     sms_sent = await notification_sms_service.send_verification_code(
         phone_number=request.phone,
@@ -510,7 +502,7 @@ async def sms_login(
     if isinstance(stored_code, bytes):
         stored_code = stored_code.decode('utf-8')
 
-    if request.code != stored_code:
+    if not hmac.compare_digest(request.code, stored_code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="验证码错误",
@@ -658,13 +650,17 @@ async def verify_email(
 
     # 检查 token 是否已使用
     redis = await get_redis()
-    if redis:
-        used_key = f"email_verify:used:{jti}"
-        if await redis.exists(used_key):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This verification link has already been used",
-            )
+    if not redis:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable, please try again later",
+        )
+    used_key = f"email_verify:used:{jti}"
+    if await redis.exists(used_key):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This verification link has already been used",
+        )
 
     # 查找用户
     try:
@@ -715,8 +711,7 @@ async def verify_email(
         )
 
     # 标记 token 为已使用
-    if redis:
-        await redis.setex(f"email_verify:used:{jti}", 3600, "1")
+    await redis.setex(f"email_verify:used:{jti}", 3600, "1")
 
     return VerifyEmailResponse(
         success=True,
