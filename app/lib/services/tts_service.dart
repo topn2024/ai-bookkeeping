@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
@@ -733,7 +734,9 @@ class FlutterTTSEngine implements TTSEngine {
     if (result == 0 && _speakCompleter != null) {
       debugPrint('[FlutterTTS] 等待播放完成回调...');
       try {
-        await _speakCompleter!.future;
+        await _speakCompleter!.future.timeout(
+          Duration(seconds: max(15, text.length ~/ 5)),
+        );
         debugPrint('[FlutterTTS] 播放完成回调已触发');
       } catch (e) {
         debugPrint('[FlutterTTS] 播放出错: $e');

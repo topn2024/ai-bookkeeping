@@ -43,12 +43,13 @@ class TransactionRepository implements ITransactionRepository {
   }
 
   @override
-  Future<List<model.Transaction>> findAll({bool includeDeleted = false}) async {
+  Future<List<model.Transaction>> findAll({bool includeDeleted = false, int limit = 1000}) async {
     final db = await _db;
     final maps = await db.query(
       'transactions',
       where: includeDeleted ? null : 'isDeleted = 0',
       orderBy: 'date DESC',
+      limit: limit,
     );
 
     return Future.wait(maps.map(_mapToTransaction));

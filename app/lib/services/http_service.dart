@@ -172,7 +172,10 @@ class HttpService implements IHttpService {
   Future<bool> _tryRefreshToken() async {
     // 如果已有刷新请求在进行中，等待其结果
     if (_refreshCompleter != null) {
-      return _refreshCompleter!.future;
+      return _refreshCompleter!.future.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => false,
+      );
     }
     _refreshCompleter = Completer<bool>();
     try {

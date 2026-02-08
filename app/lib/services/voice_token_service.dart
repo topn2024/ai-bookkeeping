@@ -130,7 +130,10 @@ class VoiceTokenService {
 
     // 如果已有请求在进行中，等待该请求完成
     if (_fetchingCompleter != null) {
-      return _fetchingCompleter!.future;
+      return _fetchingCompleter!.future.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw TimeoutException('Token fetch timeout'),
+      );
     }
 
     // 创建新的 Completer 防止并发请求
