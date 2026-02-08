@@ -57,13 +57,30 @@ class ChatMessage {
         'metadata': metadata,
       };
 
-  factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
-        id: json['id'],
-        type: MessageType.values.firstWhere((e) => e.name == json['type']),
-        content: json['content'],
-        timestamp: DateTime.parse(json['timestamp']),
-        metadata: json['metadata'],
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    try {
+      return ChatMessage(
+        id: json['id'] as String? ?? '',
+        type: MessageType.values.firstWhere(
+          (e) => e.name == json['type'],
+          orElse: () => MessageType.user,
+        ),
+        content: json['content'] as String? ?? '',
+        timestamp: json['timestamp'] != null
+            ? DateTime.parse(json['timestamp'] as String)
+            : DateTime.now(),
+        metadata: json['metadata'] as Map<String, dynamic>?,
       );
+    } catch (e) {
+      // 数据损坏时返回占位消息，避免整个历史丢失
+      return ChatMessage(
+        id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        type: MessageType.user,
+        content: '[数据恢复失败]',
+        timestamp: DateTime.now(),
+      );
+    }
+  }
 }
 
 /// 对话历史管理器
@@ -277,10 +294,13 @@ class ConversationHistoryManager extends ChangeNotifier {
       final jsonString = _prefs!.getString(_storageKey);
       if (jsonString != null) {
         final jsonList = jsonDecode(jsonString) as List<dynamic>;
-        _history.clear();
+        final loaded = <ChatMessage>[];
         for (final json in jsonList) {
-          _history.add(ChatMessage.fromJson(json as Map<String, dynamic>));
+          loaded.add(ChatMessage.fromJson(json as Map<String, dynamic>));
         }
+        // 加载成功后再替换历史，避免解析失败时清空已有数据
+        _history.clear();
+        _history.addAll(loaded);
       }
     } catch (e) {
       debugPrint('[ConversationHistoryManager] 加载失败: $e');

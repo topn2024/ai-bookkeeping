@@ -149,7 +149,7 @@ class CreditCard {
       'cardNumber': cardNumber,
       'isEnabled': isEnabled ? 1 : 0,
       'createdAt': createdAt.millisecondsSinceEpoch,
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      'updatedAt': updatedAt?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch,
     };
   }
 

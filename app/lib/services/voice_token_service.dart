@@ -38,6 +38,10 @@ class VoiceTokenService {
   static const int _maxRetries = 3;
   static const Duration _baseRetryDelay = Duration(seconds: 1);
 
+  // Auto-refresh retry configuration
+  static const int _maxAutoRefreshRetries = 5;
+  int _autoRefreshRetryCount = 0;
+
   // 存储键
   static const String _tokenKey = 'voice_service_token';
   static const String _expiresAtKey = 'voice_service_expires_at';
@@ -334,6 +338,7 @@ class VoiceTokenService {
       try {
         await refreshToken();
         debugPrint('Voice token auto-refreshed');
+        _autoRefreshRetryCount = 0; // Reset on success
         return;
       } catch (e) {
         debugPrint('Failed to auto-refresh token (attempt ${attempt + 1}/$_maxRetries): $e');
@@ -346,10 +351,20 @@ class VoiceTokenService {
       }
     }
 
-    // 所有重试都失败，设置一个短期重试定时器
-    debugPrint('All auto-refresh attempts failed, scheduling retry in 1 minute');
+    // 所有重试都失败，检查是否超过最大重试轮次
+    _autoRefreshRetryCount++;
+    if (_autoRefreshRetryCount >= _maxAutoRefreshRetries) {
+      debugPrint('Auto-refresh retry limit reached ($_maxAutoRefreshRetries rounds). Giving up.');
+      _autoRefreshRetryCount = 0;
+      return;
+    }
+
+    // 指数退避调度下一轮重试，上限为10分钟
+    final delayMinutes = (1 << (_autoRefreshRetryCount - 1)).clamp(1, 10);
+    debugPrint('All auto-refresh attempts failed, scheduling retry in $delayMinutes minute(s) '
+        '(round $_autoRefreshRetryCount/$_maxAutoRefreshRetries)');
     _refreshTimer?.cancel();
-    _refreshTimer = Timer(const Duration(minutes: 1), () async {
+    _refreshTimer = Timer(Duration(minutes: delayMinutes), () async {
       await _autoRefreshWithRetry();
     });
   }

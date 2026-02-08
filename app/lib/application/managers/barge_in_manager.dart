@@ -251,6 +251,13 @@ class BargeInManager extends ChangeNotifier {
 
     debugPrint('[BargeInManager] 打断已确认');
     notifyListeners();
+
+    // 自动重置，准备下一次打断检测
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (_state == BargeInState.confirmed) {
+        reset();
+      }
+    });
   }
 
   /// 取消打断超时

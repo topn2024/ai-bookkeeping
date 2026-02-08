@@ -269,7 +269,7 @@ class Budget {
       'color': color.toARGB32(),
       'isEnabled': isEnabled ? 1 : 0,
       'createdAt': createdAt.toIso8601String(),
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      'updatedAt': updatedAt?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch,
       'budgetType': budgetType.index,
       'enableCarryover': enableCarryover ? 1 : 0,
       'carryoverSurplusOnly': carryoverSurplusOnly ? 1 : 0,

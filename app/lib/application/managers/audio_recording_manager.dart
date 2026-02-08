@@ -151,7 +151,9 @@ class AudioRecordingManager extends ChangeNotifier {
     try {
       _updateState(RecordingState.preparing);
 
-      // 创建音频流
+      // 创建音频流（先关闭旧的 StreamController 防止泄漏）
+      await _audioStreamController?.close();
+      await _audioStreamSubscription?.cancel();
       _audioStreamController = StreamController<Uint8List>.broadcast();
 
       // 配置录音
@@ -191,7 +193,7 @@ class AudioRecordingManager extends ChangeNotifier {
 
   /// 停止录音
   Future<void> stopRecording() async {
-    if (_state != RecordingState.recording) return;
+    if (_state == RecordingState.idle || _state == RecordingState.stopping) return;
 
     try {
       _updateState(RecordingState.stopping);

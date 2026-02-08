@@ -455,13 +455,19 @@ class VoiceServiceOrchestrator extends ChangeNotifier {
     _sessionTimeoutTimer?.cancel();
     _sessionTimeoutTimer = Timer(_sessionTimeout, () {
       debugPrint('[VoiceServiceOrchestrator] 会话超时');
-      endVoiceSession();
+      if (_sessionState != VoiceSessionState.processing) {
+        endVoiceSession();
+      }
     });
   }
 
   @override
   void dispose() {
     _sessionTimeoutTimer?.cancel();
+    // Dispose child coordinators that extend ChangeNotifier
+    _recognitionCoordinator.dispose();
+    _conversationCoordinator.dispose();
+    _feedbackCoordinator.dispose();
     super.dispose();
   }
 }

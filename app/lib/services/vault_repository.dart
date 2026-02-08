@@ -326,13 +326,24 @@ class VaultRepository {
 
   /// 记录调拨
   Future<VaultTransfer> recordTransfer(VaultTransfer transfer) async {
-    await _db.insert(transferTableName, transfer.toMap());
+    await _db.transaction((txn) async {
+      // 在数据库事务中执行，保证原子性
+      await txn.insert(transferTableName, transfer.toMap());
 
-    // 更新源小金库（减少）
-    await updateAllocatedAmount(transfer.fromVaultId, -transfer.amount);
+      // 更新源小金库（减少）
+      await txn.rawUpdate('''
+        UPDATE $tableName
+        SET allocatedAmount = allocatedAmount + ?, updatedAt = ?
+        WHERE id = ?
+      ''', [-transfer.amount, DateTime.now().millisecondsSinceEpoch, transfer.fromVaultId]);
 
-    // 更新目标小金库（增加）
-    await updateAllocatedAmount(transfer.toVaultId, transfer.amount);
+      // 更新目标小金库（增加）
+      await txn.rawUpdate('''
+        UPDATE $tableName
+        SET allocatedAmount = allocatedAmount + ?, updatedAt = ?
+        WHERE id = ?
+      ''', [transfer.amount, DateTime.now().millisecondsSinceEpoch, transfer.toVaultId]);
+    });
 
     return transfer;
   }

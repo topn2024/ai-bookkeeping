@@ -128,11 +128,18 @@ class TransactionOperationCoordinator {
         tags: params.tags,
       );
 
-      // 插入交易
-      await _transactionRepository.insert(transaction);
-
-      // 更新账户余额
-      await _updateAccountBalance(transaction);
+      // 插入交易并更新余额（伪原子操作，失败时回滚）
+      try {
+        await _transactionRepository.insert(transaction);
+        await _updateAccountBalance(transaction);
+      } catch (e) {
+        // 回滚：删除已插入的交易
+        debugPrint('[TransactionCoordinator] 余额更新失败，回滚交易插入: $e');
+        try {
+          await _transactionRepository.delete(transaction.id);
+        } catch (_) {}
+        rethrow;
+      }
 
       debugPrint('[TransactionCoordinator] 交易创建成功: $transactionId');
 
@@ -167,14 +174,36 @@ class TransactionOperationCoordinator {
         );
       }
 
-      // 回滚原交易的账户余额影响
-      await _reverseAccountBalance(originalTransaction);
+      // 回滚原交易的账户余额影响、更新交易、应用新余额（伪原子操作，失败时回滚）
+      try {
+        await _reverseAccountBalance(originalTransaction);
 
-      // 更新交易
-      await _transactionRepository.update(transaction);
+        try {
+          await _transactionRepository.update(transaction);
+        } catch (e) {
+          // 回滚：恢复原交易的余额影响
+          debugPrint('[TransactionCoordinator] 交易更新失败，恢复原余额: $e');
+          try {
+            await _updateAccountBalance(originalTransaction);
+          } catch (_) {}
+          rethrow;
+        }
 
-      // 应用新交易的账户余额影响
-      await _updateAccountBalance(transaction);
+        try {
+          await _updateAccountBalance(transaction);
+        } catch (e) {
+          // 回滚：恢复原交易数据和余额
+          debugPrint('[TransactionCoordinator] 新余额更新失败，回滚交易: $e');
+          try {
+            await _transactionRepository.update(originalTransaction);
+            await _updateAccountBalance(originalTransaction);
+          } catch (_) {}
+          rethrow;
+        }
+      } catch (e) {
+        debugPrint('[TransactionCoordinator] 更新交易操作失败: $e');
+        rethrow;
+      }
 
       debugPrint('[TransactionCoordinator] 交易更新成功: ${transaction.id}');
 
@@ -207,11 +236,18 @@ class TransactionOperationCoordinator {
         );
       }
 
-      // 回滚账户余额
-      await _reverseAccountBalance(transaction);
-
-      // 删除交易
-      await _transactionRepository.delete(transactionId);
+      // 删除交易并回滚余额（伪原子操作，失败时回滚）
+      try {
+        await _transactionRepository.delete(transactionId);
+        await _reverseAccountBalance(transaction);
+      } catch (e) {
+        // 回滚：恢复已删除的交易
+        debugPrint('[TransactionCoordinator] 余额回滚失败，恢复已删除交易: $e');
+        try {
+          await _transactionRepository.insert(transaction);
+        } catch (_) {}
+        rethrow;
+      }
 
       debugPrint('[TransactionCoordinator] 交易删除成功: $transactionId');
 
@@ -254,9 +290,12 @@ class TransactionOperationCoordinator {
   /// 恢复软删除的交易
   Future<TransactionOperationResult> restoreTransaction(String transactionId) async {
     try {
-      // 使用 findAll(includeDeleted: true) 然后筛选
-      final allTransactions = await _transactionRepository.findAll(includeDeleted: true);
-      final transaction = allTransactions.where((t) => t.id == transactionId).firstOrNull;
+      // TODO: ITransactionRepository.findById 会过滤已软删除记录，
+      // 应添加 findById(id, {includeDeleted}) 方法以避免加载全部交易。
+      // 当前使用 findAll(includeDeleted: true) 是临时方案，数据量大时有性能问题。
+      final transaction = await _transactionRepository
+          .findAll(includeDeleted: true)
+          .then((list) => list.where((t) => t.id == transactionId).firstOrNull);
 
       if (transaction == null) {
         return TransactionOperationResult.failure(message: '交易不存在');
@@ -282,6 +321,13 @@ class TransactionOperationCoordinator {
   Future<TransactionOperationResult> batchCreateTransactions(
     List<CreateTransactionParams> paramsList,
   ) async {
+    if (paramsList.isEmpty) {
+      return TransactionOperationResult.success(
+        transactionId: '',
+        message: '批量创建成功，共 0 笔交易',
+      );
+    }
+
     try {
       final transactions = <Transaction>[];
 

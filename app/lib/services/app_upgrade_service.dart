@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:open_filex/open_filex.dart';
@@ -269,8 +270,8 @@ class AppUpgradeService {
         receiveTimeout: const Duration(seconds: 10),
       ));
 
-      // 配置 SSL
-      if (skipCertVerification) {
+      // ⚠️ 仅在调试模式下跳过证书验证
+      if (kDebugMode && skipCertVerification) {
         dio.httpClientAdapter = IOHttpClientAdapter(
           createHttpClient: () {
             final client = HttpClient();
@@ -524,8 +525,8 @@ class AppUpgradeService {
       dio.httpClientAdapter = IOHttpClientAdapter(
         createHttpClient: () {
           final client = HttpClient();
-          // 跳过证书验证（如果配置）
-          if (config.skipCertificateVerification) {
+          // ⚠️ 仅在调试模式下跳过证书验证
+          if (kDebugMode && config.skipCertificateVerification) {
             client.badCertificateCallback = (cert, host, port) => true;
           }
           // 设置更长的连接超时
@@ -821,7 +822,8 @@ class AppUpgradeService {
       }
 
       final dio = Dio();
-      if (config.skipCertificateVerification) {
+      // ⚠️ 仅在调试模式下跳过证书验证
+      if (kDebugMode && config.skipCertificateVerification) {
         dio.httpClientAdapter = IOHttpClientAdapter(
           createHttpClient: () {
             final client = HttpClient();

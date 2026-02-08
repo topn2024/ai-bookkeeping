@@ -248,7 +248,7 @@ class RecurringTransaction {
       'icon': icon.codePoint,
       'color': color.toARGB32(),
       'createdAt': createdAt.toIso8601String(),
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      'updatedAt': updatedAt?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch,
     };
   }
 

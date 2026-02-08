@@ -207,11 +207,8 @@ class DataCleanupService {
   /// Get cutoff date based on config
   DateTime _getCutoffDate() {
     final now = DateTime.now();
-    return DateTime(
-      now.year,
-      now.month - _config.keepMonths,
-      now.day,
-    );
+    // 使用 DateTime 构造函数的自动规范化，但固定为月初避免日期溢出
+    return DateTime(now.year, now.month - _config.keepMonths, 1);
   }
 
   /// Vacuum database to reclaim space

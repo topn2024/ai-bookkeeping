@@ -354,10 +354,20 @@ class FeedbackCoordinator extends ChangeNotifier {
       // 高优先级或紧急反馈立即播放，打断当前
       if (feedback.priority == FeedbackPriority.high ||
           feedback.priority == FeedbackPriority.urgent) {
-        await _ttsService.stop();
-        _currentFeedback = feedback;
-        notifyListeners();
-        await _ttsService.speak(feedback.message);
+        // Guard against concurrent high-priority TTS calls
+        if (_isProcessing) {
+          await _ttsService.stop();
+        }
+        _isProcessing = true;
+        try {
+          _currentFeedback = feedback;
+          notifyListeners();
+          await _ttsService.speak(feedback.message);
+        } finally {
+          _isProcessing = false;
+          _currentFeedback = null;
+          notifyListeners();
+        }
       } else {
         // 其他加入队列
         _feedbackQueue.add(feedback);
@@ -372,26 +382,34 @@ class FeedbackCoordinator extends ChangeNotifier {
 
     _isProcessing = true;
 
-    while (_feedbackQueue.isNotEmpty) {
-      final feedback = _feedbackQueue.removeAt(0);
+    try {
+      while (_feedbackQueue.isNotEmpty) {
+        final feedback = _feedbackQueue.removeAt(0);
 
-      // 跳过已过期的低优先级反馈
-      if (feedback.priority == FeedbackPriority.low) {
-        final age = DateTime.now().difference(feedback.timestamp);
-        if (age > const Duration(seconds: 10)) {
-          continue;
+        // 跳过已过期的低优先级反馈
+        if (feedback.priority == FeedbackPriority.low) {
+          final age = DateTime.now().difference(feedback.timestamp);
+          if (age > const Duration(seconds: 10)) {
+            continue;
+          }
+        }
+
+        _currentFeedback = feedback;
+        notifyListeners();
+
+        try {
+          await _ttsService.speak(feedback.message);
+        } catch (e) {
+          debugPrint('[FeedbackCoordinator] TTS播放失败: $e');
+          // 继续处理下一个，不中断队列
         }
       }
 
-      _currentFeedback = feedback;
+      _currentFeedback = null;
       notifyListeners();
-
-      await _ttsService.speak(feedback.message);
+    } finally {
+      _isProcessing = false;
     }
-
-    _currentFeedback = null;
-    _isProcessing = false;
-    notifyListeners();
   }
 
   /// 提供触觉反馈

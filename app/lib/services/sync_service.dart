@@ -55,7 +55,9 @@ class LocalBackupService extends CloudSyncService {
   Future<bool> uploadBackup(BackupData backup) async {
     try {
       final dir = await _backupDir;
-      final file = File('${dir.path}/backup_${backup.id}.json');
+      // 防止路径穿越攻击
+      final safeId = backup.id.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final file = File('${dir.path}/backup_$safeId.json');
       await file.writeAsString(jsonEncode(backup.toMap()));
       return true;
     } catch (e) {
@@ -94,7 +96,9 @@ class LocalBackupService extends CloudSyncService {
   Future<BackupData?> downloadBackup(String backupId) async {
     try {
       final dir = await _backupDir;
-      final file = File('${dir.path}/backup_$backupId.json');
+      // 防止路径穿越攻击
+      final safeId = backupId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final file = File('${dir.path}/backup_$safeId.json');
       if (!await file.exists()) return null;
 
       final content = await file.readAsString();
@@ -110,7 +114,9 @@ class LocalBackupService extends CloudSyncService {
   Future<bool> deleteBackup(String backupId) async {
     try {
       final dir = await _backupDir;
-      final file = File('${dir.path}/backup_$backupId.json');
+      // 防止路径穿越攻击
+      final safeId = backupId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final file = File('${dir.path}/backup_$safeId.json');
       if (await file.exists()) {
         await file.delete();
       }
@@ -396,8 +402,22 @@ class SyncManager {
     }
   }
 
+  bool _isSyncing = false;
+
   /// 执行同步
   Future<SyncRecord> sync({SyncDirection direction = SyncDirection.bidirectional}) async {
+    if (_isSyncing) {
+      return SyncRecord(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        timestamp: DateTime.now(),
+        status: SyncStatus.failed,
+        provider: _settings.provider,
+        direction: direction,
+        errorMessage: '同步进行中',
+        duration: Duration.zero,
+      );
+    }
+    _isSyncing = true;
     final startTime = DateTime.now();
     _status = SyncStatus.syncing;
 
@@ -467,6 +487,8 @@ class SyncManager {
       _history.insert(0, record);
       await _saveHistory();
       return record;
+    } finally {
+      _isSyncing = false;
     }
   }
 

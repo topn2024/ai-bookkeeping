@@ -170,7 +170,10 @@ class VADManager extends ChangeNotifier {
   /// 释放资源
   @override
   void dispose() {
-    stopListening();
+    _audioSubscription?.cancel();
+    _audioSubscription = null;
+    _silenceTimer?.cancel();
+    _silenceTimer = null;
     _eventController.close();
     super.dispose();
   }

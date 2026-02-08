@@ -99,7 +99,7 @@ class Account {
       'isDefault': isDefault ? 1 : 0,
       'isActive': isActive ? 1 : 0,
       'createdAt': createdAt.toIso8601String(),
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      'updatedAt': updatedAt?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch,
       'currency': currency.name,
       'isCustom': isCustom ? 1 : 0,
     };

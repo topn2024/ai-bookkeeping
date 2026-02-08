@@ -188,6 +188,14 @@ class GlobalVoiceAssistantFacade extends ChangeNotifier {
     }
     _subscriptions.clear();
     _eventController.close();
+    // Dispose child managers
+    _audioManager.dispose();
+    _vadManager.dispose();
+    _bargeInManager.dispose();
+    _historyManager.dispose();
+    _ttsManager.dispose();
+    _networkManager.dispose();
+    _pipelineManager.dispose();
     super.dispose();
   }
 

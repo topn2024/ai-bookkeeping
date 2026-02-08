@@ -215,7 +215,7 @@ class BillReminder {
       'lastRemindedAt': lastRemindedAt?.toIso8601String(),
       'nextReminderDate': nextReminderDate?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      'updatedAt': updatedAt?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch,
     };
   }
 
