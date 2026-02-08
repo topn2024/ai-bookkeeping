@@ -100,7 +100,9 @@ class DatabaseIntentDataStore implements IntentDataStore {
         contextJson = jsonDecode(contextStr) as Map<String, dynamic>;
       }
     } catch (e) {
-      debugPrint('[LearningDB] JSON parse error: $e');
+      debugPrint('[DatabaseIntentDataStore] JSON parse error for context field');
+      debugPrint('[DatabaseIntentDataStore] Row ID: ${row['id']}, Error: $e');
+      debugPrint('[DatabaseIntentDataStore] Raw context string: ${row['context']}');
     }
 
     return IntentLearningData(
@@ -229,7 +231,9 @@ class DatabaseAnomalyDataStore implements AnomalyDataStore {
         contextJson = jsonDecode(contextStr) as Map<String, dynamic>;
       }
     } catch (e) {
-      debugPrint('[LearningDB] JSON parse error: $e');
+      debugPrint('[DatabaseAnomalyDataStore] JSON parse error for context field');
+      debugPrint('[DatabaseAnomalyDataStore] Row ID: ${row['id']}, Error: $e');
+      debugPrint('[DatabaseAnomalyDataStore] Raw context string: ${row['context']}');
     }
 
     return AnomalyLearningData(

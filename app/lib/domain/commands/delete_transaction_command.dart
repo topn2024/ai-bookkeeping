@@ -166,21 +166,43 @@ class DeleteTransactionCommand extends UndoableCommand {
       return Map<String, dynamic>.from(transaction);
     }
 
-    // 如果有 toJson 方法
+    // 如果有 toMap 方法
     try {
-      return (transaction as dynamic).toJson() as Map<String, dynamic>;
+      final toMapMethod = transaction.toMap;
+      if (toMapMethod != null) {
+        return toMapMethod() as Map<String, dynamic>;
+      }
     } catch (_) {
-      // 回退：手动提取属性
+      // Continue to fallback
+    }
+
+    // 回退：手动提取属性（使用 null-safe 访问）
+    try {
       return {
-        'id': transaction.id?.toString(),
-        'amount': transaction.amount,
-        'category': transaction.category,
-        'type': transaction.type,
-        'note': transaction.note,
-        'merchant': transaction.merchant,
-        'accountId': transaction.accountId,
-        'ledgerId': transaction.ledgerId,
-        'transactionDate': transaction.transactionDate?.toIso8601String(),
+        'id': transaction?.id?.toString(),
+        'amount': transaction?.amount,
+        'category': transaction?.category,
+        'type': transaction?.type?.toString(),
+        'note': transaction?.note,
+        'accountId': transaction?.accountId,
+        'date': transaction?.date?.toIso8601String(),
+        'toAccountId': transaction?.toAccountId,
+        'imageUrl': transaction?.imageUrl,
+        'isSplit': transaction?.isSplit,
+        'isReimbursable': transaction?.isReimbursable,
+        'isReimbursed': transaction?.isReimbursed,
+        'tags': transaction?.tags,
+        'createdAt': transaction?.createdAt?.toIso8601String(),
+        'updatedAt': transaction?.updatedAt?.toIso8601String(),
+      };
+    } catch (e) {
+      // Last resort: return minimal data
+      return {
+        'id': null,
+        'amount': 0.0,
+        'category': '',
+        'type': 'expense',
+        'accountId': '',
       };
     }
   }

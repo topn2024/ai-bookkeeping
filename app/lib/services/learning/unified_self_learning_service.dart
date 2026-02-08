@@ -548,8 +548,12 @@ class LearningScheduler {
               now.difference(lastTraining) >= config.interval) {
             // 触发训练
             debugPrint('Triggering training for ${config.moduleId}');
-            await module.train(incremental: true);
-            config.lastCheckTime = now;
+            try {
+              await module.train(incremental: true);
+              config.lastCheckTime = now;
+            } catch (e) {
+              debugPrint('Error training module ${config.moduleId}: $e');
+            }
           }
         }
       } catch (e) {

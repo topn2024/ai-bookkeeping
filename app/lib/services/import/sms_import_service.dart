@@ -82,7 +82,12 @@ class SmsImportService {
           print('[SmsImportService] 跳过无效交易 #$i: 金额=${result.amount}, 商户=${result.merchant}');
           continue;
         }
-        candidates.add(_parserService.toImportCandidate(result, candidates.length));
+        final candidate = _parserService.toImportCandidate(result, candidates.length);
+        if (candidate != null) {
+          candidates.add(candidate);
+        } else {
+          skippedCount++;
+        }
       }
     }
 

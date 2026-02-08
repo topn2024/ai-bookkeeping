@@ -51,6 +51,7 @@ class _SourceAudioPlayerState extends State<SourceAudioPlayer> {
     try {
       final file = File(widget.audioPath);
       if (!await file.exists()) {
+        if (!mounted) return;
         setState(() {
           _hasError = true;
           _errorMessage = '音频文件不存在';
@@ -59,10 +60,12 @@ class _SourceAudioPlayerState extends State<SourceAudioPlayer> {
       }
 
       await _audioPlayer.setFilePath(widget.audioPath);
+      if (!mounted) return;
       setState(() {
         _isInitialized = true;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _hasError = true;
         _errorMessage = '无法加载音频: $e';

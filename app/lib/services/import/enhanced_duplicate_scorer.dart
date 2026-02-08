@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
 import '../../models/category.dart';
@@ -349,7 +351,12 @@ class EnhancedDuplicateScorer {
 请仅回复"是"或"否"。
 ''';
 
-      final response = await _aiService.chat(prompt);
+      final response = await _aiService.chat(prompt).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException('AI semantic score request timed out');
+        },
+      );
       if (response.toLowerCase().contains('是')) {
         return 10; // AI confirms duplicate
       }

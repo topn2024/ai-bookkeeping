@@ -386,7 +386,7 @@ class BatchImportService {
 
   /// Update candidate action
   void updateCandidateAction(int index, ImportAction action) {
-    if (_lastCandidates != null && index < _lastCandidates!.length) {
+    if (_lastCandidates != null && index >= 0 && index < _lastCandidates!.length) {
       _lastCandidates![index] = _lastCandidates![index].copyWith(action: action);
     }
   }
@@ -395,7 +395,7 @@ class BatchImportService {
   void batchUpdateCandidateActions(List<int> indices, ImportAction action) {
     if (_lastCandidates == null) return;
     for (final index in indices) {
-      if (index < _lastCandidates!.length) {
+      if (index >= 0 && index < _lastCandidates!.length) {
         _lastCandidates![index] = _lastCandidates![index].copyWith(action: action);
       }
     }
@@ -403,7 +403,7 @@ class BatchImportService {
 
   /// Update candidate category
   void updateCandidateCategory(int index, String category) {
-    if (_lastCandidates != null && index < _lastCandidates!.length) {
+    if (_lastCandidates != null && index >= 0 && index < _lastCandidates!.length) {
       _lastCandidates![index] = _lastCandidates![index].copyWith(
         category: category,
         isEdited: true,
@@ -413,7 +413,7 @@ class BatchImportService {
 
   /// Update candidate account
   void updateCandidateAccount(int index, String accountId) {
-    if (_lastCandidates != null && index < _lastCandidates!.length) {
+    if (_lastCandidates != null && index >= 0 && index < _lastCandidates!.length) {
       _lastCandidates![index] = _lastCandidates![index].copyWith(
         accountId: accountId,
         isEdited: true,

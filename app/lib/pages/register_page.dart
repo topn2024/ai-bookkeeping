@@ -22,12 +22,27 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
 
+  // Gesture recognizers for agreement links
+  late final TapGestureRecognizer _userAgreementRecognizer;
+  late final TapGestureRecognizer _privacyPolicyRecognizer;
+
+  @override
+  void initState() {
+    super.initState();
+    _userAgreementRecognizer = TapGestureRecognizer()
+      ..onTap = () => _openAgreement(AgreementType.userAgreement);
+    _privacyPolicyRecognizer = TapGestureRecognizer()
+      ..onTap = () => _openAgreement(AgreementType.privacyPolicy);
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _userAgreementRecognizer.dispose();
+    _privacyPolicyRecognizer.dispose();
     super.dispose();
   }
 
@@ -203,8 +218,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                               style: TextStyle(
                                 color: Theme.of(context).primaryColor,
                               ),
-                              recognizer: TapGestureRecognizer()
-                                ..onTap = () => _openAgreement(AgreementType.userAgreement),
+                              recognizer: _userAgreementRecognizer,
                             ),
                             const TextSpan(text: '和'),
                             TextSpan(
@@ -212,8 +226,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                               style: TextStyle(
                                 color: Theme.of(context).primaryColor,
                               ),
-                              recognizer: TapGestureRecognizer()
-                                ..onTap = () => _openAgreement(AgreementType.privacyPolicy),
+                              recognizer: _privacyPolicyRecognizer,
                             ),
                           ],
                         ),

@@ -28,6 +28,9 @@ class PrivacyBudgetManager extends ChangeNotifier {
   /// 重置定时器
   Timer? _resetTimer;
 
+  /// 操作锁，防止并发预算消耗
+  bool _isOperating = false;
+
   PrivacyBudgetManager({
     PrivacyBudgetConfig? config,
     PrivacyBudgetStorage? storage,
@@ -97,21 +100,32 @@ class PrivacyBudgetManager extends ChangeNotifier {
     required SensitivityLevel level,
     required String operation,
   }) async {
-    // 检查预算是否已耗尽
-    if (_state.isExhausted) {
-      debugPrint('隐私预算已耗尽，拒绝操作: $operation');
+    // 防止并发操作
+    if (_isOperating) {
+      debugPrint('预算操作进行中，请稍后重试: $operation');
       return false;
     }
 
-    // 检查是否超出总预算
-    if (!canConsume(epsilon)) {
-      _state = _state.copyWith(isExhausted: true);
-      _notifyExhaustion();
-      await _persistState();
-      notifyListeners();
-      debugPrint('隐私预算不足，拒绝操作: $operation');
-      return false;
-    }
+    _isOperating = true;
+    try {
+      // 检查并重置预算（如果需要）
+      _checkAndResetIfNeeded();
+
+      // 检查预算是否已耗尽
+      if (_state.isExhausted) {
+        debugPrint('隐私预算已耗尽，拒绝操作: $operation');
+        return false;
+      }
+
+      // 检查是否超出总预算
+      if (!canConsume(epsilon)) {
+        _state = _state.copyWith(isExhausted: true);
+        _notifyExhaustion();
+        await _persistState();
+        notifyListeners();
+        debugPrint('隐私预算不足，拒绝操作: $operation');
+        return false;
+      }
 
     // 更新对应级别的消耗
     switch (level) {
@@ -158,6 +172,9 @@ class PrivacyBudgetManager extends ChangeNotifier {
     debugPrint('剩余预算: ${remainingBudgetPercent.toStringAsFixed(1)}%');
 
     return true;
+    } finally {
+      _isOperating = false;
+    }
   }
 
   /// 批量消耗预算（用于批量操作）
@@ -185,6 +202,11 @@ class PrivacyBudgetManager extends ChangeNotifier {
 
   /// 手动重置预算
   Future<void> reset() async {
+    // 防止并发操作
+    while (_isOperating) {
+      await Future.delayed(const Duration(milliseconds: 10));
+    }
+
     _state = _state.reset();
     _consumptionHistory.clear();
     await _persistState();
@@ -231,6 +253,7 @@ class PrivacyBudgetManager extends ChangeNotifier {
   }
 
   void _checkAndResetIfNeeded() {
+    // 注意：此方法应该在 _isOperating 锁保护下调用
     final now = DateTime.now();
     final hoursSinceReset =
         now.difference(_state.lastResetTime).inHours;

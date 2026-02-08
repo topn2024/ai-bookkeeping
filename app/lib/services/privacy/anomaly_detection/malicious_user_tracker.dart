@@ -162,10 +162,20 @@ class MaliciousUserTracker extends ChangeNotifier {
     required int anomalyCount,
   }) async {
     for (var i = 0; i < normalCount; i++) {
-      await recordNormalContribution(userId);
+      try {
+        await recordNormalContribution(userId);
+      } catch (e) {
+        debugPrint('Error recording normal contribution $i for user $userId: $e');
+        // Continue with remaining items
+      }
     }
     for (var i = 0; i < anomalyCount; i++) {
-      await recordAnomaly(userId);
+      try {
+        await recordAnomaly(userId);
+      } catch (e) {
+        debugPrint('Error recording anomaly $i for user $userId: $e');
+        // Continue with remaining items
+      }
     }
   }
 

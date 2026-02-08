@@ -114,12 +114,22 @@ class TransactionRepository implements ITransactionRepository {
   @override
   Future<List<Transaction>> findByLedgerId(String ledgerId) async {
     // Transaction 模型当前通过数据库 ledgerId 字段关联 Ledger
-    // 由于 Transaction 模型不包含 ledgerId 属性，需要通过 rawQuery 查询
-    // 然后使用 getTransactions 获取完整对象
-    // TODO: 优化为直接从数据库结果构建 Transaction 对象
+    // 由于 Transaction 模型不包含 ledgerId 属性，需要在数据库层过滤
     final all = await _db.getTransactions();
-    // 临时实现：返回所有交易
-    return all;
+
+    // Filter transactions by ledgerId using raw database query
+    // Since the Transaction model doesn't expose ledgerId, we need to query the database directly
+    // and match by transaction IDs
+    final db = await _db.database;
+    final result = await db.query(
+      'transactions',
+      columns: ['id'],
+      where: 'ledgerId = ? AND isDeleted = 0',
+      whereArgs: [ledgerId],
+    );
+
+    final ledgerTransactionIds = result.map((row) => row['id'] as String).toSet();
+    return all.where((t) => ledgerTransactionIds.contains(t.id)).toList();
   }
 
   @override

@@ -459,6 +459,12 @@ class GenericBankParser extends BillParser {
           ? values[externalIdIndex]
           : null;
 
+      // Validate that we have at least some meaningful data
+      if (note == null && merchant == null) {
+        debugPrint('[GenericBankParser] Row ${rowIndex + 1}: No description or merchant, skipping');
+        return _ParseRowResult(error: '第${rowIndex + 1}行: 缺少描述信息，已跳过');
+      }
+
       // Infer category
       final category = inferCategory(merchant, note, type);
 

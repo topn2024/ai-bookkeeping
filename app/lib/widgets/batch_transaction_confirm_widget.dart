@@ -437,7 +437,10 @@ class _BatchTransactionConfirmWidgetState extends State<BatchTransactionConfirmW
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      controller.dispose();
+                      Navigator.pop(context);
+                    },
                     child: const Text('取消'),
                   ),
                   FilledButton(
@@ -451,6 +454,7 @@ class _BatchTransactionConfirmWidgetState extends State<BatchTransactionConfirmW
                         });
                         widget.onTransactionsChanged(_transactions);
                       }
+                      controller.dispose();
                       Navigator.pop(context);
                     },
                     child: const Text('确定'),
@@ -462,7 +466,7 @@ class _BatchTransactionConfirmWidgetState extends State<BatchTransactionConfirmW
           ),
         );
       },
-    );
+    ).whenComplete(() => controller.dispose());
   }
 
   IconData _getCategoryIcon(String category) {

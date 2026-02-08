@@ -107,6 +107,10 @@ class _SwipeableDismissDialogState extends State<SwipeableDismissDialog>
   // 是否已触发阈值触觉反馈
   bool _hasTriggeredThresholdHaptic = false;
 
+  // Listener references for cleanup
+  VoidCallback? _dismissListener;
+  void Function(AnimationStatus)? _dismissStatusListener;
+
   @override
   void initState() {
     super.initState();
@@ -118,6 +122,13 @@ class _SwipeableDismissDialogState extends State<SwipeableDismissDialog>
 
   @override
   void dispose() {
+    // Remove listeners before disposing
+    if (_dismissListener != null) {
+      _animationController.removeListener(_dismissListener!);
+    }
+    if (_dismissStatusListener != null) {
+      _animationController.removeStatusListener(_dismissStatusListener!);
+    }
     _animationController.dispose();
     super.dispose();
   }
@@ -217,21 +228,25 @@ class _SwipeableDismissDialogState extends State<SwipeableDismissDialog>
     // 使用动画平滑过渡到最终位置
     final startOffset = _dragOffset;
 
-    _animationController.addListener(() {
+    // Store listener references for cleanup
+    _dismissListener = () {
       if (mounted) {
         setState(() {
           final progress = _animationController.value;
           _dragOffset = Offset.lerp(startOffset, targetOffset, progress)!;
         });
       }
-    });
+    };
 
-    _animationController.addStatusListener((status) {
+    _dismissStatusListener = (status) {
       if (status == AnimationStatus.completed) {
         widget.onDismiss?.call();
         Navigator.of(context).pop();
       }
-    });
+    };
+
+    _animationController.addListener(_dismissListener!);
+    _animationController.addStatusListener(_dismissStatusListener!);
   }
 
   /// 执行回弹动画

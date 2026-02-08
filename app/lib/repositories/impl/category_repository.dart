@@ -103,16 +103,21 @@ class CategoryRepository implements ICategoryRepository {
   @override
   Future<List<Category>> findAncestors(String categoryId) async {
     final ancestors = <Category>[];
+    final visited = <String>{};
     var currentId = categoryId;
 
     while (true) {
       final category = await findById(currentId);
       if (category == null || category.parentId == null) break;
 
+      // Cycle detection: if we've seen this parent before, break to avoid infinite loop
+      if (visited.contains(category.parentId!)) break;
+
       final parent = await findById(category.parentId!);
       if (parent == null) break;
 
       ancestors.insert(0, parent);
+      visited.add(category.parentId!);
       currentId = parent.id;
     }
 
@@ -121,12 +126,23 @@ class CategoryRepository implements ICategoryRepository {
 
   @override
   Future<List<Category>> findDescendants(String categoryId) async {
+    return _findDescendantsWithDepth(categoryId, 0);
+  }
+
+  /// Internal method to find descendants with depth limit
+  Future<List<Category>> _findDescendantsWithDepth(String categoryId, int currentDepth) async {
+    const maxDepth = 20; // Maximum depth to prevent infinite recursion
+
+    if (currentDepth >= maxDepth) {
+      return [];
+    }
+
     final descendants = <Category>[];
     final children = await findByParentId(categoryId);
 
     for (final child in children) {
       descendants.add(child);
-      final childDescendants = await findDescendants(child.id);
+      final childDescendants = await _findDescendantsWithDepth(child.id, currentDepth + 1);
       descendants.addAll(childDescendants);
     }
 

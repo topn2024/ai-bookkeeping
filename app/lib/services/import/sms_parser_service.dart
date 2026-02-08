@@ -171,13 +171,15 @@ $smsListText
 
       return results;
     } catch (e) {
-      // 解析失败，返回null列表
+      // 解析失败，记录错误并返回null列表
+      debugPrint('[SmsParser] Failed to parse AI response: $e');
+      debugPrint('[SmsParser] Response content: $response');
       return List.filled(messages.length, null);
     }
   }
 
   /// 转换为ImportCandidate
-  ImportCandidate toImportCandidate(
+  ImportCandidate? toImportCandidate(
     ParsedTransaction transaction,
     int index,
   ) {
@@ -186,12 +188,8 @@ $smsListText
 
     // 验证金额范围，防止AI解析出异常值
     if (transaction.amount > AmountValidator.maxAmount) {
-      debugPrint('[SmsParser] Amount ${transaction.amount} exceeds max limit, skipping SMS');
-      throw AIParseException(
-        message: '金额超出有效范围（最大${AmountValidator.maxAmount}元）',
-        parsedCount: 0,
-        failedCount: 1,
-      );
+      debugPrint('[SmsParser] Warning: Amount ${transaction.amount} exceeds max limit (${AmountValidator.maxAmount}), skipping SMS');
+      return null;
     }
 
     // 如果AI未返回分类或分类无效，使用规则引擎兜底
