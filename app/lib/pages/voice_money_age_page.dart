@@ -519,8 +519,17 @@ class _VoiceMoneyAgePageState extends ConsumerState<VoiceMoneyAgePage> {
           content: '语音识别需要真机环境。\n\n请在下方输入框中输入您的问题，例如：\n• 如何提升钱龄？\n• 我的钱龄是多少？',
           timestamp: DateTime.now(),
         ));
+        _trimMessages();
       });
       _scrollToBottom();
+    }
+  }
+
+  /// Trim messages to prevent memory leak - keep only last 200 messages
+  void _trimMessages() {
+    const maxMessages = 200;
+    if (_messages.length > maxMessages) {
+      _messages.removeRange(0, _messages.length - maxMessages);
     }
   }
 
@@ -532,6 +541,7 @@ class _VoiceMoneyAgePageState extends ConsumerState<VoiceMoneyAgePage> {
         content: text,
         timestamp: DateTime.now(),
       ));
+      _trimMessages();
     });
 
     // 模拟回复
@@ -543,6 +553,7 @@ class _VoiceMoneyAgePageState extends ConsumerState<VoiceMoneyAgePage> {
           content: '要提升钱龄，您可以：\n\n1️⃣ 延迟非必要消费\n2️⃣ 建立应急储蓄金\n3️⃣ 减少冲动消费\n4️⃣ 优先使用"老钱"消费\n\n坚持一个月，您的钱龄就能明显提升！',
           timestamp: DateTime.now(),
         ));
+        _trimMessages();
       });
       _scrollToBottom();
     });

@@ -939,6 +939,7 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
         'content': content,
         'time': DateTime.now(),
       });
+      _trimMessages();
     });
     _scrollToBottom();
   }
@@ -951,8 +952,17 @@ class _VoiceAssistantPageState extends ConsumerState<VoiceAssistantPage> {
         'time': DateTime.now(),
         'widget': widget,
       });
+      _trimMessages();
     });
     _scrollToBottom();
+  }
+
+  /// Trim messages to prevent memory leak - keep only last 200 messages
+  void _trimMessages() {
+    const maxMessages = 200;
+    if (_messages.length > maxMessages) {
+      _messages.removeRange(0, _messages.length - maxMessages);
+    }
   }
 
   void _startRecording() {

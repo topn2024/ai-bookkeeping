@@ -156,6 +156,9 @@ class SharedPreferencesLearningCache implements LearningCacheService {
   /// 存储 key
   static const String _storageKey = 'smart_intent_cache';
 
+  /// 最大缓存大小
+  static const int _maxCacheSize = 500;
+
   /// 缓存数据
   final Map<String, LearnedPattern> _cache = {};
 
@@ -280,6 +283,7 @@ class SharedPreferencesLearningCache implements LearningCacheService {
     );
 
     _cache[normalizedInput] = pattern;
+    _evictLRUIfNeeded();
     await _save();
 
     debugPrint('[LearningCache] 学习新模式: $normalizedInput → $intentTypeName');
@@ -333,6 +337,37 @@ class SharedPreferencesLearningCache implements LearningCacheService {
     } catch (e) {
       debugPrint('[LearningCache] 保存缓存失败: $e');
     }
+  }
+
+  /// Evict least recently used entries if cache exceeds max size
+  void _evictLRUIfNeeded() {
+    if (_cache.length <= _maxCacheSize) {
+      return;
+    }
+
+    // Sort by learnedAt (oldest first) and hitCount (least used first)
+    // Priority: user corrections > high hit count > recent entries
+    final sortedEntries = _cache.entries.toList()
+      ..sort((a, b) {
+        // Keep user corrections
+        if (a.value.isUserCorrection && !b.value.isUserCorrection) return 1;
+        if (!a.value.isUserCorrection && b.value.isUserCorrection) return -1;
+
+        // Then sort by hit count (lower first for removal)
+        final hitCompare = a.value.hitCount.compareTo(b.value.hitCount);
+        if (hitCompare != 0) return hitCompare;
+
+        // Finally by age (older first for removal)
+        return a.value.learnedAt.compareTo(b.value.learnedAt);
+      });
+
+    // Remove oldest/least used entries
+    final entriesToRemove = _cache.length - _maxCacheSize;
+    for (int i = 0; i < entriesToRemove; i++) {
+      _cache.remove(sortedEntries[i].key);
+    }
+
+    debugPrint('[LearningCache] 清理了 $entriesToRemove 个最少使用的模式');
   }
 
   /// 计算 Levenshtein 编辑距离

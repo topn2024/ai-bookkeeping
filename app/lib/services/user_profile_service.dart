@@ -746,6 +746,7 @@ class UserProfileService {
   final Map<String, UserProfile> _cache = {};
 
   static const _cacheDuration = Duration(hours: 1);
+  static const _maxCacheSize = 50;
 
   UserProfileService({
     required UserProfileAnalyzer analyzer,
@@ -773,6 +774,7 @@ class UserProfileService {
 
     if (profile != null) {
       _cache[userId] = profile;
+      _evictCacheIfNeeded();
     }
 
     return profile;
@@ -800,6 +802,31 @@ class UserProfileService {
   /// 清除缓存
   void clearCache() {
     _cache.clear();
+  }
+
+  /// Evict cache entries to prevent memory leak
+  void _evictCacheIfNeeded() {
+    if (_cache.length <= _maxCacheSize) {
+      return;
+    }
+
+    final now = DateTime.now();
+
+    // First, remove expired entries
+    _cache.removeWhere((key, profile) {
+      return now.difference(profile.lastUpdated) >= _cacheDuration;
+    });
+
+    // If still over limit, remove oldest entries
+    if (_cache.length > _maxCacheSize) {
+      final sortedEntries = _cache.entries.toList()
+        ..sort((a, b) => a.value.lastUpdated.compareTo(b.value.lastUpdated));
+
+      final entriesToRemove = sortedEntries.take(_cache.length - _maxCacheSize);
+      for (final entry in entriesToRemove) {
+        _cache.remove(entry.key);
+      }
+    }
   }
 }
 
