@@ -227,6 +227,23 @@ def _apply_ownership_filter(query, model, entity_type: str, user: User):
     return query
 
 
+def _apply_user_filter(query, model, entity_type: str, user: User):
+    """Apply user ownership filtering for any entity type.
+
+    Handles special cases:
+    - category: includes system categories (user_id IS NULL, is_system=True)
+    - entities without user_id: delegates to _apply_ownership_filter
+    - normal entities: filters by user_id
+    """
+    if entity_type == "category":
+        query = query.where(or_(model.user_id == user.id, model.is_system == True))
+    elif hasattr(model, 'user_id'):
+        query = query.where(model.user_id == user.id)
+    else:
+        query = _apply_ownership_filter(query, model, entity_type, user)
+    return query
+
+
 @router.post("/push", response_model=SyncPushResponse)
 async def push_changes(
     request: SyncPushRequest,
@@ -335,10 +352,7 @@ async def _check_conflict(
 
     # Get server entity
     query = select(model).where(model.id == change.server_id)
-    if hasattr(model, 'user_id'):
-        query = query.where(model.user_id == user.id)
-    else:
-        query = _apply_ownership_filter(query, model, entity_type, user)
+    query = _apply_user_filter(query, model, entity_type, user)
 
     result = await db.execute(query)
     entity = result.scalar_one_or_none()
@@ -889,10 +903,7 @@ async def _handle_update(
 
     # Get existing entity
     query = select(model).where(model.id == change.server_id)
-    if hasattr(model, 'user_id'):
-        query = query.where(model.user_id == user.id)
-    else:
-        query = _apply_ownership_filter(query, model, entity_type, user)
+    query = _apply_user_filter(query, model, entity_type, user)
 
     result = await db.execute(query)
     entity = result.scalar_one_or_none()
@@ -987,10 +998,7 @@ async def _handle_delete(
         raise ValueError(f"Unknown entity type: {entity_type}")
 
     query = select(model).where(model.id == change.server_id)
-    if hasattr(model, 'user_id'):
-        query = query.where(model.user_id == user.id)
-    else:
-        query = _apply_ownership_filter(query, model, entity_type, user)
+    query = _apply_user_filter(query, model, entity_type, user)
 
     result = await db.execute(query)
     entity = result.scalar_one_or_none()
@@ -1087,10 +1095,7 @@ async def pull_changes(
             continue
 
         query = select(model)
-        if hasattr(model, 'user_id'):
-            query = query.where(model.user_id == current_user.id)
-        else:
-            query = _apply_ownership_filter(query, model, entity_type, current_user)
+        query = _apply_user_filter(query, model, entity_type, current_user)
 
         if last_sync_time:
             query = query.where(model.updated_at > last_sync_time)
@@ -1398,10 +1403,7 @@ async def get_sync_status(
 
     for entity_type, model in ENTITY_MODELS.items():
         query = select(func.count()).select_from(model)
-        if hasattr(model, 'user_id'):
-            query = query.where(model.user_id == current_user.id)
-        else:
-            query = _apply_ownership_filter(query, model, entity_type, current_user)
+        query = _apply_user_filter(query, model, entity_type, current_user)
 
         result = await db.execute(query)
         entity_counts[entity_type] = result.scalar() or 0

@@ -102,6 +102,7 @@ class ConsumptionRecord(Base):
     book_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("books.id"), nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
 
     # Relationships
     resource_pool = relationship("ResourcePool", back_populates="consumption_records")
@@ -156,6 +157,7 @@ class MoneyAgeSnapshot(Base):
     monthly_trend: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)  # Monthly trend data
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
 
     # Relationships
     user = relationship("User")

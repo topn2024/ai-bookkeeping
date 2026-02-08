@@ -84,6 +84,7 @@ class BookMember(Base):
     nickname: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Nickname in this book
     invited_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
 
     # Member settings as JSON
     settings: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
@@ -146,7 +147,7 @@ class FamilyBudget(Base):
     strategy: Mapped[int] = mapped_column(Integer, default=0)  # 0: unified, 1: per_member, etc.
     total_budget: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, onupdate=beijing_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
 
     # Budget rules as JSON
     rules: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
@@ -176,7 +177,7 @@ class MemberBudget(Base):
     spent: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False, default=0)  # Spent amount
     category_spent: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)  # {category_id: amount}
     created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, onupdate=beijing_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
 
     # Relationships
     family_budget = relationship("FamilyBudget", back_populates="member_budgets")
@@ -205,6 +206,7 @@ class FamilySavingGoal(Base):
     status: Mapped[int] = mapped_column(Integer, default=0)  # 0: active, 1: completed, 2: cancelled
     created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relationships
@@ -224,6 +226,7 @@ class GoalContribution(Base):
     amount: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
     note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
 
     # Relationships
     goal = relationship("FamilySavingGoal", back_populates="contributions")
@@ -253,6 +256,7 @@ class TransactionSplit(Base):
     split_type: Mapped[int] = mapped_column(Integer, default=0)  # 0: equal, 1: percentage, 2: exact, 3: shares
     status: Mapped[int] = mapped_column(Integer, default=0)  # 0: pending, 1: confirmed, 2: settling, 3: settled
     created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
     settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relationships
@@ -274,6 +278,8 @@ class SplitParticipant(Base):
     is_payer: Mapped[bool] = mapped_column(Boolean, default=False)  # Is this the original payer
     is_settled: Mapped[bool] = mapped_column(Boolean, default=False)
     settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=beijing_now_naive, onupdate=beijing_now_naive)
 
     # Relationships
     split = relationship("TransactionSplit", back_populates="participants")
