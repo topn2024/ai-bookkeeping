@@ -31,3 +31,8 @@ export 'plugins/offline/sherpa_engine_wrapper.dart'
         VADSegment,
         OfflineModelException,
         OfflineASRInitException;
+
+// 插件实现
+export 'plugins/iflytek_iat/iflytek_iat_plugin.dart';
+export 'plugins/alicloud/alicloud_asr_plugin.dart';
+export 'plugins/offline/offline_asr_plugin.dart';

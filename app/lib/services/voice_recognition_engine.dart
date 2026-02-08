@@ -52,6 +52,21 @@ class VoiceRecognitionEngine {
 
   /// 注册默认插件
   void _registerDefaultPlugins() {
+    // 讯飞语音听写（优先级10）
+    if (!_registry.hasPlugin('iflytek_iat')) {
+      _registry.register(IFlytekIATPlugin());
+    }
+
+    // 阿里云ASR（优先级20）
+    if (!_registry.hasPlugin('alicloud_asr')) {
+      _registry.register(AliCloudASRPlugin());
+    }
+
+    // 离线ASR（优先级100）
+    if (!_registry.hasPlugin('offline_sherpa')) {
+      _registry.register(OfflineASRPlugin());
+    }
+
     debugPrint('[VoiceRecognitionEngine] 已注册 ${_registry.pluginCount} 个插件');
   }
 
