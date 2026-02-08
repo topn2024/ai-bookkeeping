@@ -62,9 +62,10 @@ def decrypt_sensitive_data(ciphertext: str) -> str:
         fernet = _get_fernet()
         decrypted = fernet.decrypt(ciphertext.encode('utf-8'))
         return decrypted.decode('utf-8')
-    except Exception:
-        # Return original if decryption fails (might be unencrypted legacy data)
-        return ciphertext
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Decryption failed: {e}")
+        raise ValueError("Failed to decrypt sensitive data")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -133,6 +134,8 @@ def decode_access_token(token: str) -> Optional[str]:
     """Decode JWT access token and return user_id."""
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        if payload.get("type") != "access":
+            return None
         user_id: str = payload.get("sub")
         if user_id is None:
             return None

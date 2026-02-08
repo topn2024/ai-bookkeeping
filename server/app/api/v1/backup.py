@@ -1,5 +1,6 @@
 """Backup endpoints for user data backup and restore."""
 import json
+import logging
 from datetime import datetime, date, time
 from decimal import Decimal
 from typing import List
@@ -28,8 +29,14 @@ from app.schemas.backup import (
 )
 from app.api.deps import get_current_user
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/backup", tags=["Backup"])
+
+# Backup size limit: 50MB
+MAX_BACKUP_SIZE = 50 * 1024 * 1024
+# Max backups per user
+MAX_BACKUPS_PER_USER = 10
 
 
 def _serialize_value(value):
@@ -151,6 +158,25 @@ async def create_backup(
 
     # Serialize to JSON
     data_json = json.dumps(backup_data, ensure_ascii=False)
+
+    # Check backup size limit
+    data_size = len(data_json.encode('utf-8'))
+    if data_size > MAX_BACKUP_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"备份数据过大（{data_size // (1024*1024)}MB），最大允许 {MAX_BACKUP_SIZE // (1024*1024)}MB",
+        )
+
+    # Check per-user backup count limit
+    count_result = await db.execute(
+        select(func.count()).select_from(Backup).where(Backup.user_id == current_user.id)
+    )
+    backup_count = count_result.scalar() or 0
+    if backup_count >= MAX_BACKUPS_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"备份数量已达上限（{MAX_BACKUPS_PER_USER}个），请删除旧备份后重试",
+        )
 
     # Create backup record
     backup = Backup(
@@ -441,9 +467,10 @@ async def restore_backup(
 
     except Exception as e:
         await db.rollback()
+        logger.error(f"Backup restore failed for user {current_user.id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"恢复失败: {str(e)}",
+            detail="数据恢复失败，请稍后重试",
         )
 
 

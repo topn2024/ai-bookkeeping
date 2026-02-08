@@ -105,14 +105,17 @@ async def push_changes(
                     conflicts.append(conflict)
                     continue
 
-                result = await _process_change(
-                    db, current_user, change, entity_type
-                )
-                if result.success:
-                    accepted.append(result)
-                else:
-                    # Failed but not a conflict - add to accepted with error
-                    accepted.append(result)
+                # Use savepoint to isolate each entity's changes
+                # Failed entities rollback to savepoint, successful ones are preserved
+                async with db.begin_nested():  # savepoint
+                    result = await _process_change(
+                        db, current_user, change, entity_type
+                    )
+                    if result.success:
+                        accepted.append(result)
+                    else:
+                        # Failed but not a conflict - add to accepted with error
+                        accepted.append(result)
             except Exception as e:
                 accepted.append(EntitySyncResult(
                     local_id=change.local_id,
@@ -772,7 +775,7 @@ async def _update_account_balance_on_create(
 ):
     """Update account balance when creating a transaction."""
     result = await db.execute(
-        select(Account).where(Account.id == transaction.account_id)
+        select(Account).where(Account.id == transaction.account_id).with_for_update()
     )
     account = result.scalar_one_or_none()
 
@@ -785,7 +788,7 @@ async def _update_account_balance_on_create(
             account.balance -= transaction.amount + transaction.fee
             if transaction.target_account_id:
                 result = await db.execute(
-                    select(Account).where(Account.id == transaction.target_account_id)
+                    select(Account).where(Account.id == transaction.target_account_id).with_for_update()
                 )
                 target_account = result.scalar_one_or_none()
                 if target_account:
@@ -799,7 +802,7 @@ async def _revert_account_balance(
 ):
     """Revert account balance when updating/deleting a transaction."""
     result = await db.execute(
-        select(Account).where(Account.id == transaction.account_id)
+        select(Account).where(Account.id == transaction.account_id).with_for_update()
     )
     account = result.scalar_one_or_none()
 
@@ -812,7 +815,7 @@ async def _revert_account_balance(
             account.balance += transaction.amount + transaction.fee
             if transaction.target_account_id:
                 result = await db.execute(
-                    select(Account).where(Account.id == transaction.target_account_id)
+                    select(Account).where(Account.id == transaction.target_account_id).with_for_update()
                 )
                 target_account = result.scalar_one_or_none()
                 if target_account:
@@ -827,8 +830,13 @@ async def pull_changes(
 ):
     """
     Return all changes since last_sync_time for each entity type.
+
+    Supports pagination via limit parameter. When has_more is True,
+    the client should request again with updated last_sync_times.
     """
+    limit = getattr(request, 'limit', None) or 500
     changes: Dict[str, List[EntityData]] = {}
+    has_more = False
 
     for entity_type, last_sync_time in request.last_sync_times.items():
         model = ENTITY_MODELS.get(entity_type)
@@ -842,8 +850,14 @@ async def pull_changes(
         if last_sync_time:
             query = query.where(model.updated_at > last_sync_time)
 
+        query = query.order_by(model.updated_at).limit(limit + 1)
+
         result = await db.execute(query)
-        entities = result.scalars().all()
+        entities = list(result.scalars().all())
+
+        if len(entities) > limit:
+            has_more = True
+            entities = entities[:limit]
 
         changes[entity_type] = [
             EntityData(
@@ -860,7 +874,7 @@ async def pull_changes(
     return SyncPullResponse(
         changes=changes,
         server_time=datetime.utcnow(),
-        has_more=False,
+        has_more=has_more,
     )
 
 

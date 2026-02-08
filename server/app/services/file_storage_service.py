@@ -3,6 +3,7 @@
 Handles file upload, download, and management for source files
 (images from receipt scanning, audio from voice recognition).
 """
+import asyncio
 import io
 import uuid
 from datetime import datetime, timedelta
@@ -64,8 +65,9 @@ class FileStorageService:
             return True
 
         try:
-            if not self.client.bucket_exists(settings.MINIO_BUCKET):
-                self.client.make_bucket(settings.MINIO_BUCKET)
+            exists = await asyncio.to_thread(self.client.bucket_exists, settings.MINIO_BUCKET)
+            if not exists:
+                await asyncio.to_thread(self.client.make_bucket, settings.MINIO_BUCKET)
                 logger.info(f"Created bucket: {settings.MINIO_BUCKET}")
             self._bucket_ensured = True
             return True
@@ -104,6 +106,22 @@ class FileStorageService:
         unique_id = uuid.uuid4().hex[:12]
         return f"{prefix}{user_id}/{date_str}/{unique_id}.{extension}"
 
+    def _sync_upload_file(
+        self,
+        object_name: str,
+        file_data: bytes,
+        file_size: int,
+        content_type: str,
+    ) -> None:
+        """Synchronous upload to MinIO (called via asyncio.to_thread)."""
+        self.client.put_object(
+            settings.MINIO_BUCKET,
+            object_name,
+            io.BytesIO(file_data),
+            length=file_size,
+            content_type=content_type,
+        )
+
     async def upload_file(
         self,
         user_id: str,
@@ -135,12 +153,8 @@ class FileStorageService:
         file_size = len(file_data)
 
         try:
-            self.client.put_object(
-                settings.MINIO_BUCKET,
-                object_name,
-                io.BytesIO(file_data),
-                length=file_size,
-                content_type=content_type,
+            await asyncio.to_thread(
+                self._sync_upload_file, object_name, file_data, file_size, content_type
             )
 
             # Construct the URL
@@ -172,7 +186,8 @@ class FileStorageService:
             Presigned URL or None on failure
         """
         try:
-            url = self.client.presigned_get_object(
+            url = await asyncio.to_thread(
+                self.client.presigned_get_object,
                 settings.MINIO_BUCKET,
                 object_name,
                 expires=timedelta(seconds=expires),
@@ -192,11 +207,14 @@ class FileStorageService:
             File bytes or None on failure
         """
         try:
-            response = self.client.get_object(settings.MINIO_BUCKET, object_name)
-            data = response.read()
-            response.close()
-            response.release_conn()
-            return data
+            def _sync_download():
+                response = self.client.get_object(settings.MINIO_BUCKET, object_name)
+                data = response.read()
+                response.close()
+                response.release_conn()
+                return data
+
+            return await asyncio.to_thread(_sync_download)
         except S3Error as e:
             logger.error(f"Failed to download file: {e}")
             return None
@@ -211,7 +229,9 @@ class FileStorageService:
             True if successful, False otherwise
         """
         try:
-            self.client.remove_object(settings.MINIO_BUCKET, object_name)
+            await asyncio.to_thread(
+                self.client.remove_object, settings.MINIO_BUCKET, object_name
+            )
             logger.info(f"Deleted file: {object_name}")
             return True
         except S3Error as e:
@@ -233,10 +253,12 @@ class FileStorageService:
         for prefix in [self.IMAGE_PREFIX, self.AUDIO_PREFIX]:
             full_prefix = f"{prefix}{user_id}/"
             try:
-                objects = self.client.list_objects(
-                    settings.MINIO_BUCKET,
-                    prefix=full_prefix,
-                    recursive=True,
+                objects = await asyncio.to_thread(
+                    lambda: list(self.client.list_objects(
+                        settings.MINIO_BUCKET,
+                        prefix=full_prefix,
+                        recursive=True,
+                    ))
                 )
 
                 for obj in objects:

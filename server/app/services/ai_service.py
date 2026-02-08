@@ -34,6 +34,16 @@ class AIService:
         # Zhipu API endpoint (fallback)
         self.zhipu_url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 
+        # Shared httpx client for connection reuse
+        self._client = httpx.AsyncClient(
+            timeout=30.0,
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+
+    async def close(self):
+        """Close the shared httpx client."""
+        await self._client.aclose()
+
     async def recognize_image(self, image_content: bytes) -> dict:
         """Recognize transaction from receipt/bill image using Qwen VL."""
         # Encode image to base64
@@ -59,36 +69,35 @@ class AIService:
 如果无法识别某项，请设为null。"""
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
-                    headers={
-                        "Authorization": f"Bearer {self.qwen_api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "qwen-vl-plus",
-                        "input": {
-                            "messages": [
-                                {
-                                    "role": "user",
-                                    "content": [
-                                        {"image": f"data:image/jpeg;base64,{image_base64}"},
-                                        {"text": prompt}
-                                    ]
-                                }
-                            ]
-                        }
-                    },
-                    timeout=30.0,
-                )
+            response = await self._client.post(
+                "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+                headers={
+                    "Authorization": f"Bearer {self.qwen_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "qwen-vl-plus",
+                    "input": {
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"image": f"data:image/jpeg;base64,{image_base64}"},
+                                    {"text": prompt}
+                                ]
+                            }
+                        ]
+                    }
+                },
+                timeout=30.0,
+            )
 
-                if response.status_code == 200:
-                    result = response.json()
-                    text = result.get("output", {}).get("choices", [{}])[0].get("message", {}).get("content", "")
-                    return self._parse_ai_response(text)
-                else:
-                    return self._empty_result()
+            if response.status_code == 200:
+                result = response.json()
+                text = result.get("output", {}).get("choices", [{}])[0].get("message", {}).get("content", "")
+                return self._parse_ai_response(text)
+            else:
+                return self._empty_result()
 
         except Exception as e:
             logger.error(f"AI recognition error: {e}", exc_info=True)
@@ -142,37 +151,36 @@ class AIService:
 - 忽略余额、总计等非交易信息"""
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
-                    headers={
-                        "Authorization": f"Bearer {self.qwen_api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "qwen-vl-plus",
-                        "input": {
-                            "messages": [
-                                {
-                                    "role": "user",
-                                    "content": [
-                                        {"image": f"data:image/jpeg;base64,{image_base64}"},
-                                        {"text": prompt}
-                                    ]
-                                }
-                            ]
-                        }
-                    },
-                    timeout=60.0,  # Longer timeout for long images
-                )
+            response = await self._client.post(
+                "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+                headers={
+                    "Authorization": f"Bearer {self.qwen_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "qwen-vl-plus",
+                    "input": {
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"image": f"data:image/jpeg;base64,{image_base64}"},
+                                    {"text": prompt}
+                                ]
+                            }
+                        ]
+                    }
+                },
+                timeout=60.0,  # Longer timeout for long images
+            )
 
-                if response.status_code == 200:
-                    result = response.json()
-                    text = result.get("output", {}).get("choices", [{}])[0].get("message", {}).get("content", "")
-                    return self._parse_batch_response(text)
-                else:
-                    logger.error(f"Batch recognition failed: {response.status_code}")
-                    return []
+            if response.status_code == 200:
+                result = response.json()
+                text = result.get("output", {}).get("choices", [{}])[0].get("message", {}).get("content", "")
+                return self._parse_batch_response(text)
+            else:
+                logger.error(f"Batch recognition failed: {response.status_code}")
+                return []
 
         except Exception as e:
             logger.error(f"Batch AI recognition error: {e}", exc_info=True)
@@ -258,37 +266,36 @@ class AIService:
 }"""
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    self.qwen_vl_url,  # 使用多模态端点
-                    headers={
-                        "Authorization": f"Bearer {self.qwen_api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "qwen-omni-turbo",  # 全模态模型，支持音频理解
-                        "input": {
-                            "messages": [
-                                {
-                                    "role": "user",
-                                    "content": [
-                                        {"audio": f"data:audio/{audio_format};base64,{audio_base64}"},
-                                        {"text": prompt}
-                                    ]
-                                }
-                            ]
-                        }
-                    },
-                    timeout=60.0,
-                )
+            response = await self._client.post(
+                self.qwen_vl_url,  # 使用多模态端点
+                headers={
+                    "Authorization": f"Bearer {self.qwen_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "qwen-omni-turbo",  # 全模态模型，支持音频理解
+                    "input": {
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"audio": f"data:audio/{audio_format};base64,{audio_base64}"},
+                                    {"text": prompt}
+                                ]
+                            }
+                        ]
+                    }
+                },
+                timeout=60.0,
+            )
 
-                if response.status_code == 200:
-                    result = response.json()
-                    text = result.get("output", {}).get("choices", [{}])[0].get("message", {}).get("content", "")
-                    return self._parse_audio_response(text)
-                else:
-                    logger.error(f"Qwen Audio API error: {response.status_code} - {response.text}")
-                    return self._empty_audio_result(error=f"API error: {response.status_code}")
+            if response.status_code == 200:
+                result = response.json()
+                text = result.get("output", {}).get("choices", [{}])[0].get("message", {}).get("content", "")
+                return self._parse_audio_response(text)
+            else:
+                logger.error(f"Qwen Audio API error: {response.status_code} - {response.text}")
+                return self._empty_audio_result(error=f"API error: {response.status_code}")
 
         except Exception as e:
             logger.error(f"Qwen Audio recognition error: {e}", exc_info=True)
@@ -577,28 +584,27 @@ class AIService:
         if not self.qwen_api_key:
             return None
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.qwen_text_url,
-                headers={
-                    "Authorization": f"Bearer {self.qwen_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "qwen-plus",
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ]
-                },
-                timeout=timeout,
-            )
+        response = await self._client.post(
+            self.qwen_text_url,
+            headers={
+                "Authorization": f"Bearer {self.qwen_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "qwen-plus",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ]
+            },
+            timeout=timeout,
+        )
 
-            if response.status_code == 200:
-                result = response.json()
-                return result.get("choices", [{}])[0].get("message", {}).get("content", "")
-            else:
-                logger.error(f"Qwen API error: {response.status_code} - {response.text}")
-                return None
+        if response.status_code == 200:
+            result = response.json()
+            return result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        else:
+            logger.error(f"Qwen API error: {response.status_code} - {response.text}")
+            return None
 
     async def _call_zhipu_text(self, prompt: str, timeout: float = 30.0) -> Optional[str]:
         """Call Zhipu text API (智谱 GLM) as fallback.
@@ -613,25 +619,28 @@ class AIService:
         if not self.zhipu_api_key:
             return None
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.zhipu_url,
-                headers={
-                    "Authorization": f"Bearer {self.zhipu_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "glm-4-flash",
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ]
-                },
-                timeout=timeout,
-            )
+        response = await self._client.post(
+            self.zhipu_url,
+            headers={
+                "Authorization": f"Bearer {self.zhipu_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "glm-4-flash",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ]
+            },
+            timeout=timeout,
+        )
 
-            if response.status_code == 200:
-                result = response.json()
-                return result.get("choices", [{}])[0].get("message", {}).get("content", "")
-            else:
-                logger.error(f"Zhipu API error: {response.status_code} - {response.text}")
-                return None
+        if response.status_code == 200:
+            result = response.json()
+            return result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        else:
+            logger.error(f"Zhipu API error: {response.status_code} - {response.text}")
+            return None
+
+
+# Singleton instance
+ai_service = AIService()

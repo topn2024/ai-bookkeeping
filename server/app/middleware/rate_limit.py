@@ -105,12 +105,12 @@ class RateLimiter:
         key: str,
         limit: int,
         window_seconds: int
-    ) -> Tuple[bool, int, int]:
+    ) -> Tuple[bool, int, int, int]:
         """
         Check if request is allowed under rate limit.
 
         Returns:
-            Tuple of (allowed, current_count, remaining)
+            Tuple of (allowed, current_count, remaining, retry_after)
         """
         redis_client = await get_redis()
 
@@ -118,42 +118,43 @@ class RateLimiter:
             # If Redis is not available, allow the request
             # but log a warning
             logger.warning("Redis not available for rate limiting, allowing request")
-            return True, 0, limit
+            return True, 0, limit, 0
 
         full_key = f"{self.PREFIX}{key}"
         now = time.time()
         window_start = now - window_seconds
 
-        pipe = redis_client.pipeline()
-
         try:
+            pipe = redis_client.pipeline()
             # Remove old entries outside the window
             pipe.zremrangebyscore(full_key, 0, window_start)
             # Count current requests in window
             pipe.zcard(full_key)
-            # Add current request with timestamp
-            pipe.zadd(full_key, {str(now): now})
-            # Set expiration
-            pipe.expire(full_key, window_seconds + 1)
-
             results = await pipe.execute()
             current_count = results[1]
 
             if current_count >= limit:
-                # Get oldest entry to calculate retry_after
+                # Rejected: do NOT add to the sorted set
+                # Calculate precise retry_after from oldest entry
                 oldest = await redis_client.zrange(full_key, 0, 0, withscores=True)
                 if oldest:
-                    retry_after = int(window_seconds - (now - oldest[0][1]))
+                    retry_after = max(1, int(window_seconds - (now - oldest[0][1])))
                 else:
                     retry_after = window_seconds
-                return False, current_count, 0
+                return False, current_count, 0, retry_after
+
+            # Allowed: add current request
+            pipe2 = redis_client.pipeline()
+            pipe2.zadd(full_key, {str(now): now})
+            pipe2.expire(full_key, window_seconds + 1)
+            await pipe2.execute()
 
             remaining = limit - current_count - 1
-            return True, current_count + 1, remaining
+            return True, current_count + 1, remaining, 0
 
         except Exception as e:
             logger.error(f"Rate limit check error: {e}")
-            return True, 0, limit
+            return True, 0, limit, 0
 
     async def get_remaining(self, key: str, limit: int, window_seconds: int) -> int:
         """Get remaining requests in the current window."""
@@ -253,7 +254,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def _check_global_limit(self):
         """Check global rate limit."""
         config = DEFAULT_LIMITS["global"]
-        allowed, count, remaining = await self.limiter.is_allowed(
+        allowed, count, remaining, retry_after = await self.limiter.is_allowed(
             "global",
             config.requests,
             config.window_seconds
@@ -265,13 +266,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 "global",
                 config.requests,
                 config.window_seconds,
-                config.window_seconds
+                retry_after
             )
 
     async def _check_ip_limit(self, client_ip: str):
         """Check IP-based rate limit."""
         config = DEFAULT_LIMITS["ip"]
-        allowed, count, remaining = await self.limiter.is_allowed(
+        allowed, count, remaining, retry_after = await self.limiter.is_allowed(
             f"ip:{client_ip}",
             config.requests,
             config.window_seconds
@@ -283,7 +284,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 "ip",
                 config.requests,
                 config.window_seconds,
-                config.window_seconds
+                retry_after
             )
 
     async def _check_api_limit(
@@ -311,7 +312,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         identifier = user_id or client_ip
         limit_key = f"api:{api_key}:{identifier}"
 
-        allowed, count, remaining = await self.limiter.is_allowed(
+        allowed, count, remaining, retry_after = await self.limiter.is_allowed(
             limit_key,
             config.requests,
             config.window_seconds
@@ -323,7 +324,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 "api",
                 config.requests,
                 config.window_seconds,
-                config.window_seconds
+                retry_after
             )
 
     async def _check_user_limit(self, user_id: str, member_level: int):
@@ -334,7 +335,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if config is None:
             return  # Unlimited user
 
-        allowed, count, remaining = await self.limiter.is_allowed(
+        allowed, count, remaining, retry_after = await self.limiter.is_allowed(
             f"user:{user_id}",
             config.requests,
             config.window_seconds
@@ -346,7 +347,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 "user",
                 config.requests,
                 config.window_seconds,
-                config.window_seconds
+                retry_after
             )
 
     def _path_matches(self, pattern: str, path: str) -> bool:

@@ -21,6 +21,16 @@ from app.services.file_storage_service import file_storage_service
 router = APIRouter(prefix="/files", tags=["Files"])
 
 
+def _verify_file_ownership(user_id_str: str, object_name: str):
+    """Verify that the file belongs to the user using exact path prefix matching."""
+    valid_prefixes = [f"source-images/{user_id_str}/", f"source-audio/{user_id_str}/"]
+    if not any(object_name.startswith(p) for p in valid_prefixes):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied to this file",
+        )
+
+
 class FileUploadResponse(BaseModel):
     """Response for file upload."""
     url: str
@@ -73,17 +83,18 @@ async def upload_file(
             detail="File must be audio",
         )
 
-    # Read file content
-    content = await file.read()
-
-    # Validate file size (max 20MB for images, 10MB for audio)
+    # Read file content in chunks to prevent DoS from large uploads
     max_size = 20 * 1024 * 1024 if file_type == "image" else 10 * 1024 * 1024
-    if len(content) > max_size:
-        size_mb = max_size // (1024 * 1024)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Max size: {size_mb}MB",
-        )
+    content = bytearray()
+    while chunk := await file.read(8192):
+        content.extend(chunk)
+        if len(content) > max_size:
+            size_mb = max_size // (1024 * 1024)
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File too large. Max size: {size_mb}MB",
+            )
+    content = bytes(content)
 
     # Upload to MinIO
     url, content_type, file_size = await file_storage_service.upload_file(
@@ -189,13 +200,8 @@ async def get_presigned_url(
             detail="expires must be between 60 and 86400 seconds",
         )
 
-    # Verify user owns the file (check user_id in path)
-    user_id_str = str(current_user.id)
-    if user_id_str not in object_name:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this file",
-        )
+    # Verify user owns the file using exact path prefix matching
+    _verify_file_ownership(str(current_user.id), object_name)
 
     url = await file_storage_service.get_presigned_url(object_name, expires)
 
@@ -218,13 +224,8 @@ async def delete_file(
     Args:
         object_name: The object name/path in storage
     """
-    # Verify user owns the file
-    user_id_str = str(current_user.id)
-    if user_id_str not in object_name:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this file",
-        )
+    # Verify user owns the file using exact path prefix matching
+    _verify_file_ownership(str(current_user.id), object_name)
 
     success = await file_storage_service.delete_file(object_name)
 

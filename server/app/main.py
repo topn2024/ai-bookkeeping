@@ -75,6 +75,14 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Application shutting down...")
 
+    # Close AI service httpx client
+    try:
+        from app.services.ai_service import ai_service
+        await ai_service.close()
+        logger.info("AI service client closed")
+    except Exception as e:
+        logger.warning(f"Error closing AI service: {e}")
+
     # Cleanup distributed services
     try:
         from app.services.cache_consistency_service import cache_service

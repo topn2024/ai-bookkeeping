@@ -511,6 +511,7 @@ class VoicePipelineController {
     _asrSilenceTimer = Timer(
       Duration(milliseconds: _asrSilenceTimeoutMs),
       () {
+        if (_isDisposed) return;
         debugPrint('[VoicePipelineController] ASR静默超时，触发说话结束处理');
         _handleSpeechEnd();
       },
@@ -656,6 +657,7 @@ class VoicePipelineController {
     _sentenceAggregationTimer = Timer(
       Duration(milliseconds: waitResult.waitTimeMs),
       () {
+        if (_isDisposed) return;
         // 竞态条件防护：检查此回调是否来自当前有效的计时器
         // 如果计时器ID不匹配，说明这是一个被"取消"但仍执行的旧回调
         if (_aggregationTimerId != currentTimerId) {
@@ -690,6 +692,7 @@ class VoicePipelineController {
     _maxWaitTimer = Timer(
       Duration(milliseconds: AggregationTiming.maxWaitMs),
       () {
+        if (_isDisposed) return;
         // 再次检查用户是否在说话（双重保险）
         if (_isUserSpeaking) {
           debugPrint('[VoicePipelineController] 最大等待触发时用户正在说话，跳过');
@@ -1242,14 +1245,20 @@ class VoicePipelineController {
     // 先标记为已释放，阻止新的回调
     _isDisposed = true;
 
+    // 先取消所有 Timer，防止 stop() 期间 Timer 回调触发
+    _sentenceAggregationTimer?.cancel();
+    _sentenceAggregationTimer = null;
+    _maxWaitTimer?.cancel();
+    _maxWaitTimer = null;
+    _asrSilenceTimer?.cancel();
+    _asrSilenceTimer = null;
+    _timerRecoveryCheck?.cancel();
+    _timerRecoveryCheck = null;
+
     // 等待停止完成
     await stop().catchError((e) {
       debugPrint('[VoicePipelineController] dispose 中 stop 失败: $e');
     });
-
-    // 清理计时器恢复检查
-    _timerRecoveryCheck?.cancel();
-    _timerRecoveryCheck = null;
 
     _proactiveManager.dispose();
     // 等待子流水线释放完成

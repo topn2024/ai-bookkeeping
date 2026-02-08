@@ -115,8 +115,9 @@ class TransactionNotifier extends SimpleCrudNotifier<Transaction, String> {
 
   /// 添加交易（保持原有方法名兼容）
   Future<void> addTransaction(Transaction transaction) async {
-    await add(transaction);
-    // 新交易放在列表前面
+    // 先写入数据库
+    await insertOne(transaction);
+    // 成功后更新 state（不调用基类 add() 避免双重 state 修改）
     state = [transaction, ...state.where((t) => t.id != transaction.id)];
     // 更新账户余额
     await _updateAccountBalance(transaction);
@@ -153,11 +154,11 @@ class TransactionNotifier extends SimpleCrudNotifier<Transaction, String> {
       (t) => t.id == transaction.id,
       orElse: () => transaction,
     );
+    // 先更新数据库，成功后再更新余额
+    await update(transaction);
     if (oldTransaction.id == transaction.id && oldTransaction != transaction) {
       await _updateAccountBalance(oldTransaction, isReverse: true);
     }
-    // 执行更新
-    await update(transaction);
     // 应用新余额
     await _updateAccountBalance(transaction);
   }

@@ -128,8 +128,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             logger.info(f"Returning cached response for idempotency key: {idempotency_key[:16]}...")
             return self._build_response(cached, is_cached=True)
 
-        # Check if request is in-flight (concurrent duplicate)
-        if await self._is_in_flight(cache_key):
+        # Atomically check and set in-flight status (prevents TOCTOU race)
+        if not await self._try_acquire_in_flight(cache_key):
             logger.warning(f"Duplicate concurrent request detected: {idempotency_key[:16]}...")
             return JSONResponse(
                 status_code=409,
@@ -138,9 +138,6 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     "message": "A request with this idempotency key is currently being processed",
                 },
             )
-
-        # Mark request as in-flight
-        await self._set_in_flight(cache_key)
 
         try:
             # Execute the request
@@ -253,31 +250,22 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 
         return response
 
-    async def _is_in_flight(self, cache_key: str) -> bool:
-        """Check if a request with this key is currently in-flight."""
+    async def _try_acquire_in_flight(self, cache_key: str) -> bool:
+        """Atomically check and set in-flight status using Redis SET NX.
+
+        Returns True if acquired (no other request in-flight), False if already in-flight.
+        """
         redis_client = await get_redis()
         if not redis_client:
-            return False
+            return True  # Allow if Redis unavailable
 
         try:
             in_flight_key = f"{cache_key}:inflight"
-            return await redis_client.exists(in_flight_key) > 0
+            result = await redis_client.set(in_flight_key, "1", ex=60, nx=True)
+            return result is not None  # True = acquired, False = already in-flight
         except Exception as e:
-            logger.error(f"Error checking in-flight status: {e}")
-            return False
-
-    async def _set_in_flight(self, cache_key: str):
-        """Mark request as in-flight."""
-        redis_client = await get_redis()
-        if not redis_client:
-            return
-
-        try:
-            in_flight_key = f"{cache_key}:inflight"
-            # Short TTL to auto-expire if something goes wrong
-            await redis_client.set(in_flight_key, "1", ex=60)
-        except Exception as e:
-            logger.error(f"Error setting in-flight status: {e}")
+            logger.error(f"Error acquiring in-flight lock: {e}")
+            return True  # Allow on error
 
     async def _clear_in_flight(self, cache_key: str):
         """Clear in-flight marker."""

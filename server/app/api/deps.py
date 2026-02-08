@@ -82,7 +82,13 @@ async def get_current_user_optional(
     return user if user and user.is_active else None
 
 
+_llm_service_instance: Optional[LLMService] = None
+
+
 def get_llm_service() -> LLMService:
-    """Get LLM service instance."""
-    return LLMService()
+    """Get LLM service singleton instance."""
+    global _llm_service_instance
+    if _llm_service_instance is None:
+        _llm_service_instance = LLMService()
+    return _llm_service_instance
 

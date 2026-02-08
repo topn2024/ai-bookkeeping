@@ -34,7 +34,12 @@ export const useAuthStore = defineStore('auth', () => {
       setToken(response.access_token)
       return true
     } catch (e) {
-      // Refresh failed, clear tokens
+      // Refresh failed, clear tokens and redirect to login
+      token.value = null
+      refreshToken.value = null
+      admin.value = null
+      sessionStorage.removeItem('admin_token')
+      sessionStorage.removeItem('admin_refresh_token')
       return false
     }
   }
