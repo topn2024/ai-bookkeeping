@@ -526,8 +526,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       // Trigger log cleanup check when app resumes from background
       logger.onAppResumed();
       logger.debug('App resumed from background', tag: 'App');
+      // 恢复语音助手后台任务
+      GlobalVoiceAssistantManager.instance.onAppResumed();
     } else if (state == AppLifecycleState.paused) {
       logger.debug('App paused (entering background)', tag: 'App');
+      // 暂停语音助手后台任务（节省电量）
+      GlobalVoiceAssistantManager.instance.onAppPaused();
     }
   }
 

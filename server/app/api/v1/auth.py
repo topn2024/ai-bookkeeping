@@ -41,6 +41,21 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
+def _mask_email(email: str) -> str:
+    """Mask email for logging: user@example.com -> u***@example.com"""
+    if not email or "@" not in email:
+        return "***"
+    local, domain = email.rsplit("@", 1)
+    return f"{local[0]}***@{domain}" if local else f"***@{domain}"
+
+
+def _mask_phone(phone: str) -> str:
+    """Mask phone for logging: 13812345678 -> 138****5678"""
+    if not phone or len(phone) < 7:
+        return "***"
+    return f"{phone[:3]}****{phone[-4:]}"
+
+
 @router.post("/register", response_model=Token)
 async def register(
     user_data: UserCreate,
@@ -101,10 +116,10 @@ async def register(
                     expires_minutes=60,
                 )
             )
-            logger.info(f"Verification email queued for {user_data.email}")
+            logger.info(f"Verification email queued for {_mask_email(user_data.email)}")
         except Exception as e:
             # 发送失败不影响注册
-            logger.warning(f"Failed to queue verification email for {user_data.email}: {e}")
+            logger.warning(f"Failed to queue verification email for {_mask_email(user_data.email)}: {e}")
 
     # Generate tokens
     access_token = create_access_token(str(user.id))
@@ -268,7 +283,7 @@ async def request_password_reset(
         # Log code in debug mode for testing (REMOVE IN PRODUCTION)
         from app.core.config import settings
         if settings.DEBUG:
-            logger.info(f"[DEV] Password reset code for {request.email}: {code}")
+            logger.info(f"[DEV] Password reset code for {_mask_email(request.email)}: {code}")
     else:
         logger.error("Redis not available for password reset")
         raise HTTPException(
@@ -277,7 +292,7 @@ async def request_password_reset(
         )
 
     # Send email with the code
-    logger.info(f"Attempting to send password reset email to {request.email}")
+    logger.info(f"Attempting to send password reset email to {_mask_email(request.email)}")
 
     # Check if email service is configured
     if not notification_email_service.is_configured:
@@ -295,7 +310,7 @@ async def request_password_reset(
 
     if not email_sent:
         # Log for debugging but don't reveal to user
-        logger.warning(f"Failed to send password reset email to {request.email}")
+        logger.warning(f"Failed to send password reset email to {_mask_email(request.email)}")
 
     return ResetPasswordResponse(
         success=True,
@@ -352,10 +367,10 @@ async def confirm_password_reset(
 
     try:
         await db.commit()
-        logger.info(f"Password reset successful for user: {request.email}")
+        logger.info(f"Password reset successful for user: {_mask_email(request.email)}")
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to update password for {request.email}: {e}")
+        logger.error(f"Failed to update password for {_mask_email(request.email)}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to reset password",
@@ -442,7 +457,7 @@ async def send_sms_code(
     # 调试模式下记录验证码（生产环境移除）
     from app.core.config import settings
     if settings.DEBUG:
-        logger.info(f"[DEV] SMS code for {request.phone} ({request.scene}): {code}")
+        logger.info(f"[DEV] SMS code for {_mask_phone(request.phone)} ({request.scene}): {code}")
 
     # 发送短信
     sms_sent = await notification_sms_service.send_verification_code(
@@ -451,7 +466,7 @@ async def send_sms_code(
     )
 
     if not sms_sent:
-        logger.warning(f"Failed to send SMS to {request.phone}")
+        logger.warning(f"Failed to send SMS to {_mask_phone(request.phone)}")
         # 不向用户透露失败详情
 
     return SendSmsCodeResponse(
@@ -528,7 +543,7 @@ async def sms_login(
         await db.commit()
         await db.refresh(user)
 
-        logger.info(f"Auto-registered new user via SMS: {request.phone}")
+        logger.info(f"Auto-registered new user via SMS: {_mask_phone(request.phone)}")
 
     # 检查用户是否激活
     if not user.is_active:
@@ -604,13 +619,13 @@ async def send_verification_email(
     )
 
     if not email_sent:
-        logger.warning(f"Failed to send verification email to {current_user.email}")
+        logger.warning(f"Failed to send verification email to {_mask_email(current_user.email)}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Failed to send verification email. Please try again later.",
         )
 
-    logger.info(f"Verification email sent to {current_user.email}")
+    logger.info(f"Verification email sent to {_mask_email(current_user.email)}")
     return SendVerificationEmailResponse(
         success=True,
         message="Verification email sent. Please check your inbox.",
@@ -690,7 +705,7 @@ async def verify_email(
 
     try:
         await db.commit()
-        logger.info(f"Email verified for user {user_id}: {email}")
+        logger.info(f"Email verified for user {user_id}: {_mask_email(email)}")
     except Exception as e:
         await db.rollback()
         logger.error(f"Failed to verify email for {user_id}: {e}")

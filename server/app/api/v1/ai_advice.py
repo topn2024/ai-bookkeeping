@@ -65,6 +65,20 @@ class FinancialAdviceRequest(BaseModel):
     advice_type: str  # 'budget_warning', 'overspending', 'money_age', 'savings', 'category_insight'
     params: Dict[str, Any]
 
+    # Security: whitelist allowed param keys per advice_type to prevent injection
+    _ALLOWED_PARAMS: Dict[str, set] = {
+        'budget_warning': {'category', 'budget_amount', 'spent_amount', 'remaining_days'},
+        'overspending': {'category', 'budget_amount', 'spent_amount', 'period'},
+        'money_age': {'total_assets', 'monthly_income', 'monthly_expense', 'age'},
+        'savings': {'goal_name', 'target_amount', 'current_amount', 'deadline', 'monthly_income', 'monthly_expense'},
+        'category_insight': {'category', 'amount', 'period', 'trend', 'average'},
+    }
+
+    def get_safe_params(self) -> Dict[str, Any]:
+        """Return only whitelisted params for the given advice_type."""
+        allowed = self._ALLOWED_PARAMS.get(self.advice_type, set())
+        return {k: v for k, v in self.params.items() if k in allowed}
+
 
 class SavingsPlanRequest(BaseModel):
     goal_name: str
@@ -161,18 +175,18 @@ async def generate_financial_advice(
     generator = FinancialAdviceGenerator(llm_service)
 
     advice_type = request.advice_type
-    params = request.params
+    safe_params = request.get_safe_params()
 
     if advice_type == 'budget_warning':
-        result = await generator.generate_budget_warning_advice(**params)
+        result = await generator.generate_budget_warning_advice(**safe_params)
     elif advice_type == 'overspending':
-        result = await generator.generate_overspending_advice(**params)
+        result = await generator.generate_overspending_advice(**safe_params)
     elif advice_type == 'money_age':
-        result = await generator.generate_money_age_advice(**params)
+        result = await generator.generate_money_age_advice(**safe_params)
     elif advice_type == 'savings':
-        result = await generator.generate_savings_advice(**params)
+        result = await generator.generate_savings_advice(**safe_params)
     elif advice_type == 'category_insight':
-        result = await generator.generate_category_insight(**params)
+        result = await generator.generate_category_insight(**safe_params)
     else:
         raise HTTPException(status_code=400, detail=f"Unknown advice type: {advice_type}")
 

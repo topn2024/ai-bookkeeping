@@ -31,8 +31,7 @@ class VoiceTokenResponse(BaseModel):
     asr_rest_url: str = "https://nls-gateway-cn-shanghai.aliyuncs.com/stream/v1/asr"
     # TTS 配置
     tts_url: str = "https://nls-gateway-cn-shanghai.aliyuncs.com/stream/v1/tts"
-    # Picovoice 配置（唤醒词检测）
-    picovoice_access_key: Optional[str] = None
+    # Security: picovoice_access_key removed - permanent API keys must not be sent to clients
 
 
 class TokenCache:
@@ -198,13 +197,13 @@ async def get_voice_token(
     token, expires_at = await _get_alibaba_token()
 
     app_key = getattr(settings, "ALIBABA_NLS_APP_KEY", "")
-    picovoice_key = getattr(settings, "PICOVOICE_ACCESS_KEY", None)
+    # Security: Picovoice key is a permanent API key, do NOT send to clients.
+    # It should be embedded in the app binary or proxied through the server.
 
     return VoiceTokenResponse(
         token=token,
         expires_at=expires_at,
         app_key=app_key,
-        picovoice_access_key=picovoice_key,
     )
 
 

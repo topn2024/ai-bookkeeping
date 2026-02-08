@@ -36,7 +36,10 @@ class Settings(BaseSettings):
     # JWT
     JWT_SECRET_KEY: str = ""  # Required: Set via environment variable
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 120  # 2 hours (use refresh token for renewal)
+
+    # Admin JWT (independent from main app)
+    ADMIN_JWT_SECRET_KEY: str = ""  # Optional: If empty, derived from SECRET_KEY via HMAC
 
     # MinIO
     MINIO_ENDPOINT: str = "localhost:9000"

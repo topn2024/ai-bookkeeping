@@ -944,6 +944,8 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   /// 由 ProactiveConversationManager 触发，统一管理会话超时：
   /// - 连续3次主动话题无回应
   /// - 或30秒总计无响应
+  ///
+  /// 流程：先播放告别消息，然后再停止流水线（确保时序正确）
   Future<void> _handleProactiveSessionTimeout() async {
     debugPrint('[GlobalVoiceAssistant] 处理主动对话会话超时');
 
@@ -965,9 +967,11 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     _isProcessingCommand = false;
     _consecutiveNoResponseCount = 0;
 
+    // 告别消息播放完成后，通知流水线完成停止
+    // 这确保了正确的时序：先播放告别 → 再变成 idle
+    await _pipelineController?.stopAfterFarewell();
+
     // 停止音频录制和清理资源
-    // 注意：VoicePipelineController.stop() 已经在 _handleSessionTimeout 中被调用
-    // 但这里还需要停止 GlobalVoiceAssistantManager 层面的音频录制
     await _cleanupAudioRecording();
 
     notifyListeners();
@@ -2800,6 +2804,24 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   /// 获取是否喜欢主动对话
   bool get likesProactiveChat {
     return _userPreferencesProvider?.getPreferences()?.likesProactiveChat ?? true;
+  }
+
+  // ==================== 应用生命周期 ====================
+
+  /// 应用进入后台时调用
+  ///
+  /// 暂停网络监控等后台任务，节省电量
+  void onAppPaused() {
+    debugPrint('[GlobalVoiceAssistant] 应用进入后台，暂停后台任务');
+    _networkMonitor?.pause();
+  }
+
+  /// 应用回到前台时调用
+  ///
+  /// 恢复网络监控等后台任务
+  void onAppResumed() {
+    debugPrint('[GlobalVoiceAssistant] 应用回到前台，恢复后台任务');
+    _networkMonitor?.resume();
   }
 
   @override

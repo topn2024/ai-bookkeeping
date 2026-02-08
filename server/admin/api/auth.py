@@ -1,4 +1,6 @@
 """Admin authentication endpoints."""
+import logging
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import List, Set
 import time
@@ -18,6 +20,7 @@ from admin.core.security import (
     create_access_token,
     create_refresh_token,
     decode_refresh_token,
+    decode_access_token,
     ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 from admin.core.audit import create_audit_log
@@ -31,12 +34,118 @@ from admin.schemas.auth import (
     PasswordChangeRequest,
 )
 
-# Token blacklist for logout invalidation
-# In production, use Redis with TTL for better scalability
-# Format: {token_jti: expire_timestamp}
-_token_blacklist: dict[str, float] = {}
-_BLACKLIST_CLEANUP_INTERVAL = 300  # Clean up every 5 minutes
+logger = logging.getLogger(__name__)
+
+
+# ============ Redis-based Token Blacklist ============
+# Try to use Redis for token blacklist; fall back to in-memory if unavailable
+
+_redis_client = None
+_redis_available = False
+
+try:
+    import redis.asyncio as aioredis
+    from app.core.config import settings
+
+    _redis_url = getattr(settings, "REDIS_URL", "")
+    if _redis_url:
+        _redis_client = aioredis.from_url(
+            _redis_url,
+            decode_responses=True,
+            socket_connect_timeout=3,
+        )
+        _redis_available = True
+        logger.info("Token blacklist: using Redis backend")
+except Exception as e:
+    logger.warning(f"Token blacklist: Redis unavailable ({e}), falling back to in-memory")
+
+# In-memory fallback (only used when Redis is unavailable)
+_token_blacklist_mem: dict[str, float] = {}
+_BLACKLIST_CLEANUP_INTERVAL = 300
 _last_cleanup_time = time.time()
+_BLACKLIST_PREFIX = "admin:token:blacklist:"
+
+
+async def add_token_to_blacklist(token: str):
+    """将token加入黑名单（优先使用Redis）"""
+    ttl_seconds = ACCESS_TOKEN_EXPIRE_MINUTES * 60
+
+    # 尝试从token中提取JTI作为key
+    payload = decode_access_token(token)
+    blacklist_key = payload.get("jti", token) if payload else token
+
+    if _redis_available and _redis_client:
+        try:
+            await _redis_client.setex(
+                f"{_BLACKLIST_PREFIX}{blacklist_key}",
+                ttl_seconds,
+                "1",
+            )
+            return
+        except Exception as e:
+            logger.warning(f"Redis blacklist write failed: {e}, using in-memory fallback")
+
+    # In-memory fallback
+    _cleanup_blacklist_mem()
+    _token_blacklist_mem[blacklist_key] = time.time() + ttl_seconds
+
+
+async def is_token_blacklisted(token: str) -> bool:
+    """检查token是否在黑名单中"""
+    payload = decode_access_token(token)
+    blacklist_key = payload.get("jti", token) if payload else token
+
+    if _redis_available and _redis_client:
+        try:
+            result = await _redis_client.get(f"{_BLACKLIST_PREFIX}{blacklist_key}")
+            return result is not None
+        except Exception as e:
+            logger.warning(f"Redis blacklist read failed: {e}, using in-memory fallback")
+
+    # In-memory fallback
+    _cleanup_blacklist_mem()
+    if blacklist_key not in _token_blacklist_mem:
+        return False
+    expire_time = _token_blacklist_mem[blacklist_key]
+    if time.time() > expire_time:
+        del _token_blacklist_mem[blacklist_key]
+        return False
+    return True
+
+
+def _cleanup_blacklist_mem():
+    """清理已过期的内存黑名单token"""
+    global _last_cleanup_time
+    current_time = time.time()
+    if current_time - _last_cleanup_time < _BLACKLIST_CLEANUP_INTERVAL:
+        return
+    _last_cleanup_time = current_time
+    expired = [k for k, v in _token_blacklist_mem.items() if current_time > v]
+    for k in expired:
+        del _token_blacklist_mem[k]
+
+
+# ============ IP-based Rate Limiting ============
+
+# IP rate limit: max attempts per window
+_IP_RATE_LIMIT_MAX = 20  # max 20 login attempts per IP per window
+_IP_RATE_LIMIT_WINDOW = 300  # 5-minute window (seconds)
+_ip_attempts: dict[str, list] = defaultdict(list)
+
+
+def _check_ip_rate_limit(ip: str) -> bool:
+    """检查IP是否超过速率限制。返回True表示允许，False表示被限制。"""
+    now = time.time()
+    cutoff = now - _IP_RATE_LIMIT_WINDOW
+
+    # 清理过期记录
+    _ip_attempts[ip] = [t for t in _ip_attempts[ip] if t > cutoff]
+
+    if len(_ip_attempts[ip]) >= _IP_RATE_LIMIT_MAX:
+        return False
+
+    _ip_attempts[ip].append(now)
+    return True
 
 
 router = APIRouter(prefix="/auth", tags=["Admin Auth"])
@@ -54,6 +163,17 @@ async def login(
     db: AsyncSession = Depends(get_db),
 ):
     """管理员登录"""
+    client_ip = _get_client_ip(request)
+
+    # IP级别速率限制
+    if not _check_ip_rate_limit(client_ip):
+        logger.warning(f"IP rate limit exceeded: {client_ip}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="登录尝试过于频繁，请稍后再试",
+            headers={"Retry-After": str(_IP_RATE_LIMIT_WINDOW)},
+        )
+
     # 查询管理员
     result = await db.execute(
         select(AdminUser)
@@ -98,31 +218,34 @@ async def login(
             detail="用户名或密码错误",
         )
 
-    # 检查MFA
+    # 检查MFA - 统一错误信息，避免泄露MFA启用状态
     if admin.mfa_enabled:
         if not login_data.mfa_code:
+            # 不再单独提示"需要MFA验证码"，而是返回统一的认证失败信息
+            # 但通过特定的 error code 让前端知道需要 MFA
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="需要MFA验证码",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="用户名或密码错误",
+                headers={"X-MFA-Required": "true"},
             )
         # 验证MFA码
         if not admin.mfa_secret:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="MFA配置错误，请联系管理员",
+                detail="认证服务异常，请联系管理员",
             )
         totp = pyotp.TOTP(admin.mfa_secret)
         if not totp.verify(login_data.mfa_code, valid_window=1):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="MFA验证码错误或已过期",
+                detail="用户名或密码错误",
             )
 
     # 登录成功，重置失败计数
     admin.failed_login_count = 0
     admin.locked_until = None
     admin.last_login_at = datetime.utcnow()
-    admin.last_login_ip = _get_client_ip(request)
+    admin.last_login_ip = client_ip
     admin.login_count += 1
 
     # 获取权限列表
@@ -225,11 +348,11 @@ async def logout(
 
     await db.commit()
 
-    # 将当前Token加入黑名单
+    # 将当前Token加入黑名单（Redis-backed）
     auth_header = request.headers.get("authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]
-        add_token_to_blacklist(token)
+        await add_token_to_blacklist(token)
 
     return {"message": "登出成功"}
 
@@ -242,11 +365,21 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
 ):
     """修改密码"""
+    from admin.core.security import validate_password_complexity
+
     # 验证旧密码
     if not verify_password(password_data.old_password, current_admin.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="旧密码错误",
+        )
+
+    # 验证新密码复杂度
+    complexity_errors = validate_password_complexity(password_data.new_password)
+    if complexity_errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="密码不符合要求: " + "; ".join(complexity_errors),
         )
 
     # 更新密码
@@ -314,42 +447,3 @@ def _get_client_ip(request: Request) -> str:
         return request.client.host
 
     return "unknown"
-
-
-def _cleanup_blacklist():
-    """清理已过期的黑名单token"""
-    global _last_cleanup_time
-    current_time = time.time()
-
-    if current_time - _last_cleanup_time < _BLACKLIST_CLEANUP_INTERVAL:
-        return
-
-    _last_cleanup_time = current_time
-    expired_tokens = [
-        token for token, expire_time in _token_blacklist.items()
-        if current_time > expire_time
-    ]
-    for token in expired_tokens:
-        del _token_blacklist[token]
-
-
-def add_token_to_blacklist(token: str):
-    """将token加入黑名单"""
-    _cleanup_blacklist()
-    # Token有效期为ACCESS_TOKEN_EXPIRE_MINUTES分钟
-    expire_time = time.time() + ACCESS_TOKEN_EXPIRE_MINUTES * 60
-    _token_blacklist[token] = expire_time
-
-
-def is_token_blacklisted(token: str) -> bool:
-    """检查token是否在黑名单中"""
-    _cleanup_blacklist()
-    if token not in _token_blacklist:
-        return False
-
-    expire_time = _token_blacklist[token]
-    if time.time() > expire_time:
-        del _token_blacklist[token]
-        return False
-
-    return True

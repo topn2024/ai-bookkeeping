@@ -863,7 +863,13 @@
       "Bash(break)",
       "Bash(./scripts/fix_server2_minio_urls.sh:*)",
       "Bash(openspec-cn init:*)",
-      "Bash(/tmp/test_real_user_backup.sh)"
+      "Bash(/tmp/test_real_user_backup.sh)",
+      "Bash(read:*)",
+      "Bash(dart test_iflytek_asr.dart:*)",
+      "WebFetch(domain:www.xfyun.cn)",
+      "WebFetch(domain:gist.github.com)",
+      "Bash(git ls-tree:*)",
+      "Bash(flutter pub:*)"
     ]
   }
 }

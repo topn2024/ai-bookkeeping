@@ -131,6 +131,11 @@ service.interceptors.response.use(
 
       switch (status) {
         case 401:
+          // 检查是否需要 MFA 验证
+          if (response.headers?.['x-mfa-required'] === 'true') {
+            // 不弹出登出对话框，让登录页面处理 MFA 输入
+            break
+          }
           // 已经重试过但仍然失败
           showLogoutDialog()
           break
@@ -145,6 +150,9 @@ service.interceptors.response.use(
           break
         case 422:
           ElMessage.error(data.detail || '请求参数错误')
+          break
+        case 429:
+          ElMessage.error('操作过于频繁，请稍后再试')
           break
         case 500:
           ElMessage.error('服务器内部错误')

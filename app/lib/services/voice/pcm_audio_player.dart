@@ -32,6 +32,9 @@ class PCMAudioPlayer {
   /// 声道数
   int _channelCount = 1;
 
+  /// 音量 (0.0 - 1.0)
+  double _volume = 1.0;
+
   /// AEC参考信号回调
   ///
   /// 每次播放PCM数据时会调用此回调，用于将音频数据传递给AEC
@@ -55,6 +58,30 @@ class PCMAudioPlayer {
 
   /// 是否正在播放
   bool get isPlaying => _isPlaying;
+
+  /// 设置音量 (0.0 - 1.0)
+  void setVolume(double volume) {
+    _volume = volume.clamp(0.0, 1.0);
+    debugPrint('[PCMAudioPlayer] 设置音量: ${(_volume * 100).round()}%');
+  }
+
+  /// 对PCM数据应用音量
+  Uint8List _applyVolume(Uint8List pcmData) {
+    if (_volume >= 0.99) return pcmData; // 接近最大音量，无需处理
+
+    // PCM16是小端格式，每个样本2字节
+    final byteData = ByteData.view(pcmData.buffer, pcmData.offsetInBytes, pcmData.length);
+    final result = Uint8List(pcmData.length);
+    final resultData = ByteData.view(result.buffer);
+
+    for (int i = 0; i < pcmData.length; i += 2) {
+      final sample = byteData.getInt16(i, Endian.little);
+      final adjusted = (sample * _volume).round().clamp(-32768, 32767);
+      resultData.setInt16(i, adjusted, Endian.little);
+    }
+
+    return result;
+  }
 
   /// 初始化播放器
   ///
@@ -216,8 +243,10 @@ class PCMAudioPlayer {
   /// Feed PCM数据到播放器
   Future<void> _feedPCMData(Uint8List pcmData) async {
     try {
+      // 应用音量调节
+      final adjustedData = _applyVolume(pcmData);
       // 将Uint8List转换为PcmArrayInt16
-      final pcmArray = _uint8ListToPcmArray(pcmData);
+      final pcmArray = _uint8ListToPcmArray(adjustedData);
       await FlutterPcmSound.feed(pcmArray);
     } catch (e) {
       debugPrint('[PCMAudioPlayer] Feed数据失败: $e');

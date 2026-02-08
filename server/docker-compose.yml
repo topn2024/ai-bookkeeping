@@ -18,7 +18,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-ai_bookkeeping}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d
@@ -35,7 +35,7 @@ services:
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --appendonly yes
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -54,8 +54,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
     ports:
-      - "9000:9000"   # API
-      - "9001:9001"   # Console
+      - "127.0.0.1:9000:9000"   # API
+      - "127.0.0.1:9001:9001"   # Console
     volumes:
       - minio_data:/data
     healthcheck:
@@ -70,7 +70,7 @@ services:
     container_name: aibook-adminer
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       - postgres
     environment:
