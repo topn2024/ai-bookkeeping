@@ -1,7 +1,7 @@
 """添加数据质量检查表
 
 Revision ID: 20260111_data_quality
-Revises: 20260109_companion_message_library
+Revises: 20260109_companion_msg
 Create Date: 2026-01-11
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '20260111_data_quality'
-down_revision: Union[str, None] = '20260109_companion_message_library'
+down_revision: Union[str, None] = '20260109_companion_msg'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
