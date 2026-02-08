@@ -1,4 +1,6 @@
 """OAuth authentication endpoints for third-party login."""
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +17,8 @@ from app.schemas.oauth import (
 )
 from app.api.deps import get_current_user
 from app.services.oauth_service import OAuthService
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/auth/oauth", tags=["OAuth"])
@@ -70,9 +74,10 @@ async def oauth_login(
         )
     except Exception as e:
         await db.rollback()
+        logger.error(f"OAuth login failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"OAuth authentication failed: {str(e)}",
+            detail="OAuth authentication failed, please try again",
         )
 
 
@@ -115,9 +120,10 @@ async def bind_oauth_account(
         )
     except Exception as e:
         await db.rollback()
+        logger.error(f"OAuth bind failed for provider {provider}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to bind OAuth account: {str(e)}",
+            detail="Failed to bind OAuth account, please try again",
         )
 
 
@@ -152,9 +158,10 @@ async def unbind_oauth_account(
         )
     except Exception as e:
         await db.rollback()
+        logger.error(f"OAuth unbind failed for provider {provider}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to unbind OAuth account: {str(e)}",
+            detail="Failed to unbind OAuth account, please try again",
         )
 
 

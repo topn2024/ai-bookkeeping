@@ -122,13 +122,14 @@ async def push_changes(
                     await savepoint.rollback()
                     raise
             except Exception as e:
+                logger.error(f"Sync push failed for {entity_type}/{change.operation}: {e}", exc_info=True)
                 accepted.append(EntitySyncResult(
                     local_id=change.local_id,
                     server_id=change.server_id or UUID(int=0),
                     entity_type=entity_type,
                     operation=change.operation,
                     success=False,
-                    error=str(e),
+                    error="Failed to process entity",
                 ))
 
     await db.commit()

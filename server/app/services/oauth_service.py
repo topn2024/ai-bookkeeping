@@ -1,6 +1,8 @@
 """OAuth service for third-party login integration."""
+import logging
 import httpx
 import jwt
+from jwt import PyJWKClient
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 from uuid import UUID
@@ -13,6 +15,23 @@ from app.models.user import User
 from app.models.oauth_provider import OAuthProvider, OAuthProviderType
 from app.schemas.oauth import OAuthCallbackData
 from app.services.init_service import init_user_data
+
+logger = logging.getLogger(__name__)
+
+# Apple JWKS client (cached, thread-safe)
+_apple_jwks_client: Optional[PyJWKClient] = None
+
+
+def _get_apple_jwks_client() -> PyJWKClient:
+    """Get or create Apple JWKS client with caching."""
+    global _apple_jwks_client
+    if _apple_jwks_client is None:
+        _apple_jwks_client = PyJWKClient(
+            "https://appleid.apple.com/auth/keys",
+            cache_keys=True,
+            lifespan=3600,
+        )
+    return _apple_jwks_client
 
 
 class OAuthService:
@@ -56,7 +75,8 @@ class OAuthService:
             token_data = token_response.json()
 
             if "errcode" in token_data:
-                raise ValueError(f"WeChat token error: {token_data.get('errmsg', 'Unknown error')}")
+                logger.error(f"WeChat token error: {token_data.get('errmsg', 'Unknown error')}")
+                raise ValueError("WeChat authentication failed")
 
             access_token = token_data["access_token"]
             openid = token_data["openid"]
@@ -74,7 +94,8 @@ class OAuthService:
             userinfo_data = userinfo_response.json()
 
             if "errcode" in userinfo_data:
-                raise ValueError(f"WeChat userinfo error: {userinfo_data.get('errmsg', 'Unknown error')}")
+                logger.error(f"WeChat userinfo error: {userinfo_data.get('errmsg', 'Unknown error')}")
+                raise ValueError("WeChat authentication failed")
 
             return OAuthCallbackData(
                 provider=OAuthProviderType.WECHAT,
@@ -108,16 +129,28 @@ class OAuthService:
             token_result = token_response.json()
 
             if "error" in token_result:
-                raise ValueError(f"Apple token error: {token_result.get('error_description', token_result.get('error'))}")
+                logger.error(f"Apple token error: {token_result.get('error_description', token_result.get('error'))}")
+                raise ValueError("Apple authentication failed")
 
             id_token = token_result["id_token"]
             access_token = token_result.get("access_token")
             refresh_token = token_result.get("refresh_token")
             expires_in = token_result.get("expires_in", 3600)
 
-            # Step 2: Decode ID token to get user info
-            # Note: In production, verify the token signature
-            id_token_payload = jwt.decode(id_token, options={"verify_signature": False})
+            # Step 2: Decode and verify ID token signature using Apple's JWKS
+            try:
+                jwks_client = _get_apple_jwks_client()
+                signing_key = jwks_client.get_signing_key_from_jwt(id_token)
+                id_token_payload = jwt.decode(
+                    id_token,
+                    key=signing_key.key,
+                    algorithms=["RS256"],
+                    audience=settings.APPLE_CLIENT_ID,
+                    issuer="https://appleid.apple.com",
+                )
+            except jwt.InvalidTokenError as e:
+                logger.error(f"Apple ID token verification failed: {e}")
+                raise ValueError("Invalid Apple ID token")
 
             return OAuthCallbackData(
                 provider=OAuthProviderType.APPLE,
@@ -167,7 +200,8 @@ class OAuthService:
             token_result = token_response.json()
 
             if "error" in token_result:
-                raise ValueError(f"Google token error: {token_result.get('error_description', token_result.get('error'))}")
+                logger.error(f"Google token error: {token_result.get('error_description', token_result.get('error'))}")
+                raise ValueError("Google authentication failed")
 
             access_token = token_result["access_token"]
             refresh_token = token_result.get("refresh_token")
@@ -181,7 +215,8 @@ class OAuthService:
             userinfo_data = userinfo_response.json()
 
             if "error" in userinfo_data:
-                raise ValueError(f"Google userinfo error: {userinfo_data.get('error', {}).get('message', 'Unknown error')}")
+                logger.error(f"Google userinfo error: {userinfo_data.get('error', {}).get('message', 'Unknown error')}")
+                raise ValueError("Google authentication failed")
 
             return OAuthCallbackData(
                 provider=OAuthProviderType.GOOGLE,
