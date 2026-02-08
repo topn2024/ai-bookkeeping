@@ -272,7 +272,7 @@ class ImportService {
         .replaceAll(' ', '');
 
     final amount = double.tryParse(cleanValue);
-    if (amount == null) return null;
+    if (amount == null || amount.isNaN || amount.isInfinite) return null;
 
     // 验证金额范围，防止导入异常值
     if (amount > AmountValidator.maxAmount) {

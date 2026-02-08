@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/member.dart';
 
@@ -128,18 +129,25 @@ class InviteLinkInfo {
   }
 
   factory InviteLinkInfo.fromMap(Map<String, dynamic> map) {
+    final roleIndex = map['role'] as int? ?? 0;
+    final typeIndex = map['type'] as int? ?? 0;
+
     return InviteLinkInfo(
-      ledgerId: map['ledgerId'] as String,
-      ledgerName: map['ledgerName'] as String,
-      inviteCode: map['inviteCode'] as String,
-      inviterId: map['inviterId'] as String,
-      inviterName: map['inviterName'] as String,
-      role: MemberRole.values[map['role'] as int],
-      createdAt: DateTime.parse(map['createdAt'] as String),
-      expiresAt: DateTime.parse(map['expiresAt'] as String),
+      ledgerId: map['ledgerId'] as String? ?? '',
+      ledgerName: map['ledgerName'] as String? ?? '',
+      inviteCode: map['inviteCode'] as String? ?? '',
+      inviterId: map['inviterId'] as String? ?? '',
+      inviterName: map['inviterName'] as String? ?? '',
+      role: roleIndex >= 0 && roleIndex < MemberRole.values.length
+          ? MemberRole.values[roleIndex]
+          : MemberRole.editor,
+      createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ?? DateTime.now(),
+      expiresAt: DateTime.tryParse(map['expiresAt'] as String? ?? '') ?? DateTime.now(),
       maxUses: map['maxUses'] as int? ?? 0,
       usedCount: map['usedCount'] as int? ?? 0,
-      type: InviteType.values[map['type'] as int? ?? 0],
+      type: typeIndex >= 0 && typeIndex < InviteType.values.length
+          ? InviteType.values[typeIndex]
+          : InviteType.link,
     );
   }
 
@@ -163,7 +171,8 @@ class InviteLinkInfo {
       if (data['type'] == 'ledger_invite') {
         return data['code'] as String?;
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[QRInvite] QR parse error: $e');
       // 如果不是JSON，尝试解析为URL
       final uri = Uri.tryParse(qrData);
       if (uri != null && uri.pathSegments.isNotEmpty) {
@@ -503,7 +512,9 @@ class QrInviteService {
           );
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[QRInvite] Deep link parse error: $e');
+    }
     return null;
   }
 

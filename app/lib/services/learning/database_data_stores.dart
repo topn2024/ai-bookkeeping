@@ -99,7 +99,9 @@ class DatabaseIntentDataStore implements IntentDataStore {
       if (contextStr != null && contextStr.isNotEmpty) {
         contextJson = jsonDecode(contextStr) as Map<String, dynamic>;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[LearningDB] JSON parse error: $e');
+    }
 
     return IntentLearningData(
       userId: row['userId'] as String,
@@ -226,7 +228,9 @@ class DatabaseAnomalyDataStore implements AnomalyDataStore {
       if (contextStr != null && contextStr.isNotEmpty) {
         contextJson = jsonDecode(contextStr) as Map<String, dynamic>;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[LearningDB] JSON parse error: $e');
+    }
 
     return AnomalyLearningData(
       transactionId: row['transactionId'] as String,

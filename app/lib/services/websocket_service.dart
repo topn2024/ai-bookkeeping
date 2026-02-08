@@ -32,7 +32,7 @@ class WebSocketMessage {
       type: json['type'] as String,
       data: json['data'] as Map<String, dynamic>? ?? {},
       timestamp: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'] as String)
+          ? (DateTime.tryParse(json['timestamp'] as String) ?? DateTime.now())
           : DateTime.now(),
       messageId: json['messageId'] as String?,
     );
@@ -169,6 +169,9 @@ class WebSocketService {
   final Map<String, Completer<WebSocketMessage>> _pendingRequests = {};
   final List<WebSocketMessage> _messageQueue = [];
 
+  /// 消息队列最大容量，防止断网期间无限堆积导致 OOM
+  static const int _maxQueueSize = 500;
+
   WebSocketService({
     required this.config,
     CircuitBreaker? circuitBreaker,
@@ -258,7 +261,11 @@ class WebSocketService {
   /// 发送消息
   Future<void> send(WebSocketMessage message) async {
     if (_state != WebSocketConnectionState.connected) {
-      // 离线时加入队列
+      // 离线时加入队列，超出上限丢弃最旧消息
+      if (_messageQueue.length >= _maxQueueSize) {
+        _messageQueue.removeAt(0);
+        debugPrint('[WebSocket] Message queue full, dropped oldest message');
+      }
       _messageQueue.add(message);
       return;
     }
@@ -266,7 +273,9 @@ class WebSocketService {
     try {
       _socket?.add(jsonEncode(message.toJson()));
     } catch (e) {
-      _messageQueue.add(message);
+      if (_messageQueue.length < _maxQueueSize) {
+        _messageQueue.add(message);
+      }
       _handleError(e);
     }
   }
@@ -291,7 +300,7 @@ class WebSocketService {
     try {
       await send(messageWithId);
       return await completer.future.timeout(timeout);
-    } on TimeoutException {
+    } catch (e) {
       _pendingRequests.remove(messageId);
       rethrow;
     }
@@ -323,7 +332,7 @@ class WebSocketService {
       // 广播消息
       _messageController.add(message);
     } catch (e) {
-      // 解析失败的消息忽略
+      debugPrint('[WebSocket] Message parse error: $e');
     }
   }
 
@@ -394,9 +403,15 @@ class WebSocketService {
   }
 
   void _flushMessageQueue() {
-    while (_messageQueue.isNotEmpty && isConnected) {
-      final message = _messageQueue.removeAt(0);
-      send(message);
+    final pending = List<WebSocketMessage>.from(_messageQueue);
+    _messageQueue.clear();
+    for (var i = 0; i < pending.length; i++) {
+      if (!isConnected) {
+        // 连接断开，将剩余消息放回队列
+        _messageQueue.addAll(pending.sublist(i));
+        break;
+      }
+      send(pending[i]);
     }
   }
 

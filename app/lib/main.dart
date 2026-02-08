@@ -179,11 +179,17 @@ void main() async {
   }
 
   // Initialize global voice assistant
-  try {
-    await GlobalVoiceAssistantManager.instance.initialize();
-    logger.info('Global voice assistant initialized', tag: 'App');
-  } catch (e) {
-    logger.warning('Failed to initialize global voice assistant: $e', tag: 'App');
+  if (VoiceTokenService().isDirectMode || AliyunSpeechConfig.token.isNotEmpty) {
+    try {
+      await GlobalVoiceAssistantManager.instance.initialize();
+      logger.info('Global voice assistant initialized', tag: 'App');
+    } catch (e) {
+      debugPrint('[App] 全局语音助手初始化失败: $e');
+      logger.warning('Failed to initialize global voice assistant: $e', tag: 'App');
+    }
+  } else {
+    debugPrint('[App] 跳过语音助手初始化: NLS Token 未就绪');
+    logger.info('Skipped voice assistant init: NLS Token not ready', tag: 'App');
   }
 
   // Check for app updates (non-blocking)
@@ -245,6 +251,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   // 查询结果事件总线
   final _eventBus = QueryResultEventBus();
 
+  // 多意图确认递归深度保护
+  int _confirmationDepth = 0;
+  static const int _maxConfirmationDepth = 3;
+
   @override
   void initState() {
     super.initState();
@@ -302,17 +312,20 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
         VoiceSessionResult result;
         // 始终使用多意图处理，因为它能更好地处理有分类无金额的情况
-        if (true) {  // 原: if (mightBeMultiple)
-          result = await coordinator.processMultiIntentCommand(command);
-          // 多意图处理后自动确认执行（仅当确实有待确认的多意图时）
-          if (result.status == VoiceSessionStatus.success && coordinator.hasPendingMultiIntent) {
+        result = await coordinator.processMultiIntentCommand(command);
+        // 多意图处理后自动确认执行（仅当确实有待确认的多意图时）
+        if (result.status == VoiceSessionStatus.success &&
+            coordinator.hasPendingMultiIntent &&
+            _confirmationDepth < _maxConfirmationDepth) {
+          _confirmationDepth++;
+          try {
             debugPrint('[App] 多意图识别成功，自动确认执行');
             final confirmResult = await coordinator.confirmMultiIntents();
             debugPrint('[App] 多意图执行结果: ${confirmResult.status} - ${confirmResult.message}');
             result = confirmResult;
+          } finally {
+            _confirmationDepth--;
           }
-        } else {
-          result = await coordinator.processVoiceCommand(command);
         }
 
         debugPrint('[App] 处理完成: ${result.status}');

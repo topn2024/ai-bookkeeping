@@ -90,22 +90,35 @@ class ServerSyncService {
   final _progressController = StreamController<SyncProgress>.broadcast();
   Stream<SyncProgress> get progressStream => _progressController.stream;
 
-  bool _isSyncing = false;
-  bool get isSyncing => _isSyncing;
+  // 同步锁：防止并发同步，后续调用等待同一结果
+  Completer<SyncResult>? _syncCompleter;
+  bool get isSyncing => _syncCompleter != null;
 
   factory ServerSyncService() => _instance;
   ServerSyncService._internal();
 
   /// Perform full sync with server
   Future<SyncResult> performSync() async {
-    if (_isSyncing) {
-      return SyncResult(
-        success: false,
-        errorMessage: '同步正在进行中',
-      );
+    // 如果已有同步在进行中，等待其结果
+    if (_syncCompleter != null) {
+      return _syncCompleter!.future;
     }
+    _syncCompleter = Completer<SyncResult>();
+    try {
+      final result = await _doPerformSync();
+      _syncCompleter!.complete(result);
+      return result;
+    } catch (e) {
+      final err = SyncResult(success: false, errorMessage: e.toString());
+      _syncCompleter!.complete(err);
+      return err;
+    } finally {
+      _syncCompleter = null;
+    }
+  }
 
-    _isSyncing = true;
+  /// 执行实际的同步逻辑
+  Future<SyncResult> _doPerformSync() async {
     int uploaded = 0;
     int downloaded = 0;
     int conflicts = 0;
@@ -162,8 +175,6 @@ class ServerSyncService {
         errors: errors + 1,
         errorMessage: e.toString(),
       );
-    } finally {
-      _isSyncing = false;
     }
   }
 

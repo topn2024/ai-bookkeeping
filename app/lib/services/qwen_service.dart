@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../core/config.dart';
 import '../core/config/config.dart';
 import '../core/logger.dart';
@@ -1117,9 +1118,9 @@ $_categoryPrompt
     try {
       jsonDecode(content);
       return content;
-    } catch (_) {}
-
-    // 尝试提取 {...} 或 [...]
+    } catch (e) {
+      debugPrint('[QwenService] JSON validation error: $e');
+    }
     final jsonMatch = RegExp(r'[\{\[][\s\S]*[\}\]]').firstMatch(content);
     if (jsonMatch != null) {
       return jsonMatch.group(0);

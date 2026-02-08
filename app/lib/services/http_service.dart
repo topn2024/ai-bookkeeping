@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
@@ -21,6 +22,9 @@ class HttpService implements IHttpService {
 
   String? _authToken;
   bool _initialized = false;
+
+  // Token 刷新锁：防止多个并发 401 请求同时刷新 Token
+  Completer<bool>? _refreshCompleter;
 
   // 服务器返回的最低支持版本
   String? _serverMinVersion;
@@ -134,22 +138,18 @@ class HttpService implements IHttpService {
 
   /// 配置 SSL 证书验证
   void _configureSslVerification() {
-    debugPrint('[HttpService] _configureSslVerification called');
-    debugPrint('[HttpService] _skipCertificateVerification: $_skipCertificateVerification');
-    debugPrint('[HttpService] _configService.isInitialized: ${_configService.isInitialized}');
+    if (kDebugMode) {
+      debugPrint('[HttpService] SSL verification disabled (skipCert=$_skipCertificateVerification)');
+    }
 
     // 始终配置跳过证书验证（服务器使用 IP 地址 + 自签名证书）
     _dio.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () {
         final client = HttpClient();
-        client.badCertificateCallback = (cert, host, port) {
-          debugPrint('[HttpService] badCertificateCallback: host=$host, port=$port');
-          return true; // 跳过证书验证
-        };
+        client.badCertificateCallback = (cert, host, port) => true;
         return client;
       },
     );
-    debugPrint('[HttpService] SSL verification disabled');
   }
 
   /// 初始化：从安全存储加载Token
@@ -165,8 +165,27 @@ class HttpService implements IHttpService {
     _initDio();
   }
 
-  /// 尝试刷新Token
+  /// 尝试刷新Token（带并发锁）
   Future<bool> _tryRefreshToken() async {
+    // 如果已有刷新请求在进行中，等待其结果
+    if (_refreshCompleter != null) {
+      return _refreshCompleter!.future;
+    }
+    _refreshCompleter = Completer<bool>();
+    try {
+      final result = await _doRefreshToken();
+      _refreshCompleter!.complete(result);
+      return result;
+    } catch (e) {
+      _refreshCompleter!.complete(false);
+      return false;
+    } finally {
+      _refreshCompleter = null;
+    }
+  }
+
+  /// 执行实际的Token刷新逻辑
+  Future<bool> _doRefreshToken() async {
     final refreshToken = await _secureStorage.getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) return false;
 
@@ -208,8 +227,16 @@ class HttpService implements IHttpService {
         }
         return true;
       }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+        await setAuthToken(null);
+        await _secureStorage.deleteRefreshToken();
+        debugPrint('[HttpService] Token refresh auth failed, cleared tokens');
+      } else {
+        debugPrint('[HttpService] Token refresh network error: ${e.type}');
+      }
     } catch (e) {
-      // 刷新失败，需要重新登录
+      debugPrint('[HttpService] Token refresh unexpected error: $e');
     }
     return false;
   }
@@ -258,10 +285,9 @@ class HttpService implements IHttpService {
 
   @override
   Future<Response> post(String path, {dynamic data}) async {
-    debugPrint('[HttpService] POST $path');
-    debugPrint('[HttpService] baseUrl: $baseUrl');
-    debugPrint('[HttpService] skipCertVerification: $_skipCertificateVerification');
-    debugPrint('[HttpService] configService.isInitialized: ${_configService.isInitialized}');
+    if (kDebugMode) {
+      debugPrint('[HttpService] POST $path');
+    }
     return await _dio.post(path, data: data);
   }
 

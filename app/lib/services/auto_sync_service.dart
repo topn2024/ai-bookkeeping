@@ -26,7 +26,8 @@ class AutoSyncService {
 
   // 同步状态
   bool _isInitialized = false;
-  bool _isSyncing = false;
+  // 同步锁：防止并发同步
+  Completer<SyncResult?>? _syncCompleter;
   bool _isOnline = true;
   sync_models.SyncSettings _settings = const sync_models.SyncSettings();
 
@@ -39,7 +40,7 @@ class AutoSyncService {
 
   // 同步防抖
   Timer? _syncDebounceTimer;
-  static const Duration _syncDebounceDelay = Duration(seconds: 2);
+  static const Duration _syncDebounceDelay = Duration(seconds: 5);
 
   // 网络监听
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -130,8 +131,8 @@ class AutoSyncService {
 
   /// 执行同步
   Future<SyncResult?> performSync({bool force = false}) async {
-    // 检查是否可以同步
-    if (_isSyncing) return null;
+    // 如果已有同步在进行中，等待其结果
+    if (_syncCompleter != null) return _syncCompleter!.future;
     if (!_isOnline && !force) {
       _syncStatusController.add(sync_models.SyncStatus.offline);
       return null;
@@ -139,7 +140,7 @@ class AutoSyncService {
     if (!_settings.enabled && !force) return null;
     if (!_settings.syncPrivateData && !force) return null;
 
-    _isSyncing = true;
+    _syncCompleter = Completer<SyncResult?>();
     _syncStatusController.add(sync_models.SyncStatus.syncing);
 
     try {
@@ -149,23 +150,27 @@ class AutoSyncService {
         _currentRetryCount = 0;
         _retryTimer?.cancel();
         _syncStatusController.add(sync_models.SyncStatus.success);
+        _syncCompleter!.complete(result);
         return result;
       } else {
         // 同步失败，安排重试
         _scheduleRetry();
         _syncStatusController.add(sync_models.SyncStatus.failed);
+        _syncCompleter!.complete(result);
         return result;
       }
     } catch (e) {
       // 同步异常，安排重试
       _scheduleRetry();
       _syncStatusController.add(sync_models.SyncStatus.failed);
-      return SyncResult(
+      final result = SyncResult(
         success: false,
         errorMessage: e.toString(),
       );
+      _syncCompleter!.complete(result);
+      return result;
     } finally {
-      _isSyncing = false;
+      _syncCompleter = null;
     }
   }
 
@@ -244,7 +249,7 @@ class AutoSyncService {
   bool get isOnline => _isOnline;
 
   /// 是否正在同步
-  bool get isSyncing => _isSyncing;
+  bool get isSyncing => _syncCompleter != null;
 
   /// 释放资源
   void dispose() {

@@ -53,7 +53,8 @@ class OfflineQueueService {
   final _uuid = const Uuid();
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-  bool _isProcessing = false;
+  // 队列处理锁：防止并发处理
+  Completer<ProcessResult>? _processCompleter;
   bool _isOnline = true;
 
   factory OfflineQueueService() => _instance;
@@ -127,20 +128,16 @@ class OfflineQueueService {
     );
 
     // Try to process immediately if online
-    if (_isOnline && !_isProcessing) {
+    if (_isOnline && _processCompleter == null) {
       await processQueue();
     }
   }
 
   /// Process all pending queue items
   Future<ProcessResult> processQueue() async {
-    if (_isProcessing) {
-      return ProcessResult(
-        success: false,
-        processed: 0,
-        failed: 0,
-        message: '队列正在处理中',
-      );
+    // 如果已有处理在进行中，等待其结果
+    if (_processCompleter != null) {
+      return _processCompleter!.future;
     }
 
     if (!_isOnline) {
@@ -152,7 +149,7 @@ class OfflineQueueService {
       );
     }
 
-    _isProcessing = true;
+    _processCompleter = Completer<ProcessResult>();
     int processed = 0;
     int failed = 0;
 
@@ -171,20 +168,24 @@ class OfflineQueueService {
       // Clean up completed items
       await _db.deleteCompletedSyncQueue();
 
-      return ProcessResult(
+      final result = ProcessResult(
         success: true,
         processed: processed,
         failed: failed,
       );
+      _processCompleter!.complete(result);
+      return result;
     } catch (e) {
-      return ProcessResult(
+      final result = ProcessResult(
         success: false,
         processed: processed,
         failed: failed,
         message: e.toString(),
       );
+      _processCompleter!.complete(result);
+      return result;
     } finally {
-      _isProcessing = false;
+      _processCompleter = null;
     }
   }
 
