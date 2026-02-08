@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 
 from app.core.database import get_db
+from app.core.timezone import beijing_now_naive
 from app.models.user import User
 from app.models.book import Book, BookMember, FamilyBudget, MemberBudget, FamilySavingGoal, GoalContribution, TransactionSplit, SplitParticipant
 from app.models.account import Account
@@ -278,6 +279,19 @@ async def push_changes(
             changes_by_type[change.entity_type] = []
         changes_by_type[change.entity_type].append(change)
 
+    # Report errors for unknown entity types (not in ordered_types)
+    for entity_type, changes in changes_by_type.items():
+        if entity_type not in ordered_types:
+            for change in changes:
+                accepted.append(EntitySyncResult(
+                    local_id=change.local_id,
+                    server_id=change.server_id or UUID(int=0),
+                    entity_type=entity_type,
+                    operation=change.operation,
+                    success=False,
+                    error=f"Unknown entity type: {entity_type}",
+                ))
+
     for entity_type in ordered_types:
         if entity_type not in changes_by_type:
             continue
@@ -322,7 +336,7 @@ async def push_changes(
     return SyncPushResponse(
         accepted=accepted,
         conflicts=conflicts,
-        server_time=datetime.utcnow(),
+        server_time=beijing_now_naive(),
     )
 
 
@@ -367,7 +381,7 @@ async def _check_conflict(
                 local_data=change.data,
                 server_data={},
                 local_updated_at=change.local_updated_at,
-                server_updated_at=datetime.utcnow(),
+                server_updated_at=beijing_now_naive(),
                 conflict_type="deleted_on_server",
             )
         return None
@@ -901,9 +915,11 @@ async def _handle_update(
     if not model:
         raise ValueError(f"Unknown entity type: {entity_type}")
 
-    # Get existing entity
+    # Get existing entity (lock row for transaction updates to prevent concurrent balance corruption)
     query = select(model).where(model.id == change.server_id)
     query = _apply_user_filter(query, model, entity_type, user)
+    if entity_type == "transaction":
+        query = query.with_for_update()
 
     result = await db.execute(query)
     entity = result.scalar_one_or_none()
@@ -917,6 +933,16 @@ async def _handle_update(
 
     # Apply updates (Local-first: always use client data)
     data = change.data
+    # Protected fields that clients cannot modify
+    _protected_fields = {
+        'id', 'user_id', 'created_at', 'updated_at', 'is_system', 'created_by', 'invited_by',
+        # Server-computed aggregate fields
+        'is_fully_consumed', 'consumption_count',  # ResourcePool
+        'visit_count', 'total_spent',  # FrequentLocation
+        'current_amount',  # FamilySavingGoal (should be updated via contributions)
+        'spent',  # MemberBudget (should be updated via transactions)
+        'used_count',  # BookInvitation
+    }
     # Map FK field names to their verification functions
     _fk_verifiers = {
         'book_id': _verify_book_ownership,
@@ -936,14 +962,13 @@ async def _handle_update(
         'income_category_id': _verify_category_ownership,
     }
     for key, value in data.items():
-        if hasattr(entity, key) and key not in ['id', 'user_id', 'created_at', 'updated_at', 'is_system', 'created_by']:
+        if hasattr(entity, key) and key not in _protected_fields:
             # Handle special types
             # UUID fields - verify FK ownership
             if key in ['book_id', 'account_id', 'target_account_id', 'category_id', 'parent_id',
                        'resource_pool_id', 'income_transaction_id', 'expense_transaction_id',
                        'family_budget_id', 'goal_id', 'transaction_id', 'split_id',
-                       'linked_category_id', 'default_category_id', 'income_category_id',
-                       'invited_by'] and value:
+                       'linked_category_id', 'default_category_id', 'income_category_id'] and value:
                 verifier = _fk_verifiers.get(key)
                 if verifier:
                     value = await verifier(db, user, value)
@@ -1034,7 +1059,7 @@ async def _update_account_balance_on_create(
         if transaction.transaction_type == 1:  # Expense
             account.balance -= transaction.amount + transaction.fee
         elif transaction.transaction_type == 2:  # Income
-            account.balance += transaction.amount
+            account.balance += transaction.amount - transaction.fee
         elif transaction.transaction_type == 3:  # Transfer
             account.balance -= transaction.amount + transaction.fee
             if transaction.target_account_id:
@@ -1061,7 +1086,7 @@ async def _revert_account_balance(
         if transaction.transaction_type == 1:  # Expense
             account.balance += transaction.amount + transaction.fee
         elif transaction.transaction_type == 2:  # Income
-            account.balance -= transaction.amount
+            account.balance -= transaction.amount - transaction.fee
         elif transaction.transaction_type == 3:  # Transfer
             account.balance += transaction.amount + transaction.fee
             if transaction.target_account_id:
@@ -1123,7 +1148,7 @@ async def pull_changes(
 
     return SyncPullResponse(
         changes=changes,
-        server_time=datetime.utcnow(),
+        server_time=beijing_now_naive(),
         has_more=has_more,
     )
 
@@ -1389,6 +1414,20 @@ def _entity_to_dict(entity, entity_type: str) -> Dict[str, Any]:
             "is_primary": entity.is_primary,
             "is_enabled": entity.is_enabled,
         }
+    else:
+        # Generic fallback: serialize all columns for unknown entity types
+        for column in entity.__table__.columns:
+            if column.name in ('id', 'user_id'):
+                continue
+            value = getattr(entity, column.name)
+            if value is not None:
+                if isinstance(value, UUID):
+                    value = str(value)
+                elif isinstance(value, Decimal):
+                    value = str(value)
+                elif hasattr(value, 'isoformat'):
+                    value = value.isoformat()
+            data[column.name] = value
 
     return data
 
@@ -1409,7 +1448,7 @@ async def get_sync_status(
         entity_counts[entity_type] = result.scalar() or 0
 
     return SyncStatusResponse(
-        server_time=datetime.utcnow(),
+        server_time=beijing_now_naive(),
         entity_counts=entity_counts,
         last_sync_times={},  # TODO: Track per-device sync times
         pending_conflicts=0,
