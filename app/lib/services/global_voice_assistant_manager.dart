@@ -285,6 +285,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   // ASR输入静音（TTS播放期间停止向ASR发送音频，防止回声）
   bool _isMutingASRInput = false;
 
+  // 上次LLM可用性检测结果（用于减少日志）
+  bool? _lastLlmAvailability;
+
   // 权限回调（由 UI 层设置）
   void Function(MicrophonePermissionStatus status)? onPermissionRequired;
 
@@ -706,7 +709,11 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
 
       // 1. 检查API Key是否配置
       if (!qwenService.isAvailable) {
-        debugPrint('[GlobalVoiceAssistant] LLM不可用: API Key未配置');
+        final isAvailable = false;
+        if (_lastLlmAvailability != isAvailable) {
+          debugPrint('[GlobalVoiceAssistant] LLM可用性检测: $isAvailable (API Key未配置)');
+          _lastLlmAvailability = isAvailable;
+        }
         return false;
       }
 
@@ -718,10 +725,19 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       );
 
       final isAvailable = result != null && result.isNotEmpty;
-      debugPrint('[GlobalVoiceAssistant] LLM可用性检测: $isAvailable');
+      // 只在状态变化时记录日志
+      if (_lastLlmAvailability != isAvailable) {
+        debugPrint('[GlobalVoiceAssistant] LLM可用性检测: $isAvailable');
+        _lastLlmAvailability = isAvailable;
+      }
       return isAvailable;
     } catch (e) {
-      debugPrint('[GlobalVoiceAssistant] LLM可用性检测失败: $e');
+      final isAvailable = false;
+      // 只在状态变化时记录日志
+      if (_lastLlmAvailability != isAvailable) {
+        debugPrint('[GlobalVoiceAssistant] LLM可用性检测失败: $e');
+        _lastLlmAvailability = isAvailable;
+      }
       return false;
     }
   }

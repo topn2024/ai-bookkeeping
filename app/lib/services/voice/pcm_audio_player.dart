@@ -91,6 +91,9 @@ class PCMAudioPlayer {
   ///
   /// [sampleRate] 采样率，默认16000（与ASR一致）
   /// [channelCount] 声道数，默认1（单声道）
+  ///
+  /// 注意：初始化后不会立即启动AudioTrack，只有在实际播放时才会start()
+  /// 这样可以避免AudioTrack_Buffer_Timeout错误
   Future<void> initialize({
     int sampleRate = 16000,
     int channelCount = 1,
@@ -107,7 +110,7 @@ class PCMAudioPlayer {
       // 设置日志级别
       await FlutterPcmSound.setLogLevel(LogLevel.error);
 
-      // 初始化音频
+      // 初始化音频配置（不启动AudioTrack）
       await FlutterPcmSound.setup(
         sampleRate: sampleRate,
         channelCount: channelCount,
@@ -120,6 +123,7 @@ class PCMAudioPlayer {
 
       _isInitialized = true;
       debugPrint('[PCMAudioPlayer] 初始化成功 (sampleRate=$sampleRate, channels=$channelCount)');
+      debugPrint('[PCMAudioPlayer] AudioTrack将在首次播放时启动，避免Buffer_Timeout错误');
     } catch (e) {
       debugPrint('[PCMAudioPlayer] 初始化失败: $e');
       rethrow;
@@ -192,9 +196,6 @@ class PCMAudioPlayer {
 
     debugPrint('[PCMAudioPlayer] 播放PCM数据: ${pcmData.length}字节');
 
-    _isPlaying = true;
-    _stateController.add(PCMPlayerState.playing);
-
     // 如果有正在等待的Completer，先完成它（防止永久挂起）
     if (_playCompleter != null && !_playCompleter!.isCompleted) {
       _playCompleter!.complete();
@@ -210,8 +211,13 @@ class PCMAudioPlayer {
     // Feed数据到播放器
     await _feedPCMData(pcmData);
 
-    // 启动播放
-    FlutterPcmSound.start();
+    // 只在实际有数据时才启动AudioTrack，避免Buffer_Timeout错误
+    if (!_isPlaying) {
+      _isPlaying = true;
+      _stateController.add(PCMPlayerState.playing);
+      debugPrint('[PCMAudioPlayer] 启动AudioTrack开始播放');
+      FlutterPcmSound.start();
+    }
 
     // 等待播放完成（使用本地引用确保等待正确的Completer）
     await completer.future;
@@ -235,10 +241,13 @@ class PCMAudioPlayer {
 
     // 如果没有在播放，开始播放
     if (!_isPlaying) {
-      _isPlaying = true;
-      _stateController.add(PCMPlayerState.playing);
       _playCompleter = Completer<void>();
       await _feedNextChunk();
+
+      // 只在有数据feed后才启动AudioTrack
+      _isPlaying = true;
+      _stateController.add(PCMPlayerState.playing);
+      debugPrint('[PCMAudioPlayer] 启动AudioTrack开始流式播放');
       FlutterPcmSound.start();
     }
   }

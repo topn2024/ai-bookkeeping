@@ -61,7 +61,7 @@ void main() async {
   // Log app startup
   logger.info('Application started', tag: 'App');
 
-  // Initialize service locator (dependency injection)
+  // Initialize service locator (dependency injection) - 核心依赖，必须同步初始化
   try {
     await initServiceLocator();
     logger.info('Service locator initialized', tag: 'App');
@@ -70,6 +70,17 @@ void main() async {
     rethrow; // 服务定位器是核心依赖，初始化失败应终止启动
   }
 
+  // 启动应用，其他初始化延迟到首帧后执行
+  runApp(const ProviderScope(child: MyApp()));
+
+  // 延迟执行重的初始化操作，避免阻塞主线程
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _initializeHeavyServices();
+  });
+}
+
+/// 延迟初始化重的服务，避免阻塞主线程
+Future<void> _initializeHeavyServices() async {
   // Initialize app configuration from server
   try {
     await AppConfigService().initialize();
@@ -205,8 +216,6 @@ void main() async {
   }).catchError((e) {
     logger.warning('Failed to check for updates: $e', tag: 'App');
   });
-
-  runApp(const ProviderScope(child: MyApp()));
 }
 
 /// 初始化默认账本（用于未登录用户）

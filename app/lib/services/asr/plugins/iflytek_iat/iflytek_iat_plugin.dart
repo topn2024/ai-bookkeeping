@@ -106,11 +106,22 @@ class IFlytekIATPlugin extends ASRPluginBase {
       Stream<Uint8List> audioStream) async* {
     debugPrint('[IFlytekIATPlugin] transcribeStream 开始');
 
-    // 防止并发
+    // 防止并发 - 始终清理旧连接
     if (state == ASRPluginState.recognizing) {
       debugPrint('[IFlytekIATPlugin] 取消之前的识别');
       await cancelTranscription();
       await Future.delayed(const Duration(milliseconds: 100));
+    }
+
+    // 确保旧的WebSocket连接已完全关闭
+    if (_webSocketChannel != null) {
+      debugPrint('[IFlytekIATPlugin] 清理旧的WebSocket连接');
+      try {
+        await _webSocketChannel?.sink.close();
+      } catch (e) {
+        debugPrint('[IFlytekIATPlugin] 关闭旧连接时出错（已忽略）: $e');
+      }
+      _webSocketChannel = null;
     }
 
     _currentSessionId++;
@@ -248,12 +259,15 @@ class IFlytekIATPlugin extends ASRPluginBase {
     } catch (e) {
       debugPrint('[IFlytekIATPlugin] 识别异常: $e');
       if (!controller.isClosed) {
-        controller.addError(ASRException(
+        final error = ASRException(
           '识别异常: $e',
           errorCode: ASRErrorCode.unknown,
-        ));
+        );
+        controller.addError(error);
+        controller.close();
       }
-      rethrow;
+      // Don't rethrow - error is already in the stream
+      return;
     } finally {
       markCompleted();
       await _webSocketChannel?.sink.close();
@@ -403,11 +417,25 @@ class IFlytekIATPlugin extends ASRPluginBase {
     debugPrint('[IFlytekIATPlugin] cancelTranscription');
     _isCancelled = true;
 
-    await _webSocketChannel?.sink.close();
-    _webSocketChannel = null;
+    // 安全关闭WebSocket连接
+    if (_webSocketChannel != null) {
+      try {
+        await _webSocketChannel?.sink.close();
+      } catch (e) {
+        debugPrint('[IFlytekIATPlugin] 关闭WebSocket时出错（已忽略）: $e');
+      }
+      _webSocketChannel = null;
+    }
 
-    _streamController?.close();
-    _streamController = null;
+    // 安全关闭StreamController
+    if (_streamController != null && !_streamController!.isClosed) {
+      try {
+        _streamController?.close();
+      } catch (e) {
+        debugPrint('[IFlytekIATPlugin] 关闭StreamController时出错（已忽略）: $e');
+      }
+      _streamController = null;
+    }
 
     state = ASRPluginState.idle;
   }
