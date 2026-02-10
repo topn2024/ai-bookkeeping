@@ -1139,6 +1139,8 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         // 如果是离线模式（LLM超时降级），直接返回友好提示，避免再次调用LLM
         if (llmResult.isOfflineMode) {
           const offlineResponse = '网络不太好，我现在只能帮你记账。有什么需要记录的吗？';
+          _sessionState = VoiceSessionState.idle;
+          notifyListeners();
           await _speakWithSkipCheck(offlineResponse);
           return VoiceSessionResult.success(offlineResponse, {
             'isOfflineMode': true,
@@ -1148,6 +1150,8 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         // 直接使用第一次LLM返回的闲聊回复，避免重复调用LLM
         final chatResponse = llmResult.chatContent ?? '有什么我能帮你的吗？';
         debugPrint('[VoiceCoordinator] 直接使用LLM闲聊回复，跳过重复调用: ${chatResponse.length}字');
+        _sessionState = VoiceSessionState.idle;
+        notifyListeners();
         await _speakWithSkipCheck(chatResponse);
         return VoiceSessionResult.success(chatResponse);
       }
@@ -1195,6 +1199,13 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       _sessionState = VoiceSessionState.error;
       notifyListeners();
       return VoiceSessionResult.error('处理多意图命令失败: $e');
+    } finally {
+      // 安全网：如果状态仍然是 processing，说明某个分支忘记重置状态
+      if (_sessionState == VoiceSessionState.processing) {
+        debugPrint('[VoiceCoordinator] ⚠️ processMultiIntentCommand 结束时状态仍为 processing，强制重置为 idle');
+        _sessionState = VoiceSessionState.idle;
+        notifyListeners();
+      }
     }
   }
 

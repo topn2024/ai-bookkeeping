@@ -1253,6 +1253,46 @@ class VoicePipelineController {
     await _stopAfterFarewellInternal();
   }
 
+  /// 通过 OutputPipeline 播放告别消息并停止流水线
+  ///
+  /// 与直接调用 TTS 不同，此方法通过 OutputPipeline 播放，确保：
+  /// 1. 状态切换到 speaking（ASR 不再处理音频）
+  /// 2. AEC 正确启用（AudioProcessorService.setTTSPlaying(true)）
+  /// 3. AEC 参考信号正确发送（feedTTSAudio）
+  /// 这样可以防止 TTS 回声被 ASR 识别为用户输入
+  Future<void> playFarewellAndStop(String farewell) async {
+    if (_isDisposed || _state == VoicePipelineState.idle || _state == VoicePipelineState.stopping) {
+      return;
+    }
+
+    _proactiveManager.stopMonitoring();
+
+    // 用 Completer 等待播放完成
+    final completer = Completer<void>();
+
+    // 保存原始回调
+    final originalOnCompleted = _outputPipeline.onCompleted;
+
+    // 设置一次性回调：播放完成后恢复原始回调并停止
+    _outputPipeline.onCompleted = () {
+      _outputPipeline.onCompleted = originalOnCompleted;
+      completer.complete();
+    };
+
+    // 通过 OutputPipeline 播放（复用主动消息路径）
+    final responseId = _responseTracker.startNewResponse();
+    _outputPipeline.start(responseId);
+    _setState(VoicePipelineState.speaking);
+    _outputPipeline.addChunk(farewell);
+    _outputPipeline.complete();
+
+    // 等待播放完成（10秒超时兜底，防止永久阻塞）
+    await completer.future.timeout(Duration(seconds: 10), onTimeout: () {});
+
+    // 停止流水线
+    await _stopAfterFarewellInternal();
+  }
+
   /// 内部停止方法
   Future<void> _stopAfterFarewellInternal() async {
     debugPrint('[VoicePipelineController] 告别完成，执行停止');

@@ -980,21 +980,12 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     );
     _addAssistantMessage(farewell);
 
-    // 播放告别消息
-    try {
-      await _streamingTtsService?.speak(farewell);
-      debugPrint('[GlobalVoiceAssistant] 告别消息播放完成');
-    } catch (e) {
-      debugPrint('[GlobalVoiceAssistant] 播放告别消息失败: $e');
-    }
+    // 通过流水线播放告别消息并停止（确保 AEC 和状态管理正确）
+    await _pipelineController?.playFarewellAndStop(farewell);
 
     // 重置状态
     _isProcessingCommand = false;
     _consecutiveNoResponseCount = 0;
-
-    // 告别消息播放完成后，通知流水线完成停止
-    // 这确保了正确的时序：先播放告别 → 再变成 idle
-    await _pipelineController?.stopAfterFarewell();
 
     // 停止音频录制和清理资源
     await _cleanupAudioRecording();
