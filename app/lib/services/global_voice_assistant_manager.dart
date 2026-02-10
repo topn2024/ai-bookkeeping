@@ -2702,16 +2702,15 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
     // 调试：追踪消息来源，打印调用堆栈
     debugPrint('[GlobalVoiceAssistant] 添加消息: type=${message.type}, content="${message.content}"');
 
-    // 检查是否有重复消息（仅日志，不阻止）
+    // 检查是否有重复消息（5秒内相同类型和内容的消息）
     final recentDuplicate = _conversationHistory.where((m) =>
         m.type == message.type &&
         m.content == message.content &&
         DateTime.now().difference(m.timestamp).inSeconds < 5).toList();
     if (recentDuplicate.isNotEmpty) {
-      debugPrint('[GlobalVoiceAssistant] ⚠️ 检测到5秒内的重复消息！');
+      debugPrint('[GlobalVoiceAssistant] ⚠️ 检测到5秒内的重复消息，已阻止！');
       debugPrint('[GlobalVoiceAssistant] 已有消息时间: ${recentDuplicate.map((m) => m.timestamp).join(", ")}');
-      debugPrint('[GlobalVoiceAssistant] 调用堆栈:');
-      debugPrint(StackTrace.current.toString().split('\n').take(15).join('\n'));
+      return; // 阻止重复消息
     }
 
     _conversationHistory.add(message);
