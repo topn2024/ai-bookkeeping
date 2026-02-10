@@ -36,7 +36,7 @@ class _TodayAllowancePageState extends ConsumerState<TodayAllowancePage> {
 
     // 计算今日可支出额度（使用本月收入作为基准）
     final budgetRemaining = monthlyIncome - monthlyExpense;
-    final dailyAllowance = budgetRemaining > 0
+    final dailyAllowance = budgetRemaining > 0 && daysRemaining > 0
         ? budgetRemaining / daysRemaining
         : 0.0;
     final todayRemaining = dailyAllowance - todayExpense;
