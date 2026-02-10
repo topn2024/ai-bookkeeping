@@ -18,6 +18,7 @@ import 'today_allowance_page.dart';
 import 'money_age_page.dart';
 import 'budget_center_page.dart';
 import 'zero_based_budget_page.dart';
+import 'import/smart_import_page.dart';
 import '../services/feature_guide_service.dart';
 import '../models/guide_step.dart';
 import '../providers/feature_guide_provider.dart';
@@ -945,12 +946,27 @@ class _HomePageState extends ConsumerState<HomePage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              TextButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const TransactionListPage()),
-                ),
-                child: Text(context.l10n.viewAll),
+              Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SmartImportPage()),
+                    ),
+                    icon: const Icon(Icons.download_rounded, size: 16),
+                    label: const Text('智能导入'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TransactionListPage()),
+                    ),
+                    child: Text(context.l10n.viewAll),
+                  ),
+                ],
               ),
             ],
           ),
