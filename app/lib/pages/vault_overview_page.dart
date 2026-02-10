@@ -5,10 +5,10 @@ import '../models/budget_vault.dart';
 import '../providers/budget_vault_provider.dart';
 import '../theme/app_theme.dart';
 import 'vault_detail_page.dart';
-import 'vault_create_page.dart';
 import 'vault_allocation_page.dart';
 import 'vault_health_page.dart';
 import 'vault_ai_suggestion_page.dart';
+import 'zero_based_budget_page.dart';
 
 /// 小金库概览页面
 /// 原型设计 3.01：小金库概览
@@ -41,7 +41,9 @@ class VaultOverviewPage extends ConsumerWidget {
                             child: Column(
                               children: [
                                 _buildTotalCard(context, theme, vaultState),
-                                if (vaultState.hasUnallocated)
+                                if (vaultState.totalAllocated == 0)
+                                  _buildZeroBudgetBanner(context, theme)
+                                else if (vaultState.hasUnallocated)
                                   _buildUnallocatedBanner(
                                       context, theme, vaultState),
                                 _buildVaultList(context, theme, vaultState, ref),
@@ -123,6 +125,20 @@ class VaultOverviewPage extends ConsumerWidget {
               height: 40,
               alignment: Alignment.center,
               child: Icon(Icons.auto_awesome,
+                  color: theme.colorScheme.primary),
+            ),
+          ),
+          // 预算分配按钮
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ZeroBasedBudgetPage()),
+            ),
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              child: Icon(Icons.account_balance_wallet,
                   color: theme.colorScheme.primary),
             ),
           ),
@@ -272,6 +288,55 @@ class VaultOverviewPage extends ConsumerWidget {
               ),
               child: const Text(
                 '去分配',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 零基预算未配置引导横幅
+  Widget _buildZeroBudgetBanner(BuildContext context, ThemeData theme) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ZeroBasedBudgetPage()),
+      ),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE3F2FD),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.account_balance_wallet, color: theme.colorScheme.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '配置零基预算，让每一分钱都有去处',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Text(
+                '去配置',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -544,17 +609,15 @@ class VaultOverviewPage extends ConsumerWidget {
   }
 
   Future<void> _navigateToCreate(BuildContext context, WidgetRef ref) async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const VaultCreatePage(),
+        builder: (context) => const ZeroBasedBudgetPage(),
       ),
     );
 
-    // Force refresh if vault was created successfully
-    if (result == true) {
-      await ref.read(budgetVaultProvider.notifier).refresh();
-    }
+    // 从零基预算页面返回后刷新数据
+    await ref.read(budgetVaultProvider.notifier).refresh();
   }
 
   void _showDepositDialog(BuildContext context, WidgetRef ref) {

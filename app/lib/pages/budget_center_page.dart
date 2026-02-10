@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/budget_vault_provider.dart';
-import 'vault_create_page.dart';
+import 'zero_based_budget_page.dart';
 import 'vault_detail_page.dart';
 import 'reports/budget_report_page.dart';
 import 'transaction_list_page.dart';
@@ -205,13 +205,13 @@ class _BudgetCenterPageState extends ConsumerState<BudgetCenterPage> {
               ),
               TextButton.icon(
                 onPressed: () async {
-                  final result = await Navigator.push(
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const VaultCreatePage(),
+                      builder: (context) => const ZeroBasedBudgetPage(),
                     ),
                   );
-                  if (result == true && mounted) {
+                  if (mounted) {
                     ref.invalidate(budgetVaultProvider);
                   }
                 },

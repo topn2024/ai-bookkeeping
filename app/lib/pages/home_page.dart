@@ -17,6 +17,7 @@ import 'add_transaction_page.dart';
 import 'today_allowance_page.dart';
 import 'money_age_page.dart';
 import 'budget_center_page.dart';
+import 'zero_based_budget_page.dart';
 import '../services/feature_guide_service.dart';
 import '../models/guide_step.dart';
 import '../providers/feature_guide_provider.dart';
@@ -748,16 +749,49 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
           const SizedBox(height: 8),
           if (displayVaults.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(
-                  '暂无小金库设置',
-                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ZeroBasedBudgetPage()),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3F2FD),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.account_balance_wallet, color: theme.colorScheme.primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '配置零基预算，让每一分钱都有去处',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Text(
+                        '去配置',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             )

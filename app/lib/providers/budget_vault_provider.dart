@@ -91,8 +91,8 @@ class BudgetVaultState {
 
 /// 小金库状态管理 Provider
 class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
-  late final IDatabaseService _db;
-  late final AllocationService _allocationService;
+  late IDatabaseService _db;
+  late AllocationService _allocationService;
 
   String _currentLedgerId = 'default';
 
@@ -186,13 +186,15 @@ class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
 
       // 更新每个小金库的spentAmount
       final updatedVaults = <BudgetVault>[];
+      // 全局已匹配分类集合，防止同一分类被多个金库重复计算
+      final globalMatchedCategories = <String>{};
       for (final vault in vaults) {
         // 根据小金库名称匹配分类支出
         double totalSpent = 0;
         final matchedCategories = <String>[];
 
         // 1. 完全匹配
-        if (spendingByCategory.containsKey(vault.name)) {
+        if (spendingByCategory.containsKey(vault.name) && !globalMatchedCategories.contains(vault.name)) {
           totalSpent = spendingByCategory[vault.name]!;
           matchedCategories.add(vault.name);
         }
@@ -204,6 +206,8 @@ class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
 
           // 已经完全匹配过的跳过
           if (matchedCategories.contains(category)) continue;
+          // 已被其他金库匹配的分类跳过
+          if (globalMatchedCategories.contains(category)) continue;
 
           // 餐饮类：匹配"餐饮"、"外卖"、"饮品"、"食品"等
           if (vault.name == '餐饮' &&
@@ -248,6 +252,9 @@ class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
             matchedCategories.add(category);
           }
         }
+
+        // 将本次匹配的分类加入全局集合，防止被其他金库重复匹配
+        globalMatchedCategories.addAll(matchedCategories);
 
         if (totalSpent != vault.spentAmount) {
           // 更新数据库
