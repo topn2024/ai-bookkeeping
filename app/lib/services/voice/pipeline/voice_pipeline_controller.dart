@@ -237,12 +237,6 @@ class VoicePipelineController {
       '[VoicePipelineController] VAD: 用户停止说话，缓冲区=${_sentenceBuffer.length}句，当前中间结果="${_inputPipeline.currentPartialText}"',
     );
 
-    // 如果正在处理或播放中，不要提升中间结果，避免重复处理
-    if (_state == VoicePipelineState.processing || _state == VoicePipelineState.speaking) {
-      debugPrint('[VoicePipelineController] 当前状态=$_state，跳过中间结果提升（避免重复处理）');
-      return;
-    }
-
     // 如果缓冲区为空，尝试将中间结果提升为最终结果
     // 通过 InputPipeline.promotePartialToFinal() 统一处理，保持状态管理一致性
     if (_sentenceBuffer.isEmpty) {
@@ -745,6 +739,7 @@ class VoicePipelineController {
     _sentenceAggregationTimer = null;
     _maxWaitTimer?.cancel();
     _maxWaitTimer = null;
+    _cancelASRSilenceTimer(); // 防止静默计时器在buffer清空后触发promotePartialToFinal导致重复处理
 
     // 重置累计等待时间
     _cumulativeWaitMs = 0;
