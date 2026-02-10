@@ -1028,11 +1028,20 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         setBallState(FloatingBallState.idle);
         // 通知 WebRTC APM TTS 停止
         AudioProcessorService.instance.setTTSPlaying(false);
+        // 清理可能残留的临时用户消息（防止显示"处理中..."）
+        final hadTemporary = _conversationHistory.any((msg) => msg.id == _temporaryUserMessageId);
+        if (hadTemporary) {
+          _conversationHistory.removeWhere((msg) => msg.id == _temporaryUserMessageId);
+          _partialText = '';
+          notifyListeners();
+        }
         break;
       case VoicePipelineState.listening:
         setBallState(FloatingBallState.recording);
         // 通知 WebRTC APM TTS 停止
         AudioProcessorService.instance.setTTSPlaying(false);
+        // 重置临时消息标志，允许新一轮 ASR 识别创建临时消息
+        _temporaryMessageFinalized = false;
         // 注意：会话超时由 ProactiveConversationManager 在 VoicePipelineController 中管理
         // 不再在这里调用 _vadService?.startSilenceTimeoutDetection()
         break;
@@ -2569,9 +2578,16 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   /// 临时用户消息的固定ID
   static const String _temporaryUserMessageId = '__temporary_user_message__';
 
+  /// 标记临时消息已被 finalize，阻止后续 partial result 重新创建
+  bool _temporaryMessageFinalized = false;
+
   /// 更新或创建临时用户消息（用于实时显示ASR识别中的文字）
   void _updateOrCreateTemporaryUserMessage(String content) {
     if (content.trim().isEmpty) return;
+
+    // 如果已经 finalize 过，不再创建新的临时消息
+    // （防止 ASR 在 final result 之后又发 partial result）
+    if (_temporaryMessageFinalized) return;
 
     // 查找是否已存在临时消息
     final existingIndex = _conversationHistory.indexWhere(
@@ -2602,6 +2618,9 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
   /// 将临时用户消息转为正式消息
   void _finalizeTemporaryUserMessage(String content) {
     if (content.trim().isEmpty) return;
+
+    // 标记已 finalize，阻止后续 partial result 重新创建临时消息
+    _temporaryMessageFinalized = true;
 
     // 移除临时消息
     _conversationHistory.removeWhere((msg) => msg.id == _temporaryUserMessageId);

@@ -1267,16 +1267,36 @@ class VoicePipelineController {
 
     _proactiveManager.stopMonitoring();
 
-    // 用 Completer 等待播放完成
+    // 用 Completer 等待播放完成或被打断
     final completer = Completer<void>();
+
+    // 安全的 complete 辅助方法，防止重复 complete
+    void safeComplete() {
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    }
 
     // 保存原始回调
     final originalOnCompleted = _outputPipeline.onCompleted;
+    final originalOnStopped = _outputPipeline.onStopped;
 
-    // 设置一次性回调：播放完成后恢复原始回调并停止
-    _outputPipeline.onCompleted = () {
+    // 恢复原始回调的辅助方法
+    void restoreCallbacks() {
       _outputPipeline.onCompleted = originalOnCompleted;
-      completer.complete();
+      _outputPipeline.onStopped = originalOnStopped;
+    }
+
+    // 播放正常完成时触发
+    _outputPipeline.onCompleted = () {
+      restoreCallbacks();
+      safeComplete();
+    };
+
+    // 播放被打断（外部调用 stop()）时也触发，防止 Completer 永久挂起
+    _outputPipeline.onStopped = () {
+      restoreCallbacks();
+      safeComplete();
     };
 
     // 通过 OutputPipeline 播放（复用主动消息路径）
@@ -1287,7 +1307,9 @@ class VoicePipelineController {
     _outputPipeline.complete();
 
     // 等待播放完成（10秒超时兜底，防止永久阻塞）
-    await completer.future.timeout(Duration(seconds: 10), onTimeout: () {});
+    await completer.future.timeout(Duration(seconds: 10), onTimeout: () {
+      restoreCallbacks();
+    });
 
     // 停止流水线
     await _stopAfterFarewellInternal();

@@ -19,11 +19,11 @@ import 'enhanced_voice_assistant_page.dart';
 import 'add_transaction_page.dart';
 
 /// 主导航页面
-/// 底部导航：首页 | 分析 | ➕ | 小记 | 我的
+/// 底部导航：首页 | 分析 | 小记 | ➕ | 我的
 /// - 首页（仪表盘）
 /// - 分析（数据分析中心）
-/// - ➕（单击手动记账，长按语音记账）
-/// - 小记（语音助手）
+/// - 小记（语音助手，中间按钮）
+/// - ➕（手动记账）
 /// - 我的（个人中心，包含预算）
 class MainNavigation extends ConsumerStatefulWidget {
   const MainNavigation({super.key});
@@ -263,68 +263,65 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
     );
   }
 
-  /// 中间的+按钮
-  /// 单击：手动记账
-  /// 长按：直接开始语音录音
+  /// 中间的小记按钮
+  /// 单击：进入语音助手页面
+  /// 长按：直接开始单次语音记账
   Widget _buildCenterButton(BuildContext context) {
     return Transform.translate(
       offset: const Offset(0, 8),  // 向下偏移
       child: Container(
-        key: _mainNavFabKey,  // Add key for feature guide
+        key: _mainNavXiaojiNavKey,  // 小记按钮的key（用于功能引导）
         child: GestureDetector(
           onTap: () {
-          // 单击进入手动记账
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AddTransactionPage()),
-          );
-        },
-        onLongPressStart: (_) {
-          // 长按直接开始录音
-          _startRecording();
-        },
-        onLongPressEnd: (_) {
-          // 松开结束录音
-          _stopRecording();
-        },
-        onLongPressCancel: () {
-          // 取消录音
-          _stopRecording();
-        },
-        child: AnimatedBuilder(
-          animation: _pulseController,
-          builder: (context, child) {
-            final isRecording = _isRecording;
-            return Container(
-              width: isRecording ? 72 : 64,
-              height: isRecording ? 72 : 64,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isRecording
-                      ? [AppTheme.expenseColor, AppTheme.expenseColor.withValues(alpha: 0.85)]
-                      : [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.85)],
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: (isRecording ? AppTheme.expenseColor : AppTheme.primaryColor)
-                        .withValues(alpha: 0.4),
-                    blurRadius: isRecording ? 24 : 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Icon(
-                isRecording ? Icons.mic : Icons.add,
-                color: Colors.white,
-                size: isRecording ? 36 : 32,
-              ),
-            );
+            // 单击进入小记语音助手页面
+            setState(() => _currentIndex = 2);
           },
+          onLongPressStart: (_) {
+            // 长按直接开始录音（单次语音记账）
+            _startRecording();
+          },
+          onLongPressEnd: (_) {
+            // 松开结束录音
+            _stopRecording();
+          },
+          onLongPressCancel: () {
+            // 取消录音
+            _stopRecording();
+          },
+          child: AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, child) {
+              final isRecording = _isRecording;
+              return Container(
+                width: isRecording ? 72 : 64,
+                height: isRecording ? 72 : 64,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isRecording
+                        ? [AppTheme.expenseColor, AppTheme.expenseColor.withValues(alpha: 0.85)]
+                        : [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.85)],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isRecording ? AppTheme.expenseColor : AppTheme.primaryColor)
+                          .withValues(alpha: 0.4),
+                      blurRadius: isRecording ? 24 : 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  isRecording ? Icons.mic : Icons.pets,
+                  color: Colors.white,
+                  size: isRecording ? 36 : 32,
+                ),
+              );
+            },
+          ),
         ),
-      ),
       ),
     );
   }
@@ -495,12 +492,20 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
   /// 底部导航栏
   Widget _buildBottomNavBar(BuildContext context) {
     return Container(
-      key: _mainNavXiaojiNavKey,  // Add key for the navigation bar (targeting xiaoji tab)
+      key: _mainNavFabKey,  // Add key for the navigation bar
       child: GlassBottomNavigation(
       currentIndex: _currentIndex,
       onTap: (index) {
         // 跳过中间的占位项(index=2)
         if (index == 2) return;
+        // index 3 是 ➕ 记账按钮，直接跳转到记账页面
+        if (index == 3) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddTransactionPage()),
+          );
+          return;
+        }
         final actualIndex = index > 2 ? index - 1 : index;
         setState(() => _currentIndex = actualIndex);
       },
@@ -515,16 +520,16 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
           activeIcon: Icons.analytics,
           label: context.l10n.trends,
         ),
-        // 中间占位（给FAB留空间）
+        // 中间占位（给小记FAB留空间）
         const GlassBottomNavItem(
           label: '',
           isPlaceholder: true,
         ),
-        // 小记宠物助手
+        // ➕ 手动记账
         const GlassBottomNavItem(
-          icon: Icons.pets_outlined,
-          activeIcon: Icons.pets,
-          label: '小记',
+          icon: Icons.add_circle_outline,
+          activeIcon: Icons.add_circle,
+          label: '记账',
         ),
         GlassBottomNavItem(
           icon: Icons.person_outline,
