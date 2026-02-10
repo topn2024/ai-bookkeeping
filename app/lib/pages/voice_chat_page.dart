@@ -491,6 +491,7 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
   Widget _buildInputArea(AppLocalizations l10n, FloatingBallState ballState) {
     final isRecording = ballState == FloatingBallState.recording;
     final isProcessing = ballState == FloatingBallState.processing;
+    final isSpeaking = ballState == FloatingBallState.speaking;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -514,7 +515,7 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
                 ),
                 child: TextField(
                   controller: _textController,
-                  enabled: !isRecording && !isProcessing,
+                  enabled: !isRecording && !isProcessing && !isSpeaking,
                   decoration: InputDecoration(
                     hintText: l10n.typeOrSpeak,
                     hintStyle: TextStyle(
@@ -641,6 +642,8 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
         return '正在录音...';
       case FloatingBallState.processing:
         return '处理中...';
+      case FloatingBallState.speaking:
+        return '播放中...';
       case FloatingBallState.success:
         return '完成';
       case FloatingBallState.error:
@@ -659,6 +662,8 @@ class _VoiceChatPageState extends ConsumerState<VoiceChatPage> {
         return Colors.red;
       case FloatingBallState.processing:
         return Colors.orange;
+      case FloatingBallState.speaking:
+        return const Color(0xFF4A90D9);
       case FloatingBallState.success:
         return Colors.green;
       case FloatingBallState.error:

@@ -190,7 +190,8 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
 
     debugPrint('[GlobalFloatingBall] 悬浮球显示中');
 
-    final currentSize = manager.ballState == FloatingBallState.recording
+    final currentSize = (manager.ballState == FloatingBallState.recording ||
+            manager.ballState == FloatingBallState.speaking)
         ? _ballSizeExpanded
         : _ballSize;
 
@@ -298,6 +299,9 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
         return [Colors.white, const Color(0xFFF5F5F5)];
       case FloatingBallState.processing:
         return [Colors.orange, Colors.orange.shade400];
+      case FloatingBallState.speaking:
+        // TTS播放状态使用蓝色主题
+        return [const Color(0xFF4A90D9), const Color(0xFF357ABD)];
       case FloatingBallState.success:
         return [Colors.green, Colors.green.shade400];
       case FloatingBallState.error:
@@ -318,6 +322,8 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
         return Colors.red.withValues(alpha:0.5);
       case FloatingBallState.processing:
         return Colors.orange.withValues(alpha:0.4);
+      case FloatingBallState.speaking:
+        return const Color(0xFF4A90D9).withValues(alpha:0.4);
       case FloatingBallState.success:
         return Colors.green.withValues(alpha:0.4);
       case FloatingBallState.error:
@@ -353,6 +359,14 @@ class _GlobalFloatingBallState extends ConsumerState<GlobalFloatingBall>
             strokeWidth: 2.5,
             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
           ),
+        );
+
+      case FloatingBallState.speaking:
+        // TTS播放状态：显示喇叭图标
+        return const Icon(
+          Icons.volume_up,
+          color: Colors.white,
+          size: 28,
         );
 
       case FloatingBallState.success:

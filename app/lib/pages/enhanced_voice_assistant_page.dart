@@ -80,6 +80,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     final messages = voiceManager.conversationHistory;
     final isRecording = voiceManager.ballState == FloatingBallState.recording;
     final isProcessing = voiceManager.ballState == FloatingBallState.processing;
+    final isSpeaking = voiceManager.ballState == FloatingBallState.speaking;
 
     // 根据录音状态控制动画（使用 addPostFrameCallback 避免 build 中的副作用）
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -644,6 +645,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     final voiceManager = ref.watch(globalVoiceAssistantProvider);
     final isRecording = voiceManager.ballState == FloatingBallState.recording;
     final isProcessing = voiceManager.ballState == FloatingBallState.processing;
+    final isSpeaking = voiceManager.ballState == FloatingBallState.speaking;
     final isListening = isRecording || sessionState == VoiceSessionState.listening;
 
     return GestureDetector(
@@ -867,6 +869,10 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
       // 正在录音，停止当前录音（但保持连续模式，处理完后会自动继续）
       await voiceManager.stopRecording();
       debugPrint('[VoiceAssistantPage] 停止录音，等待处理后自动继续');
+    } else if (currentState == FloatingBallState.speaking) {
+      // TTS播放中，点击可打断播放
+      await voiceManager.stopRecording();
+      debugPrint('[VoiceAssistantPage] 打断TTS播放');
     } else if (currentState == FloatingBallState.idle ||
         currentState == FloatingBallState.success ||
         currentState == FloatingBallState.error) {
@@ -1196,6 +1202,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     final voiceManager = ref.read(globalVoiceAssistantProvider);
     final isRecording = voiceManager.ballState == FloatingBallState.recording;
     final isProcessing = voiceManager.ballState == FloatingBallState.processing;
+    final isSpeaking = voiceManager.ballState == FloatingBallState.speaking;
     if (isRecording) return '正在聆听...';
     if (isProcessing || sessionState == VoiceSessionState.processing) return '正在处理';
     if (sessionState != VoiceSessionState.idle) return '等待回应';
@@ -1206,6 +1213,7 @@ class _EnhancedVoiceAssistantPageState extends ConsumerState<EnhancedVoiceAssist
     final voiceManager = ref.read(globalVoiceAssistantProvider);
     final isRecording = voiceManager.ballState == FloatingBallState.recording;
     final isProcessing = voiceManager.ballState == FloatingBallState.processing;
+    final isSpeaking = voiceManager.ballState == FloatingBallState.speaking;
     final isContinuous = voiceManager.isContinuousMode;
     if (isRecording) {
       return _tapToToggleMode ? '再次点击结束，说完会自动继续' : '松开即结束';

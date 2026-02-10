@@ -37,6 +37,7 @@ enum FloatingBallState {
   idle,       // 默认状态，显示麦克风图标
   recording,  // 录音中，显示波浪动画
   processing, // 处理中，显示加载动画
+  speaking,   // TTS播放中，显示喇叭动画
   success,    // 成功，短暂显示勾号
   error,      // 错误，短暂显示错误图标
   hidden,     // 隐藏状态
@@ -1048,7 +1049,7 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
         setBallState(FloatingBallState.processing);
         break;
       case VoicePipelineState.speaking:
-        setBallState(FloatingBallState.recording);  // 播放时保持录音状态（支持打断）
+        setBallState(FloatingBallState.speaking);  // TTS播放时显示播放状态
         // 通知 WebRTC APM TTS 开始播放，增强 AEC
         AudioProcessorService.instance.setTTSPlaying(true);
         break;

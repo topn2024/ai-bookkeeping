@@ -376,8 +376,8 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
         if (!_isRecording) return;
 
         final state = voiceManager.ballState;
-        if (state == FloatingBallState.processing) {
-          // 录音结束，正在处理
+        if (state == FloatingBallState.processing || state == FloatingBallState.speaking) {
+          // 录音结束，正在处理或播放
           _removeRecordingOverlay();
         } else if (state == FloatingBallState.success || state == FloatingBallState.error) {
           // 处理完成
