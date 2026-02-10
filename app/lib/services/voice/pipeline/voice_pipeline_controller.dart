@@ -864,15 +864,11 @@ class VoicePipelineController {
         return;
       }
 
-      // 优化：只有当输入流水线不在listening状态时才重启
-      // 避免不必要的ASR会话重建和音频录制重启，减少API调用和延迟
-      if (_inputPipeline.state != InputPipelineState.listening) {
-        debugPrint('[VoicePipelineController] 输入流水线状态=${_inputPipeline.state}，需要重启');
-        await _restartInputPipeline();
-      } else {
-        // 流水线已在listening状态，无需重启（音频录制也无需重启）
-        debugPrint('[VoicePipelineController] 输入流水线已在listening，跳过重启（保持现有音频流）');
-      }
+      // 重启输入流水线以重建ASR连接
+      // 注意：即使InputPipeline状态是listening也必须重启，
+      // 因为TTS播放期间讯飞WebSocket连接可能已超时断开（invalid handle）
+      debugPrint('[VoicePipelineController] 输出完成，重启输入流水线以重建ASR连接');
+      await _restartInputPipeline();
 
       // 注意：静默监听已在 _setState(VoicePipelineState.listening) 中自动启动
       // 无需手动调用 startSilenceMonitoring()，避免重复启动
