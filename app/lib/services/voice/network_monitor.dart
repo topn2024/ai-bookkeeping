@@ -320,6 +320,8 @@ class ProactiveNetworkMonitor {
     _connectivitySubscription?.cancel();
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
       (results) {
+        // 暂停时跳过网络变化处理，避免后台不必要的网络检测
+        if (_isPaused) return;
         final isOnline =
             results.isNotEmpty && !results.contains(ConnectivityResult.none);
         if (isOnline != _cachedStatus.isOnline) {

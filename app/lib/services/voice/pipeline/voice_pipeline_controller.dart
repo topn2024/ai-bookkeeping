@@ -1294,15 +1294,21 @@ class VoicePipelineController {
     _timerRecoveryCheck?.cancel();
     _timerRecoveryCheck = null;
 
-    // 等待停止完成
-    await stop().catchError((e) {
-      debugPrint('[VoicePipelineController] dispose 中 stop 失败: $e');
-    });
+    try {
+      // 等待停止完成
+      await stop().catchError((e) {
+        debugPrint('[VoicePipelineController] dispose 中 stop 失败: $e');
+      });
 
-    _proactiveManager.dispose();
-    // 等待子流水线释放完成
-    await _inputPipeline.dispose();
-    await _outputPipeline.dispose();
-    await _stateController.close();
+      _proactiveManager.dispose();
+      // 等待子流水线释放完成
+      await _inputPipeline.dispose();
+      await _outputPipeline.dispose();
+    } finally {
+      // 确保 StreamController 一定被关闭，即使上面的步骤抛出异常
+      await _stateController.close().catchError((e) {
+        debugPrint('[VoicePipelineController] 关闭 StateController 异常: $e');
+      });
+    }
   }
 }

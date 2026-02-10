@@ -365,7 +365,14 @@ class InputPipeline {
   ///
   /// 注意：异步方法，确保 stop() 完成后再关闭 StreamController
   Future<void> dispose() async {
-    await stop();
-    await _stateController.close();
+    try {
+      await stop();
+    } catch (e) {
+      debugPrint('[InputPipeline] dispose 中 stop 失败: $e');
+    } finally {
+      await _stateController.close().catchError((e) {
+        debugPrint('[InputPipeline] 关闭 StateController 异常: $e');
+      });
+    }
   }
 }

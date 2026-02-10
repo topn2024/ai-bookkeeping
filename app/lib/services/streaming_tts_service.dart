@@ -641,8 +641,14 @@ class StreamingTTSService {
 
   /// 释放资源
   Future<void> dispose() async {
-    await stop();
-    _stateController.close();
+    try {
+      await stop();
+    } catch (e) {
+      debugPrint('[StreamingTTSService] dispose 中 stop 失败: $e');
+    }
+    await _stateController.close().catchError((e) {
+      debugPrint('[StreamingTTSService] 关闭 StateController 异常: $e');
+    });
     _streamPlayer.dispose();
     await _pcmPlayer.dispose();
     _dio.close();

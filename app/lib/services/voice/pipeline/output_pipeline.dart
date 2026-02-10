@@ -273,13 +273,10 @@ class OutputPipeline {
   /// TTS播放完成回调
   void _onTTSCompleted() {
     // 确认播放完成（参考chat-companion-app的playback confirmation机制）
-    // 只有当响应ID匹配且未被打断时才接受完成事件
     final accepted = _responseTracker.confirmPlaybackComplete(_currentResponseId);
-    if (!accepted) {
-      debugPrint('[OutputPipeline] 播放完成事件被拒绝（响应已过期或已被打断）');
-      return;
-    }
 
+    // 无论响应是否被接受，都必须重置输出流水线状态
+    // 否则流水线控制器会永久卡在 speaking 状态
     _state = OutputPipelineState.idle;
     _stateController.add(_state);
 
@@ -289,8 +286,14 @@ class OutputPipeline {
     // 更新打断检测器
     _bargeInDetector.updateTTSState(isPlaying: false, currentText: '');
 
+    if (!accepted) {
+      debugPrint('[OutputPipeline] 播放完成事件被拒绝（响应已过期或已被打断），但仍重置状态');
+    } else {
+      debugPrint('[OutputPipeline] 播放完成');
+    }
+
+    // 始终通知上层完成，确保流水线控制器状态机能正确转换
     onCompleted?.call();
-    debugPrint('[OutputPipeline] 播放完成');
   }
 
   /// 句子开始播放回调
