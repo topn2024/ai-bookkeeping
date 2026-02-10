@@ -196,6 +196,10 @@ class IFlytekIATPlugin extends ASRPluginBase {
                 if (!completer.isCompleted) {
                   completer.complete();
                 }
+                // isLast后关闭controller，不再接收后续消息（防止服务器关闭前发送的error变成Unhandled Exception）
+                if (!controller.isClosed) {
+                  controller.close();
+                }
               }
               break;
             case IFlytekIATParsedResultType.completed:
@@ -203,11 +207,15 @@ class IFlytekIATPlugin extends ASRPluginBase {
               if (!completer.isCompleted) {
                 completer.complete();
               }
+              if (!controller.isClosed) {
+                controller.close();
+              }
               break;
             case IFlytekIATParsedResultType.error:
               markCompleted();
               if (!controller.isClosed) {
                 controller.addError(result.error!);
+                controller.close(); // error后关闭controller，防止后续消息变成Unhandled
               }
               if (!completer.isCompleted) {
                 completer.completeError(result.error!);
