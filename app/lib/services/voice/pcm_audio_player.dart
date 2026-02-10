@@ -87,13 +87,13 @@ class PCMAudioPlayer {
     return result;
   }
 
-  /// 初始化播放器
+  /// 初始化播放器（轻量级，不创建AudioTrack）
   ///
   /// [sampleRate] 采样率，默认16000（与ASR一致）
   /// [channelCount] 声道数，默认1（单声道）
   ///
-  /// 注意：初始化后不会立即启动AudioTrack，只有在实际播放时才会start()
-  /// 这样可以避免AudioTrack_Buffer_Timeout错误
+  /// 注意：只保存配置参数，AudioTrack的setup()延迟到首次播放时调用
+  /// 这样可以完全避免华为设备上的AudioTrack_Buffer_Timeout错误
   Future<void> initialize({
     int sampleRate = 16000,
     int channelCount = 1,
@@ -105,27 +105,35 @@ class PCMAudioPlayer {
 
     _sampleRate = sampleRate;
     _channelCount = channelCount;
+    _isInitialized = true;
+
+    debugPrint('[PCMAudioPlayer] 初始化成功 (sampleRate=$sampleRate, channels=$channelCount)');
+    debugPrint('[PCMAudioPlayer] AudioTrack将在首次播放时创建，避免Buffer_Timeout错误');
+  }
+
+  /// 是否已完成原生层setup
+  bool _isNativeSetup = false;
+
+  /// 确保原生层AudioTrack已创建（仅在首次播放时调用）
+  Future<void> _ensureNativeSetup() async {
+    if (_isNativeSetup) return;
 
     try {
-      // 设置日志级别
       await FlutterPcmSound.setLogLevel(LogLevel.error);
 
-      // 初始化音频配置（不启动AudioTrack）
       await FlutterPcmSound.setup(
-        sampleRate: sampleRate,
-        channelCount: channelCount,
+        sampleRate: _sampleRate,
+        channelCount: _channelCount,
         iosAudioCategory: IosAudioCategory.playAndRecord,
       );
 
-      // 设置缓冲阈值和回调
-      await FlutterPcmSound.setFeedThreshold(sampleRate ~/ 10); // 100ms缓冲
+      await FlutterPcmSound.setFeedThreshold(_sampleRate ~/ 10); // 100ms缓冲
       FlutterPcmSound.setFeedCallback(_onFeedCallback);
 
-      _isInitialized = true;
-      debugPrint('[PCMAudioPlayer] 初始化成功 (sampleRate=$sampleRate, channels=$channelCount)');
-      debugPrint('[PCMAudioPlayer] AudioTrack将在首次播放时启动，避免Buffer_Timeout错误');
+      _isNativeSetup = true;
+      debugPrint('[PCMAudioPlayer] 原生AudioTrack已创建');
     } catch (e) {
-      debugPrint('[PCMAudioPlayer] 初始化失败: $e');
+      debugPrint('[PCMAudioPlayer] 原生AudioTrack创建失败: $e');
       rethrow;
     }
   }
@@ -196,6 +204,9 @@ class PCMAudioPlayer {
 
     debugPrint('[PCMAudioPlayer] 播放PCM数据: ${pcmData.length}字节');
 
+    // 确保原生层已创建（首次播放时才创建AudioTrack）
+    await _ensureNativeSetup();
+
     // 如果有正在等待的Completer，先完成它（防止永久挂起）
     if (_playCompleter != null && !_playCompleter!.isCompleted) {
       _playCompleter!.complete();
@@ -232,6 +243,9 @@ class PCMAudioPlayer {
     }
 
     if (pcmData.isEmpty) return;
+
+    // 确保原生层已创建（首次播放时才创建AudioTrack）
+    await _ensureNativeSetup();
 
     // 触发AEC回调
     onAudioPlayed?.call(pcmData);
@@ -295,6 +309,7 @@ class PCMAudioPlayer {
     // 释放并重新初始化以清空缓冲
     await FlutterPcmSound.release();
     _isInitialized = false;
+    _isNativeSetup = false;
   }
 
   /// 释放资源
