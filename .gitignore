@@ -91,3 +91,9 @@ local.properties
 *API*.md
 app/aliyun_token.json
 CLAUDE.md
+
+# User uploaded images
+user_image_*.jpg
+
+# Report files
+*报告*.md
