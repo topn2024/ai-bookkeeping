@@ -249,8 +249,11 @@ class IFlytekIATPlugin extends ASRPluginBase {
         connectionReady.complete();
       }
 
-      // 启动音频发送任务
-      _sendAudioTask(audioStream, sessionId, completer, controller, connectionReady);
+      // 启动音频发送任务（捕获异常防止Unhandled Exception）
+      _sendAudioTask(audioStream, sessionId, completer, controller, connectionReady)
+          .catchError((e) {
+        debugPrint('[IFlytekIATPlugin] 音频发送任务异常（已捕获）: $e');
+      });
 
       // 立即开始输出结果
       await for (final result in controller.stream) {
@@ -278,6 +281,24 @@ class IFlytekIATPlugin extends ASRPluginBase {
     }
   }
 
+  /// 检查WebSocket连接是否仍然活跃
+  bool get _isWebSocketAlive => _webSocketChannel != null && _webSocketChannel!.closeCode == null;
+
+  /// 安全发送WebSocket数据，检测连接是否已断开
+  bool _safeSend(String data) {
+    if (!_isWebSocketAlive) {
+      debugPrint('[IFlytekIATPlugin] WebSocket已断开，无法发送数据');
+      return false;
+    }
+    try {
+      _webSocketChannel!.sink.add(data);
+      return true;
+    } catch (e) {
+      debugPrint('[IFlytekIATPlugin] 发送数据失败: $e');
+      return false;
+    }
+  }
+
   /// 音频发送任务
   ///
   /// 添加音频缓冲机制，防止在WebSocket连接建立前丢失音频
@@ -302,6 +323,15 @@ class IFlytekIATPlugin extends ASRPluginBase {
           break;
         }
 
+        // 检查WebSocket是否仍然活跃
+        if (!_isWebSocketAlive) {
+          debugPrint('[IFlytekIATPlugin] WebSocket已断开，停止发送音频');
+          if (!controller.isClosed) {
+            controller.close();
+          }
+          break;
+        }
+
         // 检查连接是否就绪
         if (!isConnectionReady) {
           if (connectionReady.isCompleted) {
@@ -312,11 +342,12 @@ class IFlytekIATPlugin extends ASRPluginBase {
             // 发送缓冲的音频
             for (final bufferedChunk in audioBuffer) {
               if (_isCancelled || sessionId != _currentSessionId) break;
+              if (!_isWebSocketAlive) break;
 
               final frame = _buildFrame(bufferedChunk, status);
               if (status == 0) status = 1;
 
-              _webSocketChannel?.sink.add(jsonEncode(frame));
+              if (!_safeSend(jsonEncode(frame))) break;
               frameCount++;
 
               if (frameCount <= 3) {
@@ -342,7 +373,7 @@ class IFlytekIATPlugin extends ASRPluginBase {
         final frame = _buildFrame(audioChunk, status);
         if (status == 0) status = 1;
 
-        _webSocketChannel?.sink.add(jsonEncode(frame));
+        if (!_safeSend(jsonEncode(frame))) break;
         frameCount++;
 
         if (frameCount <= 3 || frameCount % 50 == 0) {
@@ -352,7 +383,7 @@ class IFlytekIATPlugin extends ASRPluginBase {
       }
 
       // 发送结束帧
-      if (!_isCancelled && sessionId == _currentSessionId) {
+      if (!_isCancelled && sessionId == _currentSessionId && _isWebSocketAlive) {
         final endFrame = {
           'data': {
             'status': 2,
@@ -361,24 +392,34 @@ class IFlytekIATPlugin extends ASRPluginBase {
             'audio': '',
           },
         };
-        _webSocketChannel?.sink.add(jsonEncode(endFrame));
-        debugPrint('[IFlytekIATPlugin] 发送结束帧，共发送 $frameCount 个音频帧');
+        if (_safeSend(jsonEncode(endFrame))) {
+          debugPrint('[IFlytekIATPlugin] 发送结束帧，共发送 $frameCount 个音频帧');
+        }
 
-        // 等待服务器返回最终结果
-        await completer.future.timeout(
-          const Duration(seconds: 5),
-          onTimeout: () {
-            debugPrint('[IFlytekIATPlugin] 等待最终结果超时');
-            if (!controller.isClosed) {
-              controller.close();
-            }
-          },
-        );
+        // 等待服务器返回最终结果（捕获错误防止Unhandled Exception）
+        try {
+          await completer.future.timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              debugPrint('[IFlytekIATPlugin] 等待最终结果超时');
+              if (!controller.isClosed) {
+                controller.close();
+              }
+            },
+          );
+        } catch (e) {
+          debugPrint('[IFlytekIATPlugin] 等待最终结果时出错（已捕获）: $e');
+          if (!controller.isClosed) {
+            controller.close();
+          }
+        }
+      } else if (!controller.isClosed) {
+        // WebSocket已断开或已取消，直接关闭controller
+        controller.close();
       }
     } catch (e) {
       debugPrint('[IFlytekIATPlugin] 音频发送任务异常: $e');
       if (!controller.isClosed) {
-        controller.addError(e);
         controller.close();
       }
     }
