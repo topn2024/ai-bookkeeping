@@ -735,7 +735,7 @@ class _SmartImportPageState extends ConsumerState<SmartImportPage> {
           const SizedBox(height: 12),
           _buildHelpItem(
             '微信支付',
-            '微信 → 我 → 服务 → 钱包 → 账单 → 常见问题 → 下载账单',
+            '微信 → 我 → 服务 → 钱包 → 账单 → 右上角… → 客服中心 → 下载账单',
           ),
           _buildHelpItem(
             '支付宝',

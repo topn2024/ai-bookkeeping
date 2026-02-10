@@ -34,19 +34,19 @@ class _BillExportTutorialPageState extends ConsumerState<BillExportTutorialPage>
       icon: Icons.chat,
       steps: [
         TutorialStep(
-          title: '打开微信，点击「我」',
-          description: '进入微信主界面后，点击底部导航栏的「我」',
+          title: '打开微信，点击右下角「我」→「服务」',
+          description: '进入微信主界面后，点击底部导航栏的「我」，然后进入「服务」',
         ),
         TutorialStep(
-          title: '进入「服务」→「钱包」',
-          description: '在个人页面中找到服务入口',
+          title: '进入「钱包」→ 右上角「账单」',
+          description: '在服务页面中点击「钱包」，然后点击右上角的「账单」',
         ),
         TutorialStep(
-          title: '点击「账单」→ 右上角「···」',
-          description: '打开账单页面后，点击右上角更多按钮',
+          title: '点击账单页右上角「…」→「客服中心」',
+          description: '在账单页面点击右上角三个点，选择「客服中心」',
         ),
         TutorialStep(
-          title: '选择「账单下载」并设置时间',
+          title: '选择「下载账单」并设置时间',
           description: '建议选择「用于个人对账」格式，包含完整交易信息',
           isHighlight: true,
         ),

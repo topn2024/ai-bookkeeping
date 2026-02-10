@@ -290,6 +290,9 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
       });
     }
 
+    // 收入为0时的提示状态
+    final isZeroIncome = widget.incomeAmount <= 0;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('智能分配建议'),
@@ -323,29 +326,52 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
 
           // 分配建议列表
           Expanded(
-            child: _allocations.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: [
-                      ..._allocations.map((item) => _AllocationItemCard(
-                        item: item,
-                        onAmountChanged: (amount) {
-                          setState(() {
-                            item.amount = amount;
-                            final total = _allocations.fold(0.0, (sum, i) => sum + i.amount);
-                            _unallocated = widget.incomeAmount - total;
-                          });
-                        },
-                      )),
+            child: isZeroIncome
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.info_outline, size: 48, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(
+                            '本月暂无收入记录',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '请先记录收入，智能分配将根据收入金额生成预算方案',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : _allocations.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          ..._allocations.map((item) => _AllocationItemCard(
+                            item: item,
+                            onAmountChanged: (amount) {
+                              setState(() {
+                                item.amount = amount;
+                                final total = _allocations.fold(0.0, (sum, i) => sum + i.amount);
+                                _unallocated = widget.incomeAmount - total;
+                              });
+                            },
+                          )),
 
-                      // 未分配金额
-                      if (_unallocated > 0)
-                        _UnallocatedCard(amount: _unallocated),
+                          // 未分配金额
+                          if (_unallocated > 0)
+                            _UnallocatedCard(amount: _unallocated),
 
-                      const SizedBox(height: 100),
-                    ],
-                  ),
+                          const SizedBox(height: 100),
+                        ],
+                      ),
           ),
         ],
       ),

@@ -477,10 +477,6 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
 
       if (!mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ 零基预算分配成功，已分配资金到小金库')),
-      );
-      print('🔍 [确认预算] 成功提示已显示');
     } catch (e, stack) {
       print('🔍 [确认预算] 发生错误: $e');
       print('🔍 [确认预算] 错误堆栈: $stack');
