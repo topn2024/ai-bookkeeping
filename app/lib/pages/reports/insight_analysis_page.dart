@@ -4,8 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../latte_factor_page.dart';
 import '../budget_management_page.dart';
 import '../trends_page.dart';
+import '../subscription_waste_page.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/budget_provider.dart';
+import '../../providers/recurring_provider.dart';
+import '../../models/transaction.dart';
+import '../../models/recurring_transaction.dart';
 
 /// 洞察分析页面
 /// 原型设计 7.02：洞察分析
@@ -23,6 +27,7 @@ class InsightAnalysisPage extends ConsumerWidget {
     final monthlyExpense = ref.watch(monthlyExpenseProvider);
     final monthlyIncome = ref.watch(monthlyIncomeProvider);
     final budgets = ref.watch(budgetProvider);
+    final allRecurring = ref.watch(recurringProvider);
 
     // 计算拿铁因子（小额高频消费，如咖啡、奶茶等）
     final latteCategories = ['咖啡', '奶茶', '饮料', '零食'];
@@ -59,7 +64,7 @@ class InsightAnalysisPage extends ConsumerWidget {
                   children: [
                     _buildLatteFactorCard(theme, latteExpense, dailyLatte),
                     const SizedBox(height: 12),
-                    _buildSubscriptionAlert(theme),
+                    _buildSubscriptionAlert(theme, allRecurring),
                     const SizedBox(height: 12),
                     _buildSpendingPatternCard(theme, monthlyExpense),
                     const SizedBox(height: 12),
@@ -130,9 +135,42 @@ class InsightAnalysisPage extends ConsumerWidget {
   }
 
   /// 闲置订阅提醒
-  Widget _buildSubscriptionAlert(ThemeData theme) {
-    // TODO: 从实际订阅数据中计算闲置订阅
-    // 暂时显示空状态提示
+  Widget _buildSubscriptionAlert(ThemeData theme, List<RecurringTransaction> allRecurring) {
+    final subscriptions = allRecurring
+        .where((r) => r.type == TransactionType.expense && r.isEnabled)
+        .toList();
+
+    if (subscriptions.isEmpty) {
+      return _InsightCard(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFEBEE), Color(0xFFFFCDD2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        icon: Icons.subscriptions,
+        iconColor: Colors.red,
+        title: '闲置订阅',
+        badge: null,
+        content: '暂无订阅数据，添加周期性支出后可自动检测',
+        actionText: null,
+        actionColor: null,
+        onAction: null,
+      );
+    }
+
+    final totalMonthly = subscriptions.fold<double>(0.0, (sum, r) {
+      switch (r.frequency) {
+        case RecurringFrequency.daily: return sum + r.amount * 30;
+        case RecurringFrequency.weekly: return sum + r.amount * 4.33;
+        case RecurringFrequency.monthly: return sum + r.amount;
+        case RecurringFrequency.yearly: return sum + r.amount / 12;
+      }
+    });
+
+    final count = subscriptions.length;
+    final badgeText = count >= 5 ? '偏多' : (count >= 3 ? '适中' : '良好');
+    final badgeColor = count >= 5 ? Colors.red : (count >= 3 ? Colors.orange : Colors.green);
+
     return _InsightCard(
       gradient: const LinearGradient(
         colors: [Color(0xFFFFEBEE), Color(0xFFFFCDD2)],
@@ -141,12 +179,15 @@ class InsightAnalysisPage extends ConsumerWidget {
       ),
       icon: Icons.subscriptions,
       iconColor: Colors.red,
-      title: '闲置订阅',
-      badge: null,
-      content: '暂无订阅数据，添加订阅后可自动检测闲置情况',
-      actionText: null,
-      actionColor: null,
-      onAction: null,
+      title: '订阅支出',
+      badge: _InsightBadge(text: badgeText, color: badgeColor),
+      content: '当前 $count 项活跃订阅，月均支出 ¥${totalMonthly.toStringAsFixed(0)}',
+      actionText: '查看详情 →',
+      actionColor: Colors.red,
+      onAction: (context) => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SubscriptionWastePage()),
+      ),
     );
   }
 
