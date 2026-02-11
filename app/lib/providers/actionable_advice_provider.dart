@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../pages/actionable_advice_page.dart';
 import '../services/advice_service.dart';
 import 'budget_provider.dart';
+import 'budget_vault_provider.dart';
 import 'transaction_provider.dart';
 import 'money_age_provider.dart';
 import 'ledger_context_provider.dart';
@@ -21,11 +22,14 @@ final actionableAdviceProvider = FutureProvider<List<ActionableAdvice>>((ref) as
 
   final budgets = ref.watch(budgetProvider);
   final transactions = ref.watch(transactionProvider);
+  final vaultState = ref.watch(budgetVaultProvider);
   final moneyAgeDashboard = await ref.watch(moneyAgeDashboardProvider(bookId).future);
 
   return service.generateAdvice(
     budgets: budgets,
     transactions: transactions,
+    vaults: vaultState.vaults,
+    unallocatedAmount: vaultState.unallocatedAmount,
     moneyAgeDashboard: moneyAgeDashboard,
   );
 });
