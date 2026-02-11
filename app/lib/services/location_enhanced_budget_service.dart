@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../models/common_types.dart';
+import 'category_localization_service.dart';
 import 'location_service.dart' hide CityTier, CityTierExtension, CityInfo, CityLocation,
   CityLocationService, UserHomeLocationService, CrossRegionSpendingService, CrossRegionResult;
 import 'location_data_services.dart' hide CityTier, CityTierExtension, CityInfo, CityLocation;
@@ -248,14 +249,14 @@ class LocationEnhancedBudgetService {
 
       recommendations.add(EnhancedBudgetRecommendation(
         categoryId: categoryId,
-        categoryName: category.name,
+        categoryName: categoryId.localizedCategoryName,
         suggestedAmount: suggestedAmount,
         minAmount: minAmount,
         maxAmount: maxAmount,
         cityTier: cityTier,
         cityName: cityName,
         reasoning: _generateReasoning(
-          categoryName: category.name,
+          categoryName: categoryId.localizedCategoryName,
           cityName: cityName,
           cityTier: cityTier,
           isTemporary: isTemporary,
@@ -501,7 +502,7 @@ class LocationEnhancedBudgetService {
 
       categoryAllocations.add(CategoryBudgetAllocation(
         categoryId: category.categoryId,
-        categoryName: category.name,
+        categoryName: category.categoryId.localizedCategoryName,
         allocatedAmount: allocation,
         suggestedMin: amountSuggestion.suggestedMin,
         suggestedMax: amountSuggestion.suggestedMax,

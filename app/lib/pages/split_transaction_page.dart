@@ -8,6 +8,7 @@ import '../models/transaction_split.dart';
 import '../models/category.dart';
 import '../models/account.dart';
 import '../extensions/extensions.dart';
+import '../extensions/category_extensions.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/category_provider.dart';
 
@@ -380,7 +381,7 @@ class _SplitTransactionPageState extends ConsumerState<SplitTransactionPage> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      selectedCat.name,
+                      selectedCat.localizedName,
                       style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                   ] else ...[
@@ -900,7 +901,7 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                   size: 16, color: parentCategory?.color ?? Colors.grey),
               const SizedBox(width: 4),
               Text(
-                '${parentCategory?.name ?? ""} 的子分类',
+                '${parentCategory?.localizedName ?? ""} 的子分类',
                 style: TextStyle(
                   fontSize: 12,
                   color: parentCategory?.color ?? AppColors.textSecondary,
@@ -951,7 +952,7 @@ class _CategoryPickerSheetState extends ConsumerState<_CategoryPickerSheet> {
                       Icon(child.icon, size: 16, color: child.color),
                       const SizedBox(width: 4),
                       Text(
-                        child.name,
+                        child.localizedName,
                         style: TextStyle(
                           fontSize: 12,
                           color: isSelected ? child.color : AppColors.textPrimary,

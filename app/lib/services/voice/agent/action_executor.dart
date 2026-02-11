@@ -16,6 +16,7 @@
 library;
 
 import 'package:flutter/foundation.dart';
+import '../../../services/category_localization_service.dart';
 import 'action_registry.dart';
 import 'decomposed_intent.dart';
 import '../network_monitor.dart';
@@ -152,7 +153,7 @@ class MultiIntentItem {
     if (amount != null) {
       final amountStr = '${amount}元';
       if (categoryName != null && categoryName.isNotEmpty) {
-        return '$typeLabel $amountStr · $categoryName${merchant != null ? ' ($merchant)' : ''}';
+        return '$typeLabel $amountStr · ${categoryName.localizedCategoryName}${merchant != null ? ' ($merchant)' : ''}';
       }
       return '$typeLabel $amountStr${merchant != null ? ' ($merchant)' : ''}';
     }
@@ -1221,7 +1222,7 @@ class ActionExecutor {
           break;
       }
 
-      final categoryStr = categoryName != null ? '($categoryName)' : '';
+      final categoryStr = categoryName != null ? '(${categoryName.localizedCategoryName})' : '';
       return '确定要记录$typeLabel${amount}元$categoryStr吗？这笔金额比较大。';
     }
 

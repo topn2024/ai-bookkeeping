@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../../../core/contracts/i_database_service.dart';
 import '../../../../models/transaction.dart';
+import '../../../../services/category_localization_service.dart';
 import '../action_registry.dart';
 
 /// 数据导出Action
@@ -146,7 +147,7 @@ class DataExportAction extends Action {
       final date = '${t.date.year}-${t.date.month.toString().padLeft(2, '0')}-${t.date.day.toString().padLeft(2, '0')}';
       final type = t.type == TransactionType.expense ? '支出' : (t.type == TransactionType.income ? '收入' : '转账');
       final amount = t.amount.toStringAsFixed(2);
-      final category = _escapeCsv(t.category);
+      final category = _escapeCsv(t.category.localizedCategoryName);
       final note = _escapeCsv(t.note ?? '');
       final account = _escapeCsv(t.accountId);
       final merchant = _escapeCsv(t.rawMerchant ?? '');
@@ -173,7 +174,7 @@ class DataExportAction extends Action {
       'date': t.date.toIso8601String(),
       'type': t.type.name,
       'amount': t.amount,
-      'category': t.category,
+      'category': t.category.localizedCategoryName,
       'note': t.note,
       'accountId': t.accountId,
       'merchant': t.rawMerchant,
@@ -487,7 +488,7 @@ class DataStatisticsAction extends Action {
     final responseBuffer = StringBuffer('$periodText支出分类统计：');
     for (var i = 0; i < top5.length; i++) {
       if (i > 0) responseBuffer.write('，');
-      responseBuffer.write('${top5[i].key}${top5[i].value.toStringAsFixed(0)}元');
+      responseBuffer.write('${top5[i].key.localizedCategoryName}${top5[i].value.toStringAsFixed(0)}元');
     }
 
     return ActionResult.success(
@@ -785,7 +786,7 @@ class DataReportAction extends Action {
         summary.write('超支${(-balance).toStringAsFixed(0)}元');
       }
       if (topExpenseCategory != null) {
-        summary.write('。$topExpenseCategory支出最多');
+        summary.write('。${topExpenseCategory!.localizedCategoryName}支出最多');
       }
 
       return ActionResult.success(

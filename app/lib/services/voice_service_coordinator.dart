@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import '../models/transaction.dart' as model;
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
-import '../services/category_localization_service.dart';
 import '../services/duplicate_detection_service.dart';
 import '../utils/amount_validator.dart';
 import 'voice/entity_disambiguation_service.dart';
@@ -1457,7 +1456,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
     for (var i = 0; i < intents.length; i++) {
       final intent = intents[i];
-      buffer.writeln('  ${i + 1}. ${intent.category ?? intent.originalText}');
+      buffer.writeln('  ${i + 1}. ${intent.category?.localizedCategoryName ?? intent.originalText}');
     }
 
     buffer.write('请说"第几个多少钱"来补充');
@@ -1466,7 +1465,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
   /// 生成对话式金额询问提示（单个不完整意图）
   String _generateConversationalAmountPrompt(IncompleteIntent intent) {
-    final category = intent.category ?? intent.originalText;
+    final category = intent.category?.localizedCategoryName ?? intent.originalText;
     // 使用更自然的对话方式询问
     return '$category多少钱？';
   }
@@ -2944,7 +2943,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         message = searchResult.answer;
         final transaction = searchResult.data?['transaction'] as NLSearchTransaction?;
         if (transaction != null) {
-          message += '，${transaction.category ?? ''}${transaction.description ?? ''}';
+          message += '，${transaction.category?.localizedCategoryName ?? ''}${transaction.description ?? ''}';
           resultData = {
             'transaction': {
               'id': transaction.id,

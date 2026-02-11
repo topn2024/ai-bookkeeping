@@ -2171,7 +2171,7 @@ class _SavingsGoalFormPageState extends ConsumerState<SavingsGoalFormPage> {
                 if (selectedCategory != null) ...[
                   Icon(selectedCategory.icon, color: selectedCategory.color, size: 24),
                   const SizedBox(width: 12),
-                  Text(selectedCategory.name),
+                  Text(selectedCategory.localizedName),
                 ] else ...[
                   Icon(Icons.category, color: Colors.grey[600]),
                   const SizedBox(width: 12),

@@ -11,6 +11,7 @@ import 'result_buffer.dart';
 import 'timing_judge.dart';
 import '../input_filter.dart';
 import '../smart_intent_recognizer.dart' show MultiOperationResult, Operation, OperationPriority, OperationType, RecognitionSource;
+import '../../../services/category_localization_service.dart';
 import '../adapters/adapter_interfaces.dart';
 import '../adapters/bookkeeping_feedback_adapter.dart';
 import '../network_monitor.dart' show NetworkStatus;
@@ -820,7 +821,7 @@ class IntelligenceEngine {
     final amount = _safeParseAmount(params['amount']);
 
     if (category.isNotEmpty && amount != null) {
-      return '$category${amount.toStringAsFixed(0)}元';
+      return '${category.localizedCategoryName}${amount.toStringAsFixed(0)}元';
     } else if (category.isNotEmpty) {
       return category;
     } else if (amount != null) {

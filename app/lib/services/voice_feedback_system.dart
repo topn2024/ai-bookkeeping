@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'category_localization_service.dart';
 import 'tts_service.dart';
 import 'voice/voice_intent_router.dart';
 import 'voice_service_coordinator.dart' show VoiceIntentType;
@@ -264,7 +265,7 @@ class VoiceFeedbackSystem extends ChangeNotifier {
     if (entities.containsKey('timeRange')) {
       return '正在查找${entities['timeRange']}的交易记录...';
     } else if (entities.containsKey('category')) {
-      return '正在查找${entities['category']}类别的交易记录...';
+      return '正在查找${(entities['category'] as String).localizedCategoryName}类别的交易记录...';
     } else if (entities.containsKey('amount')) {
       return '正在查找金额为${entities['amount']}元的交易记录...';
     } else {
@@ -289,7 +290,7 @@ class VoiceFeedbackSystem extends ChangeNotifier {
 
     if (entities.containsKey('amount') && entities.containsKey('category')) {
       final typeLabel = entities['type'] == 'income' ? '收入' : '支出';
-      return '正在为您添加${entities['category']}$typeLabel${entities['amount']}元...';
+      return '正在为您添加${(entities['category'] as String).localizedCategoryName}$typeLabel${entities['amount']}元...';
     } else if (entities.containsKey('amount')) {
       return '正在为您添加${entities['amount']}元的交易记录...';
     } else {
@@ -304,7 +305,7 @@ class VoiceFeedbackSystem extends ChangeNotifier {
     if (entities.containsKey('timeRange')) {
       return '正在统计${entities['timeRange']}的消费情况...';
     } else if (entities.containsKey('category')) {
-      return '正在统计${entities['category']}类别的消费情况...';
+      return '正在统计${(entities['category'] as String).localizedCategoryName}类别的消费情况...';
     } else {
       return '正在为您查询相关信息...';
     }

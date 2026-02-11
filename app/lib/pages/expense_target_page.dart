@@ -4,6 +4,7 @@ import '../models/expense_target.dart';
 import '../utils/amount_validator.dart';
 import '../providers/expense_target_provider.dart';
 import '../providers/category_provider.dart';
+import '../extensions/category_extensions.dart';
 import '../providers/ledger_provider.dart';
 
 /// 月度开支目标页面
@@ -562,7 +563,7 @@ class _ExpenseTargetPageState extends ConsumerState<ExpenseTargetPage> {
                           .where((c) => c.isExpense) // 只显示支出分类
                           .map((c) => DropdownMenuItem(
                                 value: c.id,
-                                child: Text(c.name),
+                                child: Text(c.localizedName),
                               )),
                     ],
                     onChanged: (value) {

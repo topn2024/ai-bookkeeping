@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../../../../core/contracts/i_database_service.dart';
 import '../../../../models/transaction.dart';
+import '../../../../services/category_localization_service.dart';
 import '../action_registry.dart';
 
 /// 查询消费习惯Action
@@ -78,7 +79,7 @@ class HabitQueryAction extends Action {
       responseBuilder.write('最近$days天的消费习惯：');
 
       if (habits['topCategory'] != null) {
-        responseBuilder.write('消费最多的是${habits['topCategory']}，');
+        responseBuilder.write('消费最多的是${(habits['topCategory'] as String).localizedCategoryName}，');
       }
 
       if (habits['avgAmount'] != null) {
@@ -384,7 +385,7 @@ class HabitReminderAction extends Action {
   /// 设置超支提醒
   ActionResult _setupOverspendReminder(double? threshold, String? category) {
     final effectiveThreshold = threshold ?? 500.0;
-    final categoryText = category != null ? '${category}类' : '单笔';
+    final categoryText = category != null ? '${category.localizedCategoryName}类' : '单笔';
 
     return ActionResult.success(
       responseText: '已设置${categoryText}消费超过${effectiveThreshold.toStringAsFixed(0)}元时提醒',
@@ -402,7 +403,7 @@ class HabitReminderAction extends Action {
   ActionResult _setupPeriodicReminder(String? category) {
     return ActionResult.success(
       responseText: category != null
-          ? '已设置${category}类消费定期回顾提醒'
+          ? '已设置${category.localizedCategoryName}类消费定期回顾提醒'
           : '已设置消费定期回顾提醒，每周日会为您总结',
       data: {
         'reminderType': 'periodic',

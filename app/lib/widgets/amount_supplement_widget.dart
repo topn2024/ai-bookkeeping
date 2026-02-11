@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/category_localization_service.dart';
 import '../services/voice/multi_intent_models.dart';
 
 /// 金额补充输入组件
@@ -213,7 +214,7 @@ class _AmountSupplementWidgetState extends State<AmountSupplementWidget> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  intent.category ?? '其他',
+                  intent.category?.localizedCategoryName ?? '其他',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: _getCategoryColor(intent.category),
                     fontWeight: FontWeight.w600,

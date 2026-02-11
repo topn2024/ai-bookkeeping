@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/contracts/i_database_service.dart';
 import '../../../models/transaction.dart';
+import '../../../services/category_localization_service.dart';
 import '../../voice_navigation_service.dart';
 import '../../voice_navigation_executor.dart';
 import '../entity_disambiguation_service.dart';
@@ -652,7 +653,7 @@ class _TransactionAddAction extends Action {
           break;
         case TransactionType.expense:
         default:
-          responseText = '好的，已记录$category${amount.toStringAsFixed(0)}元';
+          responseText = '好的，已记录${category.localizedCategoryName}${amount.toStringAsFixed(0)}元';
           break;
       }
 
@@ -1474,7 +1475,7 @@ class _BudgetConfigAction extends Action {
       await _onConfigChange?.call(configKey, amount);
 
       final message = category != null
-          ? '已将${category}预算设为${amount.toStringAsFixed(0)}元'
+          ? '已将${category.localizedCategoryName}预算设为${amount.toStringAsFixed(0)}元'
           : '已将月度预算设为${amount.toStringAsFixed(0)}元';
 
       return ActionResult.success(

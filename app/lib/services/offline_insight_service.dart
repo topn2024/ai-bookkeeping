@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
+import 'category_localization_service.dart';
 
 /// 离线洞察预生成服务
 ///
@@ -195,7 +196,7 @@ class OfflineInsightService {
     String topCategory = '未分类';
     double topAmount = 0;
     if (categories.isNotEmpty) {
-      topCategory = categories.first['name'] as String;
+      topCategory = (categories.first['name'] as String).localizedCategoryName;
       topAmount = (categories.first['amount'] as num).toDouble();
     }
 
@@ -433,7 +434,8 @@ class OfflineInsightService {
       );
     }
 
-    final category = result.first['name'] as String? ?? '未分类';
+    final rawCategory = result.first['name'] as String? ?? '未分类';
+    final category = rawCategory.localizedCategoryName;
     final diff = (result.first['diff'] as num).toDouble();
 
     if (diff > 0) {
