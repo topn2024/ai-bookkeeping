@@ -7,9 +7,8 @@ import '../trends_page.dart';
 import '../subscription_waste_page.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/budget_provider.dart';
-import '../../providers/recurring_provider.dart';
-import '../../models/transaction.dart';
-import '../../models/recurring_transaction.dart';
+import '../../providers/subscription_detection_provider.dart';
+import '../../services/subscription_tracking_service.dart';
 
 /// 洞察分析页面
 /// 原型设计 7.02：洞察分析
@@ -27,7 +26,7 @@ class InsightAnalysisPage extends ConsumerWidget {
     final monthlyExpense = ref.watch(monthlyExpenseProvider);
     final monthlyIncome = ref.watch(monthlyIncomeProvider);
     final budgets = ref.watch(budgetProvider);
-    final allRecurring = ref.watch(recurringProvider);
+    final detectedSubscriptions = ref.watch(detectedSubscriptionsProvider);
 
     // 计算拿铁因子（小额高频消费，如咖啡、奶茶等）
     final latteCategories = ['咖啡', '奶茶', '饮料', '零食'];
@@ -64,7 +63,7 @@ class InsightAnalysisPage extends ConsumerWidget {
                   children: [
                     _buildLatteFactorCard(theme, latteExpense, dailyLatte),
                     const SizedBox(height: 12),
-                    _buildSubscriptionAlert(theme, allRecurring),
+                    _buildSubscriptionAlert(theme, detectedSubscriptions),
                     const SizedBox(height: 12),
                     _buildSpendingPatternCard(theme, monthlyExpense),
                     const SizedBox(height: 12),
@@ -135,13 +134,9 @@ class InsightAnalysisPage extends ConsumerWidget {
   }
 
   /// 闲置订阅提醒
-  Widget _buildSubscriptionAlert(ThemeData theme, List<RecurringTransaction> allRecurring) {
-    final subscriptions = allRecurring
-        .where((r) => r.type == TransactionType.expense && r.isEnabled)
-        .toList();
-
-    if (subscriptions.isEmpty) {
-      return _InsightCard(
+  Widget _buildSubscriptionAlert(ThemeData theme, AsyncValue<List<SubscriptionPattern>> subscriptionsAsync) {
+    return subscriptionsAsync.when(
+      loading: () => _InsightCard(
         gradient: const LinearGradient(
           colors: [Color(0xFFFFEBEE), Color(0xFFFFCDD2)],
           begin: Alignment.topLeft,
@@ -149,45 +144,77 @@ class InsightAnalysisPage extends ConsumerWidget {
         ),
         icon: Icons.subscriptions,
         iconColor: Colors.red,
-        title: '闲置订阅',
+        title: '订阅支出',
         badge: null,
-        content: '暂无订阅数据，添加周期性支出后可自动检测',
+        content: '正在分析订阅数据...',
         actionText: null,
         actionColor: null,
         onAction: null,
-      );
-    }
-
-    final totalMonthly = subscriptions.fold<double>(0.0, (sum, r) {
-      switch (r.frequency) {
-        case RecurringFrequency.daily: return sum + r.amount * 30;
-        case RecurringFrequency.weekly: return sum + r.amount * 4.33;
-        case RecurringFrequency.monthly: return sum + r.amount;
-        case RecurringFrequency.yearly: return sum + r.amount / 12;
-      }
-    });
-
-    final count = subscriptions.length;
-    final badgeText = count >= 5 ? '偏多' : (count >= 3 ? '适中' : '良好');
-    final badgeColor = count >= 5 ? Colors.red : (count >= 3 ? Colors.orange : Colors.green);
-
-    return _InsightCard(
-      gradient: const LinearGradient(
-        colors: [Color(0xFFFFEBEE), Color(0xFFFFCDD2)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
       ),
-      icon: Icons.subscriptions,
-      iconColor: Colors.red,
-      title: '订阅支出',
-      badge: _InsightBadge(text: badgeText, color: badgeColor),
-      content: '当前 $count 项活跃订阅，月均支出 ¥${totalMonthly.toStringAsFixed(0)}',
-      actionText: '查看详情 →',
-      actionColor: Colors.red,
-      onAction: (context) => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const SubscriptionWastePage()),
+      error: (_, _) => _InsightCard(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFEBEE), Color(0xFFFFCDD2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        icon: Icons.subscriptions,
+        iconColor: Colors.red,
+        title: '订阅支出',
+        badge: null,
+        content: '订阅分析暂时不可用',
+        actionText: null,
+        actionColor: null,
+        onAction: null,
       ),
+      data: (subscriptions) {
+        if (subscriptions.isEmpty) {
+          return _InsightCard(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFFEBEE), Color(0xFFFFCDD2)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            icon: Icons.subscriptions,
+            iconColor: Colors.red,
+            title: '订阅支出',
+            badge: _InsightBadge(text: '良好', color: Colors.green),
+            content: '未检测到周期性订阅支出',
+            actionText: null,
+            actionColor: null,
+            onAction: null,
+          );
+        }
+
+        final totalMonthly = subscriptions.fold<double>(0.0, (sum, s) => sum + s.monthlyAmount);
+        final count = subscriptions.length;
+        final wasted = subscriptions.where((s) => s.usageStatus == UsageStatus.unused || s.usageStatus == UsageStatus.rarelyUsed).toList();
+
+        final badgeText = wasted.isNotEmpty ? '有浪费' : (count >= 5 ? '偏多' : '正常');
+        final badgeColor = wasted.isNotEmpty ? Colors.red : (count >= 5 ? Colors.orange : Colors.green);
+
+        final content = wasted.isNotEmpty
+            ? '检测到 $count 项订阅（月均 ¥${totalMonthly.toStringAsFixed(0)}），其中 ${wasted.length} 项可能闲置'
+            : '检测到 $count 项周期性订阅，月均支出 ¥${totalMonthly.toStringAsFixed(0)}';
+
+        return _InsightCard(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFFEBEE), Color(0xFFFFCDD2)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          icon: Icons.subscriptions,
+          iconColor: Colors.red,
+          title: '订阅支出',
+          badge: _InsightBadge(text: badgeText, color: badgeColor),
+          content: content,
+          actionText: '查看详情 →',
+          actionColor: Colors.red,
+          onAction: (context) => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SubscriptionWastePage()),
+          ),
+        );
+      },
     );
   }
 
