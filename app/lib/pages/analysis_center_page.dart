@@ -31,9 +31,12 @@ import 'reports/budget_report_page.dart';
 import 'custom_report_page.dart';
 
 // 洞察发现相关
-import 'reports/insight_analysis_page.dart';
 import 'ai/spending_prediction_page.dart';
 import 'actionable_advice_page.dart';
+import 'latte_factor_page.dart';
+import 'subscription_waste_page.dart';
+import 'trends_page.dart';
+import 'budget_management_page.dart';
 
 // 专项分析相关
 import 'money_age_page.dart';
@@ -1232,18 +1235,51 @@ class _InsightTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // AI洞察（含拿铁因子、订阅支出、消费习惯、预算执行）
+        // 拿铁因子
         _buildInsightCard(
           context, theme,
-          icon: Icons.auto_awesome,
-          title: 'AI智能洞察',
-          subtitle: '拿铁因子、订阅支出、消费习惯、预算执行',
-          color: Colors.purple,
-          page: const InsightAnalysisPage(),
+          icon: Icons.coffee,
+          title: '拿铁因子',
+          subtitle: '发现隐藏的小额高频消费',
+          color: Colors.brown,
+          page: const LatteFactorPage(),
         ),
         const SizedBox(height: 12),
 
-        // 消费预测
+        // 订阅支出
+        _buildInsightCard(
+          context, theme,
+          icon: Icons.subscriptions,
+          title: '订阅支出',
+          subtitle: '检测闲置订阅，减少浪费',
+          color: Colors.deepPurple,
+          page: const SubscriptionWastePage(),
+        ),
+        const SizedBox(height: 12),
+
+        // 消费习惯
+        _buildInsightCard(
+          context, theme,
+          icon: Icons.insights,
+          title: '消费习惯',
+          subtitle: '分析消费模式与行为趋势',
+          color: Colors.orange,
+          page: const TrendsPage(),
+        ),
+        const SizedBox(height: 12),
+
+        // 预算执行
+        _buildInsightCard(
+          context, theme,
+          icon: Icons.account_balance_wallet,
+          title: '预算执行',
+          subtitle: '预算使用情况与执行分析',
+          color: Colors.teal,
+          page: const BudgetManagementPage(),
+        ),
+        const SizedBox(height: 12),
+
+        // 消费趋势预测
         _buildInsightCard(
           context, theme,
           icon: Icons.timeline,
