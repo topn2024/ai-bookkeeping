@@ -1,60 +1,70 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/recurring_transaction.dart';
-import '../models/transaction.dart';
-import '../models/category.dart';
-import '../providers/recurring_provider.dart';
+import '../services/subscription_tracking_service.dart';
+import '../providers/subscription_detection_provider.dart';
 
 /// 订阅管理页面
 ///
-/// 基于真实的周期性交易数据（recurringProvider）展示订阅/固定支出
+/// 基于 AI 自动检测的周期性订阅数据展示
 class SubscriptionWastePage extends ConsumerWidget {
   const SubscriptionWastePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final allRecurring = ref.watch(recurringProvider);
-    // 只看支出类的周期性交易
-    final subscriptions = allRecurring
-        .where((r) => r.type == TransactionType.expense)
-        .toList();
-
-    final active = subscriptions.where((r) => r.isEnabled).toList();
-    final inactive = subscriptions.where((r) => !r.isEnabled).toList();
-
-    final totalMonthly = active.fold(0.0, (sum, r) => sum + _toMonthly(r));
+    final asyncSubscriptions = ref.watch(detectedSubscriptionsProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('订阅管理'),
       ),
-      body: subscriptions.isEmpty
-          ? _buildEmptyState()
-          : ListView(
-              children: [
-                _OverviewCard(
-                  totalMonthly: totalMonthly,
-                  activeCount: active.length,
-                ),
-                if (active.isNotEmpty) ...[
-                  const _SectionHeader(title: '活跃订阅'),
-                  ...active.map((r) => _SubscriptionCard(
-                    recurring: r,
-                    monthlyFee: _toMonthly(r),
-                  )),
-                ],
-                if (inactive.isNotEmpty) ...[
-                  const _SectionHeader(title: '已停用', color: Colors.grey),
-                  ...inactive.map((r) => _SubscriptionCard(
-                    recurring: r,
-                    monthlyFee: _toMonthly(r),
-                    isInactive: true,
-                  )),
-                ],
-                const SizedBox(height: 32),
+      body: asyncSubscriptions.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Text('加载失败: $e',
+                style: TextStyle(color: Colors.grey[600])),
+          ),
+        ),
+        data: (subscriptions) {
+          if (subscriptions.isEmpty) return _buildEmptyState();
+
+          final wasted = subscriptions
+              .where((s) => s.usageStatus.isWasted)
+              .toList();
+          final active = subscriptions
+              .where((s) => !s.usageStatus.isWasted)
+              .toList();
+
+          final totalMonthly = subscriptions.fold(
+              0.0, (sum, s) => sum + s.monthlyAmount);
+
+          return ListView(
+            children: [
+              _OverviewCard(
+                totalMonthly: totalMonthly,
+                activeCount: subscriptions.length,
+                wastedCount: wasted.length,
+              ),
+              if (wasted.isNotEmpty) ...[
+                const _SectionHeader(title: '可能闲置', color: Colors.orange),
+                ...wasted.map((s) => _SubscriptionCard(
+                  subscription: s,
+                  isWasted: true,
+                )),
               ],
-            ),
+              if (active.isNotEmpty) ...[
+                const _SectionHeader(title: '活跃订阅'),
+                ...active.map((s) => _SubscriptionCard(
+                  subscription: s,
+                )),
+              ],
+              const SizedBox(height: 32),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -67,25 +77,17 @@ class SubscriptionWastePage extends ConsumerWidget {
           children: [
             Icon(Icons.autorenew, size: 48, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text('暂无周期性支出',
+            Text('暂未检测到周期性订阅',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,
                     color: Colors.grey[700])),
             const SizedBox(height: 8),
-            Text('添加周期性交易后，这里会自动展示',
+            Text('需要至少6个月内同一商家2笔以上相同金额的支出',
+                textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 14, color: Colors.grey[600])),
           ],
         ),
       ),
     );
-  }
-
-  static double _toMonthly(RecurringTransaction r) {
-    switch (r.frequency) {
-      case RecurringFrequency.daily: return r.amount * 30;
-      case RecurringFrequency.weekly: return r.amount * 4.33;
-      case RecurringFrequency.monthly: return r.amount;
-      case RecurringFrequency.yearly: return r.amount / 12;
-    }
   }
 }
 
@@ -109,7 +111,12 @@ class _SectionHeader extends StatelessWidget {
 class _OverviewCard extends StatelessWidget {
   final double totalMonthly;
   final int activeCount;
-  const _OverviewCard({required this.totalMonthly, required this.activeCount});
+  final int wastedCount;
+  const _OverviewCard({
+    required this.totalMonthly,
+    required this.activeCount,
+    required this.wastedCount,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -128,7 +135,7 @@ class _OverviewCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('每月固定支出',
+              Text('每月订阅支出',
                   style: TextStyle(fontSize: 13, color: Colors.grey[600])),
               Text('¥${totalMonthly.toStringAsFixed(0)}',
                   style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
@@ -137,10 +144,11 @@ class _OverviewCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('活跃项目',
+              Text('$activeCount 项订阅',
                   style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-              Text('$activeCount个',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
+              if (wastedCount > 0)
+                Text('$wastedCount 项可能闲置',
+                    style: const TextStyle(fontSize: 13, color: Colors.orange)),
             ],
           ),
         ],
@@ -150,30 +158,25 @@ class _OverviewCard extends StatelessWidget {
 }
 
 class _SubscriptionCard extends StatelessWidget {
-  final RecurringTransaction recurring;
-  final double monthlyFee;
-  final bool isInactive;
+  final SubscriptionPattern subscription;
+  final bool isWasted;
 
   const _SubscriptionCard({
-    required this.recurring,
-    required this.monthlyFee,
-    this.isInactive = false,
+    required this.subscription,
+    this.isWasted = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cat = DefaultCategories.findById(recurring.category);
-    final catName = cat?.name ?? recurring.category;
-    final lastExec = recurring.lastExecutedAt;
-    final daysAgo = lastExec != null
-        ? DateTime.now().difference(lastExec).inDays : null;
+    final daysAgo = DateTime.now()
+        .difference(subscription.lastPaymentDate).inDays;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isInactive
-            ? Colors.grey[100]
+        color: isWasted
+            ? Colors.orange.withValues(alpha: 0.05)
             : Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [BoxShadow(
@@ -184,34 +187,40 @@ class _SubscriptionCard extends StatelessWidget {
           Container(
             width: 44, height: 44,
             decoration: BoxDecoration(
-              color: recurring.color.withValues(alpha: 0.15),
+              color: (isWasted ? Colors.orange : Colors.blue)
+                  .withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(recurring.icon, color: recurring.color, size: 22),
+            child: Icon(
+              isWasted ? Icons.warning_amber_rounded : Icons.autorenew,
+              color: isWasted ? Colors.orange : Colors.blue,
+              size: 22,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(recurring.name, style: TextStyle(
+                Text(subscription.merchantName, style: const TextStyle(
                   fontSize: 14, fontWeight: FontWeight.w500,
-                  color: isInactive ? Colors.grey : null,
                 )),
                 const SizedBox(height: 2),
                 Text(
-                  '$catName · ${recurring.frequencyName}'
-                  '${daysAgo != null ? " · 上次执行：${_formatDaysAgo(daysAgo)}" : ""}',
+                  '${subscription.interval.displayName} · '
+                  '¥${subscription.amount.toStringAsFixed(0)}/次 · '
+                  '${subscription.usageStatus.displayName} · '
+                  '上次: ${_formatDaysAgo(daysAgo)}',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
           ),
           Text(
-            '¥${monthlyFee.toStringAsFixed(0)}/月',
+            '¥${subscription.monthlyAmount.toStringAsFixed(0)}/月',
             style: TextStyle(
               fontSize: 14, fontWeight: FontWeight.w600,
-              color: isInactive ? Colors.grey : null,
+              color: isWasted ? Colors.orange : null,
             ),
           ),
         ],
