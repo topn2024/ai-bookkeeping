@@ -32,8 +32,6 @@ import 'custom_report_page.dart';
 
 // 洞察发现相关
 import 'reports/insight_analysis_page.dart';
-import 'latte_factor_page.dart';
-import 'subscription_waste_page.dart';
 import 'ai/spending_prediction_page.dart';
 import 'actionable_advice_page.dart';
 
@@ -1234,36 +1232,14 @@ class _InsightTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // AI洞察
+        // AI洞察（含拿铁因子、订阅支出、消费习惯、预算执行）
         _buildInsightCard(
           context, theme,
           icon: Icons.auto_awesome,
           title: 'AI智能洞察',
-          subtitle: '消费习惯、异常检测、优化建议',
+          subtitle: '拿铁因子、订阅支出、消费习惯、预算执行',
           color: Colors.purple,
           page: const InsightAnalysisPage(),
-        ),
-        const SizedBox(height: 12),
-
-        // 拿铁因子
-        _buildInsightCard(
-          context, theme,
-          icon: Icons.local_cafe,
-          title: '拿铁因子分析',
-          subtitle: '小额高频消费累计影响',
-          color: Colors.brown,
-          page: const LatteFactorPage(),
-        ),
-        const SizedBox(height: 12),
-
-        // 订阅浪费
-        _buildInsightCard(
-          context, theme,
-          icon: Icons.subscriptions,
-          title: '订阅浪费识别',
-          subtitle: '发现未使用的订阅服务',
-          color: Colors.orange,
-          page: const SubscriptionWastePage(),
         ),
         const SizedBox(height: 12),
 
