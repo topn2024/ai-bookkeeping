@@ -351,8 +351,8 @@ class SpendingInsightCalculator {
     final amounts = values.map((h) => h.total).toList();
     final mean = amounts.reduce((a, b) => a + b) / amounts.length;
     final stdDev = _calculateStdDev(amounts);
-    final cv = mean > 0 ? stdDev / mean : 0;
-    return (1 - cv).clamp(0.5, 0.95);
+    final cv = mean > 0 ? stdDev / mean : 0.0;
+    return (1.0 - cv).clamp(0.5, 0.95);
   }
 
   /// 分类级别月度预测（TOP N）
