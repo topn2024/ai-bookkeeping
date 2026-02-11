@@ -249,16 +249,6 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
   }
 
   void _applyAllocation() {
-    // 调试信息
-    final totalAllocated = _allocations.fold(0.0, (sum, item) => sum + item.amount);
-    print('🔍 [SmartAllocation] 收入: ${widget.incomeAmount}');
-    print('🔍 [SmartAllocation] 分配总额: $totalAllocated');
-    print('🔍 [SmartAllocation] 差额: ${widget.incomeAmount - totalAllocated}');
-    print('🔍 [SmartAllocation] 分类数量: ${_allocations.length}');
-    for (final item in _allocations) {
-      print('  - ${item.name}: ¥${item.amount}');
-    }
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(

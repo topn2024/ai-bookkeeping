@@ -47,7 +47,6 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
         }
       }
     });
-    print('🔍 [零基预算] 已加载现有分配: ${_vaultAllocations.length} 个小金库');
   }
 
   /// 计算本月实际收入
@@ -165,13 +164,6 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
   Widget build(BuildContext context) {
     final monthlyIncome = _calculateMonthlyIncome();
     final vaultState = ref.watch(budgetVaultProvider);
-
-    // 调试信息
-    print('🔍 [零基预算] 总小金库数: ${vaultState.vaults.length}');
-    print('🔍 [零基预算] 已启用小金库数: ${vaultState.vaults.where((v) => v.isEnabled).length}');
-    for (final vault in vaultState.vaults) {
-      print('  - ${vault.name}: enabled=${vault.isEnabled}, target=${vault.targetAmount}, allocated=${vault.allocatedAmount}');
-    }
 
     final vaults = vaultState.vaults.where((v) => v.isEnabled).toList();
 
@@ -313,20 +305,15 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
           _vaultAllocations.clear();
         });
 
-        print('🔍 [智能分配应用] 开始处理 ${result.length} 个分类');
-
         // 收集智能分配中所有的分类名称
         final smartAllocationNames = result.map((item) => item.name).toSet();
-        print('🔍 [智能分配应用] 智能分配的分类: ${smartAllocationNames.join(", ")}');
 
         // 1. 删除不在智能分配结果中的小金库
         final vaultsToDelete = vaultState.vaults.where((v) =>
           v.isEnabled && !smartAllocationNames.contains(v.name)
         ).toList();
 
-        print('🔍 [智能分配应用] 准备删除 ${vaultsToDelete.length} 个多余的小金库');
         for (final vault in vaultsToDelete) {
-          print('🔍 [智能分配应用] 删除多余小金库: ${vault.name}');
           await vaultNotifier.deleteVault(vault.id);
         }
 
@@ -345,10 +332,8 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
             setState(() {
               _vaultAllocations[matchingVault!.id] = item.amount;
             });
-            print('🔍 [智能分配应用] 匹配到现有小金库: ${item.name} -> ${matchingVault.id}');
           } else {
             // 没有找到匹配的小金库，自动创建
-            print('🔍 [智能分配应用] 创建新小金库: ${item.name}');
 
             final newVault = BudgetVault(
               id: 'vault_${item.id}_${DateTime.now().millisecondsSinceEpoch}',
@@ -378,31 +363,17 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
             setState(() {
               _vaultAllocations[newVault.id] = item.amount;
             });
-            print('🔍 [智能分配应用] 新小金库创建成功: ${item.name} -> ${newVault.id}');
           }
         }
 
         // 智能分配创建小金库后，立即同步已有交易的支出数据
         await ref.read(budgetVaultProvider.notifier).refresh();
 
-        // 调试信息
-        final totalFromSmart = _vaultAllocations.values.fold(0.0, (sum, amount) => sum + amount);
-        print('🔍 智能分配返回: 收入=$income, 分配总额=$totalFromSmart, 差额=${income - totalFromSmart}');
-        print('🔍 小金库分配明细:');
-        final currentVaults = ref.read(budgetVaultProvider).vaults;
-        for (final entry in _vaultAllocations.entries) {
-          try {
-            final vault = currentVaults.firstWhere((v) => v.id == entry.key);
-            print('  - ${vault.name}: ¥${entry.value}');
-          } catch (e) {
-            print('  - 未知小金库 ${entry.key}: ¥${entry.value}');
-          }
-        }
 
         // 智能分配完成提示已移除，避免遮挡底部按钮
       } catch (e, stack) {
-        print('🔍 智能分配应用失败: $e');
-        print('🔍 错误堆栈: $stack');
+        debugPrint('[零基预算] 智能分配应用失败: $e');
+        debugPrint('[零基预算] 错误堆栈: $stack');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('应用智能分配失败: $e')),
@@ -413,12 +384,8 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
   }
 
   void _confirmBudget() async {
-    print('🔍 [确认预算] 开始执行');
-    print('🔍 [确认预算] _isBalanced: $_isBalanced, _remaining: $_remaining');
-    print('🔍 [确认预算] _vaultAllocations: ${_vaultAllocations.length} 个');
 
     if (!_isBalanced) {
-      print('🔍 [确认预算] 未平衡，还有 $_remaining 未分配');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('还有 ¥${_remaining.toStringAsFixed(0)} 未分配'),
@@ -432,21 +399,15 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
     }
 
     try {
-      print('🔍 [确认预算] 开始更新小金库');
       final vaultNotifier = ref.read(budgetVaultProvider.notifier);
       final vaultState = ref.read(budgetVaultProvider);
-
-      print('🔍 [确认预算] 当前小金库状态: ${vaultState.vaults.length} 个');
 
       // 更新每个小金库的目标金额和已分配金额
       for (final entry in _vaultAllocations.entries) {
         final vaultId = entry.key;
         final targetAmount = entry.value;
 
-        print('🔍 [确认预算] 准备更新小金库: $vaultId, 金额: $targetAmount');
-
         final vault = vaultState.vaults.firstWhere((v) => v.id == vaultId);
-        print('🔍 [确认预算] 找到小金库: ${vault.name}');
 
         final updatedVault = BudgetVault(
           id: vault.id,
@@ -469,12 +430,8 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
           updatedAt: DateTime.now(),
         );
 
-        print('🔍 [确认预算] 调用 updateVault: ${vault.name}, target=$targetAmount, allocated=$targetAmount');
         await vaultNotifier.updateVault(updatedVault);
-        print('🔍 [确认预算] 小金库更新完成: ${vault.name}');
       }
-
-      print('🔍 [确认预算] 所有小金库更新完成');
 
       // 触发完整刷新，从已有交易中匹配计算各小金库的支出
       await ref.read(budgetVaultProvider.notifier).refresh();
@@ -482,8 +439,8 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
       if (!mounted) return;
       Navigator.pop(context);
     } catch (e, stack) {
-      print('🔍 [确认预算] 发生错误: $e');
-      print('🔍 [确认预算] 错误堆栈: $stack');
+      debugPrint('[零基预算] 确认预算发生错误: $e');
+      debugPrint('[零基预算] 错误堆栈: $stack');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('❌ 更新小金库失败: $e')),
@@ -536,22 +493,17 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
         vaultsByName.putIfAbsent(vault.name, () => []).add(vault);
       }
 
-      int deletedCount = 0;
       // 对每个分组，保留最新的，删除其他的
       for (final entry in vaultsByName.entries) {
         final vaults = entry.value;
         if (vaults.length > 1) {
           // 按更新时间排序，保留最新的
           vaults.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-          final toKeep = vaults.first;
           final toDelete = vaults.skip(1).toList();
 
           for (final vault in toDelete) {
             await vaultNotifier.deleteVault(vault.id);
-            deletedCount++;
           }
-
-          print('🔍 小金库"${entry.key}": 保留 ${toKeep.id}, 删除 ${toDelete.length} 个重复项');
         }
       }
 
