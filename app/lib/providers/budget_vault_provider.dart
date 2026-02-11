@@ -246,6 +246,41 @@ class BudgetVaultNotifier extends Notifier<BudgetVaultState> {
             totalSpent += amount;
             matchedCategories.add(category);
           }
+          // 生活消费类：匹配日常生活相关分类
+          else if (vault.name == '生活消费' &&
+                   (category.contains('餐') || category.contains('饮') ||
+                    category.contains('外卖') || category.contains('食品') ||
+                    category.contains('超市') || category.contains('日用') ||
+                    category.contains('水果') || category.contains('蔬菜') ||
+                    category.contains('交通') || category.contains('打车') ||
+                    category.contains('公交') || category.contains('地铁') ||
+                    category.contains('医疗') || category.contains('药') ||
+                    category.contains('通讯') || category.contains('话费'))) {
+            totalSpent += amount;
+            matchedCategories.add(category);
+          }
+          // 弹性支出类：匹配非固定的消费分类
+          else if (vault.name == '弹性支出' &&
+                   (category.contains('购物') || category.contains('服饰') ||
+                    category.contains('美容') || category.contains('娱乐') ||
+                    category.contains('电影') || category.contains('游戏') ||
+                    category.contains('旅游') || category.contains('运动') ||
+                    category.contains('健身') || category.contains('数码') ||
+                    category.contains('电器') || category.contains('礼物') ||
+                    category.contains('红包') || category.contains('人情'))) {
+            totalSpent += amount;
+            matchedCategories.add(category);
+          }
+          // 固定支出类：匹配固定费用分类
+          else if (vault.name == '固定支出' &&
+                   (category.contains('房租') || category.contains('水电') ||
+                    category.contains('物业') || category.contains('保险') ||
+                    category.contains('贷款') || category.contains('还款') ||
+                    category.contains('网费') || category.contains('宽带') ||
+                    category.contains('会员') || category.contains('订阅'))) {
+            totalSpent += amount;
+            matchedCategories.add(category);
+          }
           // 通用匹配：分类名包含小金库名，或小金库名包含分类名
           else if (category.contains(vault.name) || vault.name.contains(category)) {
             totalSpent += amount;

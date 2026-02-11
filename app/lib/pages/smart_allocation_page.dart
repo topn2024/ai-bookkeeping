@@ -7,6 +7,7 @@ import '../models/category.dart';
 import '../providers/recurring_provider.dart';
 import '../providers/budget_provider.dart';
 import '../providers/transaction_provider.dart';
+import '../services/smart_budget_engine.dart';
 
 /// 智能分配建议页面
 ///
@@ -29,6 +30,7 @@ class SmartAllocationPage extends ConsumerStatefulWidget {
 
 class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
   List<AllocationItem> _allocations = [];
+  List<String> _insights = [];
   double _unallocated = 0;
 
   @override
@@ -36,242 +38,48 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
     super.initState();
   }
 
-  /// 根据历史交易数据生成智能分配方案
+  /// 使用智能预算引擎生成分配方案
   void _generateSmartAllocations(
     List<RecurringTransaction> recurring,
     List<BudgetUsage> budgetUsages,
   ) {
-    // 获取历史交易数据
     final transactions = ref.read(transactionProvider);
-    final allocations = <AllocationItem>[];
-    int priorityId = 1;
 
-    // 分析最近3个月的消费模式
-    final now = DateTime.now();
-    final threeMonthsAgo = DateTime(now.year, now.month - 3, now.day);
-    final recentExpenses = transactions
-        .where((t) =>
-            t.type == TransactionType.expense &&
-            t.date.isAfter(threeMonthsAgo))
-        .toList();
+    final engine = SmartBudgetEngine(
+      monthlyIncome: widget.incomeAmount,
+      allTransactions: transactions,
+      recurringTransactions: recurring,
+    );
 
-    // 按分类统计平均月支出
-    final categorySpending = <String, double>{};
-    for (final expense in recentExpenses) {
-      categorySpending[expense.category] =
-          (categorySpending[expense.category] ?? 0) + expense.amount;
-    }
+    final result = engine.generate();
 
-    // 转换为月平均值
-    final monthsDiff = now.difference(threeMonthsAgo).inDays / 30;
-    categorySpending.forEach((category, total) {
-      categorySpending[category] = total / monthsDiff.clamp(1, 3);
-    });
+    // 转换为页面使用的 AllocationItem 格式
+    _allocations = result.items.map((item) => AllocationItem(
+      id: item.id,
+      name: item.name,
+      icon: item.icon,
+      color: item.color,
+      priority: item.priority,
+      priorityLabel: 'P${item.priority}',
+      amount: item.amount,
+      type: _mapCategory(item.type),
+      reason: item.reason,
+      details: item.details,
+    )).toList();
 
-    // 检测是否有历史数据
-    final hasHistoryData = categorySpending.isNotEmpty;
-
-    // 如果没有历史数据，使用冷启动方案
-    if (!hasHistoryData) {
-      _generateColdStartAllocation(allocations, priorityId);
-    } else {
-      // 有历史数据，基于实际消费生成智能分配
-      _generateDataDrivenAllocation(allocations, priorityId, categorySpending);
-    }
-
-    _allocations = allocations;
-    final totalAllocated = _allocations.fold(0.0, (sum, item) => sum + item.amount);
-    _unallocated = widget.incomeAmount - totalAllocated;
+    _insights = result.insights;
+    _unallocated = widget.incomeAmount - result.totalAllocated;
   }
 
-  /// 冷启动方案 - 没有历史数据时使用
-  void _generateColdStartAllocation(List<AllocationItem> allocations, int startPriority) {
-    // 使用合理的默认比例，总和=100%
-    final coldStartPlan = [
-      {'name': '固定支出', 'icon': Icons.home, 'color': Colors.red, 'percentage': 0.33, 'reason': '房租、水电、物业等必要支出', 'type': AllocationPriorityType.fixed},
-      {'name': '储蓄优先', 'icon': Icons.savings, 'color': Colors.green, 'percentage': 0.20, 'reason': '先存后花，养成储蓄习惯', 'type': AllocationPriorityType.savings},
-      {'name': '餐饮', 'icon': Icons.restaurant, 'color': Colors.orange, 'percentage': 0.20, 'reason': '日常三餐、外卖等', 'type': AllocationPriorityType.flexible},
-      {'name': '交通', 'icon': Icons.directions_car, 'color': Colors.blue, 'percentage': 0.10, 'reason': '通勤、出行费用', 'type': AllocationPriorityType.flexible},
-      {'name': '购物', 'icon': Icons.shopping_bag, 'color': Colors.purple, 'percentage': 0.10, 'reason': '服饰、日用品等', 'type': AllocationPriorityType.flexible},
-      {'name': '娱乐', 'icon': Icons.celebration, 'color': Colors.pink, 'percentage': 0.07, 'reason': '电影、运动、游戏等', 'type': AllocationPriorityType.flexible},
-    ];
-
-    var priority = startPriority;
-    for (final plan in coldStartPlan) {
-      allocations.add(AllocationItem(
-        id: priority.toString(),
-        name: plan['name'] as String,
-        icon: plan['icon'] as IconData,
-        color: plan['color'] as Color,
-        priority: priority,
-        priorityLabel: 'P$priority',
-        amount: widget.incomeAmount * (plan['percentage'] as double),
-        type: plan['type'] as AllocationPriorityType,
-        reason: '${plan['name']} · ${plan['reason']}',
-      ));
-      priority++;
+  AllocationPriorityType _mapCategory(AllocationCategory cat) {
+    switch (cat) {
+      case AllocationCategory.fixed:
+        return AllocationPriorityType.fixed;
+      case AllocationCategory.savings:
+        return AllocationPriorityType.savings;
+      case AllocationCategory.flexible:
+        return AllocationPriorityType.flexible;
     }
-  }
-
-  /// 基于历史数据的智能分配
-  void _generateDataDrivenAllocation(
-    List<AllocationItem> allocations,
-    int startPriority,
-    Map<String, double> categorySpending,
-  ) {
-    var priorityId = startPriority;
-
-    // P1: 固定支出 - 基于历史数据识别
-    double totalFixed = 0;
-    final fixedDetails = <String>[];
-
-    for (final entry in categorySpending.entries) {
-      if (_isFixedExpenseCategory(entry.key)) {
-        totalFixed += entry.value;
-        final cat = DefaultCategories.findById(entry.key);
-        fixedDetails.add('${cat?.name ?? entry.key}: ¥${entry.value.toStringAsFixed(0)}');
-      }
-    }
-
-    if (totalFixed > 0) {
-      allocations.add(AllocationItem(
-        id: priorityId.toString(),
-        name: '固定支出',
-        icon: Icons.home,
-        color: Colors.red,
-        priority: priorityId,
-        priorityLabel: 'P$priorityId',
-        amount: totalFixed.clamp(0, widget.incomeAmount * 0.5),
-        type: AllocationPriorityType.fixed,
-        reason: '固定支出 · 基于过去3个月平均',
-        details: fixedDetails.take(5).toList(),
-      ));
-      priorityId++;
-    }
-
-    // P2: 储蓄优先 - 建议20%
-    final suggestedSavings = widget.incomeAmount * 0.2;
-    final allocatedSoFar = allocations.fold(0.0, (sum, item) => sum + item.amount);
-    final remainingAfterFixed = widget.incomeAmount - allocatedSoFar;
-    final actualSavings = suggestedSavings.clamp(0.0, remainingAfterFixed * 0.4);
-
-    if (actualSavings > 0) {
-      allocations.add(AllocationItem(
-        id: priorityId.toString(),
-        name: '储蓄优先',
-        icon: Icons.savings,
-        color: Colors.green,
-        priority: priorityId,
-        priorityLabel: 'P$priorityId',
-        amount: actualSavings,
-        type: AllocationPriorityType.savings,
-        reason: '储蓄目标 · 建议储蓄20%收入',
-      ));
-      priorityId++;
-    }
-
-    // P3-P6: 细分日常消费 - 基于历史数据
-    final flexibleCategories = {
-      '餐饮': {'keywords': ['餐饮', '美食', '食品', '外卖', 'food', '早餐', '午餐', '晚餐'], 'icon': Icons.restaurant, 'color': Colors.orange},
-      '交通': {'keywords': ['交通', '出行', '打车', '公交', '地铁', 'transport'], 'icon': Icons.directions_car, 'color': Colors.blue},
-      '购物': {'keywords': ['购物', '服饰', '美容', 'shopping', '电商'], 'icon': Icons.shopping_bag, 'color': Colors.purple},
-      '娱乐': {'keywords': ['娱乐', '电影', '游戏', '运动', '健身', 'entertainment'], 'icon': Icons.celebration, 'color': Colors.pink},
-    };
-
-    // 收集所有弹性支出分类的历史数据
-    final flexibleCategoryData = <String, Map<String, dynamic>>{};
-    for (final entry in flexibleCategories.entries) {
-      double categoryTotal = 0;
-      final details = <String>[];
-
-      for (final spending in categorySpending.entries) {
-        final keywords = entry.value['keywords'] as List<String>;
-        if (keywords.any((k) => spending.key.toLowerCase().contains(k.toLowerCase()))) {
-          categoryTotal += spending.value;
-          final cat = DefaultCategories.findById(spending.key);
-          if (details.length < 3) {
-            details.add('${cat?.name ?? spending.key}: ¥${spending.value.toStringAsFixed(0)}');
-          }
-        }
-      }
-
-      // 只添加有消费记录的分类（至少100元）
-      if (categoryTotal > 100) {
-        flexibleCategoryData[entry.key] = {
-          'amount': categoryTotal,
-          'icon': entry.value['icon'],
-          'color': entry.value['color'],
-          'details': details.isEmpty ? null : details,
-        };
-      }
-    }
-
-    // 计算已分配金额和剩余可用金额
-    final totalAllocatedSoFar = allocations.fold(0.0, (sum, item) => sum + item.amount);
-    final remainingForFlexible = (widget.incomeAmount - totalAllocatedSoFar).clamp(0.0, double.infinity);
-
-    // 如果有剩余金额，按比例分配给弹性支出分类
-    if (remainingForFlexible > 0 && flexibleCategoryData.isNotEmpty) {
-      final totalFlexibleFromHistory = flexibleCategoryData.values.fold(0.0, (sum, data) => sum + (data['amount'] as double));
-
-      for (final entry in flexibleCategoryData.entries) {
-        final historyAmount = entry.value['amount'] as double;
-        // 按历史比例分配剩余金额
-        final allocatedAmount = totalFlexibleFromHistory > 0
-            ? (historyAmount / totalFlexibleFromHistory * remainingForFlexible)
-            : (remainingForFlexible / flexibleCategoryData.length);
-
-        allocations.add(AllocationItem(
-          id: priorityId.toString(),
-          name: entry.key,
-          icon: entry.value['icon'] as IconData,
-          color: entry.value['color'] as Color,
-          priority: priorityId,
-          priorityLabel: 'P$priorityId',
-          amount: allocatedAmount,
-          type: AllocationPriorityType.flexible,
-          reason: '${entry.key} · 基于过去3个月平均',
-          details: entry.value['details'] as List<String>?,
-        ));
-        priorityId++;
-      }
-    }
-
-    // 检查是否还有剩余金额（由于精度问题可能会有小额剩余）
-    final totalAllocated = allocations.fold(0.0, (sum, item) => sum + item.amount);
-    final remaining = widget.incomeAmount - totalAllocated;
-
-    // 如果剩余金额>10元，添加到"其他弹性支出"
-    // （小于10元的差额可能是精度问题，忽略）
-    if (remaining > 10) {
-      allocations.add(AllocationItem(
-        id: priorityId.toString(),
-        name: '其他弹性支出',
-        icon: Icons.more_horiz,
-        color: Colors.grey,
-        priority: priorityId,
-        priorityLabel: 'P$priorityId',
-        amount: remaining,
-        type: AllocationPriorityType.flexible,
-        reason: '剩余可支配金额',
-      ));
-    } else if (remaining > 1) {
-      // 小额剩余分配到第一个弹性支出分类
-      if (allocations.isNotEmpty) {
-        for (final item in allocations.reversed) {
-          if (item.type == AllocationPriorityType.flexible) {
-            item.amount += remaining;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  /// 判断是否为固定支出分类（房租、水电、物业等）
-  bool _isFixedExpenseCategory(String category) {
-    final fixedCategories = ['房租', '水电', '物业', '保险', '通讯', '网费', '话费', 'rent', 'utilities'];
-    return fixedCategories.any((c) => category.toLowerCase().contains(c.toLowerCase()));
   }
 
 
@@ -354,6 +162,27 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
                     : ListView(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         children: [
+                          // 智能洞察
+                          if (_insights.isNotEmpty)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF3E8FF),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: _insights.map((insight) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Text(
+                                    insight,
+                                    style: const TextStyle(fontSize: 12, height: 1.5),
+                                  ),
+                                )).toList(),
+                              ),
+                            ),
+
                           ..._allocations.map((item) => _AllocationItemCard(
                             item: item,
                             onAmountChanged: (amount) {
@@ -444,9 +273,6 @@ class _SmartAllocationPageState extends ConsumerState<SmartAllocationPage> {
             onPressed: () {
               Navigator.pop(context);
               Navigator.pop(context, _allocations);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('分配方案已应用')),
-              );
             },
             child: const Text('确认'),
           ),
@@ -770,7 +596,7 @@ class AllocationItem {
   final String priorityLabel;
   double amount;
   final AllocationPriorityType type;
-  final String reason;
+  String reason;
   final List<String>? details;  // 分配详情（如具体的支出项）
 
   AllocationItem({
