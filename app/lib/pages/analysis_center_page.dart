@@ -36,7 +36,7 @@ import 'actionable_advice_page.dart';
 import 'latte_factor_page.dart';
 import 'subscription_waste_page.dart';
 import 'trends_page.dart';
-import 'budget_management_page.dart';
+import 'vault_overview_page.dart';
 
 // 专项分析相关
 import 'money_age_page.dart';
@@ -1273,9 +1273,9 @@ class _InsightTab extends StatelessWidget {
           context, theme,
           icon: Icons.account_balance_wallet,
           title: '预算执行',
-          subtitle: '预算使用情况与执行分析',
+          subtitle: '零基预算小金库使用情况',
           color: Colors.teal,
-          page: const BudgetManagementPage(),
+          page: const VaultOverviewPage(),
         ),
         const SizedBox(height: 12),
 
