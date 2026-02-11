@@ -240,19 +240,109 @@ class PreciseLocationService implements LocationService {
     stopLocationStream();
   }
 
-  /// 反向地理编码
+  /// 反向地理编码（本地城市库匹配，后续接入地图API替换）
   Future<Map<String, String>> _reverseGeocode(Position position) async {
-    // 实际实现需要调用高德或百度地图API
+    // 在本地城市库中找到最近的城市
+    String? matchedCity;
+    String? matchedProvince;
+    double minDistance = double.infinity;
+
+    for (final entry in _localCityDatabase) {
+      final cityPos = Position(
+        latitude: entry['lat'] as double,
+        longitude: entry['lng'] as double,
+        timestamp: DateTime.now(),
+      );
+      final distance = position.distanceTo(cityPos);
+      if (distance < minDistance) {
+        minDistance = distance;
+        matchedCity = entry['city'] as String;
+        matchedProvince = entry['province'] as String;
+      }
+    }
+
+    // 50公里内匹配到城市
+    if (matchedCity != null && minDistance <= 50000) {
+      return {
+        'country': '中国',
+        'province': matchedProvince!,
+        'city': matchedCity,
+        'district': '',
+        'street': '',
+        'address': '$matchedProvince$matchedCity',
+        'poi': '',
+      };
+    }
+
+    // 未匹配到城市，返回空值（后续接入地图API可获取精确地址）
     return {
       'country': '中国',
-      'province': '北京市',
-      'city': '北京市',
-      'district': '朝阳区',
-      'street': '建国路',
-      'address': '北京市朝阳区建国路',
+      'province': '',
+      'city': '',
+      'district': '',
+      'street': '',
+      'address': '',
       'poi': '',
     };
   }
+
+  /// 本地城市坐标库（一二线城市，后续接入地图API后可移除）
+  static const _localCityDatabase = <Map<String, dynamic>>[
+    // 一线城市
+    {'city': '北京市', 'province': '北京市', 'lat': 39.9042, 'lng': 116.4074},
+    {'city': '上海市', 'province': '上海市', 'lat': 31.2304, 'lng': 121.4737},
+    {'city': '广州市', 'province': '广东省', 'lat': 23.1291, 'lng': 113.2644},
+    {'city': '深圳市', 'province': '广东省', 'lat': 22.5431, 'lng': 114.0579},
+    // 新一线城市
+    {'city': '成都市', 'province': '四川省', 'lat': 30.5728, 'lng': 104.0668},
+    {'city': '重庆市', 'province': '重庆市', 'lat': 29.5630, 'lng': 106.5516},
+    {'city': '杭州市', 'province': '浙江省', 'lat': 30.2741, 'lng': 120.1551},
+    {'city': '武汉市', 'province': '湖北省', 'lat': 30.5928, 'lng': 114.3055},
+    {'city': '西安市', 'province': '陕西省', 'lat': 34.3416, 'lng': 108.9398},
+    {'city': '南京市', 'province': '江苏省', 'lat': 32.0603, 'lng': 118.7969},
+    {'city': '天津市', 'province': '天津市', 'lat': 39.0842, 'lng': 117.2009},
+    {'city': '长沙市', 'province': '湖南省', 'lat': 28.2282, 'lng': 112.9388},
+    {'city': '郑州市', 'province': '河南省', 'lat': 34.7466, 'lng': 113.6253},
+    {'city': '东莞市', 'province': '广东省', 'lat': 23.0430, 'lng': 113.7633},
+    {'city': '苏州市', 'province': '江苏省', 'lat': 31.2990, 'lng': 120.5853},
+    {'city': '沈阳市', 'province': '辽宁省', 'lat': 41.8057, 'lng': 123.4315},
+    {'city': '青岛市', 'province': '山东省', 'lat': 36.0671, 'lng': 120.3826},
+    {'city': '合肥市', 'province': '安徽省', 'lat': 31.8206, 'lng': 117.2272},
+    {'city': '佛山市', 'province': '广东省', 'lat': 23.0218, 'lng': 113.1219},
+    // 二线城市
+    {'city': '宁波市', 'province': '浙江省', 'lat': 29.8683, 'lng': 121.5440},
+    {'city': '昆明市', 'province': '云南省', 'lat': 25.0389, 'lng': 102.7183},
+    {'city': '无锡市', 'province': '江苏省', 'lat': 31.4912, 'lng': 120.3119},
+    {'city': '大连市', 'province': '辽宁省', 'lat': 38.9140, 'lng': 121.6147},
+    {'city': '厦门市', 'province': '福建省', 'lat': 24.4798, 'lng': 118.0894},
+    {'city': '福州市', 'province': '福建省', 'lat': 26.0745, 'lng': 119.2965},
+    {'city': '济南市', 'province': '山东省', 'lat': 36.6512, 'lng': 116.9972},
+    {'city': '温州市', 'province': '浙江省', 'lat': 27.9939, 'lng': 120.6994},
+    {'city': '石家庄市', 'province': '河北省', 'lat': 38.0428, 'lng': 114.5149},
+    {'city': '呼和浩特市', 'province': '内蒙古自治区', 'lat': 40.8414, 'lng': 111.7519},
+    {'city': '哈尔滨市', 'province': '黑龙江省', 'lat': 45.8038, 'lng': 126.5350},
+    {'city': '长春市', 'province': '吉林省', 'lat': 43.8171, 'lng': 125.3235},
+    {'city': '南宁市', 'province': '广西壮族自治区', 'lat': 22.8170, 'lng': 108.3665},
+    {'city': '泉州市', 'province': '福建省', 'lat': 24.8741, 'lng': 118.6757},
+    {'city': '贵阳市', 'province': '贵州省', 'lat': 26.6470, 'lng': 106.6302},
+    {'city': '南昌市', 'province': '江西省', 'lat': 28.6820, 'lng': 115.8579},
+    {'city': '常州市', 'province': '江苏省', 'lat': 31.8106, 'lng': 119.9741},
+    {'city': '海口市', 'province': '海南省', 'lat': 20.0440, 'lng': 110.1999},
+    {'city': '拉萨市', 'province': '西藏自治区', 'lat': 29.6500, 'lng': 91.1409},
+    {'city': '兰州市', 'province': '甘肃省', 'lat': 36.0611, 'lng': 103.8343},
+    {'city': '银川市', 'province': '宁夏回族自治区', 'lat': 38.4872, 'lng': 106.2309},
+    {'city': '西宁市', 'province': '青海省', 'lat': 36.6171, 'lng': 101.7782},
+    {'city': '乌鲁木齐市', 'province': '新疆维吾尔自治区', 'lat': 43.8256, 'lng': 87.6168},
+    {'city': '三亚市', 'province': '海南省', 'lat': 18.2528, 'lng': 109.5120},
+    {'city': '惠州市', 'province': '广东省', 'lat': 23.1116, 'lng': 114.4161},
+    {'city': '肇庆市', 'province': '广东省', 'lat': 23.0469, 'lng': 112.4653},
+    {'city': '中山市', 'province': '广东省', 'lat': 22.5166, 'lng': 113.3926},
+    {'city': '珠海市', 'province': '广东省', 'lat': 22.2710, 'lng': 113.5767},
+    {'city': '南通市', 'province': '江苏省', 'lat': 31.9800, 'lng': 120.8943},
+    {'city': '淄博市', 'province': '山东省', 'lat': 36.8131, 'lng': 118.0548},
+    {'city': '烟台市', 'province': '山东省', 'lat': 37.4638, 'lng': 121.4479},
+    // TODO: 后续接入地图API后移除本地城市库
+  ];
 
   /// 判定城市等级
   CityTier _determineCityTier(String city) {
