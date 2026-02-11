@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/transaction.dart';
 import '../providers/transaction_provider.dart';
+import '../services/category_localization_service.dart';
 import 'reports/monthly_report_page.dart';
 
 class AnnualReportPage extends ConsumerStatefulWidget {
@@ -507,7 +508,7 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
                   _buildHighlightItem(
                     Icons.shopping_cart,
                     '最大支出',
-                    report.topExpenseCategories.first.key,
+                    report.topExpenseCategories.first.key.localizedCategoryName,
                     Colors.orange,
                   ),
               ],
@@ -648,6 +649,7 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
 
   Widget _buildCategoryRow(String category, double amount, double total, Color color) {
     final percent = total > 0 ? amount / total : 0.0;
+    final displayName = category.localizedCategoryName;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
@@ -655,7 +657,7 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(category),
+              Text(displayName),
               Text(
                 '¥${amount.toStringAsFixed(0)}',
                 style: TextStyle(fontWeight: FontWeight.bold, color: color),
@@ -874,7 +876,7 @@ class _AnnualReportPageState extends ConsumerState<AnnualReportPage> {
           ? (topCategory.value / report.totalExpense * 100)
           : 0;
       if (topPercent > 30) {
-        advice.add('${topCategory.key}支出占比${topPercent.toStringAsFixed(0)}%，建议关注这方面的开支');
+        advice.add('${topCategory.key.localizedCategoryName}支出占比${topPercent.toStringAsFixed(0)}%，建议关注这方面的开支');
       }
     }
 
