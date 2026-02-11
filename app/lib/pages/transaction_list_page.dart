@@ -515,7 +515,7 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
                         Expanded(
                           child: Text(
                             _selectedCategory != null
-                                ? DefaultCategories.findById(_selectedCategory!)?.name ?? _selectedCategory!
+                                ? _selectedCategory!.localizedCategoryName
                                 : '选择分类',
                             style: TextStyle(
                               color: _selectedCategory != null ? AppColors.textPrimary : AppColors.textSecondary,

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../category_localization_service.dart';
 import 'entity_disambiguation_service.dart';
 
 /// 语音删除与安全确认服务
@@ -190,7 +191,7 @@ class VoiceDeleteService extends ChangeNotifier {
       return DeleteResult.awaitingVoiceConfirmation(
         records: [record],
         confirmLevel: confirmLevel,
-        prompt: '确定删除${record.description ?? record.category}'
+        prompt: '确定删除${record.description ?? (record.category?.localizedCategoryName ?? "记录")}'
             '¥${record.amount.toStringAsFixed(2)}吗？说"确认"或"取消"',
       );
     }

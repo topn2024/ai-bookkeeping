@@ -1,4 +1,5 @@
 import '../../models/transaction.dart' as model;
+import '../../services/category_localization_service.dart';
 
 /// 语音操作反馈服务
 ///
@@ -47,7 +48,7 @@ class VoiceActionFeedbackService {
         buffer.write('¥${result.amount.toStringAsFixed(2)}');
 
         if (result.category != null) {
-          buffer.write(' · ${result.category}');
+          buffer.write(' · ${result.category!.localizedCategoryName}');
         }
 
         if (result.merchant != null) {

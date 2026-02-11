@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'category_localization_service.dart';
 
 /// 消费趋势预测服务
 ///
@@ -166,7 +167,7 @@ class TrendPredictionService {
 
       predictions.add(CategoryPrediction(
         categoryId: category.id,
-        categoryName: category.name,
+        categoryName: CategoryLocalizationService.instance.getCategoryName(category.id),
         predictedAmount: predicted,
         trend: trend,
         trendPercentage: _calculateTrendPercentage(history),

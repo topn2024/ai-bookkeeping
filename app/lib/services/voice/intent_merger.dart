@@ -1,3 +1,4 @@
+import '../category_localization_service.dart';
 import '../voice_service_coordinator.dart' show VoiceIntentType;
 import 'multi_intent_models.dart';
 import 'noise_filter.dart';
@@ -242,12 +243,12 @@ class IntentMerger {
   String? _generateDescription(SegmentAnalysis segment) {
     // 优先使用分类 + 商家
     if (segment.category != null && segment.merchant != null) {
-      return '${segment.category} - ${segment.merchant}';
+      return '${segment.category!.localizedCategoryName} - ${segment.merchant}';
     }
 
     // 只有分类
     if (segment.category != null) {
-      return segment.category;
+      return segment.category!.localizedCategoryName;
     }
 
     // 只有商家

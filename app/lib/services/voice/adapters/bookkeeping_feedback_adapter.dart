@@ -3,6 +3,7 @@ import '../intelligence_engine/intelligence_engine.dart';
 import '../intelligence_engine/models.dart';
 import '../llm_response_generator.dart';
 import '../../casual_chat_service.dart';
+import '../../category_localization_service.dart';
 
 /// 记账反馈适配器
 ///
@@ -303,7 +304,7 @@ class BookkeepingFeedbackAdapter implements FeedbackAdapter {
       final total = transactions.fold<double>(0, (sum, t) => sum + t.amount);
       if (transactions.length == 1) {
         final t = transactions.first;
-        return '记了${t.category}${t.amount.toStringAsFixed(0)}元';
+        return '记了${t.category.localizedCategoryName}${t.amount.toStringAsFixed(0)}元';
       }
       return '记了${transactions.length}笔，共${total.toStringAsFixed(0)}元';
     }
@@ -312,7 +313,7 @@ class BookkeepingFeedbackAdapter implements FeedbackAdapter {
     if (transactions.length == 1) {
       final t = transactions.first;
       final noteStr = t.description != null ? '，${t.description}' : '';
-      return '好的，已记录${t.category}${t.isIncome ? "收入" : "支出"}${t.amount.toStringAsFixed(0)}元$noteStr';
+      return '好的，已记录${t.category.localizedCategoryName}${t.isIncome ? "收入" : "支出"}${t.amount.toStringAsFixed(0)}元$noteStr';
     }
 
     final expenseTotal = transactions

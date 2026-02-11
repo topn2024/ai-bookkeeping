@@ -863,7 +863,7 @@ class _VoiceRecognitionPageState extends ConsumerState<VoiceRecognitionPage>
                               ),
                             ),
                             title: Text(
-                              t.note ?? DefaultCategories.findById(t.category)?.name ?? t.category,
+                              t.note ?? t.category.localizedCategoryName,
                               style: TextStyle(
                                 color: isDark ? Colors.white : Colors.black87,
                               ),

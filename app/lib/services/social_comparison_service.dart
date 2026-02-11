@@ -1,3 +1,4 @@
+import 'category_localization_service.dart';
 import 'database_service.dart';
 
 /// 用户画像标签
@@ -570,15 +571,7 @@ class SocialComparisonService {
   }
 
   String _getCategoryDisplayName(String category) {
-    const names = {
-      'food': '餐饮',
-      'transport': '交通',
-      'entertainment': '娱乐',
-      'shopping': '购物',
-      'housing': '居住',
-      'education': '教育',
-    };
-    return names[category] ?? category;
+    return CategoryLocalizationService.instance.getCategoryName(category);
   }
 
   String _generatePositiveMessage(UserRanking ranking) {

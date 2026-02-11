@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'category_localization_service.dart';
 
 /// 对话上下文持久化服务
 ///
@@ -120,7 +121,7 @@ class DialogContextPersistenceService {
         final tx = session.pendingTransaction;
         if (tx != null) {
           return '上次您要记录 ¥${tx.amount?.toStringAsFixed(2) ?? "?"} 的'
-              '${tx.category ?? "未分类"}消费，是否确认？';
+              '${tx.category != null ? tx.category!.localizedCategoryName : "未分类"}消费，是否确认？';
         }
         return '是否确认记录？';
 

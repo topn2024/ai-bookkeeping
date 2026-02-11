@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/category_localization_service.dart';
 
 /// Batch confirmation widget for multi-transaction split (第23章多笔拆分记账批量确认)
 class BatchTransactionConfirmWidget extends StatefulWidget {
@@ -216,7 +217,7 @@ class _BatchTransactionConfirmWidgetState extends State<BatchTransactionConfirmW
                       Row(
                         children: [
                           Text(
-                            transaction.category,
+                            transaction.category.localizedCategoryName,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w500,
                             ),

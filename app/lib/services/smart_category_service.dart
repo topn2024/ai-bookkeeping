@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'category_localization_service.dart';
 
 /// 智能分类服务 - 四层混合策略
 ///
@@ -207,7 +208,7 @@ class SmartCategoryService {
     return CategorySuggestion(
       category: category,
       confidence: 0.85 + frequency * 0.1,
-      reason: '在"$merchant"的消费通常记为${category.name}',
+      reason: '在"$merchant"的消费通常记为${CategoryLocalizationService.instance.getCategoryName(category.id)}',
       source: SuggestionSource.merchantHistory,
     );
   }
@@ -450,7 +451,7 @@ class LLMService {
         return LLMClassificationResult(
           category: category,
           confidence: 0.7,
-          explanation: '语义分析匹配"${category.name}"',
+          explanation: '语义分析匹配"${CategoryLocalizationService.instance.getCategoryName(category.id)}"',
         );
       }
     }

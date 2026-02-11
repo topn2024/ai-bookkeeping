@@ -546,7 +546,7 @@ class EntityDisambiguationService extends ChangeNotifier {
     final buffer = StringBuffer('找到${candidates.length}笔相似记录，您要操作哪一笔？\n');
     for (var i = 0; i < candidates.length; i++) {
       final c = candidates[i];
-      buffer.writeln('${i + 1}. ${c.record.description ?? c.record.category} '
+      buffer.writeln('${i + 1}. ${c.record.description ?? (c.record.category?.localizedCategoryName ?? "记录")} '
           '¥${c.record.amount.toStringAsFixed(2)} '
           '${_formatDate(c.record.date)}');
     }

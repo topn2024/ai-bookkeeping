@@ -1,3 +1,4 @@
+import '../services/category_localization_service.dart';
 import 'transaction_split.dart';
 import 'transaction_location.dart';
 
@@ -121,12 +122,12 @@ class Transaction {
   /// 获取拆分项的分类摘要显示
   String get splitCategorySummary {
     if (!isSplit || splits == null || splits!.isEmpty) {
-      return category;
+      return category.localizedCategoryName;
     }
     if (splits!.length == 1) {
-      return splits!.first.category;
+      return splits!.first.category.localizedCategoryName;
     }
-    return '${splits!.first.category} 等${splits!.length}项';
+    return '${splits!.first.category.localizedCategoryName} 等${splits!.length}项';
   }
 
   Transaction copyWith({

@@ -10,6 +10,7 @@
 library;
 
 import 'package:flutter/foundation.dart';
+import '../../category_localization_service.dart';
 import '../entity_disambiguation_service.dart';
 
 /// 确认级别
@@ -228,7 +229,7 @@ class SafetyConfirmationService {
 
       case ConfirmationLevel.light:
         return ConfirmationResult.light(
-          prompt: '确定删除${record.description ?? record.category}'
+          prompt: '确定删除${record.description ?? (record.category?.localizedCategoryName ?? "记录")}'
               '¥${record.amount.toStringAsFixed(2)}吗？说"确认"或"取消"',
           data: {'recordId': record.id, 'amount': record.amount},
         );
@@ -236,7 +237,7 @@ class SafetyConfirmationService {
       case ConfirmationLevel.standard:
         return ConfirmationResult.standard(
           prompt: '这是一笔较大金额的历史记录。'
-              '确定要删除${record.description ?? record.category}'
+              '确定要删除${record.description ?? (record.category?.localizedCategoryName ?? "记录")}'
               '¥${record.amount.toStringAsFixed(2)}吗？',
           data: {'recordId': record.id, 'amount': record.amount},
         );

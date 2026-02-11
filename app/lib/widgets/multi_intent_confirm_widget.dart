@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/category_localization_service.dart';
 import '../services/voice/multi_intent_models.dart';
 
 /// 多意图确认组件
@@ -197,7 +198,7 @@ class MultiIntentConfirmWidget extends StatelessWidget {
       ),
       subtitle: intent.category != null
           ? Text(
-              intent.category!,
+              intent.category!.localizedCategoryName,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.outline,
               ),

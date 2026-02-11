@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/member.dart';
 import '../providers/member_provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/category_localization_service.dart';
 
 class MemberManagementPage extends ConsumerStatefulWidget {
   final String ledgerId;
@@ -651,7 +652,7 @@ class _ApprovalCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${approval.requesterName} · ${approval.category}',
+                        '${approval.requesterName} · ${approval.category.localizedCategoryName}',
                         style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                       ),
                     ],
@@ -1025,7 +1026,7 @@ class _ApprovalActionDialogState extends ConsumerState<_ApprovalActionDialog> {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           Text('申请人: ${widget.approval.requesterName}'),
-          Text('分类: ${widget.approval.category}'),
+          Text('分类: ${widget.approval.category.localizedCategoryName}'),
           if (widget.approval.note != null)
             Text('备注: ${widget.approval.note}'),
           const SizedBox(height: 16),

@@ -6,6 +6,7 @@ import '../models/recurring_transaction.dart';
 import '../models/transaction.dart';
 import '../providers/recurring_provider.dart';
 import '../providers/category_provider.dart';
+import '../services/category_localization_service.dart';
 import '../providers/account_provider.dart';
 import '../extensions/extensions.dart';
 import '../theme/app_theme.dart';
@@ -143,7 +144,7 @@ class RecurringManagementPage extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${recurring.typeName} · ${recurring.category}',
+                        '${recurring.typeName} · ${recurring.category.localizedCategoryName}',
                         style: TextStyle(
                           color: theme.colorScheme.outline,
                           fontSize: 13,

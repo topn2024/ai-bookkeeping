@@ -8,6 +8,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../domain/events/domain_event.dart';
+import '../../services/category_localization_service.dart';
 import '../../domain/events/transaction_events.dart';
 import '../../domain/events/budget_events.dart';
 import '../../domain/repositories/i_budget_repository.dart';
@@ -372,7 +373,7 @@ class NotificationHandler implements IEventSubscriber {
   Future<void> _handleBudgetExceeded(BudgetExceededEvent event) async {
     final title = '预算超支提醒';
     final message =
-        '${event.budgetName ?? event.category ?? "总预算"}已超支${event.exceededAmount.toStringAsFixed(2)}元';
+        '${event.budgetName ?? (event.category != null ? event.category!.localizedCategoryName : "总预算")}已超支${event.exceededAmount.toStringAsFixed(2)}元';
 
     await onNotify?.call(title, message);
     debugPrint('[NotificationHandler] $title: $message');
@@ -381,7 +382,7 @@ class NotificationHandler implements IEventSubscriber {
   Future<void> _handleBudgetWarning(BudgetWarningEvent event) async {
     final title = '预算预警';
     final message =
-        '${event.budgetName ?? event.category ?? "总预算"}已使用${event.usagePercent.toStringAsFixed(1)}%';
+        '${event.budgetName ?? (event.category != null ? event.category!.localizedCategoryName : "总预算")}已使用${event.usagePercent.toStringAsFixed(1)}%';
 
     await onNotify?.call(title, message);
     debugPrint('[NotificationHandler] $title: $message');

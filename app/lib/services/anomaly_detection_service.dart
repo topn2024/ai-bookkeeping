@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'category_localization_service.dart';
 
 /// 数据不足警告
 class AnomalyDataInsufficiency {
@@ -229,7 +230,7 @@ class AnomalyDetectionService {
         severity: AnomalySeverity.high,
         transactionId: newTx.id,
         message:
-            '此笔${newTx.categoryName ?? ""}消费金额(¥${newTx.amount.toStringAsFixed(2)})显著高于平均水平(¥${mean.toStringAsFixed(0)})',
+            '此笔${newTx.categoryId != null ? CategoryLocalizationService.instance.getCategoryName(newTx.categoryId!) : ""}消费金额(¥${newTx.amount.toStringAsFixed(2)})显著高于平均水平(¥${mean.toStringAsFixed(0)})',
         suggestion: '请确认金额是否正确',
         metadata: {
           'mean': mean,
@@ -337,7 +338,7 @@ class AnomalyDetectionService {
         severity: AnomalySeverity.medium,
         transactionId: newTx.id,
         message:
-            '今日${newTx.categoryName ?? "此类"}消费次数($todayCount次)明显多于平常',
+            '今日${newTx.categoryId != null ? CategoryLocalizationService.instance.getCategoryName(newTx.categoryId!) : "此类"}消费次数($todayCount次)明显多于平常',
         suggestion: '是否有重复记录?',
         metadata: {
           'todayCount': todayCount,

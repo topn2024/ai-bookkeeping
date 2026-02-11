@@ -6,6 +6,7 @@ library;
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import '../../../models/transaction.dart' as model;
+import '../../../services/category_localization_service.dart';
 import 'query_models.dart';
 import 'query_calculator.dart';
 
@@ -302,7 +303,7 @@ class RecentCalculator implements QueryCalculatorStrategy {
       if (transaction.type == model.TransactionType.expense) {
         totalExpense += transaction.amount;
         dataPoints.add(DataPoint(
-          label: '${transaction.category} - ${DateFormat('MM-dd').format(transaction.date)}',
+          label: '${transaction.category.localizedCategoryName} - ${DateFormat('MM-dd').format(transaction.date)}',
           value: transaction.amount,
           timestamp: transaction.date,
           category: transaction.category,
@@ -310,7 +311,7 @@ class RecentCalculator implements QueryCalculatorStrategy {
       } else if (transaction.type == model.TransactionType.income) {
         totalIncome += transaction.amount;
         dataPoints.add(DataPoint(
-          label: '${transaction.category} - ${DateFormat('MM-dd').format(transaction.date)}',
+          label: '${transaction.category.localizedCategoryName} - ${DateFormat('MM-dd').format(transaction.date)}',
           value: transaction.amount,
           timestamp: transaction.date,
           category: transaction.category,

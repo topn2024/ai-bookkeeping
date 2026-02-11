@@ -4,6 +4,7 @@ import '../models/template.dart';
 import '../models/transaction.dart';
 import '../providers/template_provider.dart';
 import '../providers/transaction_provider.dart';
+import '../services/category_localization_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/duplicate_transaction_dialog.dart';
 import 'template_management_page.dart';
@@ -225,7 +226,7 @@ class _QuickEntryPageState extends ConsumerState<QuickEntryPage> {
         ),
         title: Text(template.name),
         subtitle: Text(
-          '${template.typeName} · ${template.category}',
+          '${template.typeName} · ${template.category.localizedCategoryName}',
           style: TextStyle(color: theme.colorScheme.outline),
         ),
         trailing: Row(

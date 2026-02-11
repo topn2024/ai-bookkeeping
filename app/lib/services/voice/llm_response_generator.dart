@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import '../category_localization_service.dart';
 import '../qwen_service.dart';
 
 /// LLM响应生成器
@@ -390,7 +391,7 @@ ${userInput != null ? '用户说的是：$userInput' : ''}
   String _buildTransactionPrompt(List<TransactionInfo> transactions, String userInput) {
     final txList = transactions.map((tx) {
       final type = tx.isIncome ? '收入' : '支出';
-      return '$type ${tx.amount}元 ${tx.category}${tx.merchant != null ? ' (${tx.merchant})' : ''}';
+      return '$type ${tx.amount}元 ${tx.category.localizedCategoryName}${tx.merchant != null ? ' (${tx.merchant})' : ''}';
     }).join('、');
 
     return '''

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../../../../core/contracts/i_database_service.dart';
 import '../../../../models/transaction.dart';
+import '../../../../services/category_localization_service.dart';
 import '../action_registry.dart';
 
 /// 分享交易记录Action
@@ -102,13 +103,14 @@ class ShareTransactionAction extends Action {
     final typeText = transaction.type == TransactionType.expense ? '支出' : '收入';
     final date = '${transaction.date.month}月${transaction.date.day}日';
 
+    final categoryName = transaction.category.localizedCategoryName;
     switch (shareType) {
       case 'text':
-        return '【记账打卡】$date${transaction.category}$typeText${transaction.amount.toStringAsFixed(2)}元${transaction.note != null ? " - ${transaction.note}" : ""}';
+        return '【记账打卡】$date$categoryName$typeText${transaction.amount.toStringAsFixed(2)}元${transaction.note != null ? " - ${transaction.note}" : ""}';
       case 'simple':
-        return '$typeText: ${transaction.category} ¥${transaction.amount.toStringAsFixed(2)}';
+        return '$typeText: $categoryName ¥${transaction.amount.toStringAsFixed(2)}';
       default:
-        return '${transaction.category} $typeText ${transaction.amount.toStringAsFixed(2)}元';
+        return '$categoryName $typeText ${transaction.amount.toStringAsFixed(2)}元';
     }
   }
 }

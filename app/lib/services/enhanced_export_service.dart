@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
+import 'category_localization_service.dart';
 import 'gamification_service.dart';
 
 /// 增强版导出服务
@@ -576,7 +577,7 @@ class EnhancedExportService {
         final status = spent > amount ? '超支' : (rate < 20 ? '紧张' : '正常');
 
         buffer.writeln(
-          '${budget.categoryId ?? budget.name},${amount.toStringAsFixed(2)},${spent.toStringAsFixed(2)},${remaining.toStringAsFixed(2)},${rate.toStringAsFixed(1)}%,$status',
+          '${budget.categoryId != null ? budget.categoryId!.localizedCategoryName : budget.name},${amount.toStringAsFixed(2)},${spent.toStringAsFixed(2)},${remaining.toStringAsFixed(2)},${rate.toStringAsFixed(1)}%,$status',
         );
       }
       buffer.writeln('');

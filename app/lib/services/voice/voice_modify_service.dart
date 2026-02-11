@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../category_localization_service.dart';
 import 'entity_disambiguation_service.dart';
 
 /// 语音修改记录服务
@@ -988,7 +989,7 @@ class ModifyPreview {
   /// 生成预览文本
   String generatePreviewText() {
     final buffer = StringBuffer();
-    buffer.writeln('原记录: ${originalRecord.description ?? originalRecord.category} '
+    buffer.writeln('原记录: ${originalRecord.description ?? (originalRecord.category?.localizedCategoryName ?? "记录")} '
         '¥${originalRecord.amount.toStringAsFixed(2)}');
     buffer.write('修改为: ');
 

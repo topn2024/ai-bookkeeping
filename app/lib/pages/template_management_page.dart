@@ -6,6 +6,7 @@ import '../models/transaction.dart';
 import '../providers/template_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/account_provider.dart';
+import '../services/category_localization_service.dart';
 import '../extensions/extensions.dart';
 import '../theme/app_theme.dart';
 
@@ -91,7 +92,7 @@ class TemplateManagementPage extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${template.typeName} · ${template.category}',
+              '${template.typeName} · ${template.category.localizedCategoryName}',
               style: TextStyle(color: theme.colorScheme.outline),
             ),
             if (template.useCount > 0)

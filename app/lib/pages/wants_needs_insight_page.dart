@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/transaction_provider.dart';
 import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 
 /// 必要支出分类ID列表
 const _needsCategoryIds = {
@@ -34,7 +35,7 @@ class WantsNeedsInsightPage extends ConsumerWidget {
           .where((c) => c.id == categoryId)
           .firstOrNull;
       final emoji = _getCategoryEmoji(categoryId);
-      final name = category?.name ?? categoryId;
+      final name = category?.localizedName ?? categoryId;
 
       if (_needsCategoryIds.contains(categoryId)) {
         needsAmount += amount;

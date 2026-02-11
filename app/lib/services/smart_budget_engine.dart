@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/transaction.dart';
 import '../models/recurring_transaction.dart';
 import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 
 /// 智能预算分配引擎
 ///
@@ -296,7 +297,7 @@ class SmartBudgetEngine {
       if (monthlyAmount > 0) {
         total += monthlyAmount;
         final cat = DefaultCategories.findById(recurring.category);
-        details.add('${cat?.name ?? recurring.category}: ¥${monthlyAmount.toStringAsFixed(0)}/月（周期性）');
+        details.add('${cat?.localizedName ?? recurring.category}: ¥${monthlyAmount.toStringAsFixed(0)}/月（周期性）');
       }
     }
 

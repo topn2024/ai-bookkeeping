@@ -13,6 +13,7 @@ library;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../category_localization_service.dart';
 import '../conversation_context.dart';
 
 /// 引用类型
@@ -352,7 +353,7 @@ class ContextManager {
     // 最近交易
     if (_lastTransaction != null) {
       parts.add(
-          '【最近交易】${_lastTransaction!.category} ${_lastTransaction!.amount}元');
+          '【最近交易】${_lastTransaction!.category.localizedCategoryName} ${_lastTransaction!.amount}元');
     }
 
     // 最近时间范围

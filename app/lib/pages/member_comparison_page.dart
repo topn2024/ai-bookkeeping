@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/member.dart';
 import '../providers/member_statistics_provider.dart';
 import '../providers/member_provider.dart';
+import '../services/category_localization_service.dart';
 
 class MemberComparisonPage extends ConsumerStatefulWidget {
   final String ledgerId;
@@ -495,7 +496,7 @@ class _MemberComparisonPageState extends ConsumerState<MemberComparisonPage> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(category.key)),
+                    Expanded(child: Text(category.key.localizedCategoryName)),
                     Text(
                       '¥${_formatAmount(category.value)}',
                       style: const TextStyle(fontWeight: FontWeight.w500),

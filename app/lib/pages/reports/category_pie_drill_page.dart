@@ -353,7 +353,7 @@ class _CategoryPieDrillPageState extends ConsumerState<CategoryPieDrillPage> {
             ),
             const SizedBox(width: 4),
             Text(
-              '${category?.name ?? '未知'} ${percentage.toStringAsFixed(0)}%',
+              '${category?.localizedName ?? '未知'} ${percentage.toStringAsFixed(0)}%',
               style: TextStyle(
                 fontSize: 11,
                 color: theme.colorScheme.onSurfaceVariant,

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/transaction.dart' as model;
 import '../core/di/service_locator.dart';
 import '../core/contracts/i_database_service.dart';
+import '../services/category_localization_service.dart';
 import '../services/duplicate_detection_service.dart';
 import '../utils/amount_validator.dart';
 import 'voice/entity_disambiguation_service.dart';
@@ -1911,7 +1912,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           transactions: [
             TransactionInfo(
               amount: transaction.amount,
-              category: transaction.category,
+              category: transaction.category.localizedCategoryName,
               isIncome: transaction.type == model.TransactionType.income,
             ),
           ],
@@ -2127,7 +2128,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         String voiceMessage;
         if (similarTx != null) {
           final timeAgo = _getTimeAgoDescription(similarTx.date);
-          voiceMessage = '这笔和$timeAgo记的${similarTx.category}${similarTx.amount.toStringAsFixed(0)}元很像，要继续记吗？';
+          voiceMessage = '这笔和$timeAgo记的${similarTx.category.localizedCategoryName}${similarTx.amount.toStringAsFixed(0)}元很像，要继续记吗？';
         } else {
           voiceMessage = '这笔可能是重复的，要继续记吗？';
         }
@@ -2137,7 +2138,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
         detailMessage.writeln('⚠️ 检测到疑似重复记录');
         if (similarTx != null) {
           final timeStr = _formatDateTime(similarTx.date);
-          detailMessage.writeln('与 $timeStr 记录的「${similarTx.category} ${similarTx.amount}元」高度相似');
+          detailMessage.writeln('与 $timeStr 记录的「${similarTx.category.localizedCategoryName} ${similarTx.amount}元」高度相似');
         }
         detailMessage.writeln('');
         detailMessage.write('请说"确认"继续记录，或"取消"放弃');
@@ -2329,7 +2330,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           message = searchResult.answer;
           final transaction = searchResult.data?['transaction'] as NLSearchTransaction?;
           if (transaction != null) {
-            message += '，${transaction.category ?? ''}${transaction.description ?? ''}';
+            message += '，${transaction.category != null ? transaction.category!.localizedCategoryName : ''}${transaction.description ?? ''}';
             resultData = {
               'transaction': {
                 'id': transaction.id,

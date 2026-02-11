@@ -508,7 +508,7 @@ class NaturalLanguageSearchService {
     }
 
     if (intent.category != null) {
-      buffer.write('${intent.category}');
+      buffer.write(intent.category!.localizedCategoryName);
     }
 
     if (intent.merchant != null) {
@@ -529,7 +529,7 @@ class NaturalLanguageSearchService {
     }
 
     if (intent.category != null) {
-      buffer.write('${intent.category}');
+      buffer.write(intent.category!.localizedCategoryName);
     }
 
     buffer.write('共消费 $count 次');

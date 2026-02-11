@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'category_localization_service.dart';
 
 /// 对话式记账助手服务
 ///
@@ -334,7 +335,7 @@ class DialogManagerService {
       final categories = await _categoryRepo.getAllExpenseCategories();
       return AssistantResponse(
         message: '请选择分类：',
-        suggestions: categories.take(6).map((c) => c.name).toList(),
+        suggestions: categories.take(6).map((c) => CategoryLocalizationService.instance.getCategoryName(c.id)).toList(),
         expectingType: ExpectingType.category,
       );
     }
@@ -378,7 +379,7 @@ class DialogManagerService {
       final categories = await _categoryRepo.getAllExpenseCategories();
       return AssistantResponse(
         message: '请选择一个有效的分类：',
-        suggestions: categories.take(6).map((c) => c.name).toList(),
+        suggestions: categories.take(6).map((c) => CategoryLocalizationService.instance.getCategoryName(c.id)).toList(),
         expectingType: ExpectingType.category,
       );
     }
@@ -419,7 +420,7 @@ class DialogManagerService {
       message: '''
 确认记录以下${tx.type == TransactionType.expense ? '消费' : '收入'}？
 • 金额：¥${tx.amount!.toStringAsFixed(2)}
-• 分类：${tx.category ?? '未分类'}
+• 分类：${tx.category != null ? tx.category!.localizedCategoryName : '未分类'}
 • 描述：${tx.description ?? '无'}
 • 日期：$dateStr
 ''',
@@ -462,7 +463,7 @@ class DialogManagerService {
       final categories = await _categoryRepo.getAllExpenseCategories();
       return AssistantResponse(
         message: '请选择新的分类：',
-        suggestions: categories.take(6).map((c) => c.name).toList(),
+        suggestions: categories.take(6).map((c) => CategoryLocalizationService.instance.getCategoryName(c.id)).toList(),
         expectingType: ExpectingType.category,
       );
     }
@@ -503,7 +504,7 @@ class DialogManagerService {
 
       String message;
       if (intent.category != null) {
-        message = '${intent.category}类消费共¥${total.toStringAsFixed(2)}，$count笔';
+        message = '${intent.category!.localizedCategoryName}类消费共¥${total.toStringAsFixed(2)}，$count笔';
       } else {
         message = '共消费¥${total.toStringAsFixed(2)}，$count笔';
       }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/transaction.dart';
 import '../models/recurring_transaction.dart';
 import '../models/category.dart';
+import '../extensions/category_extensions.dart';
 
 /// 智能预算建议引擎
 ///
@@ -173,7 +174,7 @@ class SmartSuggestionEngine {
       final changeRate = previous > 0 ? (latest - previous) / previous : 0.0;
 
       final cat = DefaultCategories.findById(entry.key);
-      final catName = cat?.name ?? entry.key;
+      final catName = cat?.localizedName ?? entry.key;
 
       BudgetSuggestion? suggestion;
 
@@ -326,7 +327,7 @@ class SmartSuggestionEngine {
       if (tx.date.isBefore(month) || tx.date.isAfter(monthEnd)) continue;
 
       final cat = DefaultCategories.findById(tx.category);
-      final catName = cat?.name ?? tx.category;
+      final catName = cat?.localizedName ?? tx.category;
 
       if (essentialKeywords.any((k) => catName.contains(k))) {
         essential += tx.amount;
@@ -436,7 +437,7 @@ class SmartSuggestionEngine {
       }
       totalMonthly += monthly;
       final cat = DefaultCategories.findById(sub.category);
-      items.add('${cat?.name ?? sub.category} ¥${monthly.toStringAsFixed(0)}/月');
+      items.add('${cat?.localizedName ?? sub.category} ¥${monthly.toStringAsFixed(0)}/月');
     }
     if (totalMonthly > monthlyIncome * 0.15 && monthlyIncome > 0) {
       return BudgetSuggestion(

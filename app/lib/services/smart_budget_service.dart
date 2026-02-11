@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:sqflite/sqflite.dart';
 
 import '../models/transaction.dart';
+import 'category_localization_service.dart';
 
 /// 预算建议
 class BudgetSuggestion {
@@ -203,8 +204,8 @@ class SmartBudgetService {
 
     for (final tx in transactions) {
       final categoryId = tx['categoryId'] as String?;
-      final categoryName = tx['categoryName'] as String? ?? '未分类';
       if (categoryId == null) continue;
+      final categoryName = CategoryLocalizationService.instance.getCategoryName(categoryId);
 
       final stats = categoryStats.putIfAbsent(
         categoryId,
@@ -436,7 +437,7 @@ class SmartBudgetService {
           anomalies.add(AnomalyExpense(
             transactionId: tx['id'] as String,
             categoryId: categoryId,
-            categoryName: tx['categoryName'] as String? ?? '未分类',
+            categoryName: CategoryLocalizationService.instance.getCategoryName(categoryId),
             amount: amount,
             expectedRange: AmountRange(
               min: max(0, mean - stdDev),
