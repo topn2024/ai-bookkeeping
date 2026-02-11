@@ -65,7 +65,7 @@ class InsightAnalysisPage extends ConsumerWidget {
                     const SizedBox(height: 12),
                     _buildSubscriptionAlert(theme, detectedSubscriptions),
                     const SizedBox(height: 12),
-                    _buildSpendingPatternCard(theme, monthlyExpense),
+                    _buildSpendingPatternCard(theme, monthlyExpense, categoryExpenses),
                     const SizedBox(height: 12),
                     _buildBudgetInsightCard(theme, foodUsagePercent, projectedOverspend),
                   ],
@@ -219,11 +219,55 @@ class InsightAnalysisPage extends ConsumerWidget {
   }
 
   /// 消费习惯卡片
-  Widget _buildSpendingPatternCard(ThemeData theme, double monthlyExpense) {
+  Widget _buildSpendingPatternCard(ThemeData theme, double monthlyExpense, Map<String, double> categoryExpenses) {
     final now = DateTime.now();
     final daysElapsed = now.day;
-    final dailyAvg = daysElapsed > 0 ? monthlyExpense / daysElapsed : 0;
     final hasData = monthlyExpense > 0;
+
+    if (!hasData) {
+      return _InsightCard(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        icon: Icons.trending_up,
+        iconColor: Colors.green,
+        title: '消费习惯',
+        badge: null,
+        content: '暂无消费数据，开始记账后可查看分析',
+        actionText: '查看趋势 →',
+        actionColor: Colors.green,
+        onAction: (context) => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TrendsPage()),
+        ),
+      );
+    }
+
+    // 找出最大支出分类
+    final sorted = categoryExpenses.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final topCategory = sorted.first;
+    final topPercent = (topCategory.value / monthlyExpense * 100).toInt();
+
+    // 判断消费集中度
+    final String badgeText;
+    final Color badgeColor;
+    if (topPercent >= 60) {
+      badgeText = '过于集中';
+      badgeColor = Colors.red;
+    } else if (topPercent >= 40) {
+      badgeText = '较集中';
+      badgeColor = Colors.orange;
+    } else {
+      badgeText = '均衡';
+      badgeColor = Colors.green;
+    }
+
+    final dailyAvg = monthlyExpense / daysElapsed;
+    final content = '${topCategory.key}占比最高（$topPercent%），'
+        '日均支出 ¥${dailyAvg.toStringAsFixed(0)}';
 
     return _InsightCard(
       gradient: const LinearGradient(
@@ -234,10 +278,8 @@ class InsightAnalysisPage extends ConsumerWidget {
       icon: Icons.trending_up,
       iconColor: Colors.green,
       title: '消费习惯',
-      badge: hasData ? _InsightBadge(text: '分析中', color: Colors.green) : null,
-      content: hasData
-          ? '本月已支出 ¥${monthlyExpense.toStringAsFixed(0)}，日均 ¥${dailyAvg.toStringAsFixed(0)}'
-          : '暂无消费数据，开始记账后可查看分析',
+      badge: _InsightBadge(text: badgeText, color: badgeColor),
+      content: content,
       actionText: '查看趋势 →',
       actionColor: Colors.green,
       onAction: (context) => Navigator.push(
