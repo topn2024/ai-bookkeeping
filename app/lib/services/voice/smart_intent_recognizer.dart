@@ -5,6 +5,7 @@ import '../qwen_service.dart';
 import '../voice_service_coordinator.dart' show VoiceIntentType;
 import '../voice_navigation_service.dart';
 import '../location_data_services.dart';
+import '../location_service.dart' show PreciseLocationService;
 import 'voice_intent_router.dart';
 import 'network_monitor.dart' show NetworkStatus, RoutingMode;
 import 'unified_intent_type.dart' as unified;
@@ -76,7 +77,21 @@ class SmartIntentRecognizer {
   Future<void> preloadUserCity() async {
     try {
       final cityService = CityLocationService();
-      final cityInfo = await cityService.getCurrentCity();
+      var cityInfo = await cityService.getCurrentCity();
+
+      // 缓存未命中时，尝试通过 GPS 定位识别城市
+      if (cityInfo == null) {
+        try {
+          final locationService = PreciseLocationService();
+          final position = await locationService.getCurrentPosition();
+          if (position != null) {
+            cityInfo = await cityService.identifyCity(position);
+          }
+        } catch (_) {
+          // GPS 获取失败，静默忽略
+        }
+      }
+
       if (cityInfo != null && cityInfo.name.isNotEmpty) {
         // 移除"市"后缀
         _cachedCityName = cityInfo.name.replaceAll('市', '');

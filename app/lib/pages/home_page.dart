@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../l10n/l10n.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/auth_provider.dart';
+import '../models/budget.dart' show MoneyAge;
 import '../providers/budget_provider.dart';
 import '../providers/budget_vault_provider.dart';
 import '../providers/gamification_provider.dart';
@@ -181,7 +182,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               const BudgetAlertBanner(),
               _buildTodayAllowanceCard(context, theme, monthlyIncome, monthlyExpense),
               _buildCelebrationCard(context, theme),
-              _buildMoneyAgeCard(context, theme, ref),
+              _buildMoneyAgeCard(context, theme, ref, moneyAgeData),
               _buildQuickStats(context, theme, monthlyIncome, monthlyExpense, colors),
               _buildBudgetOverview(context, theme),
               _buildRecentTransactions(context, theme, transactions, colors),
@@ -489,8 +490,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   /// 钱龄卡片
   /// 原型设计：钱龄数值、等级、趋势
-  Widget _buildMoneyAgeCard(BuildContext context, ThemeData theme, WidgetRef ref) {
-    final moneyAgeData = ref.watch(moneyAgeProvider);
+  Widget _buildMoneyAgeCard(BuildContext context, ThemeData theme, WidgetRef ref, MoneyAge moneyAgeData) {
     final moneyAge = moneyAgeData.days;
 
     // 根据钱龄天数确定等级

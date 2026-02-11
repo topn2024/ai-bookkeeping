@@ -57,6 +57,8 @@ class VoiceContextRouteObserver extends RouteObserver<PageRoute<dynamic>> {
 
     if (route is PageRoute) {
       final routeName = route.settings.name;
+      if (routeName == null) return;  // 无路由名的页面跳过，减少日志噪音
+
       final arguments = route.settings.arguments;
 
       debugPrint('[VoiceContextRouteObserver] 路由变化: $routeName');

@@ -305,17 +305,63 @@ class CityLocationService {
   static const String _keyCurrentCity = 'current_city';
   static const String _keyHomeCity = 'home_city';
 
-  // 主要城市数据库（简化版）
+  // 一二线城市数据库（后续接入地图API后可移除）
   static final _cityDatabase = <CityInfo>[
+    // 一线城市
     CityInfo(code: '110000', name: '北京', province: '北京', tier: CityTier.tier1, latitude: 39.9042, longitude: 116.4074),
     CityInfo(code: '310000', name: '上海', province: '上海', tier: CityTier.tier1, latitude: 31.2304, longitude: 121.4737),
     CityInfo(code: '440100', name: '广州', province: '广东', tier: CityTier.tier1, latitude: 23.1291, longitude: 113.2644),
     CityInfo(code: '440300', name: '深圳', province: '广东', tier: CityTier.tier1, latitude: 22.5431, longitude: 114.0579),
-    CityInfo(code: '330100', name: '杭州', province: '浙江', tier: CityTier.tier2, latitude: 30.2741, longitude: 120.1551),
-    CityInfo(code: '320100', name: '南京', province: '江苏', tier: CityTier.tier2, latitude: 32.0603, longitude: 118.7969),
-    CityInfo(code: '510100', name: '成都', province: '四川', tier: CityTier.tier2, latitude: 30.5728, longitude: 104.0668),
-    CityInfo(code: '420100', name: '武汉', province: '湖北', tier: CityTier.tier2, latitude: 30.5928, longitude: 114.3055),
-    // ... 可添加更多城市
+    // 新一线城市
+    CityInfo(code: '510100', name: '成都', province: '四川', tier: CityTier.newTier1, latitude: 30.5728, longitude: 104.0668),
+    CityInfo(code: '500000', name: '重庆', province: '重庆', tier: CityTier.newTier1, latitude: 29.5630, longitude: 106.5516),
+    CityInfo(code: '330100', name: '杭州', province: '浙江', tier: CityTier.newTier1, latitude: 30.2741, longitude: 120.1551),
+    CityInfo(code: '420100', name: '武汉', province: '湖北', tier: CityTier.newTier1, latitude: 30.5928, longitude: 114.3055),
+    CityInfo(code: '610100', name: '西安', province: '陕西', tier: CityTier.newTier1, latitude: 34.3416, longitude: 108.9398),
+    CityInfo(code: '320100', name: '南京', province: '江苏', tier: CityTier.newTier1, latitude: 32.0603, longitude: 118.7969),
+    CityInfo(code: '120000', name: '天津', province: '天津', tier: CityTier.newTier1, latitude: 39.0842, longitude: 117.2009),
+    CityInfo(code: '430100', name: '长沙', province: '湖南', tier: CityTier.newTier1, latitude: 28.2282, longitude: 112.9388),
+    CityInfo(code: '410100', name: '郑州', province: '河南', tier: CityTier.newTier1, latitude: 34.7466, longitude: 113.6253),
+    CityInfo(code: '441900', name: '东莞', province: '广东', tier: CityTier.newTier1, latitude: 23.0430, longitude: 113.7633),
+    CityInfo(code: '320500', name: '苏州', province: '江苏', tier: CityTier.newTier1, latitude: 31.2990, longitude: 120.5853),
+    CityInfo(code: '210100', name: '沈阳', province: '辽宁', tier: CityTier.newTier1, latitude: 41.8057, longitude: 123.4315),
+    CityInfo(code: '370200', name: '青岛', province: '山东', tier: CityTier.newTier1, latitude: 36.0671, longitude: 120.3826),
+    CityInfo(code: '340100', name: '合肥', province: '安徽', tier: CityTier.newTier1, latitude: 31.8206, longitude: 117.2272),
+    CityInfo(code: '440600', name: '佛山', province: '广东', tier: CityTier.newTier1, latitude: 23.0218, longitude: 113.1219),
+    // 二线城市
+    CityInfo(code: '330200', name: '宁波', province: '浙江', tier: CityTier.tier2, latitude: 29.8683, longitude: 121.5440),
+    CityInfo(code: '530100', name: '昆明', province: '云南', tier: CityTier.tier2, latitude: 25.0389, longitude: 102.7183),
+    CityInfo(code: '320200', name: '无锡', province: '江苏', tier: CityTier.tier2, latitude: 31.4912, longitude: 120.3119),
+    CityInfo(code: '210200', name: '大连', province: '辽宁', tier: CityTier.tier2, latitude: 38.9140, longitude: 121.6147),
+    CityInfo(code: '350200', name: '厦门', province: '福建', tier: CityTier.tier2, latitude: 24.4798, longitude: 118.0894),
+    CityInfo(code: '350100', name: '福州', province: '福建', tier: CityTier.tier2, latitude: 26.0745, longitude: 119.2965),
+    CityInfo(code: '370100', name: '济南', province: '山东', tier: CityTier.tier2, latitude: 36.6512, longitude: 116.9972),
+    CityInfo(code: '330300', name: '温州', province: '浙江', tier: CityTier.tier2, latitude: 27.9939, longitude: 120.6994),
+    CityInfo(code: '130100', name: '石家庄', province: '河北', tier: CityTier.tier2, latitude: 38.0428, longitude: 114.5149),
+    CityInfo(code: '150100', name: '呼和浩特', province: '内蒙古', tier: CityTier.tier2, latitude: 40.8414, longitude: 111.7519),
+    CityInfo(code: '230100', name: '哈尔滨', province: '黑龙江', tier: CityTier.tier2, latitude: 45.8038, longitude: 126.5350),
+    CityInfo(code: '220100', name: '长春', province: '吉林', tier: CityTier.tier2, latitude: 43.8171, longitude: 125.3235),
+    CityInfo(code: '450100', name: '南宁', province: '广西', tier: CityTier.tier2, latitude: 22.8170, longitude: 108.3665),
+    CityInfo(code: '350500', name: '泉州', province: '福建', tier: CityTier.tier2, latitude: 24.8741, longitude: 118.6757),
+    CityInfo(code: '520100', name: '贵阳', province: '贵州', tier: CityTier.tier2, latitude: 26.6470, longitude: 106.6302),
+    CityInfo(code: '360100', name: '南昌', province: '江西', tier: CityTier.tier2, latitude: 28.6820, longitude: 115.8579),
+    CityInfo(code: '320400', name: '常州', province: '江苏', tier: CityTier.tier2, latitude: 31.8106, longitude: 119.9741),
+    CityInfo(code: '460100', name: '海口', province: '海南', tier: CityTier.tier2, latitude: 20.0440, longitude: 110.1999),
+    CityInfo(code: '540100', name: '拉萨', province: '西藏', tier: CityTier.tier2, latitude: 29.6500, longitude: 91.1409),
+    CityInfo(code: '620100', name: '兰州', province: '甘肃', tier: CityTier.tier2, latitude: 36.0611, longitude: 103.8343),
+    CityInfo(code: '640100', name: '银川', province: '宁夏', tier: CityTier.tier2, latitude: 38.4872, longitude: 106.2309),
+    CityInfo(code: '630100', name: '西宁', province: '青海', tier: CityTier.tier2, latitude: 36.6171, longitude: 101.7782),
+    CityInfo(code: '650100', name: '乌鲁木齐', province: '新疆', tier: CityTier.tier2, latitude: 43.8256, longitude: 87.6168),
+    CityInfo(code: '460200', name: '三亚', province: '海南', tier: CityTier.tier2, latitude: 18.2528, longitude: 109.5120),
+    CityInfo(code: '441300', name: '惠州', province: '广东', tier: CityTier.tier2, latitude: 23.1116, longitude: 114.4161),
+    CityInfo(code: '441200', name: '肇庆', province: '广东', tier: CityTier.tier2, latitude: 23.0469, longitude: 112.4653),
+    CityInfo(code: '442000', name: '中山', province: '广东', tier: CityTier.tier2, latitude: 22.5166, longitude: 113.3926),
+    CityInfo(code: '440400', name: '珠海', province: '广东', tier: CityTier.tier2, latitude: 22.2710, longitude: 113.5767),
+    CityInfo(code: '320600', name: '南通', province: '江苏', tier: CityTier.tier2, latitude: 31.9800, longitude: 120.8943),
+    CityInfo(code: '321300', name: '宿迁', province: '江苏', tier: CityTier.tier2, latitude: 33.9631, longitude: 118.2750),
+    CityInfo(code: '370300', name: '淄博', province: '山东', tier: CityTier.tier2, latitude: 36.8131, longitude: 118.0548),
+    CityInfo(code: '370600', name: '烟台', province: '山东', tier: CityTier.tier2, latitude: 37.4638, longitude: 121.4479),
+    // TODO: 后续接入高德/百度地图API后，可移除本地城市库
   ];
 
   /// 识别当前城市

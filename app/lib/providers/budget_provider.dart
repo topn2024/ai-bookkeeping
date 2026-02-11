@@ -395,10 +395,12 @@ final moneyAgeProvider = Provider<MoneyAge>((ref) {
     }
   }
 
-  // 调试日志
-  debugPrint('[MoneyAge] 总收入: $totalIncome, 总支出: $totalExpense, 总余额: $totalBalance');
-  debugPrint('[MoneyAge] 正常平均日支出: $avgDailyExpense');
-  debugPrint('[MoneyAge] 钱龄天数: $moneyAgeDays');
+  // 仅在有实际交易数据时输出调试日志
+  if (transactions.isNotEmpty) {
+    debugPrint('[MoneyAge] 总收入: $totalIncome, 总支出: $totalExpense, 总余额: $totalBalance');
+    debugPrint('[MoneyAge] 正常平均日支出: $avgDailyExpense');
+    debugPrint('[MoneyAge] 钱龄天数: $moneyAgeDays');
+  }
 
   // 计算趋势（对比上月钱龄）
   String? trend;
