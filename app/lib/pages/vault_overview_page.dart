@@ -403,8 +403,10 @@ class VaultOverviewPage extends ConsumerWidget {
 
   Widget _buildVaultCard(
       BuildContext context, ThemeData theme, BudgetVault vault) {
-    final progress = vault.progress;
-    final progressPercent = (progress * 100).round();
+    // 对于储蓄类型，展示分配完成度；其他类型展示消费使用率
+    final isSavings = vault.type == VaultType.savings;
+    final displayRate = isSavings ? vault.progress : vault.usageRate.clamp(0.0, 1.0);
+    final displayPercent = (displayRate * 100).round();
 
     Color badgeColor;
     Color badgeBgColor;
@@ -414,10 +416,10 @@ class VaultOverviewPage extends ConsumerWidget {
     } else if (vault.isAlmostEmpty) {
       badgeColor = AppColors.warning;
       badgeBgColor = const Color(0xFFFFF3E0);
-    } else if (progressPercent >= 80) {
+    } else if (displayPercent >= 80) {
       badgeColor = AppColors.success;
       badgeBgColor = const Color(0xFFE8F5E9);
-    } else if (progressPercent >= 50) {
+    } else if (displayPercent >= 50) {
       badgeColor = AppColors.warning;
       badgeBgColor = const Color(0xFFFFF3E0);
     } else {
@@ -487,7 +489,7 @@ class VaultOverviewPage extends ConsumerWidget {
                         child: Text(
                           vault.isOverSpent
                               ? '超支'
-                              : '$progressPercent%',
+                              : '$displayPercent%',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
@@ -516,7 +518,7 @@ class VaultOverviewPage extends ConsumerWidget {
                     ),
                     child: FractionallySizedBox(
                       alignment: Alignment.centerLeft,
-                      widthFactor: progress.clamp(0.0, 1.0),
+                      widthFactor: displayRate.clamp(0.0, 1.0),
                       child: Container(
                         decoration: BoxDecoration(
                           color: badgeColor,
@@ -527,7 +529,9 @@ class VaultOverviewPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '目标 ¥${vault.targetAmount.toStringAsFixed(0)}',
+                    isSavings
+                        ? '目标 ¥${vault.targetAmount.toStringAsFixed(0)}'
+                        : '已花费 ¥${vault.spentAmount.toStringAsFixed(0)} / 预算 ¥${vault.allocatedAmount.toStringAsFixed(0)}',
                     style: TextStyle(
                       fontSize: 11,
                       color: theme.colorScheme.onSurfaceVariant,
