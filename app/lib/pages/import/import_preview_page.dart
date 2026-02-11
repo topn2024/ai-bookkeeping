@@ -8,6 +8,7 @@ import '../../services/import/batch_import_service.dart';
 import '../../services/import/bill_format_detector.dart';
 import '../../services/import/bill_parser.dart';
 import '../../providers/transaction_provider.dart';
+import '../../providers/budget_vault_provider.dart';
 
 /// Import preview page for reviewing and confirming candidates
 class ImportPreviewPage extends ConsumerStatefulWidget {
@@ -516,6 +517,9 @@ class _ImportPreviewPageState extends ConsumerState<ImportPreviewPage>
         if (result.isSuccess) {
           // Refresh transaction list
           ref.invalidate(transactionProvider);
+
+          // 刷新小金库预算进度（从新导入的交易中匹配计算支出）
+          ref.read(budgetVaultProvider.notifier).refresh();
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

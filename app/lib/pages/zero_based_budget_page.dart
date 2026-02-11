@@ -70,7 +70,7 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
 
   double get _remaining => _calculateMonthlyIncome() - _totalAllocated;
 
-  bool get _isBalanced => _remaining.abs() < 0.01;
+  bool get _isBalanced => _remaining.abs() < 1.0;
 
   /// 创建默认小金库
   Future<void> _createDefaultVaults() async {
@@ -157,9 +157,7 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ 已创建4个默认小金库')),
-      );
+      setState(() {}); // 刷新页面
     }
   }
 
@@ -384,6 +382,9 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
           }
         }
 
+        // 智能分配创建小金库后，立即同步已有交易的支出数据
+        await ref.read(budgetVaultProvider.notifier).refresh();
+
         // 调试信息
         final totalFromSmart = _vaultAllocations.values.fold(0.0, (sum, amount) => sum + amount);
         print('🔍 智能分配返回: 收入=$income, 分配总额=$totalFromSmart, 差额=${income - totalFromSmart}');
@@ -475,6 +476,9 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
 
       print('🔍 [确认预算] 所有小金库更新完成');
 
+      // 触发完整刷新，从已有交易中匹配计算各小金库的支出
+      await ref.read(budgetVaultProvider.notifier).refresh();
+
       if (!mounted) return;
       Navigator.pop(context);
     } catch (e, stack) {
@@ -552,9 +556,6 @@ class _ZeroBasedBudgetPageState extends ConsumerState<ZeroBasedBudgetPage> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ 已清理 $deletedCount 个重复小金库')),
-      );
 
       // 刷新页面
       setState(() {
