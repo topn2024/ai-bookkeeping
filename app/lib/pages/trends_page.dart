@@ -4,10 +4,13 @@ import 'package:fl_chart/fl_chart.dart';
 import '../theme/app_theme.dart';
 import '../l10n/l10n.dart';
 import '../providers/transaction_provider.dart';
+import '../providers/budget_provider.dart';
 import '../models/transaction.dart';
+import '../models/budget.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
 import '../services/category_localization_service.dart';
+import '../services/spending_insight_calculator.dart';
 import 'reports/trend_drill_page.dart';
 import 'reports/drill_navigation_page.dart';
 
@@ -94,6 +97,7 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
     final theme = Theme.of(context);
     final allTransactions = ref.watch(transactionProvider);
     final transactions = _filterTransactionsByPeriod(allTransactions);
+    final budgets = ref.watch(budgetProvider);
 
     // 计算过滤后的支出总额
     final periodExpense = transactions
@@ -113,7 +117,7 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
                 children: [
                   _buildTrendContent(context, theme, transactions, periodExpense),
                   _buildCategoryContent(context, theme, transactions),
-                  _buildInsightContent(context, theme),
+                  _buildInsightContent(context, theme, transactions, allTransactions, budgets),
                 ],
               ),
             ),
@@ -663,51 +667,609 @@ class _TrendsPageState extends ConsumerState<TrendsPage>
     );
   }
 
+  /// 分类占比颜色
+  static const _pieColors = [
+    Color(0xFFFF7043),
+    Color(0xFF42A5F5),
+    Color(0xFF66BB6A),
+    Color(0xFFAB47BC),
+    Color(0xFFFFCA28),
+    Color(0xFF26A69A),
+    Color(0xFFEC407A),
+    Color(0xFF5C6BC0),
+  ];
+
   /// 分类占比内容
   Widget _buildCategoryContent(
     BuildContext context,
     ThemeData theme,
     List<Transaction> transactions,
   ) {
-    return Center(
+    // 按分类汇总支出
+    final categoryTotals = <String, double>{};
+    final categoryCounts = <String, int>{};
+    for (final t in transactions) {
+      if (t.type != TransactionType.expense) continue;
+      if (t.category == 'transfer') continue;
+      final category = DefaultCategories.findById(t.category);
+      if (category == null || !category.isExpense) continue;
+      categoryTotals[t.category] = (categoryTotals[t.category] ?? 0) + t.amount;
+      categoryCounts[t.category] = (categoryCounts[t.category] ?? 0) + 1;
+    }
+    final totalExpense = categoryTotals.values.fold<double>(0, (a, b) => a + b);
+    final sortedCategories = categoryTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    // 饼图扇区
+    final sections = sortedCategories.isEmpty
+        ? [
+            PieChartSectionData(
+              value: 1,
+              color: theme.colorScheme.surfaceContainerHighest,
+              radius: 24,
+              showTitle: false,
+            ),
+          ]
+        : sortedCategories.asMap().entries.map((entry) {
+            final index = entry.key;
+            final catEntry = entry.value;
+            final pct = totalExpense > 0 ? catEntry.value / totalExpense * 100 : 0.0;
+            return PieChartSectionData(
+              value: catEntry.value,
+              color: _pieColors[index % _pieColors.length],
+              radius: 24,
+              showTitle: pct >= 5,
+              title: '${pct.toStringAsFixed(0)}%',
+              titleStyle: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            );
+          }).toList();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.pie_chart,
-            size: 64,
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '分类占比饼图',
-            style: TextStyle(
-              color: theme.colorScheme.onSurfaceVariant,
+          // 环形图
+          SizedBox(
+            width: 200,
+            height: 200,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                PieChart(
+                  PieChartData(
+                    sections: sections,
+                    centerSpaceRadius: 70,
+                    sectionsSpace: 2,
+                    pieTouchData: PieTouchData(
+                      enabled: true,
+                      touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                        if (event is FlTapUpEvent &&
+                            pieTouchResponse?.touchedSection != null) {
+                          final idx = pieTouchResponse!
+                              .touchedSection!.touchedSectionIndex;
+                          if (idx >= 0 && idx < sortedCategories.length) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DrillDownNavigationPage(
+                                  categoryId: sortedCategories[idx].key,
+                                  dateRange: _getDateRange(),
+                                  timeRangeLabel: _getPeriodLabel(),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '总支出',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      '¥${totalExpense.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
+          const SizedBox(height: 16),
+          // 图例（前5个分类）
+          if (sortedCategories.isNotEmpty)
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: sortedCategories.take(5).toList().asMap().entries.map((entry) {
+                final index = entry.key;
+                final catEntry = entry.value;
+                final category = DefaultCategories.findById(catEntry.key);
+                final pct = totalExpense > 0
+                    ? (catEntry.value / totalExpense * 100).toStringAsFixed(0)
+                    : '0';
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: _pieColors[index % _pieColors.length],
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(catEntry.key)} $pct%',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          if (sortedCategories.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '暂无支出数据',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          const SizedBox(height: 24),
+          // 分类列表
+          ...sortedCategories.asMap().entries.map((entry) {
+            final index = entry.key;
+            final catEntry = entry.value;
+            final category = DefaultCategories.findById(catEntry.key);
+            final count = categoryCounts[catEntry.key] ?? 0;
+            final pct = totalExpense > 0
+                ? (catEntry.value / totalExpense * 100).toStringAsFixed(1)
+                : '0.0';
+
+            return GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DrillDownNavigationPage(
+                    categoryId: catEntry.key,
+                    dateRange: _getDateRange(),
+                    timeRangeLabel: _getPeriodLabel(),
+                  ),
+                ),
+              ),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: _pieColors[index % _pieColors.length],
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: (category?.color ?? Colors.grey).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        category?.icon ?? Icons.help_outline,
+                        color: category?.color ?? Colors.grey,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            category?.localizedName ?? CategoryLocalizationService.instance.getCategoryName(catEntry.key),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 15,
+                            ),
+                          ),
+                          Text(
+                            '$count笔交易',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '¥${catEntry.value.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            color: AppColors.expense,
+                          ),
+                        ),
+                        Text(
+                          '$pct%',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
         ],
       ),
     );
   }
 
   /// 洞察内容
-  Widget _buildInsightContent(BuildContext context, ThemeData theme) {
-    return Center(
+  Widget _buildInsightContent(
+    BuildContext context,
+    ThemeData theme,
+    List<Transaction> transactions,
+    List<Transaction> allTransactions,
+    List<Budget> budgets,
+  ) {
+    final range = _getDateRange();
+    final expenseTx =
+        transactions.where((t) => t.type == TransactionType.expense).toList();
+
+    if (expenseTx.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.lightbulb_outline,
+              size: 64,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '暂无消费数据，无法生成洞察',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 环比变化
+    final pop = SpendingInsightCalculator.periodOverPeriodChange(allTransactions, range);
+
+    // 星期消费分布
+    final weekdayDist = SpendingInsightCalculator.weekdayDistribution(expenseTx);
+    final maxWeekday = weekdayDist.values.reduce((a, b) => a > b ? a : b);
+    final weekendPct = (SpendingInsightCalculator.weekendRatio(expenseTx) * 100);
+
+    // 动态洞察
+    final insights = SpendingInsightCalculator.generatePeriodInsights(
+      transactions,
+      allTransactions,
+      range,
+      budgets,
+    );
+
+    const weekdayNames = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.lightbulb_outline,
-            size: 64,
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'AI 消费洞察',
-            style: TextStyle(
-              color: theme.colorScheme.onSurfaceVariant,
+          // 环比变化摘要卡片
+          if (pop != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    pop > 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                    color: pop > 0 ? Colors.red : Colors.green,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '环比变化',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${pop > 0 ? "+" : ""}${pop.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: pop > 0 ? Colors.red : Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    pop > 0 ? '支出增长' : '支出下降',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (pop != null) const SizedBox(height: 16),
+
+          // 星期消费分布柱状图
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '星期消费分布',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 160,
+                  child: BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: maxWeekday > 0 ? maxWeekday * 1.2 : 100,
+                      barTouchData: BarTouchData(
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipColor: (_) => theme.colorScheme.inverseSurface,
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            return BarTooltipItem(
+                              '${weekdayNames[group.x + 1]}\n¥${rod.toY.toStringAsFixed(0)}',
+                              TextStyle(
+                                color: theme.colorScheme.onInverseSurface,
+                                fontSize: 12,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      titlesData: FlTitlesData(
+                        leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              final idx = value.toInt() + 1;
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  weekdayNames[idx],
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: idx >= 6 ? FontWeight.w600 : FontWeight.normal,
+                                    color: idx >= 6
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      gridData: const FlGridData(show: false),
+                      borderData: FlBorderData(show: false),
+                      barGroups: List.generate(7, (i) {
+                        final day = i + 1;
+                        final isWeekend = day >= 6;
+                        return BarChartGroupData(
+                          x: i,
+                          barRods: [
+                            BarChartRodData(
+                              toY: weekdayDist[day] ?? 0,
+                              color: isWeekend
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.primary.withValues(alpha: 0.4),
+                              width: 24,
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                            ),
+                          ],
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    '周末消费占比 ${weekendPct.toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          // 动态洞察卡片列表
+          if (insights.isNotEmpty) ...[
+            Text(
+              '智能洞察',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...insights.map((item) => Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: (item.badgeColor ?? theme.colorScheme.primary)
+                          .withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      item.icon,
+                      color: item.badgeColor ?? theme.colorScheme.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              item.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            if (item.badgeText != null) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: (item.badgeColor ?? Colors.grey)
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  item.badgeText!,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: item.badgeColor ?? Colors.grey,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.description,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )),
+          ],
         ],
       ),
     );

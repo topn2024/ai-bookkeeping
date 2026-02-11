@@ -8,7 +8,10 @@ import '../subscription_waste_page.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/budget_provider.dart';
 import '../../providers/subscription_detection_provider.dart';
+import '../../models/transaction.dart';
+import '../../services/category_localization_service.dart';
 import '../../services/subscription_tracking_service.dart';
+import '../../services/spending_insight_calculator.dart';
 
 /// 洞察分析页面
 /// 原型设计 7.02：洞察分析
@@ -22,34 +25,45 @@ class InsightAnalysisPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final allTransactions = ref.watch(transactionProvider);
     final categoryExpenses = ref.watch(monthlyExpenseByCategoryProvider);
     final monthlyExpense = ref.watch(monthlyExpenseProvider);
-    final monthlyIncome = ref.watch(monthlyIncomeProvider);
-    final budgets = ref.watch(budgetProvider);
     final detectedSubscriptions = ref.watch(detectedSubscriptionsProvider);
+    final allBudgetUsages = ref.watch(allBudgetUsagesProvider);
 
-    // 计算拿铁因子（小额高频消费，如咖啡、奶茶等）
-    final latteCategories = ['咖啡', '奶茶', '饮料', '零食'];
-    double latteExpense = 0;
-    for (final cat in latteCategories) {
-      latteExpense += categoryExpenses[cat] ?? 0;
-    }
     final now = DateTime.now();
     final daysInMonth = now.day;
+
+    // 拿铁因子：本月小额消费（<50元）
+    final monthStart = DateTime(now.year, now.month, 1);
+    final thisMonthTx = allTransactions.where((t) =>
+        t.type == TransactionType.expense &&
+        !t.date.isBefore(monthStart) &&
+        !t.date.isAfter(now)).toList();
+    final latteTx = thisMonthTx.where((t) => t.amount < 50).toList();
+    final latteExpense = latteTx.fold<double>(0, (sum, t) => sum + t.amount);
     final dailyLatte = daysInMonth > 0 ? latteExpense / daysInMonth : 0.0;
 
-    // 计算餐饮预算使用情况
-    final foodExpense = categoryExpenses['餐饮'] ?? categoryExpenses['吃饭'] ?? 0;
-    // 从预算列表中查找餐饮类预算
-    final foodBudgetItem = budgets.where((b) =>
-        b.categoryId == '餐饮' || b.categoryId == '吃饭').firstOrNull;
-    // 修复：使��monthlyIncome * 0.3作为默认值，而非totalMonthlyBudget * 0.3
-    final foodBudget = foodBudgetItem?.amount ??
-        (monthlyIncome > 0 ? monthlyIncome * 0.3 : 0);
-    final foodUsagePercent = foodBudget > 0 ? (foodExpense / foodBudget * 100) : 0.0;
-    final projectedOverspend = foodBudget > 0 && now.day > 0
-        ? (foodExpense / now.day * DateTime(now.year, now.month + 1, 0).day - foodBudget)
-        : 0.0;
+    // 上月小额消费（用于环比）
+    final lastMonthStart = DateTime(now.year, now.month - 1, 1);
+    final lastMonthEnd = DateTime(now.year, now.month, 0);
+    final lastMonthLatteTx = allTransactions.where((t) =>
+        t.type == TransactionType.expense &&
+        t.amount < 50 &&
+        !t.date.isBefore(lastMonthStart) &&
+        !t.date.isAfter(lastMonthEnd)).toList();
+    final lastMonthLatteTotal = lastMonthLatteTx.fold<double>(0, (sum, t) => sum + t.amount);
+
+    // 年化预估
+    final annualizedLatte = daysInMonth > 0 ? latteExpense / daysInMonth * 365 : 0.0;
+
+    // 拿铁环比
+    final latteMoM = lastMonthLatteTotal > 0
+        ? (latteExpense - lastMonthLatteTotal) / lastMonthLatteTotal * 100
+        : null;
+
+    // 消费习惯：周末占比
+    final weekendRatio = SpendingInsightCalculator.weekendRatio(thisMonthTx);
 
     return Scaffold(
       body: SafeArea(
@@ -61,13 +75,25 @@ class InsightAnalysisPage extends ConsumerWidget {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _buildLatteFactorCard(theme, latteExpense, dailyLatte),
+                    _buildLatteFactorCard(
+                      theme,
+                      latteExpense,
+                      dailyLatte,
+                      latteMoM,
+                      annualizedLatte,
+                      monthlyExpense,
+                    ),
                     const SizedBox(height: 12),
                     _buildSubscriptionAlert(theme, detectedSubscriptions),
                     const SizedBox(height: 12),
-                    _buildSpendingPatternCard(theme, monthlyExpense, categoryExpenses),
+                    _buildSpendingPatternCard(
+                      theme,
+                      monthlyExpense,
+                      categoryExpenses,
+                      weekendRatio,
+                    ),
                     const SizedBox(height: 12),
-                    _buildBudgetInsightCard(theme, foodUsagePercent, projectedOverspend),
+                    _buildBudgetInsightCard(theme, allBudgetUsages),
                   ],
                 ),
               ),
@@ -105,11 +131,42 @@ class InsightAnalysisPage extends ConsumerWidget {
     );
   }
 
-  /// 拿铁因子卡片
-  Widget _buildLatteFactorCard(ThemeData theme, double latteExpense, double dailyLatte) {
+  /// 拿铁因子卡片（含环比 + 年化）
+  Widget _buildLatteFactorCard(
+    ThemeData theme,
+    double latteExpense,
+    double dailyLatte,
+    double? latteMoM,
+    double annualizedLatte,
+    double monthlyExpense,
+  ) {
     final hasLatteData = latteExpense > 0;
-    final badgeText = dailyLatte > 20 ? '可优化' : (dailyLatte > 10 ? '适中' : '良好');
-    final badgeColor = dailyLatte > 20 ? Colors.orange : (dailyLatte > 10 ? Colors.blue : Colors.green);
+
+    // Badge 基于占总支出比
+    final latteRatio = monthlyExpense > 0 ? latteExpense / monthlyExpense : 0.0;
+    final String badgeText;
+    final Color badgeColor;
+    if (latteRatio > 0.15) {
+      badgeText = '可优化';
+      badgeColor = Colors.orange;
+    } else if (latteRatio > 0.08) {
+      badgeText = '适中';
+      badgeColor = Colors.blue;
+    } else {
+      badgeText = '良好';
+      badgeColor = Colors.green;
+    }
+
+    String content;
+    if (hasLatteData) {
+      final momStr = latteMoM != null
+          ? '（较上月 ${latteMoM > 0 ? "+" : ""}${latteMoM.toStringAsFixed(0)}%）'
+          : '';
+      content = '本月小额消费 ¥${latteExpense.toStringAsFixed(0)}$momStr\n'
+          '日均 ¥${dailyLatte.toStringAsFixed(1)}，按此频率年累计约 ¥${annualizedLatte.toStringAsFixed(0)}';
+    } else {
+      content = '暂无小额高频消费数据';
+    }
 
     return _InsightCard(
       gradient: const LinearGradient(
@@ -121,9 +178,7 @@ class InsightAnalysisPage extends ConsumerWidget {
       iconColor: const Color(0xFF8D6E63),
       title: '拿铁因子',
       badge: hasLatteData ? _InsightBadge(text: badgeText, color: badgeColor) : null,
-      content: hasLatteData
-          ? '本月小额消费 ¥${latteExpense.toStringAsFixed(0)}，日均 ¥${dailyLatte.toStringAsFixed(1)}'
-          : '暂无小额高频消费数据',
+      content: content,
       actionText: '查看详情 →',
       actionColor: theme.colorScheme.primary,
       onAction: (context) => Navigator.push(
@@ -218,8 +273,13 @@ class InsightAnalysisPage extends ConsumerWidget {
     );
   }
 
-  /// 消费习惯卡片
-  Widget _buildSpendingPatternCard(ThemeData theme, double monthlyExpense, Map<String, double> categoryExpenses) {
+  /// 消费习惯卡片（TOP3 + HHI + 周末占比）
+  Widget _buildSpendingPatternCard(
+    ThemeData theme,
+    double monthlyExpense,
+    Map<String, double> categoryExpenses,
+    double weekendRatio,
+  ) {
     final now = DateTime.now();
     final daysElapsed = now.day;
     final hasData = monthlyExpense > 0;
@@ -245,19 +305,23 @@ class InsightAnalysisPage extends ConsumerWidget {
       );
     }
 
-    // 找出最大支出分类
+    // TOP 3 分类及占比
     final sorted = categoryExpenses.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    final topCategory = sorted.first;
-    final topPercent = (topCategory.value / monthlyExpense * 100).toInt();
+    final top3 = sorted.take(3).map((e) {
+      final name = e.key.localizedCategoryName;
+      final pct = (e.value / monthlyExpense * 100).toInt();
+      return '$name($pct%)';
+    }).join('、');
 
-    // 判断消费集中度
+    // HHI 集中度
+    final hhi = SpendingInsightCalculator.concentrationIndex(categoryExpenses);
     final String badgeText;
     final Color badgeColor;
-    if (topPercent >= 60) {
+    if (hhi >= 0.25) {
       badgeText = '过于集中';
       badgeColor = Colors.red;
-    } else if (topPercent >= 40) {
+    } else if (hhi >= 0.15) {
       badgeText = '较集中';
       badgeColor = Colors.orange;
     } else {
@@ -266,8 +330,9 @@ class InsightAnalysisPage extends ConsumerWidget {
     }
 
     final dailyAvg = monthlyExpense / daysElapsed;
-    final content = '${topCategory.key}占比最高（$topPercent%），'
-        '日均支出 ¥${dailyAvg.toStringAsFixed(0)}';
+    final weekendPct = (weekendRatio * 100).toStringAsFixed(0);
+    final content = 'TOP3: $top3\n'
+        '日均 ¥${dailyAvg.toStringAsFixed(0)}，周末占比 $weekendPct%';
 
     return _InsightCard(
       gradient: const LinearGradient(
@@ -289,20 +354,71 @@ class InsightAnalysisPage extends ConsumerWidget {
     );
   }
 
-  /// 预算执行洞察
-  Widget _buildBudgetInsightCard(ThemeData theme, double usagePercent, double projectedOverspend) {
-    final usageInt = usagePercent.toInt();
-    final isOverBudget = projectedOverspend > 0;
-    final badgeText = usageInt >= 90 ? '需关注' : (usageInt >= 70 ? '适中' : '良好');
-    final badgeColor = usageInt >= 90 ? Colors.red : (usageInt >= 70 ? Colors.orange : Colors.green);
+  /// 预算执行洞察（展示所有预算）
+  Widget _buildBudgetInsightCard(ThemeData theme, List<BudgetUsage> usages) {
+    if (usages.isEmpty) {
+      return _InsightCard(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        icon: Icons.account_balance_wallet,
+        iconColor: Colors.blue,
+        title: '预算执行',
+        badge: null,
+        content: '暂未设置预算，设置后可查看执行情况',
+        actionText: '调整预算 →',
+        actionColor: Colors.blue,
+        onAction: (context) => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const BudgetManagementPage()),
+        ),
+      );
+    }
 
-    String content;
-    if (usagePercent == 0) {
-      content = '暂未设置预算，设置后可查看执行情况';
-    } else if (isOverBudget) {
-      content = '餐饮类目已使用$usageInt%，按当前速度月底将超支¥${projectedOverspend.toStringAsFixed(0)}';
+    // 统计各预算使用情况
+    final overBudgetCount = usages.where((u) => u.isOverBudget).length;
+    final nearLimitCount = usages.where((u) => u.isNearLimit).length;
+
+    // 整体使用率
+    final totalBudget = usages.fold<double>(0, (s, u) => s + u.budget.amount);
+    final totalSpent = usages.fold<double>(0, (s, u) => s + u.spent);
+    final overallPct = totalBudget > 0 ? (totalSpent / totalBudget * 100).toInt() : 0;
+
+    // 找出使用率最高的预算项
+    final highest = usages.reduce((a, b) => a.percentage > b.percentage ? a : b);
+    final highestPct = (highest.percentage * 100).toInt();
+
+    // Badge
+    final String badgeText;
+    final Color badgeColor;
+    if (overBudgetCount > 0) {
+      badgeText = '$overBudgetCount项超支';
+      badgeColor = Colors.red;
+    } else if (nearLimitCount > 0) {
+      badgeText = '$nearLimitCount项需关注';
+      badgeColor = Colors.orange;
     } else {
-      content = '餐饮类目已使用$usageInt%，预算执行良好';
+      badgeText = '执行良好';
+      badgeColor = Colors.green;
+    }
+
+    // Content
+    String content;
+    if (usages.length == 1) {
+      final u = usages.first;
+      final pct = (u.percentage * 100).toInt();
+      if (u.isOverBudget) {
+        content = '${u.budget.name}已使用$pct%，超出预算 ¥${(u.spent - u.budget.amount).toStringAsFixed(0)}';
+      } else {
+        content = '${u.budget.name}已使用$pct%，剩余 ¥${u.remaining.toStringAsFixed(0)}';
+      }
+    } else {
+      final needAttention = overBudgetCount + nearLimitCount;
+      content = '${usages.length} 个预算整体使用 $overallPct%，'
+          '${highest.budget.name}占比最高（$highestPct%）'
+          '${needAttention > 0 ? "，$needAttention 项需关注" : ""}';
     }
 
     return _InsightCard(
@@ -314,7 +430,7 @@ class InsightAnalysisPage extends ConsumerWidget {
       icon: Icons.account_balance_wallet,
       iconColor: Colors.blue,
       title: '预算执行',
-      badge: usagePercent > 0 ? _InsightBadge(text: badgeText, color: badgeColor) : null,
+      badge: _InsightBadge(text: badgeText, color: badgeColor),
       content: content,
       actionText: '调整预算 →',
       actionColor: Colors.blue,
