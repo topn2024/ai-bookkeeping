@@ -409,7 +409,7 @@ class BackupPackageService {
     final meta = packageData['metadata'] as Map<String, dynamic>;
     final buffer = StringBuffer();
 
-    buffer.writeln('鱼记 - 备份包');
+    buffer.writeln('白记 - 备份包');
     buffer.writeln('=' * 50);
     buffer.writeln('');
     buffer.writeln('包ID: ${meta['packageId']}');

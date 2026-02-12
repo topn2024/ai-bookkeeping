@@ -37,7 +37,7 @@ class PersonaConfig {
   /// 默认人格配置
   factory PersonaConfig.defaultConfig() {
     return const PersonaConfig(
-      name: '鱼记',
+      name: '白记',
       role: '智能记账助手',
       traits: ['友好热情', '专业可靠', '适度幽默', '关心用户财务健康'],
       speechStyle: SpeechStyle.defaultStyle,
@@ -298,7 +298,7 @@ class ChatEngine {
       RegExp(r'^我来[\s,，]*'),
       RegExp(r'^(下面是|以下是)[\s,，:：]*'),
       RegExp(r'^回复[\s,，:：]*'),
-      RegExp(r'^(鱼记说|${_persona.name}说)[\s,，:：]*'),
+      RegExp(r'^(白记说|${_persona.name}说)[\s,，:：]*'),
     ];
     for (final pattern in prefixPatterns) {
       cleaned = cleaned.replaceFirst(pattern, '');

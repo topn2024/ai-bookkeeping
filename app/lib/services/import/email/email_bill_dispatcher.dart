@@ -62,6 +62,7 @@ class EmailBillDispatcher {
     required DateTime startDate,
     required DateTime endDate,
     List<String>? senderFilter,
+    String? zipPassword,
     void Function(String stage, int current, int total, String? message)? onProgress,
   }) async {
     final errors = <String>[];
@@ -121,7 +122,7 @@ class EmailBillDispatcher {
         final message = messages[i];
         debugPrint('[EmailBillDispatcher] 处理邮件 ${i+1}/${messages.length}: "${message.subject}" from=${message.senderAddress} 附件=${message.attachments.length}个 hasHtml=${message.htmlBody != null}');
         try {
-          final candidates = await _dispatchMessage(message, allCandidates.length);
+          final candidates = await _dispatchMessage(message, allCandidates.length, zipPassword: zipPassword);
           debugPrint('[EmailBillDispatcher] 邮件 "${message.subject}" 解析出 ${candidates.length} 条记录');
           allCandidates.addAll(candidates);
           if (candidates.isNotEmpty) {
@@ -166,8 +167,9 @@ class EmailBillDispatcher {
   /// 根据发件人路由到不同的解析器
   Future<List<ImportCandidate>> _dispatchMessage(
     EmailMessage message,
-    int startIndex,
-  ) async {
+    int startIndex, {
+    String? zipPassword,
+  }) async {
     final sender = message.senderAddress.toLowerCase();
 
     // 招行信用卡账单
@@ -177,7 +179,7 @@ class EmailBillDispatcher {
 
     // 微信/支付宝 CSV 附件
     if (sender.contains('tenpay.com') || sender.contains('alipay.com')) {
-      return await _attachmentExtractor.extractAndParse(message, startIndex);
+      return await _attachmentExtractor.extractAndParse(message, startIndex, zipPassword: zipPassword);
     }
 
     // 未知发件人 - 同时尝试 HTML 解析和附件提取

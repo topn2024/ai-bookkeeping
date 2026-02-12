@@ -138,7 +138,7 @@ class AchievementSharePage extends ConsumerWidget {
                 const Icon(Icons.star, color: Colors.white, size: 16),
                 const SizedBox(width: 4),
                 const Text(
-                  '鱼记',
+                  '白记',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 12,

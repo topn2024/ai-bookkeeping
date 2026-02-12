@@ -17,6 +17,7 @@ class EmailImportProgressPage extends StatefulWidget {
   final DateTime startDate;
   final DateTime endDate;
   final List<String>? senderFilter;
+  final String? zipPassword;
 
   const EmailImportProgressPage({
     super.key,
@@ -24,6 +25,7 @@ class EmailImportProgressPage extends StatefulWidget {
     required this.startDate,
     required this.endDate,
     this.senderFilter,
+    this.zipPassword,
   });
 
   @override
@@ -352,6 +354,7 @@ class _EmailImportProgressPageState extends State<EmailImportProgressPage> {
         startDate: widget.startDate,
         endDate: widget.endDate,
         senderFilter: widget.senderFilter,
+        zipPassword: widget.zipPassword,
         onProgress: (stage, current, total, message) {
           if (mounted) {
             setState(() {

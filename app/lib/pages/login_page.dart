@@ -79,7 +79,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  '鱼记',
+                  '白记',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28,

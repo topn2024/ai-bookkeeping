@@ -93,8 +93,8 @@ class VoiceWakeupService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("鱼记正在聆听")
-            .setContentText("说\"鱼记鱼记\"开始语音记账")
+            .setContentTitle("白记正在聆听")
+            .setContentText("说\"小记小记\"开始语音记账")
             .setSmallIcon(R.drawable.ic_mic)
             .setContentIntent(pendingIntent)
             .setOngoing(true)

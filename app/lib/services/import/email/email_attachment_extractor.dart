@@ -26,8 +26,9 @@ class EmailAttachmentExtractor {
   /// 从邮件消息中提取附件并解析
   Future<List<ImportCandidate>> extractAndParse(
     EmailMessage message,
-    int startIndex,
-  ) async {
+    int startIndex, {
+    String? zipPassword,
+  }) async {
     final candidates = <ImportCandidate>[];
 
     // 收集所有 CSV 数据（直接 CSV 附件 + ZIP 中的 CSV）
@@ -38,7 +39,7 @@ class EmailAttachmentExtractor {
       if (lowerName.endsWith('.csv')) {
         csvFiles.add(_CsvFile(attachment.filename, attachment.data));
       } else if (lowerName.endsWith('.zip')) {
-        final extracted = _extractCsvFromZip(attachment.data);
+        final extracted = _extractCsvFromZip(attachment.data, password: zipPassword);
         csvFiles.addAll(extracted);
       }
     }
@@ -61,20 +62,37 @@ class EmailAttachmentExtractor {
     return candidates;
   }
 
+  /// ZIP 是否加密（需要用户提供密码）
+  bool _lastZipEncrypted = false;
+  bool get hasEncryptedZip => _lastZipEncrypted;
+
   /// 从 ZIP 压缩包中提取 CSV 文件
-  List<_CsvFile> _extractCsvFromZip(Uint8List zipData) {
+  List<_CsvFile> _extractCsvFromZip(Uint8List zipData, {String? password}) {
     final csvFiles = <_CsvFile>[];
+    _lastZipEncrypted = false;
     try {
-      final archive = ZipDecoder().decodeBytes(zipData);
+      final archive = ZipDecoder().decodeBytes(zipData, verify: false, password: password);
       for (final file in archive.files) {
         if (file.isFile && file.name.toLowerCase().endsWith('.csv')) {
           final content = file.content as Uint8List;
+          if (content.isEmpty) {
+            // 加密的 ZIP 解压后内容为空
+            _lastZipEncrypted = true;
+            debugPrint('[EmailAttachmentExtractor] ZIP文件已加密，需要密码: ${file.name}');
+            continue;
+          }
           csvFiles.add(_CsvFile(file.name, content));
           debugPrint('[EmailAttachmentExtractor] 从ZIP中提取: ${file.name} (${content.length} bytes)');
         }
       }
     } catch (e) {
-      debugPrint('[EmailAttachmentExtractor] ZIP解压失败: $e');
+      final errStr = e.toString();
+      if (errStr.contains('encrypt') || errStr.contains('password') || errStr.contains('Password')) {
+        _lastZipEncrypted = true;
+        debugPrint('[EmailAttachmentExtractor] ZIP文件已加密: $e');
+      } else {
+        debugPrint('[EmailAttachmentExtractor] ZIP解压失败: $e');
+      }
     }
     return csvFiles;
   }

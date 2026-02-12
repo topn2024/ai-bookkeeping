@@ -220,7 +220,7 @@ class _HelpPageState extends ConsumerState<HelpPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '欢迎使用鱼记',
+            '欢迎使用白记',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,

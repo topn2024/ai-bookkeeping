@@ -43,7 +43,7 @@ class ShareViewController: SLComposeServiceViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         // 设置标题
-        self.title = "发送到鱼记"
+        self.title = "发送到白记"
         // 自定义发布按钮文字
         self.navigationItem.rightBarButtonItem?.title = "识别记账"
     }

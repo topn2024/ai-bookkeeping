@@ -449,7 +449,7 @@ class ShareCard extends StatelessWidget {
                 const Icon(Icons.account_balance_wallet, size: 20),
                 const SizedBox(width: 8),
                 const Text(
-                  '鱼记',
+                  '白记',
                   style: TextStyle(
                     fontWeight: FontWeight.w500,
                   ),

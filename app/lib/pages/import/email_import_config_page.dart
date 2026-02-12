@@ -32,6 +32,9 @@ class _EmailImportConfigPageState extends State<EmailImportConfigPage> {
   bool _filterWechat = true;
   bool _filterAlipay = true;
 
+  // 支付宝 ZIP 解压密码
+  final _zipPasswordController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -70,6 +73,10 @@ class _EmailImportConfigPageState extends State<EmailImportConfigPage> {
                   _buildDateRangeSection(theme),
                   const SizedBox(height: 20),
                   _buildBillTypeFilter(theme),
+                  if (_filterAlipay) ...[
+                    const SizedBox(height: 20),
+                    _buildZipPasswordField(theme),
+                  ],
                   const SizedBox(height: 20),
                   _buildSecurityNote(theme),
                   const SizedBox(height: 24),
@@ -347,6 +354,35 @@ class _EmailImportConfigPageState extends State<EmailImportConfigPage> {
     );
   }
 
+  Widget _buildZipPasswordField(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '支付宝账单解压密码（可选）',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _zipPasswordController,
+          decoration: InputDecoration(
+            hintText: '如有加密ZIP附件，请输入解压密码',
+            helperText: '密码在支付宝App「我的-账单-开具交易流水证明-申请记录」中查看',
+            helperMaxLines: 2,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            prefixIcon: const Icon(Icons.lock_outline),
+            isDense: true,
+          ),
+          obscureText: true,
+        ),
+      ],
+    );
+  }
+
   Widget _buildSecurityNote(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -433,6 +469,7 @@ class _EmailImportConfigPageState extends State<EmailImportConfigPage> {
           startDate: _startDate,
           endDate: _endDate,
           senderFilter: _getSelectedSenders(),
+          zipPassword: _zipPasswordController.text.isNotEmpty ? _zipPasswordController.text : null,
         ),
       ),
     );

@@ -195,7 +195,12 @@ class CmbCreditCardBillParser extends BillParser {
       '取现额度', '还款', '退款', '消费', '预借现金',
       '合计', '月账单', '尊敬的', '先生', '您好',
     ];
-    return summaryKeywords.any((k) => text.contains(k));
+    if (summaryKeywords.any((k) => text.contains(k))) return true;
+    // 过滤账单周期格式 "2024/03/18-2024/04/17"
+    if (RegExp(r'^\d{4}/\d{2}/\d{2}\s*-\s*\d{4}/\d{2}/\d{2}$').hasMatch(text.trim())) return true;
+    // 过滤过短的无意义文本（如 "CN"）
+    if (text.trim().length < 3) return true;
+    return false;
   }
 
   ImportCandidate? _buildCandidate(_CmbTransaction t, int index) {
