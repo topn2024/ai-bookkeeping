@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:csv/csv.dart';
 import 'package:flutter/foundation.dart';
+import 'package:gbk_codec/gbk_codec.dart';
 import '../../models/import_candidate.dart';
 import '../../models/transaction.dart';
 import 'bill_format_detector.dart';
@@ -51,12 +52,32 @@ class AlipayBillParser extends BillParser {
     try {
       // Try different encodings (Alipay typically uses GBK)
       String content;
+      // Remove UTF-8 BOM if present
+      Uint8List dataBytes = bytes;
+      if (bytes.length > 3 &&
+          bytes[0] == 0xEF &&
+          bytes[1] == 0xBB &&
+          bytes[2] == 0xBF) {
+        dataBytes = bytes.sublist(3);
+      }
       try {
-        // Try UTF-8 first
-        content = utf8.decode(bytes);
+        // Try UTF-8 first (strict mode)
+        final decoded = utf8.decode(dataBytes, allowMalformed: false);
+        // Verify content has expected Chinese characters
+        if (decoded.contains('交易') || decoded.contains('支付宝') || decoded.contains('金额')) {
+          content = decoded;
+        } else {
+          // UTF-8 decoded but no Chinese content recognized, try GBK
+          content = gbk_bytes.decode(dataBytes);
+        }
       } catch (e) {
-        // Fall back to latin1 (which preserves bytes for GBK)
-        content = latin1.decode(bytes);
+        // UTF-8 failed, use GBK (Alipay's default encoding)
+        try {
+          content = gbk_bytes.decode(dataBytes);
+        } catch (e2) {
+          // Last resort
+          content = utf8.decode(dataBytes, allowMalformed: true);
+        }
       }
 
       // Check for BOM

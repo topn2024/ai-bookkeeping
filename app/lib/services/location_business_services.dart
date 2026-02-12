@@ -283,12 +283,14 @@ class TransactionWithLocation {
   final double amount;
   final DateTime timestamp;
   final Position position;
+  final String? categoryId;
 
   const TransactionWithLocation({
     required this.id,
     required this.amount,
     required this.timestamp,
     required this.position,
+    this.categoryId,
   });
 }
 
@@ -384,9 +386,85 @@ class SavingSuggestionService {
   Future<List<LocationPattern>> _analyzeLocationPatterns(
     List<TransactionWithLocation> transactions,
   ) async {
-    // 按位置聚类交易
+    if (transactions.isEmpty) return [];
+
+    // 按位置聚类交易（200m半径内视为同一地点）
+    const clusterRadiusMeters = 200.0;
+    final clusters = <List<TransactionWithLocation>>[];
+    final assigned = List<bool>.filled(transactions.length, false);
+
+    for (int i = 0; i < transactions.length; i++) {
+      if (assigned[i]) continue;
+
+      final cluster = <TransactionWithLocation>[transactions[i]];
+      assigned[i] = true;
+
+      for (int j = i + 1; j < transactions.length; j++) {
+        if (assigned[j]) continue;
+
+        final distance = transactions[i].position.distanceTo(
+          transactions[j].position,
+        );
+        if (distance <= clusterRadiusMeters) {
+          cluster.add(transactions[j]);
+          assigned[j] = true;
+        }
+      }
+
+      clusters.add(cluster);
+    }
+
+    // 将每个聚类转换为 LocationPattern
     final patterns = <LocationPattern>[];
-    // TODO: 实现位置聚类分析逻辑
+    for (final cluster in clusters) {
+      if (cluster.isEmpty) continue;
+
+      // 计算聚类中心点
+      double sumLat = 0, sumLon = 0;
+      double totalAmount = 0;
+      for (final tx in cluster) {
+        sumLat += tx.position.latitude;
+        sumLon += tx.position.longitude;
+        totalAmount += tx.amount;
+      }
+
+      final centerLat = sumLat / cluster.length;
+      final centerLon = sumLon / cluster.length;
+      final averageAmount = totalAmount / cluster.length;
+
+      // 取聚类中最常见的 categoryId 作为代表
+      String? dominantCategory;
+      final categoryCounts = <String, int>{};
+      for (final tx in cluster) {
+        if (tx.categoryId != null) {
+          categoryCounts[tx.categoryId!] =
+              (categoryCounts[tx.categoryId!] ?? 0) + 1;
+        }
+      }
+      if (categoryCounts.isNotEmpty) {
+        dominantCategory = categoryCounts.entries
+            .reduce((a, b) => a.value >= b.value ? a : b)
+            .key;
+      }
+
+      patterns.add(LocationPattern(
+        location: Position(
+          latitude: centerLat,
+          longitude: centerLon,
+          timestamp: cluster.last.timestamp,
+        ),
+        locationName:
+            '${centerLat.toStringAsFixed(4)},${centerLon.toStringAsFixed(4)}',
+        frequency: cluster.length,
+        averageAmount: averageAmount,
+        totalAmount: totalAmount,
+        categoryId: dominantCategory,
+      ));
+    }
+
+    // 按频率降序排列，高频地点优先
+    patterns.sort((a, b) => b.frequency.compareTo(a.frequency));
+
     return patterns;
   }
 
@@ -416,8 +494,76 @@ class SavingSuggestionService {
   ) async {
     final suggestions = <SavingSuggestion>[];
 
-    // TODO: 分析通勤消费模式
-    // 识别通勤路线上的重复消费
+    // 筛选交通类消费交易
+    final transportTransactions = transactions.where((tx) {
+      final cat = tx.categoryId?.toLowerCase() ?? '';
+      return cat.contains('transport') ||
+          cat.contains('commute') ||
+          cat.contains('traffic') ||
+          cat.contains('taxi') ||
+          cat.contains('bus') ||
+          cat.contains('subway') ||
+          cat.contains('metro');
+    }).toList();
+
+    if (transportTransactions.isEmpty) return suggestions;
+
+    // 按日期分组，识别重复通勤模式
+    final dayGroups = <String, List<TransactionWithLocation>>{};
+    for (final tx in transportTransactions) {
+      final dayKey =
+          '${tx.timestamp.year}-${tx.timestamp.month}-${tx.timestamp.day}';
+      dayGroups.putIfAbsent(dayKey, () => []).add(tx);
+    }
+
+    // 统计通勤天数和总花费
+    final commuteDays = dayGroups.length;
+    final totalCommuteCost = transportTransactions.fold<double>(
+      0.0,
+      (sum, tx) => sum + tx.amount,
+    );
+    final avgDailyCost =
+        commuteDays > 0 ? totalCommuteCost / commuteDays : 0.0;
+
+    // 如果有持续的日常通勤消费，建议优化
+    if (commuteDays >= 5 && avgDailyCost > 10) {
+      final monthlyEstimate = avgDailyCost * 22; // 按22个工作日估算
+      final potentialSaving = monthlyEstimate * 0.15; // 预估可节省15%
+
+      suggestions.add(SavingSuggestion(
+        type: SavingSuggestionType.commuteOptimization,
+        title: '通勤交通费用优化',
+        description: '过去 $commuteDays 天您的日均交通花费为'
+            '${avgDailyCost.toStringAsFixed(1)}元，'
+            '月度预估约${monthlyEstimate.toStringAsFixed(0)}元',
+        potentialSaving: potentialSaving,
+        actionable: '建议办理公交/地铁月卡或通勤套餐，预计每月节省'
+            '${potentialSaving.toStringAsFixed(0)}元',
+      ));
+    }
+
+    // 如果经常使用打车，建议降级出行方式
+    final taxiTransactions = transportTransactions.where((tx) {
+      final cat = tx.categoryId?.toLowerCase() ?? '';
+      return cat.contains('taxi');
+    }).toList();
+
+    if (taxiTransactions.length >= 10) {
+      final taxiTotal = taxiTransactions.fold<double>(
+        0.0,
+        (sum, tx) => sum + tx.amount,
+      );
+      final avgTaxiCost = taxiTotal / taxiTransactions.length;
+
+      suggestions.add(SavingSuggestion(
+        type: SavingSuggestionType.commuteOptimization,
+        title: '减少打车次数',
+        description: '您共打车${taxiTransactions.length}次，'
+            '平均每次${avgTaxiCost.toStringAsFixed(1)}元',
+        potentialSaving: taxiTotal * 0.5,
+        actionable: '将部分打车出行替换为公共交通，预计可节省50%交通费用',
+      ));
+    }
 
     return suggestions;
   }
@@ -427,8 +573,58 @@ class SavingSuggestionService {
   ) {
     final suggestions = <SavingSuggestion>[];
 
-    // TODO: 分析分类消费分散度
-    // 建议集中采购以获得优惠
+    // 按分类聚合位置模式
+    final categoryPatterns = <String, List<LocationPattern>>{};
+    for (final pattern in patterns) {
+      final category = pattern.categoryId;
+      if (category != null && category.isNotEmpty) {
+        categoryPatterns.putIfAbsent(category, () => []).add(pattern);
+      }
+    }
+
+    // 找到在3个以上不同地点消费的分类
+    for (final entry in categoryPatterns.entries) {
+      final categoryId = entry.key;
+      final locations = entry.value;
+
+      if (locations.length >= 3) {
+        // 计算该分类的总消费金额
+        final totalSpent = locations.fold<double>(
+          0.0,
+          (sum, p) => sum + p.totalAmount,
+        );
+
+        // 找到该分类中平均单价最低的地点
+        final cheapest = locations.reduce(
+          (a, b) => a.averageAmount <= b.averageAmount ? a : b,
+        );
+
+        // 如果把所有消费集中到最便宜的地点，可以节省的金额
+        final totalFrequency = locations.fold<int>(
+          0,
+          (sum, p) => sum + p.frequency,
+        );
+        final consolidatedCost = cheapest.averageAmount * totalFrequency;
+        final potentialSaving = totalSpent - consolidatedCost;
+
+        if (potentialSaving > 0) {
+          suggestions.add(SavingSuggestion(
+            type: SavingSuggestionType.categoryConsolidation,
+            title: '集中$categoryId类消费',
+            description: '您在${locations.length}个不同地点进行了$categoryId类消费，'
+                '总计${totalSpent.toStringAsFixed(0)}元',
+            potentialSaving: potentialSaving,
+            actionable: '建议将$categoryId类消费集中在'
+                '${cheapest.locationName}附近，该地点平均消费最低'
+                '（${cheapest.averageAmount.toStringAsFixed(1)}元/次），'
+                '预计可节省${potentialSaving.toStringAsFixed(0)}元',
+          ));
+        }
+      }
+    }
+
+    // 按潜在节省金额降序排列
+    suggestions.sort((a, b) => b.potentialSaving.compareTo(a.potentialSaving));
 
     return suggestions;
   }
@@ -441,6 +637,7 @@ class LocationPattern {
   final int frequency;
   final double averageAmount;
   final double totalAmount;
+  final String? categoryId;
 
   const LocationPattern({
     required this.location,
@@ -448,6 +645,7 @@ class LocationPattern {
     required this.frequency,
     required this.averageAmount,
     required this.totalAmount,
+    this.categoryId,
   });
 }
 
@@ -527,13 +725,15 @@ class CommuteAnalysisService {
         (sum, tx) => sum + tx.amount,
       );
 
+      final averageTime = _estimateAverageCommuteTime(commuteTx);
+
       routes.add(CommuteRoute(
         id: 'home_to_office',
         start: home.center,
         end: office.center,
         name: '家 → 公司',
         frequency: commuteTx.length,
-        averageTime: 30.0, // TODO: 实际计算
+        averageTime: averageTime,
         totalCost: totalCost,
       ));
     }
@@ -546,7 +746,20 @@ class CommuteAnalysisService {
     required CommuteRoute route,
     required List<TransactionWithLocation> transactions,
   }) async {
-    final monthlyAvgCost = route.totalCost / 1; // TODO: 计算实际月数
+    // Calculate actual month count from the transaction date range
+    int monthCount = 1;
+    if (transactions.length >= 2) {
+      final sortedDates = transactions
+          .map((tx) => tx.timestamp)
+          .toList()
+        ..sort();
+      final firstDate = sortedDates.first;
+      final lastDate = sortedDates.last;
+      final daySpan = lastDate.difference(firstDate).inDays;
+      monthCount = (daySpan / 30).ceil();
+      if (monthCount < 1) monthCount = 1;
+    }
+    final monthlyAvgCost = route.totalCost / monthCount;
     final costPerTrip = route.frequency > 0 ? route.totalCost / route.frequency : 0.0;
 
     final suggestions = <String>[];
@@ -567,6 +780,50 @@ class CommuteAnalysisService {
       commuteTransactions: transactions,
       suggestions: suggestions,
     );
+  }
+
+  /// Estimate average commute time in minutes from transaction timestamps.
+  ///
+  /// Groups commute transactions by date. On days with 2+ commute transactions,
+  /// treats the time gap between the first and second transaction as a commute
+  /// duration estimate. Returns the average of all such estimates.
+  /// When insufficient data is available, defaults to 30 minutes.
+  double _estimateAverageCommuteTime(List<TransactionWithLocation> commuteTx) {
+    // Group transactions by date
+    final dayGroups = <String, List<TransactionWithLocation>>{};
+    for (final tx in commuteTx) {
+      final dayKey =
+          '${tx.timestamp.year}-${tx.timestamp.month}-${tx.timestamp.day}';
+      dayGroups.putIfAbsent(dayKey, () => []).add(tx);
+    }
+
+    final commuteGapsMinutes = <double>[];
+
+    for (final dayTxs in dayGroups.values) {
+      if (dayTxs.length < 2) continue;
+
+      // Sort by timestamp within the day
+      dayTxs.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+      // The gap between the first two commute transactions on a day
+      // approximates a single commute duration
+      final gapMinutes =
+          dayTxs[1].timestamp.difference(dayTxs[0].timestamp).inMinutes.abs();
+
+      // Only count reasonable commute durations (5-180 minutes)
+      if (gapMinutes >= 5 && gapMinutes <= 180) {
+        commuteGapsMinutes.add(gapMinutes.toDouble());
+      }
+    }
+
+    if (commuteGapsMinutes.isEmpty) {
+      // Default when data is insufficient to calculate actual commute time
+      return 30.0;
+    }
+
+    final totalMinutes =
+        commuteGapsMinutes.reduce((sum, val) => sum + val);
+    return totalMinutes / commuteGapsMinutes.length;
   }
 
   List<TransactionWithLocation> _identifyCommuteTransactions(

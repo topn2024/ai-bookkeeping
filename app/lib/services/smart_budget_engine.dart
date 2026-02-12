@@ -4,6 +4,7 @@ import '../models/transaction.dart';
 import '../models/recurring_transaction.dart';
 import '../models/category.dart';
 import '../extensions/category_extensions.dart';
+import 'category_localization_service.dart';
 
 /// 智能预算分配引擎
 ///

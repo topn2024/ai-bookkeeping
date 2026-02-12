@@ -260,8 +260,8 @@ class UserProfileScheduler {
         return;
       }
 
-      // 这里可以实现增量更新逻辑
-      // 目前简化为检查是否需要完整更新
+      // 增量更新：仅在画像标记为需要更新时执行重建，
+      // 日常场景下大部分调用会跳过，保持轻量级。
       if (profile.needsUpdate) {
         await _profileService.rebuildProfile(userId);
       }
@@ -501,9 +501,11 @@ class ProfileUpdateTrigger {
   }
 
   /// 检查是否为异常交易
+  ///
+  /// 金额超过月均值的指定倍数视为异常。
+  /// 当月均值为零（新用户）时不触发异常判定。
   Future<bool> _isAnomalousTransaction(TransactionEvent event) async {
-    // 简化实现：金额超过月均值的3倍视为异常
-    // 实际实现应该使用 AnomalyDetectionService
+    if (event.monthlyAverage <= 0) return false;
     return event.amount >= _config.anomalyMultiplier * event.monthlyAverage;
   }
 

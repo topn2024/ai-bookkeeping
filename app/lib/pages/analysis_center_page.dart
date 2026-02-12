@@ -162,11 +162,43 @@ class _AnalysisCenterPageState extends ConsumerState<AnalysisCenterPage>
           IconButton(
             icon: const Icon(Icons.filter_list, color: Colors.white),  // 白色图标
             onPressed: () {
-              // TODO: 打开筛选页面
+              _showFilterSheet(context, theme);
             },
           ),
         ],
       ),
+    );
+  }
+
+  void _showFilterSheet(BuildContext context, ThemeData theme) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('选择分析时段', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              ...List.generate(_periods.length, (index) {
+                return ListTile(
+                  title: Text(_periods[index]),
+                  trailing: _selectedPeriod == index ? Icon(Icons.check, color: theme.colorScheme.primary) : null,
+                  onTap: () {
+                    setState(() => _selectedPeriod = index);
+                    Navigator.pop(ctx);
+                  },
+                );
+              }),
+            ],
+          ),
+        );
+      },
     );
   }
 

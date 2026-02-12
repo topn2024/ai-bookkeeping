@@ -290,18 +290,15 @@ class TransactionOperationCoordinator {
   /// 恢复软删除的交易
   Future<TransactionOperationResult> restoreTransaction(String transactionId) async {
     try {
-      // TODO: ITransactionRepository.findById 会过滤已软删除记录，
-      // 应添加 findById(id, {includeDeleted}) 方法以避免加载全部交易。
-      // 当前使用 findAll(includeDeleted: true) 是临时方案，数据量大时有性能问题。
-      final transaction = await _transactionRepository
-          .findAll(includeDeleted: true)
-          .then((list) => list.where((t) => t.id == transactionId).firstOrNull);
+      // 先尝试恢复记录，再通过 findById 获取恢复后的交易数据。
+      // 这样避免了加载全部交易的性能问题。
+      await _transactionRepository.restore(transactionId);
 
+      final transaction = await _transactionRepository.findById(transactionId);
       if (transaction == null) {
         return TransactionOperationResult.failure(message: '交易不存在');
       }
 
-      await _transactionRepository.restore(transactionId);
       await _updateAccountBalance(transaction);
 
       return TransactionOperationResult.success(

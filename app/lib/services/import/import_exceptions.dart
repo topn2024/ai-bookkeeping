@@ -48,3 +48,24 @@ class SmsReadException implements Exception {
   @override
   String toString() => 'SmsReadException: $message';
 }
+
+/// 邮箱连接异常
+class EmailConnectionException implements Exception {
+  final String message;
+  final dynamic originalError;
+
+  EmailConnectionException(this.message, {this.originalError});
+
+  @override
+  String toString() => 'EmailConnectionException: $message';
+}
+
+/// 邮箱认证异常
+class EmailAuthException implements Exception {
+  final String message;
+
+  EmailAuthException(this.message);
+
+  @override
+  String toString() => 'EmailAuthException: $message';
+}

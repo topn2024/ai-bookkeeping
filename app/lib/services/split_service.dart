@@ -414,6 +414,26 @@ class SplitService {
       }
     }
 
+    // 收集每对成员间的相关交易ID
+    final relatedTxMap = <String, List<String>>{};
+    for (final transaction in transactions) {
+      if (transaction.status == SplitStatus.cancelled) continue;
+
+      for (final participant in transaction.splitInfo.participants) {
+        if (participant.memberId == memberId) {
+          if (participant.isPayer) {
+            for (final other in transaction.splitInfo.participants) {
+              if (!other.isPayer && !other.isSettled) {
+                relatedTxMap.putIfAbsent(other.memberId, () => []).add(transaction.id);
+              }
+            }
+          } else if (!participant.isSettled) {
+            relatedTxMap.putIfAbsent(transaction.splitInfo.payerId, () => []).add(transaction.id);
+          }
+        }
+      }
+    }
+
     // 构建详细余额列表
     final details = balanceMap.entries.map((entry) {
       final otherMember = members.firstWhere(
@@ -431,7 +451,7 @@ class SplitService {
         otherMemberId: entry.key,
         otherMemberName: otherMember.displayName,
         amount: entry.value,
-        relatedTransactionIds: [], // TODO: 收集相关交易ID
+        relatedTransactionIds: relatedTxMap[entry.key] ?? [],
       );
     }).toList();
 

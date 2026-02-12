@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:archive/archive_io.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/di/service_locator.dart';
 import '../../core/contracts/i_database_service.dart';
@@ -16,6 +17,13 @@ class BackupPackageService {
   final IDatabaseService _db;
   final GamificationService _gamification;
   final ImportLearningService _learning;
+
+  static String _appVersion = '2.0.0';
+
+  static Future<void> initVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    _appVersion = info.version;
+  }
 
   BackupPackageService({
     IDatabaseService? databaseService,
@@ -56,7 +64,7 @@ class BackupPackageService {
         'version': '2.0',
         'packageId': packageId,
         'createdAt': DateTime.now().toIso8601String(),
-        'appVersion': '2.0.0', // TODO: 从配置获取
+        'appVersion': _appVersion,
         'deviceInfo': await _getDeviceInfo(),
         'options': opts.toJson(),
       };

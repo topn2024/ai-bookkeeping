@@ -501,6 +501,9 @@ class SmartDefaultService {
   }
 
   /// 基于位置的推荐
+  ///
+  /// 需要位置服务集成后才能提供完整推荐。当前依赖调用方通过 context
+  /// 传入 'locationCategory' (如 'restaurant', 'supermarket') 来提供基础推荐。
   SmartDefaultResult<T>? _getLocationBasedRecommendation<T>(
     String fieldName,
     Map<String, dynamic>? context,
@@ -508,8 +511,36 @@ class SmartDefaultService {
     final location = context?['location'];
     if (location == null) return null;
 
-    // TODO: 实现位置推荐逻辑
-    // 需要与位置服务集成
+    // 如果调用方已通过 context 提供了 POI 分类信息，直接使用
+    final locationCategory = context?['locationCategory'] as String?;
+    if (locationCategory != null && fieldName == 'category') {
+      const poiToCategoryMap = {
+        'restaurant': '餐饮',
+        'cafe': '餐饮',
+        'supermarket': '购物',
+        'mall': '购物',
+        'hospital': '医疗',
+        'pharmacy': '医疗',
+        'gas_station': '交通',
+        'parking': '交通',
+        'gym': '运动',
+        'cinema': '娱乐',
+        'hotel': '住宿',
+      };
+
+      final category = poiToCategoryMap[locationCategory];
+      if (category != null) {
+        return SmartDefaultResult<T>(
+          value: category as T,
+          type: SmartDefaultType.locationBasedRecommendation,
+          confidence: 0.65,
+          reason: '根据您当前所在位置推荐',
+          metadata: {
+            'locationCategory': locationCategory,
+          },
+        );
+      }
+    }
 
     return null;
   }

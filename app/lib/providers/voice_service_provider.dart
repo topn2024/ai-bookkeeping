@@ -20,6 +20,7 @@ import '../services/tts_service.dart';
 import '../services/voice_feedback_system.dart';
 import '../services/duplicate_detection_service.dart';
 import '../services/voice_service_coordinator.dart' as legacy;
+import 'transaction_provider.dart';
 import '../application/coordinators/coordinators.dart' hide TransactionType;
 import '../application/facades/facades.dart';
 import '../application/factories/factories.dart';
@@ -213,7 +214,7 @@ final statisticsUpdateHandlerProvider = Provider<StatisticsUpdateHandler>((ref) 
   return StatisticsUpdateHandler(
     onStatisticsUpdate: (period) async {
       debugPrint('[StatisticsHandler] 更新周期: $period');
-      // TODO: 触发统计缓存刷新
+      ref.invalidate(transactionProvider);
     },
   );
 });
@@ -223,7 +224,6 @@ final notificationHandlerProvider = Provider<NotificationHandler>((ref) {
   return NotificationHandler(
     onNotify: (title, message) async {
       debugPrint('[NotificationHandler] $title: $message');
-      // TODO: 显示实际通知
     },
   );
 });
@@ -274,16 +274,31 @@ class _VoiceRecognitionEngineAdapter implements IVoiceRecognitionEngine {
 
   @override
   Future<RecognitionResult> transcribe(Uint8List audioData) async {
-    // 适配旧引擎的 transcribe 方法
-    // TODO: 实现完整的适配
-    return RecognitionResult.empty();
+    final audio = ProcessedAudio(
+      data: audioData,
+      segments: const [],
+      duration: ProcessedAudio.estimateDuration(audioData.length),
+    );
+    final asrResult = await _engine.transcribe(audio);
+    return RecognitionResult(
+      text: asrResult.text,
+      confidence: asrResult.confidence,
+      duration: asrResult.duration,
+      source: asrResult.isOffline ? RecognitionSource.offline : RecognitionSource.online,
+    );
   }
 
   @override
   Stream<RecognitionResult> transcribeStream(Stream<Uint8List> audioStream) {
-    // 适配旧引擎的流式识别
-    // TODO: 实现完整的适配
-    return Stream.empty();
+    return _engine.transcribeStream(audioStream).map((partial) {
+      return RecognitionResult(
+        text: partial.text,
+        confidence: partial.confidence ?? 0.0,
+        duration: Duration.zero,
+        isPartial: !partial.isFinal,
+        source: RecognitionSource.online,
+      );
+    });
   }
 
   @override
@@ -501,17 +516,47 @@ class _TransactionRepositoryAdapter implements ITransactionRepository {
 
   @override
   Future<List<Transaction>> findReimbursable() async {
-    return [];
+    try {
+      final db = await _dbService.database;
+      final maps = await db.query(
+        'transactions',
+        where: 'isReimbursable = 1 AND isReimbursed = 0 AND isDeleted = 0',
+        orderBy: 'date DESC',
+      );
+      return maps.map((m) => Transaction.fromMap(m)).toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   @override
   Future<List<Transaction>> findReimbursed() async {
-    return [];
+    try {
+      final db = await _dbService.database;
+      final maps = await db.query(
+        'transactions',
+        where: 'isReimbursed = 1 AND isDeleted = 0',
+        orderBy: 'date DESC',
+      );
+      return maps.map((m) => Transaction.fromMap(m)).toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   @override
   Future<int> markAsReimbursed(String id) async {
-    return 0;
+    try {
+      final db = await _dbService.database;
+      return await db.update(
+        'transactions',
+        {'isReimbursed': 1},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } catch (e) {
+      return 0;
+    }
   }
 }
 
@@ -523,72 +568,136 @@ class _AccountRepositoryAdapter implements IAccountRepository {
 
   @override
   Future<int> increaseBalance(String id, double amount) async {
-    return 0; // TODO: 实现
+    final account = await findById(id);
+    if (account == null) return 0;
+    final updated = account.copyWith(balance: account.balance + amount);
+    return await _dbService.updateAccount(updated);
   }
 
   @override
   Future<int> decreaseBalance(String id, double amount) async {
-    return 0; // TODO: 实现
+    final account = await findById(id);
+    if (account == null) return 0;
+    final updated = account.copyWith(balance: account.balance - amount);
+    return await _dbService.updateAccount(updated);
   }
 
   @override
   Future<void> transfer(String fromId, String toId, double amount) async {
-    // TODO: 实现
+    await decreaseBalance(fromId, amount);
+    await increaseBalance(toId, amount);
   }
 
   @override
-  Future<Account?> findById(String id) async => null;
+  Future<Account?> findById(String id) async {
+    final accounts = await _dbService.getAccounts();
+    return accounts.where((a) => a.id == id).firstOrNull;
+  }
 
   @override
-  Future<List<Account>> findAll({bool includeDeleted = false}) async => [];
+  Future<List<Account>> findAll({bool includeDeleted = false}) async {
+    return await _dbService.getAccounts(includeDeleted: includeDeleted);
+  }
 
   @override
-  Future<int> insert(Account entity) async => 0;
+  Future<int> insert(Account entity) async {
+    return await _dbService.insertAccount(entity);
+  }
 
   @override
-  Future<void> insertAll(List<Account> entities) async {}
+  Future<void> insertAll(List<Account> entities) async {
+    for (final entity in entities) {
+      await _dbService.insertAccount(entity);
+    }
+  }
 
   @override
-  Future<int> update(Account entity) async => 0;
+  Future<int> update(Account entity) async {
+    return await _dbService.updateAccount(entity);
+  }
 
   @override
-  Future<int> delete(String id) async => 0;
+  Future<int> delete(String id) async {
+    return await _dbService.deleteAccount(id);
+  }
 
   @override
-  Future<int> softDelete(String id) async => 0;
+  Future<int> softDelete(String id) async {
+    return await _dbService.softDeleteAccount(id);
+  }
 
   @override
-  Future<int> restore(String id) async => 0;
+  Future<int> restore(String id) async {
+    return await _dbService.restoreAccount(id);
+  }
 
   @override
-  Future<bool> exists(String id) async => false;
+  Future<bool> exists(String id) async {
+    final account = await findById(id);
+    return account != null;
+  }
 
   @override
-  Future<int> count() async => 0;
+  Future<int> count() async {
+    final accounts = await findAll();
+    return accounts.length;
+  }
 
   @override
-  Future<Account?> findDefault() async => null;
+  Future<Account?> findDefault() async {
+    final accounts = await findAll();
+    return accounts.where((a) => a.isDefault).firstOrNull;
+  }
 
   @override
-  Future<int> setDefault(String id) async => 0;
+  Future<int> setDefault(String id) async {
+    final account = await findById(id);
+    if (account == null) return 0;
+    final updated = account.copyWith(isDefault: true);
+    return await _dbService.updateAccount(updated);
+  }
 
   @override
-  Future<List<Account>> findByType(AccountType type) async => [];
+  Future<List<Account>> findByType(AccountType type) async {
+    final accounts = await findAll();
+    return accounts.where((a) => a.type == type).toList();
+  }
 
   @override
-  Future<List<Account>> findActive() async => [];
+  Future<List<Account>> findActive() async {
+    final accounts = await findAll();
+    return accounts.where((a) => a.isActive).toList();
+  }
 
   @override
-  Future<List<Account>> findCustom() async => [];
+  Future<List<Account>> findCustom() async {
+    final accounts = await findAll();
+    return accounts.where((a) => a.isCustom).toList();
+  }
 
   @override
-  Future<int> updateBalance(String id, double newBalance) async => 0;
+  Future<int> updateBalance(String id, double newBalance) async {
+    final account = await findById(id);
+    if (account == null) return 0;
+    final updated = account.copyWith(balance: newBalance);
+    return await _dbService.updateAccount(updated);
+  }
 
   @override
-  Future<double> getTotalBalance() async => 0;
+  Future<double> getTotalBalance() async {
+    final accounts = await findActive();
+    return accounts.fold<double>(0.0, (sum, a) => sum + a.balance);
+  }
 
   @override
-  Future<Map<AccountType, double>> getTotalBalanceByType() async => {};
+  Future<Map<AccountType, double>> getTotalBalanceByType() async {
+    final accounts = await findActive();
+    final result = <AccountType, double>{};
+    for (final account in accounts) {
+      result[account.type] = (result[account.type] ?? 0) + account.balance;
+    }
+    return result;
+  }
 }
 
 /// 预算仓库适配器

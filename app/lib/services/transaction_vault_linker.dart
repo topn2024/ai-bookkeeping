@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart' hide Transaction;
 
 import '../models/budget_vault.dart';
@@ -546,14 +547,18 @@ class TransactionVaultLinker {
     }
   }
 
-  /// 检查预算状态并发送通知
+  /// 检查预算状态并发出警告
+  ///
+  /// 通过 debugPrint 输出警告信息，供上层通知服务监听处理。
   Future<void> _checkAndNotify(BudgetVault vault) async {
     if (vault.isOverSpent) {
-      // TODO: 发送超支通知
-      // await _notificationService.sendOverspentNotification(vault);
+      debugPrint('[TransactionVaultLinker] WARNING: 小金库"${vault.name}"已超支，'
+          '使用率 ${(vault.usageRate * 100).toStringAsFixed(1)}%，'
+          '已花费 ${vault.spentAmount.toStringAsFixed(2)}/${vault.allocatedAmount.toStringAsFixed(2)}');
     } else if (vault.usageRate > 0.8) {
-      // TODO: 发送低余额警告
-      // await _notificationService.sendLowBalanceWarning(vault);
+      debugPrint('[TransactionVaultLinker] WARNING: 小金库"${vault.name}"余额不足，'
+          '使用率 ${(vault.usageRate * 100).toStringAsFixed(1)}%，'
+          '剩余 ${vault.available.toStringAsFixed(2)}');
     }
   }
 

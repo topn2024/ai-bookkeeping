@@ -34,6 +34,7 @@ import 'automation_task_service.dart';
 import 'nl_search_service.dart';
 import 'voice_budget_query_service.dart';
 import 'vault_repository.dart';
+import '../models/budget_vault.dart';
 import 'casual_chat_service.dart';
 import 'learning/voice_intent_learning_service.dart';
 import 'category_localization_service.dart';
@@ -97,6 +98,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   final VoiceConfigService _configService;
   final VoiceAdviceService _adviceService;
   VoiceBudgetQueryService? _budgetQueryService;
+  VaultRepository? _vaultRepository;
 
   /// 对话上下文管理
   final ConversationContext _conversationContext;
@@ -1771,6 +1773,46 @@ class VoiceServiceCoordinator extends ChangeNotifier {
     return null;
   }
 
+  /// 根据商户名称和描述推断分类
+  ///
+  /// 优先使用商户名称匹配，然后回退到描述文本匹配。
+  /// 商户匹配包含常见品牌和关键词。
+  String? _inferCategoryFromMerchant(String? merchant, String? description) {
+    // 商户名称关键词映射
+    const merchantKeywords = <String, List<String>>{
+      'food': ['餐', '饭', '外卖', '美团', '饿了么', '肯德基', '麦当劳', '星巴克',
+               '瑞幸', '海底捞', '必胜客', '奶茶', '食堂', '烧烤', '火锅'],
+      'shopping': ['超市', '商超', '便利店', '沃尔玛', '永辉', '盒马', '全家',
+                   '711', '罗森', '淘宝', '京东', '拼多多', '天猫'],
+      'transport': ['打车', '滴滴', '出租', '地铁', '公交', '高德', '嘀嗒',
+                    '花小猪', 'T3出行', '曹操出行'],
+      'housing': ['水电', '电费', '水费', '燃气', '物业', '房租', '宽带'],
+      'medical': ['医院', '药', '诊所', '药店', '药房', '体检'],
+      'education': ['教育', '培训', '学费', '课程', '网课'],
+      'entertainment': ['娱乐', '电影', '游戏', 'KTV', 'ktv', '万达影城', '猫眼'],
+      'communication': ['话费', '中国移动', '中国联通', '中国电信', '流量'],
+    };
+
+    // 先尝试从商户名称推断
+    if (merchant != null && merchant.isNotEmpty) {
+      final merchantLower = merchant.toLowerCase();
+      for (final entry in merchantKeywords.entries) {
+        for (final keyword in entry.value) {
+          if (merchantLower.contains(keyword.toLowerCase())) {
+            return entry.key;
+          }
+        }
+      }
+    }
+
+    // 再尝试从描述推断（复用已有方法）
+    if (description != null && description.isNotEmpty) {
+      return _inferCategoryFromNote(description);
+    }
+
+    return null;
+  }
+
   /// 处理删除意图
   Future<VoiceSessionResult> _handleDeleteIntent(
     IntentAnalysisResult intentResult,
@@ -2242,6 +2284,15 @@ class VoiceServiceCoordinator extends ChangeNotifier {
       _budgetQueryService = VoiceBudgetQueryService(VaultRepository(db));
     }
     return _budgetQueryService!;
+  }
+
+  /// 获取小金库仓库（延迟初始化）
+  Future<VaultRepository> _getVaultRepository() async {
+    if (_vaultRepository == null) {
+      final db = await _databaseService.database;
+      _vaultRepository = VaultRepository(db);
+    }
+    return _vaultRepository!;
   }
 
   /// 处理预算相关查询
@@ -3125,7 +3176,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
           id: '${DateTime.now().millisecondsSinceEpoch}_${recordedIds.length}',
           type: _mapBillTypeToTransactionType(billInfo.type),
           amount: billInfo.amount!,
-          category: 'other_expense', // TODO: 根据商户智能分类
+          category: _inferCategoryFromMerchant(billInfo.merchant, billInfo.description) ?? 'other_expense',
           note: billInfo.description,
           date: DateTime.now(),
           accountId: 'default',
@@ -3340,26 +3391,25 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       switch (operation) {
         case 'query':
-          // 查询钱龄
-          // TODO: 集成钱龄服务获取实际数据
-          message = '您的平均钱龄为45天，处于健康水平';
-          data = {'averageAge': 45, 'status': 'healthy'};
+          // 钱龄服务暂未接入
+          message = '钱龄分析功能正在完善中，暂时无法查询，请稍后再试';
+          data = {'available': false};
           break;
 
         case 'optimize':
-          // 钱龄优化建议
-          message = '建议您减少冲动消费，延长资金持有时间可以提高钱龄';
-          data = {'suggestion': 'reduce_impulse_spending'};
+          // 钱龄优化建议（通用建议不依赖实时数据）
+          message = '钱龄优化功能正在开发中。一般来说，减少冲动消费、延长资金持有时间有助于提高钱龄';
+          data = {'available': false, 'suggestion': 'general_advice'};
           break;
 
         case 'pool':
-          // 资金池查看
-          message = '当前资金池共有3笔资金，总金额5000元';
-          data = {'poolCount': 3, 'totalAmount': 5000};
+          // 资金池查看暂未接入
+          message = '资金池功能正在完善中，暂时无法查看，请稍后再试';
+          data = {'available': false};
           break;
 
         default:
-          message = '钱龄操作已完成';
+          message = '钱龄功能正在开发中，暂未开放';
       }
 
       await _speakWithSkipCheck(message);
@@ -3392,32 +3442,31 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       switch (operation) {
         case 'checkin':
-          // 打卡
-          // TODO: 集成习惯服务执行打卡
-          message = '打卡成功！已连续记账15天，继续保持！';
-          data = {'streak': 15, 'checkedIn': true};
+          // 习惯打卡服务暂未接入
+          message = '习惯打卡功能正在开发中，暂时无法执行打卡，请稍后再试';
+          data = {'available': false};
           break;
 
         case 'challenge':
-          // 查看挑战进度
-          message = '当前省钱挑战进度：已完成60%，还差200元达成目标';
-          data = {'progress': 0.6, 'remaining': 200};
+          // 挑战功能暂未接入
+          message = '省钱挑战功能正在开发中，敬请期待';
+          data = {'available': false};
           break;
 
         case 'reward':
-          // 兑换奖励
-          message = '已兑换奖励，获得10积分';
-          data = {'points': 10, 'redeemed': true};
+          // 奖励功能暂未接入
+          message = '积分兑换功能正在开发中，敬请期待';
+          data = {'available': false};
           break;
 
         case 'points':
-          // 查看积分
-          message = '您当前有150积分，可兑换3个奖励';
-          data = {'totalPoints': 150, 'availableRewards': 3};
+          // 积分功能暂未接入
+          message = '积分系统正在开发中，敬请期待';
+          data = {'available': false};
           break;
 
         default:
-          message = '习惯操作已完成';
+          message = '习惯功能正在开发中，暂未开放';
       }
 
       await _speakWithSkipCheck(message);
@@ -3458,19 +3507,64 @@ class VoiceServiceCoordinator extends ChangeNotifier {
             await _speakWithSkipCheck(message);
             return VoiceSessionResult.error(message);
           }
-          // TODO: 集成VaultRepository执行分配
-          message = '已向$vaultName小金库分配${amount.toStringAsFixed(0)}元';
-          data = {'vault': vaultName, 'amount': amount, 'allocated': true};
+          try {
+            final vaultRepo = await _getVaultRepository();
+            final allVaults = await vaultRepo.getEnabled();
+            final targetVaultObj = allVaults.where(
+              (v) => v.name.contains(vaultName) || vaultName.contains(v.name),
+            ).firstOrNull;
+            if (targetVaultObj == null) {
+              message = '未找到名为"$vaultName"的小金库，请确认名称后重试';
+              await _speakWithSkipCheck(message);
+              return VoiceSessionResult.error(message);
+            }
+            await vaultRepo.updateAllocatedAmount(targetVaultObj.id, amount);
+            await vaultRepo.recordAllocation(VaultAllocation(
+              id: '${DateTime.now().millisecondsSinceEpoch}',
+              vaultId: targetVaultObj.id,
+              amount: amount,
+              note: '语音分配',
+              allocatedAt: DateTime.now(),
+            ));
+            message = '已向${targetVaultObj.name}小金库分配${amount.toStringAsFixed(0)}元';
+            data = {'vault': targetVaultObj.name, 'vaultId': targetVaultObj.id, 'amount': amount, 'allocated': true};
+          } catch (e) {
+            debugPrint('[VoiceCoordinator] 小金库分配失败: $e');
+            message = '小金库分配失败，请稍后重试';
+            data = {'error': e.toString()};
+          }
           break;
 
         case 'query':
           // 查询余额
-          if (vaultName != null) {
-            message = '$vaultName小金库余额为2000元';
-            data = {'vault': vaultName, 'balance': 2000};
-          } else {
-            message = '您有3个小金库，总余额5000元';
-            data = {'vaultCount': 3, 'totalBalance': 5000};
+          try {
+            final vaultRepo = await _getVaultRepository();
+            if (vaultName != null) {
+              final allVaults = await vaultRepo.getEnabled();
+              final matchedVault = allVaults.where(
+                (v) => v.name.contains(vaultName) || vaultName.contains(v.name),
+              ).firstOrNull;
+              if (matchedVault != null) {
+                message = '${matchedVault.name}小金库余额为${matchedVault.available.toStringAsFixed(0)}元';
+                data = {'vault': matchedVault.name, 'balance': matchedVault.available};
+              } else {
+                message = '未找到名为"$vaultName"的小金库';
+                data = {'found': false};
+              }
+            } else {
+              final summary = await vaultRepo.getSummary();
+              if (summary.totalVaults > 0) {
+                message = '您有${summary.totalVaults}个小金库，总余额${summary.totalAvailable.toStringAsFixed(0)}元';
+                data = {'vaultCount': summary.totalVaults, 'totalBalance': summary.totalAvailable};
+              } else {
+                message = '您还没有创建小金库，可以在预算页面创建';
+                data = {'vaultCount': 0};
+              }
+            }
+          } catch (e) {
+            debugPrint('[VoiceCoordinator] 小金库查询失败: $e');
+            message = '小金库查询失败，请稍后重试';
+            data = {'error': e.toString()};
           }
           break;
 
@@ -3531,33 +3625,31 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
       switch (operation) {
         case 'backup':
-          // 立即备份
-          // TODO: 集成数据备份服务
-          message = '数据备份完成，已保存到云端';
-          data = {'backupTime': DateTime.now().toIso8601String(), 'success': true};
+          // 数据备份服务暂未接入语音控制
+          message = '语音备份功能暂未接入，请前往设置页面手动备份数据';
+          data = {'available': false};
           break;
 
         case 'export':
-          // 导出数据
-          final period = entities['period'] as String? ?? 'month';
-          message = '已导出${period == 'month' ? '本月' : period}数据到文件';
-          data = {'period': period, 'exported': true};
+          // 数据导出暂未接入语音控制
+          message = '语音导出功能暂未接入，请前往设置页面手动导出数据';
+          data = {'available': false};
           break;
 
         case 'sync':
-          // 同步数据
-          message = '数据同步完成，所有设备已更新';
-          data = {'syncTime': DateTime.now().toIso8601String(), 'synced': true};
+          // 数据同步暂未接入语音控制
+          message = '语音同步功能暂未接入，请前往设置页面进行数据同步';
+          data = {'available': false};
           break;
 
         case 'restore':
-          // 恢复数据
-          message = '正在恢复数据，请稍候...';
-          data = {'restoring': true};
+          // 数据恢复暂未接入语音控制
+          message = '语音恢复功能暂未接入，请前往设置页面手动恢复数据';
+          data = {'available': false};
           break;
 
         default:
-          message = '数据操作已完成';
+          message = '数据操作功能正在开发中，请前往设置页面操作';
       }
 
       await _speakWithSkipCheck(message);

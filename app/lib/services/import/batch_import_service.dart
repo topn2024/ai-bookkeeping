@@ -195,6 +195,9 @@ class BatchImportService {
       case BillSourceType.sms:
         // 短信导入使用 SmsImportService 单独处理，不需要解析器
         return null;
+      case BillSourceType.email:
+        // 邮箱导入使用 EmailBillDispatcher 单独处理，不需要解析器
+        return null;
       case BillSourceType.unknown:
         return null;
     }

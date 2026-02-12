@@ -783,17 +783,58 @@ class SmartMoneyAgeService {
 
   Future<MoneyAgeStatistics?> _getCurrentStats({String? ledgerId}) async {
     try {
-      // TODO: 从 provider 或数据库获取实际数据
+      final db = await _db.database;
+
+      // 查询所有有剩余金额的资源池
+      final poolResults = await db.query(
+        'resource_pools',
+        where: 'remainingAmount > 0',
+      );
+
+      if (poolResults.isEmpty) {
+        return MoneyAgeStatistics(
+          averageAge: 0,
+          trend: const [],
+          ageByCategory: const {},
+          ageByAccount: const {},
+          totalResourcePoolBalance: 0,
+          activePoolCount: 0,
+          calculatedAt: DateTime.now(),
+        );
+      }
+
+      // 计算加权平均钱龄（按剩余金额加权）
+      double totalWeightedAge = 0;
+      double totalBalance = 0;
+      final ageByAccount = <String, int>{};
+
+      for (final row in poolResults) {
+        final createdAt = DateTime.fromMillisecondsSinceEpoch(row['createdAt'] as int);
+        final remaining = (row['remainingAmount'] as num).toDouble();
+        final age = DateTime.now().difference(createdAt).inDays;
+
+        totalWeightedAge += age * remaining;
+        totalBalance += remaining;
+
+        final accountId = row['accountId'] as String?;
+        if (accountId != null) {
+          ageByAccount[accountId] = age;
+        }
+      }
+
+      final averageAge = totalBalance > 0 ? (totalWeightedAge / totalBalance).round() : 0;
+
       return MoneyAgeStatistics(
-        averageAge: 25,
+        averageAge: averageAge,
         trend: const [],
         ageByCategory: const {},
-        ageByAccount: const {},
-        totalResourcePoolBalance: 10000,
-        activePoolCount: 5,
+        ageByAccount: ageByAccount,
+        totalResourcePoolBalance: totalBalance,
+        activePoolCount: poolResults.length,
         calculatedAt: DateTime.now(),
       );
     } catch (e) {
+      _logger.warning('Failed to get current stats: $e', tag: 'SmartMoneyAge');
       return null;
     }
   }
@@ -837,9 +878,22 @@ class SmartMoneyAgeService {
       final weekendAvg = weekendCount > 0 ? weekendTotal / weekendCount : 0;
       final weekendRatio = weekdayAvg > 0 ? weekendAvg / weekdayAvg : 1;
 
+      // 检测大额周期性支出：过去90天内，同分类+相近金额出现3次以上
+      final ninetyDaysAgo = DateTime.now().subtract(const Duration(days: 90));
+      final recurringResults = await db.rawQuery('''
+        SELECT category, ROUND(amount, -1) as rounded_amount, COUNT(*) as cnt
+        FROM transactions
+        WHERE type = ? AND date >= ?
+        GROUP BY category, rounded_amount
+        HAVING cnt >= 3
+        LIMIT 1
+      ''', [TransactionType.expense.index, ninetyDaysAgo.millisecondsSinceEpoch]);
+
+      final hasLargeRecurring = recurringResults.isNotEmpty;
+
       return {
         'weekendRatio': weekendRatio,
-        'hasLargeRecurring': false, // TODO: 实现大额周期性支出检测
+        'hasLargeRecurring': hasLargeRecurring,
       };
     } catch (e) {
       return {};
@@ -853,9 +907,29 @@ class SmartMoneyAgeService {
     if (currentAge < milestone) return false;
     if (currentAge > milestone + 3) return false;
 
-    // 检查是否在最近3天内刚达到这个里程碑
-    // TODO: 实现历史数据检查
-    return currentAge == milestone;
+    // Check if this milestone celebration was already generated recently
+    // by looking in the smart_suggestions table for a matching milestone entry
+    try {
+      final db = await _db.database;
+      final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+      final existing = await db.query(
+        'smart_suggestions',
+        where: 'id LIKE ? AND generatedAt > ?',
+        whereArgs: [
+          'milestone_${milestone}_%',
+          sevenDaysAgo.millisecondsSinceEpoch,
+        ],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        return false; // Already celebrated this milestone recently
+      }
+    } catch (e) {
+      // Table might not exist yet; fall through to simple check
+    }
+
+    // Simple heuristic: celebrate if current age is within the milestone window
+    return currentAge >= milestone && currentAge <= milestone + 3;
   }
 
   Future<void> _saveSuggestions(List<SmartSuggestion> suggestions) async {

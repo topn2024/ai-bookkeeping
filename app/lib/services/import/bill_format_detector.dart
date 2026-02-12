@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
+import 'package:gbk_codec/gbk_codec.dart';
 import '../../models/transaction.dart';
 
 /// Supported bill file formats
@@ -28,6 +29,7 @@ enum BillSourceType {
   otherBank,
   generic,
   sms,      // 短信导入
+  email,    // 邮箱账单导入
   unknown,
 }
 
@@ -119,6 +121,8 @@ class BillFormatResult {
         return ExternalSource.generic;
       case BillSourceType.sms:
         return ExternalSource.sms;
+      case BillSourceType.email:
+        return ExternalSource.email;
       case BillSourceType.unknown:
         return null;
     }
@@ -147,6 +151,8 @@ class BillFormatResult {
         return '通用表格';
       case BillSourceType.sms:
         return '短信导入';
+      case BillSourceType.email:
+        return '邮箱账单';
       case BillSourceType.unknown:
         return '未知格式';
     }
@@ -175,6 +181,8 @@ class BillFormatResult {
         return 'generic';
       case BillSourceType.sms:
         return 'sms';
+      case BillSourceType.email:
+        return 'email';
       case BillSourceType.unknown:
         return 'unknown';
     }
@@ -744,15 +752,13 @@ class BillFormatDetector {
     }
   }
 
-  /// Simple GBK decoder (fallback)
+  /// Decode GBK/GB2312 encoded bytes
   String _decodeGbk(Uint8List bytes) {
-    // This is a simplified approach - in production, use a proper GBK codec
-    // For now, try latin1 as a fallback which preserves the bytes
     try {
-      return latin1.decode(bytes);
+      return gbk_bytes.decode(bytes);
     } catch (e) {
-      // Last resort: just interpret as string with replacement
-      return String.fromCharCodes(bytes);
+      // Last resort: latin1 preserves raw bytes
+      return latin1.decode(bytes);
     }
   }
 }

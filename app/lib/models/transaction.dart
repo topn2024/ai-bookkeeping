@@ -29,6 +29,7 @@ enum ExternalSource {
   otherBank,    // 其他银行
   generic,      // 通用格式
   sms,          // 短信导入
+  email,        // 邮箱账单
 }
 
 class Transaction {
@@ -356,6 +357,8 @@ class Transaction {
         return '通用导入';
       case ExternalSource.sms:
         return '短信导入';
+      case ExternalSource.email:
+        return '邮箱账单';
     }
   }
 

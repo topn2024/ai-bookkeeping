@@ -28,6 +28,7 @@ import 'core/config.dart';
 import 'services/voice_context_route_observer.dart';
 import 'core/config/secrets.dart';
 import 'services/voice_service_coordinator.dart' show VoiceSessionResult, VoiceSessionStatus;
+import 'services/tts_service.dart';
 import 'services/voice/config/feature_flags.dart';
 import 'services/voice/events/query_result_event_bus.dart';
 import 'providers/voice_coordinator_provider.dart';
@@ -393,9 +394,18 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           if (!isPipelineMode) {
             GlobalVoiceAssistantManager.instance.addResultMessage('⏳ $confirmMsg');
           }
-          // 延迟让 TTS 播放完成，然后自动开始录音
-          // TODO: 应使用TTS完成回调替代固定延时，当前为临时方案
-          await Future.delayed(const Duration(milliseconds: 2500));
+          // Wait for TTS playback to finish before starting confirmation recording.
+          // Poll TTSService.isSpeaking with a timeout to avoid indefinite blocking.
+          final tts = TTSService.instance;
+          const pollInterval = Duration(milliseconds: 100);
+          const maxWait = Duration(seconds: 8);
+          var waited = Duration.zero;
+          while (tts.isSpeaking && waited < maxWait) {
+            await Future.delayed(pollInterval);
+            waited += pollInterval;
+          }
+          // Brief post-TTS buffer so the user can process the question
+          await Future.delayed(const Duration(milliseconds: 300));
           if (!mounted) return '';
           debugPrint('[App] 自动开始录音等待确认');
           GlobalVoiceAssistantManager.instance.startRecording();

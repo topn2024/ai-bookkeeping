@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../core/contracts/i_database_service.dart';
+import '../models/transaction.dart';
 import 'financial_health_score_service.dart';
 
 /// 目标类型
@@ -486,19 +487,159 @@ class GoalAchievementService {
   }
 
   /// 获取目标历史趋势
+  ///
+  /// Approximates historical achievement rates by computing daily budget
+  /// execution rates from transaction data over the requested period.
   Future<List<({DateTime date, double rate})>> getAchievementHistory({
     int days = 30,
   }) async {
-    // TODO: 实现历史趋势查询
-    return [];
+    try {
+      final db = await _dbService.database;
+      final now = DateTime.now();
+      final startDate = now.subtract(Duration(days: days));
+
+      // Get enabled budget vaults for reference
+      final vaultResults = await db.query(
+        'budget_vaults',
+        where: 'isEnabled = 1',
+      );
+
+      if (vaultResults.isEmpty) return [];
+
+      // Compute total allocated budget across all enabled vaults
+      double totalAllocated = 0;
+      for (final v in vaultResults) {
+        totalAllocated += (v['allocatedAmount'] as num?)?.toDouble() ?? 0;
+      }
+      if (totalAllocated <= 0) return [];
+
+      // Daily budget is total monthly allocation / 30
+      final dailyBudget = totalAllocated / 30.0;
+
+      // Query daily expense totals for the period
+      final dailyExpenses = await db.rawQuery('''
+        SELECT DATE(datetime / 1000, 'unixepoch', 'localtime') as date,
+               SUM(amount) as total
+        FROM transactions
+        WHERE type = ? AND datetime >= ?
+        GROUP BY date
+        ORDER BY date ASC
+      ''', [TransactionType.expense.index, startDate.millisecondsSinceEpoch]);
+
+      // Build a map of date -> expense total
+      final expenseMap = <String, double>{};
+      for (final row in dailyExpenses) {
+        final dateStr = row['date'] as String;
+        expenseMap[dateStr] = (row['total'] as num?)?.toDouble() ?? 0;
+      }
+
+      // Generate daily achievement rates
+      final history = <({DateTime date, double rate})>[];
+      double cumulativeSpent = 0;
+
+      for (var i = 0; i < days; i++) {
+        final date = startDate.add(Duration(days: i + 1));
+        final dateStr =
+            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        final daySpent = expenseMap[dateStr] ?? 0;
+        cumulativeSpent += daySpent;
+
+        // Rate: how much budget remains as a ratio (1.0 = perfect, 0 = fully spent)
+        final cumulativeBudget = dailyBudget * (i + 1);
+        final rate = cumulativeBudget > 0
+            ? (1.0 - (cumulativeSpent / cumulativeBudget)).clamp(0.0, 1.0)
+            : 0.0;
+
+        history.add((date: DateTime(date.year, date.month, date.day), rate: rate));
+      }
+
+      return history;
+    } catch (e) {
+      debugPrint('Get achievement history error: $e');
+      return [];
+    }
   }
 
   /// 获取上月的总体达成率（用于计算月度进展）
+  ///
+  /// Computes last month's achievement by evaluating budget execution,
+  /// recording habit, and money age goals for the previous calendar month.
   Future<double?> _getLastMonthAchievementRate() async {
     try {
-      // 简化实现：返回null表示没有历史数据
-      // 完整实现需要存储每日/每月的达成率快照
-      return null;
+      final db = await _dbService.database;
+      final now = DateTime.now();
+      final lastMonthStart = DateTime(now.year, now.month - 1, 1);
+      final lastMonthEnd = DateTime(now.year, now.month, 1);
+
+      // 1. Budget execution rate for last month
+      double budgetRate = 0.5; // default if no budget data
+      final vaultResults = await db.query(
+        'budget_vaults',
+        where: 'isEnabled = 1',
+      );
+      if (vaultResults.isNotEmpty) {
+        double totalAllocated = 0;
+        for (final v in vaultResults) {
+          totalAllocated += (v['allocatedAmount'] as num?)?.toDouble() ?? 0;
+        }
+
+        if (totalAllocated > 0) {
+          final expenseResults = await db.rawQuery('''
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE type = ? AND datetime >= ? AND datetime < ?
+          ''', [
+            TransactionType.expense.index,
+            lastMonthStart.millisecondsSinceEpoch,
+            lastMonthEnd.millisecondsSinceEpoch,
+          ]);
+
+          final totalSpent = (expenseResults.first['total'] as num?)?.toDouble() ?? 0;
+          budgetRate = (1.0 - totalSpent / totalAllocated).clamp(0.0, 1.0);
+        }
+      }
+
+      // 2. Recording habit: count distinct days with transactions last month
+      final habitResults = await db.rawQuery('''
+        SELECT COUNT(DISTINCT DATE(datetime / 1000, 'unixepoch', 'localtime')) as days_count
+        FROM transactions
+        WHERE datetime >= ? AND datetime < ?
+      ''', [
+        lastMonthStart.millisecondsSinceEpoch,
+        lastMonthEnd.millisecondsSinceEpoch,
+      ]);
+
+      final daysRecorded = (habitResults.first['days_count'] as num?)?.toInt() ?? 0;
+      final daysInLastMonth = lastMonthEnd.difference(lastMonthStart).inDays;
+      final habitRate = daysInLastMonth > 0
+          ? (daysRecorded / 21.0).clamp(0.0, 1.0)  // target is 21 days
+          : 0.0;
+
+      // 3. Money age goal: use resource pools that existed last month
+      final poolResults = await db.query(
+        'resource_pools',
+        where: 'remainingAmount > 0 AND createdAt < ?',
+        whereArgs: [lastMonthEnd.millisecondsSinceEpoch],
+      );
+
+      double moneyAgeRate = 0.0;
+      if (poolResults.isNotEmpty) {
+        double totalWeightedAge = 0;
+        double totalRemaining = 0;
+        for (final row in poolResults) {
+          final createdAt = DateTime.fromMillisecondsSinceEpoch(row['createdAt'] as int);
+          final remaining = (row['remainingAmount'] as num).toDouble();
+          final age = lastMonthEnd.difference(createdAt).inDays;
+          totalWeightedAge += age * remaining;
+          totalRemaining += remaining;
+        }
+        final avgAge = totalRemaining > 0 ? totalWeightedAge / totalRemaining : 0;
+        moneyAgeRate = (avgAge / 30.0).clamp(0.0, 1.0); // target 30 days
+      }
+
+      // Average across the goals we could compute
+      final overallRate = (budgetRate + habitRate + moneyAgeRate) / 3.0;
+      return overallRate;
     } catch (e) {
       debugPrint('Get last month achievement rate error: $e');
       return null;

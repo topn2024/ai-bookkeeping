@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 位置触发点
 class LocationTrigger {
@@ -69,6 +71,8 @@ class LocationTriggerService {
   Stream<LocationTriggerEvent> get onLocationTriggered =>
       _eventController.stream;
 
+  static const String _storageKey = 'location_triggers';
+
   final List<LocationTrigger> _triggers = [];
   bool _isMonitoring = false;
   StreamSubscription<Position>? _positionSubscription;
@@ -82,26 +86,27 @@ class LocationTriggerService {
 
   /// 加载触发点
   Future<void> _loadTriggers() async {
-    // TODO: 从数据库加载
-    // 示例触发点
-    _triggers.addAll([
-      LocationTrigger(
-        id: 'supermarket',
-        name: '超市',
-        latitude: 39.9042,
-        longitude: 116.4074,
-        radius: 100,
-        category: '购物',
-      ),
-      LocationTrigger(
-        id: 'restaurant',
-        name: '餐厅',
-        latitude: 39.9042,
-        longitude: 116.4074,
-        radius: 50,
-        category: '餐饮',
-      ),
-    ]);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString(_storageKey);
+      if (jsonStr != null) {
+        final list = jsonDecode(jsonStr) as List<dynamic>;
+        _triggers.addAll(list.map((e) => LocationTrigger.fromJson(e as Map<String, dynamic>)));
+      }
+    } catch (e) {
+      debugPrint('Failed to load location triggers: $e');
+    }
+  }
+
+  /// 保存触发点
+  Future<void> _saveTriggers() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = jsonEncode(_triggers.map((t) => t.toJson()).toList());
+      await prefs.setString(_storageKey, jsonStr);
+    } catch (e) {
+      debugPrint('Failed to save location triggers: $e');
+    }
   }
 
   /// 开始监听
@@ -173,13 +178,13 @@ class LocationTriggerService {
   /// 添加触发点
   Future<void> addTrigger(LocationTrigger trigger) async {
     _triggers.add(trigger);
-    // TODO: 保存到数据库
+    await _saveTriggers();
   }
 
   /// 删除触发点
   Future<void> removeTrigger(String id) async {
     _triggers.removeWhere((t) => t.id == id);
-    // TODO: 从数据库删除
+    await _saveTriggers();
   }
 
   /// 获取所有触发点

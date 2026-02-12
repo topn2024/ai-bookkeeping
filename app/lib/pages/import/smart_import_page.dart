@@ -10,6 +10,7 @@ import '../../services/import/bill_parser.dart';
 import 'import_preview_page.dart';
 import 'import_history_page.dart';
 import 'sms_import_config_page.dart';
+import 'email_import_config_page.dart';
 
 /// Smart import page with format detection and deduplication
 class SmartImportPage extends ConsumerStatefulWidget {
@@ -202,6 +203,14 @@ class _SmartImportPageState extends ConsumerState<SmartImportPage> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 12),
+        _buildImportOptionCard(
+          title: '邮箱账单',
+          subtitle: '通过IMAP读取信用卡账单和支付平台邮件',
+          icon: Icons.email,
+          color: const Color(0xFF7C4DFF),
+          onTap: _startEmailImport,
         ),
       ],
     );
@@ -956,6 +965,15 @@ class _SmartImportPageState extends ConsumerState<SmartImportPage> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ImportHistoryPage()),
+    );
+  }
+
+  void _startEmailImport() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const EmailImportConfigPage(),
+      ),
     );
   }
 

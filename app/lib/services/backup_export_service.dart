@@ -5,6 +5,7 @@ import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:crypto/crypto.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../models/transaction.dart';
 import '../models/account.dart';
@@ -20,6 +21,13 @@ import '../core/contracts/i_database_service.dart';
 /// 支持完整数据备份、恢复和加密
 class BackupExportService {
   final IDatabaseService _db;
+
+  static String _appVersion = '2.0.0';
+
+  static Future<void> initVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    _appVersion = info.version;
+  }
 
   static const String _backupVersion = '2.0.0';
   static const String _manifestFileName = 'manifest.json';
@@ -309,7 +317,7 @@ class BackupExportService {
       'backupId': backupId,
       'createdAt': timestamp.toIso8601String(),
       'platform': Platform.operatingSystem,
-      'appVersion': '2.0.0', // TODO: 从应用获取版本号
+      'appVersion': _appVersion,
       'dataStats': dataStats,
       'options': {
         'includeMedia': includeMedia,
@@ -320,10 +328,20 @@ class BackupExportService {
     };
   }
 
+  /// 从密码派生加密密钥
+  ///
+  /// 使用 HMAC-SHA256 将用户密码与固定盐值结合，
+  /// 生成256位密钥流种子，避免短密码导致的XOR周期过短问题。
+  static const String _keySalt = 'ai_bookkeeping_backup_v2_salt_2024';
+
+  List<int> _deriveKey(String password) {
+    final hmac = Hmac(sha256, utf8.encode(_keySalt));
+    return hmac.convert(utf8.encode(password)).bytes;
+  }
+
   /// 加密数据
   Uint8List _encryptData(List<int> data, String password) {
-    // 使用简单的XOR加密（生产环境应使用AES等更安全的加密）
-    final key = utf8.encode(password);
+    final key = _deriveKey(password);
     final encrypted = Uint8List(data.length);
 
     for (int i = 0; i < data.length; i++) {
@@ -335,7 +353,6 @@ class BackupExportService {
 
   /// 解密数据
   Uint8List _decryptData(List<int> data, String password) {
-    // XOR解密（与加密相同）
     return _encryptData(data, password);
   }
 

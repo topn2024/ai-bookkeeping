@@ -21,6 +21,7 @@ import 'money_age_page.dart';
 import 'budget_center_page.dart';
 import 'zero_based_budget_page.dart';
 import 'import/smart_import_page.dart';
+import 'vault_detail_page.dart';
 import '../services/feature_guide_service.dart';
 import '../services/share_receiver_service.dart';
 import '../services/payment_notification_service.dart';
@@ -913,8 +914,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                 padding: EdgeInsets.only(top: index > 0 ? 12 : 0),
                 child: GestureDetector(
                   onTap: () {
-                    // 跳转到小金库详情页面
-                    // TODO: 实现小金库详情页面导航
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VaultDetailPage(vault: vault),
+                      ),
+                    );
                   },
                   child: _buildBudgetItem(
                     context,

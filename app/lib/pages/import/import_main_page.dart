@@ -9,6 +9,7 @@ import 'smart_format_detection_page.dart';
 import 'import_history_page.dart';
 import 'smart_directory_discovery_page.dart';
 import 'bill_export_tutorial_page.dart';
+import 'email_import_config_page.dart';
 
 /// 导入账单主页
 /// 原型设计 5.01：导入账单
@@ -50,6 +51,12 @@ class _ImportMainPageState extends ConsumerState<ImportMainPage> {
       name: '通用格式',
       icon: Icons.description,
       color: AppTheme.primaryColor,
+    ),
+    QuickImportOption(
+      id: 'email',
+      name: '邮箱账单',
+      icon: Icons.email,
+      color: const Color(0xFF7C4DFF),
     ),
   ];
 
@@ -466,6 +473,11 @@ class _ImportMainPageState extends ConsumerState<ImportMainPage> {
             initialPlatform: option.id,
           ),
         ),
+      );
+    } else if (option.id == 'email') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const EmailImportConfigPage()),
       );
     } else {
       // 通用格式直接选择文件

@@ -554,8 +554,16 @@ class EnhancedExportService {
         0.0,
         (sum, b) => sum + b.amount,
       );
-      // TODO: Calculate spent from transactions if needed
-      final totalSpent = 0.0;
+
+      // 计算目标月份的实际支出总额
+      final monthStart = DateTime(targetMonth.year, targetMonth.month, 1);
+      final monthEnd = DateTime(targetMonth.year, targetMonth.month + 1, 1);
+      final totalSpentResult = await _db.rawQuery(
+        'SELECT COALESCE(SUM(amount), 0) as total FROM transactions '
+        'WHERE type = 0 AND date >= ? AND date < ? AND (isDeleted IS NULL OR isDeleted = 0)',
+        [monthStart.toIso8601String(), monthEnd.toIso8601String()],
+      );
+      final totalSpent = (totalSpentResult.first['total'] as num?)?.toDouble() ?? 0.0;
 
       buffer.writeln('预算概览');
       buffer.writeln('总预算,${totalBudget.toStringAsFixed(2)}');
@@ -570,8 +578,16 @@ class EnhancedExportService {
 
       for (final budget in budgets) {
         final amount = budget.amount;
-        // TODO: Calculate spent from transactions if needed
-        final spent = 0.0;
+        // 计算该分类在目标月份的实际支出
+        double spent = 0.0;
+        if (budget.categoryId != null) {
+          final categorySpentResult = await _db.rawQuery(
+            'SELECT COALESCE(SUM(amount), 0) as total FROM transactions '
+            'WHERE type = 0 AND category = ? AND date >= ? AND date < ? AND (isDeleted IS NULL OR isDeleted = 0)',
+            [budget.categoryId, monthStart.toIso8601String(), monthEnd.toIso8601String()],
+          );
+          spent = (categorySpentResult.first['total'] as num?)?.toDouble() ?? 0.0;
+        }
         final remaining = amount - spent;
         final rate = amount > 0 ? (1 - spent / amount) * 100 : 100;
         final status = spent > amount ? '超支' : (rate < 20 ? '紧张' : '正常');

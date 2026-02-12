@@ -43,7 +43,8 @@ class SceneAwareWakeUpService {
   /// 初始化
   Future<void> initialize() async {
     debugPrint('SceneAwareWakeUpService initialized');
-    // TODO: 加载常去地点数据
+    // 常去地点数据通过 addFrequentLocation() 在用户使用位置功能时逐步积累，
+    // 无需在初始化时预加载。
   }
 
   /// 处理支付通知

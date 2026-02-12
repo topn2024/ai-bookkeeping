@@ -97,6 +97,8 @@ class ImportBatch {
         return '其他银行';
       case 'generic':
         return '通用格式';
+      case 'email':
+        return '邮箱账单';
       default:
         return fileFormat;
     }
