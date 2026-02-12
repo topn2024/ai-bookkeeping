@@ -494,7 +494,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
     return Container(
       key: _mainNavFabKey,  // Add key for the navigation bar
       child: GlassBottomNavigation(
-      currentIndex: _currentIndex,
+      currentIndex: _currentIndex >= 3 ? _currentIndex + 1 : _currentIndex,
       onTap: (index) {
         // 跳过中间的占位项(index=2)
         if (index == 2) return;

@@ -44,8 +44,8 @@ class MemberNotifier extends Notifier<MemberState> {
 
   @override
   MemberState build() {
-    _loadData();
-    return const MemberState();
+    Future.microtask(() => _loadData());
+    return const MemberState(isLoading: true);
   }
 
   Future<void> _loadData() async {
