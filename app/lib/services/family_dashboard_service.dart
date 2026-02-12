@@ -188,7 +188,7 @@ class FamilyDashboardService {
         // 获取前3个最高消费类别
         final topCategories = categoryMap.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
-        final topCategoryNames = topCategories.take(3).map((e) => e.key).toList();
+        final topCategoryNames = topCategories.take(3).map((e) => e.key.localizedCategoryName).toList();
 
         contributions.add(MemberContribution(
           memberId: member.userId,
@@ -265,7 +265,7 @@ class FamilyDashboardService {
 
         breakdowns.add(CategoryBreakdown(
           categoryId: entry.key,
-          categoryName: entry.key,
+          categoryName: entry.key.localizedCategoryName,
           icon: Icons.category,
           color: _getCategoryColor(entry.key),
           amount: amount,

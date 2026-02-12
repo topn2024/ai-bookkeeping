@@ -297,7 +297,7 @@ class SmartBudgetEngine {
       if (monthlyAmount > 0) {
         total += monthlyAmount;
         final cat = DefaultCategories.findById(recurring.category);
-        details.add('${cat?.localizedName ?? recurring.category}: ¥${monthlyAmount.toStringAsFixed(0)}/月（周期性）');
+        details.add('${cat?.localizedName ?? recurring.category.localizedCategoryName}: ¥${monthlyAmount.toStringAsFixed(0)}/月（周期性）');
       }
     }
 

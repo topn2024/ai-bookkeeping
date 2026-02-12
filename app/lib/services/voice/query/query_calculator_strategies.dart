@@ -190,7 +190,7 @@ class DistributionCalculator implements QueryCalculatorStrategy {
     // 生成数据点
     final dataPoints = topCategories
         .map((e) => DataPoint(
-              label: e.key,
+              label: e.key.localizedCategoryName,
               value: e.value,
               category: e.key,
             ))
@@ -240,7 +240,7 @@ class ComparisonCalculator implements QueryCalculatorStrategy {
     // 生成对比数据点
     final dataPoints = groupedData.entries
         .map((e) => DataPoint(
-              label: e.key,
+              label: e.key.localizedCategoryName,
               value: e.value,
             ))
         .toList()

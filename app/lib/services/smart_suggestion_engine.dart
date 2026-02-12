@@ -437,7 +437,7 @@ class SmartSuggestionEngine {
       }
       totalMonthly += monthly;
       final cat = DefaultCategories.findById(sub.category);
-      items.add('${cat?.localizedName ?? sub.category} ¥${monthly.toStringAsFixed(0)}/月');
+      items.add('${cat?.localizedName ?? sub.category.localizedCategoryName} ¥${monthly.toStringAsFixed(0)}/月');
     }
     if (totalMonthly > monthlyIncome * 0.15 && monthlyIncome > 0) {
       return BudgetSuggestion(

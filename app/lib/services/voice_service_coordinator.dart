@@ -1514,7 +1514,7 @@ class VoiceServiceCoordinator extends ChangeNotifier {
 
     // 生成成功回复
     final llmGenerator = LLMResponseGenerator.instance;
-    final category = incompleteIntent.category ?? incompleteIntent.originalText;
+    final category = incompleteIntent.category?.localizedCategoryName ?? incompleteIntent.originalText;
     final message = await llmGenerator.generateResponse(
       action: '记账',
       result: '成功记录$category ${amount.toStringAsFixed(2)}元',

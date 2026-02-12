@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../services/category_localization_service.dart';
 import '../../services/user_profile_service.dart';
 
 /// 用户画像可视化页面
@@ -439,7 +440,7 @@ class _SpendingFeatureCard extends StatelessWidget {
                 children: profile.spendingBehavior.topCategories
                     .take(3)
                     .map((c) => Chip(
-                          label: Text(c, style: const TextStyle(fontSize: 11)),
+                          label: Text(c.localizedCategoryName, style: const TextStyle(fontSize: 11)),
                           padding: EdgeInsets.zero,
                           materialTapTargetSize:
                               MaterialTapTargetSize.shrinkWrap,
@@ -972,7 +973,7 @@ class _AICommentCard extends StatelessWidget {
   String _generateAIComment() {
     final personality = profile.personalityTraits.spendingPersonality;
     final topCategory = profile.spendingBehavior.topCategories.isNotEmpty
-        ? profile.spendingBehavior.topCategories.first
+        ? profile.spendingBehavior.topCategories.first.localizedCategoryName
         : '日常消费';
     final savingsRate = profile.financialFeatures.savingsRate;
     final budgetRate = profile.financialFeatures.budgetComplianceRate;
