@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 /// 分享接收服务
 ///
 /// 处理从其他应用分享过来的图片（如微信/支付宝账单截图）
+/// 和文件（如微信/支付宝导出的CSV/Excel账单）
 /// 支持 Android 和 iOS 平台
 class ShareReceiverService extends ChangeNotifier {
   static const MethodChannel _channel =
@@ -22,11 +23,17 @@ class ShareReceiverService extends ChangeNotifier {
   /// 待处理的分享图片路径
   List<String> _pendingImages = [];
 
+  /// 待处理的分享文件路径
+  List<String> _pendingFiles = [];
+
   /// 分享事件流订阅
   StreamSubscription<dynamic>? _eventSubscription;
 
   /// 分享图片回调
   void Function(List<String> imagePaths)? onImagesReceived;
+
+  /// 分享文件回调（CSV/Excel账单等）
+  void Function(List<String> filePaths)? onFilesReceived;
 
   /// 是否已初始化
   bool _initialized = false;
@@ -34,8 +41,12 @@ class ShareReceiverService extends ChangeNotifier {
   /// 待处理的分享图片
   List<String> get pendingImages => List.unmodifiable(_pendingImages);
 
+  /// 待处理的分享文件
+  List<String> get pendingFiles => List.unmodifiable(_pendingFiles);
+
   /// 是否有待处理的分享内容
-  bool get hasPendingSharedContent => _pendingImages.isNotEmpty;
+  bool get hasPendingSharedContent =>
+      _pendingImages.isNotEmpty || _pendingFiles.isNotEmpty;
 
   /// 初始化服务
   Future<void> init() async {
@@ -65,7 +76,18 @@ class ShareReceiverService extends ChangeNotifier {
         onImagesReceived?.call(_pendingImages);
       }
     } catch (e) {
-      debugPrint('ShareReceiverService: 获取分享内容失败: $e');
+      debugPrint('ShareReceiverService: 获取分享图片失败: $e');
+    }
+
+    try {
+      final List<dynamic>? files = await _channel.invokeMethod('getSharedFiles');
+      if (files != null && files.isNotEmpty) {
+        _pendingFiles = files.cast<String>();
+        notifyListeners();
+        onFilesReceived?.call(_pendingFiles);
+      }
+    } catch (e) {
+      debugPrint('ShareReceiverService: 获取分享文件失败: $e');
     }
   }
 
@@ -80,6 +102,13 @@ class ShareReceiverService extends ChangeNotifier {
           notifyListeners();
           onImagesReceived?.call(_pendingImages);
         }
+      } else if (type == 'files') {
+        final paths = (event['paths'] as List?)?.cast<String>() ?? [];
+        if (paths.isNotEmpty) {
+          _pendingFiles = paths;
+          notifyListeners();
+          onFilesReceived?.call(_pendingFiles);
+        }
       }
     }
   }
@@ -92,11 +121,26 @@ class ShareReceiverService extends ChangeNotifier {
     try {
       await _channel.invokeMethod('clearSharedImages');
     } catch (e) {
-      debugPrint('ShareReceiverService: 清除分享内容失败: $e');
+      debugPrint('ShareReceiverService: 清除分享图片失败: $e');
     }
 
     notifyListeners();
     return images;
+  }
+
+  /// 获取并清除待处理的分享文件
+  Future<List<String>> consumePendingFiles() async {
+    final files = List<String>.from(_pendingFiles);
+    _pendingFiles = [];
+
+    try {
+      await _channel.invokeMethod('clearSharedFiles');
+    } catch (e) {
+      debugPrint('ShareReceiverService: 清除分享文件失败: $e');
+    }
+
+    notifyListeners();
+    return files;
   }
 
   /// 清除待处理的分享内容
@@ -106,7 +150,20 @@ class ShareReceiverService extends ChangeNotifier {
     try {
       await _channel.invokeMethod('clearSharedImages');
     } catch (e) {
-      debugPrint('ShareReceiverService: 清除分享内容失败: $e');
+      debugPrint('ShareReceiverService: 清除分享图片失败: $e');
+    }
+
+    notifyListeners();
+  }
+
+  /// 清除待处理的分享文件
+  Future<void> clearPendingFiles() async {
+    _pendingFiles = [];
+
+    try {
+      await _channel.invokeMethod('clearSharedFiles');
+    } catch (e) {
+      debugPrint('ShareReceiverService: 清除分享文件失败: $e');
     }
 
     notifyListeners();

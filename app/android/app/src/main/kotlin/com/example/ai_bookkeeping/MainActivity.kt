@@ -23,9 +23,12 @@ class MainActivity : FlutterActivity() {
         private const val SCREEN_READER_CHANNEL = "com.example.ai_bookkeeping/screen_reader"
         private const val DEEP_LINK_CHANNEL = "com.example.ai_bookkeeping/deep_link"
         private const val DEEP_LINK_EVENT_CHANNEL = "com.example.ai_bookkeeping/deep_link_events"
+        private const val PAYMENT_CHANNEL = "com.bookkeeping.ai/payment_notification"
+        private const val PAYMENT_EVENT_CHANNEL = "com.bookkeeping.ai/payment_notification_events"
     }
 
     private var sharedImages: ArrayList<String>? = null
+    private var sharedFiles: ArrayList<String>? = null
     private var eventSink: EventChannel.EventSink? = null
     private var deepLinkEventSink: EventChannel.EventSink? = null
     private var pendingDeepLink: String? = null
@@ -48,8 +51,16 @@ class MainActivity : FlutterActivity() {
                     // 清除已处理的分享内容
                     sharedImages = null
                 }
+                "getSharedFiles" -> {
+                    result.success(sharedFiles ?: emptyList<String>())
+                    sharedFiles = null
+                }
                 "clearSharedImages" -> {
                     sharedImages = null
+                    result.success(true)
+                }
+                "clearSharedFiles" -> {
+                    sharedFiles = null
                     result.success(true)
                 }
                 else -> {
@@ -69,6 +80,14 @@ class MainActivity : FlutterActivity() {
                             eventSink?.success(mapOf(
                                 "type" to "images",
                                 "paths" to images
+                            ))
+                        }
+                    }
+                    sharedFiles?.let { files ->
+                        if (files.isNotEmpty()) {
+                            eventSink?.success(mapOf(
+                                "type" to "files",
+                                "paths" to files
                             ))
                         }
                     }
@@ -408,6 +427,45 @@ class MainActivity : FlutterActivity() {
             }
         )
 
+        // 支付通知 MethodChannel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PAYMENT_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "requestNotificationPermission" -> {
+                    // 检查通知监听权限
+                    val enabled = isNotificationListenerEnabled()
+                    if (!enabled) {
+                        val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        startActivity(intent)
+                    }
+                    result.success(enabled)
+                }
+                "isNotificationListenerEnabled" -> {
+                    result.success(isNotificationListenerEnabled())
+                }
+                "startMonitoring" -> {
+                    result.success(true)
+                }
+                "stopMonitoring" -> {
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // 支付通知 EventChannel
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, PAYMENT_EVENT_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    PaymentNotificationListenerService.eventSink = events
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    PaymentNotificationListenerService.eventSink = null
+                }
+            }
+        )
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "applyPatch" -> {
@@ -505,6 +563,9 @@ class MainActivity : FlutterActivity() {
             Intent.ACTION_SEND -> {
                 if (intent.type?.startsWith("image/") == true) {
                     handleSendImage(intent)
+                } else {
+                    // 尝试作为文件处理（CSV/Excel等）
+                    handleSendFile(intent)
                 }
             }
             Intent.ACTION_SEND_MULTIPLE -> {
@@ -600,5 +661,76 @@ class MainActivity : FlutterActivity() {
                 "paths" to images
             ))
         }
+    }
+
+    /**
+     * 处理分享的文件（CSV/Excel账单等）
+     */
+    private fun handleSendFile(intent: Intent) {
+        (intent.getParcelableExtra<Parcelable>(Intent.EXTRA_STREAM) as? Uri)?.let { fileUri ->
+            val filePath = copyFileUriToCache(fileUri)
+            if (filePath != null) {
+                sharedFiles = arrayListOf(filePath)
+                notifyFlutterFiles()
+            }
+        }
+    }
+
+    /**
+     * 将文件Uri复制到缓存目录，保留原始文件名
+     */
+    private fun copyFileUriToCache(uri: Uri): String? {
+        return try {
+            val inputStream = contentResolver.openInputStream(uri) ?: return null
+
+            // 尝试获取原始文件名
+            var fileName: String? = null
+            val cursor = contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        fileName = it.getString(nameIndex)
+                    }
+                }
+            }
+            if (fileName.isNullOrEmpty()) {
+                fileName = "shared_file_${System.currentTimeMillis()}"
+            }
+
+            val cacheDir = File(cacheDir, "shared_files")
+            if (!cacheDir.exists()) {
+                cacheDir.mkdirs()
+            }
+            val outputFile = File(cacheDir, fileName!!)
+            FileOutputStream(outputFile).use { outputStream ->
+                inputStream.copyTo(outputStream)
+            }
+            inputStream.close()
+            outputFile.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    /**
+     * 通知Flutter有新的文件分享
+     */
+    private fun notifyFlutterFiles() {
+        sharedFiles?.let { files ->
+            eventSink?.success(mapOf(
+                "type" to "files",
+                "paths" to files
+            ))
+        }
+    }
+
+    /**
+     * 检查通知监听权限是否已开启
+     */
+    private fun isNotificationListenerEnabled(): Boolean {
+        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+        return flat != null && flat.contains(packageName)
     }
 }

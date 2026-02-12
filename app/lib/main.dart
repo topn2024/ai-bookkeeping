@@ -17,6 +17,8 @@ import 'services/http_service.dart';
 import 'services/app_upgrade_service.dart';
 import 'services/auto_sync_service.dart';
 import 'services/multimodal_wakeup_service.dart';
+import 'services/share_receiver_service.dart';
+import 'services/payment_notification_service.dart';
 import 'services/secure_storage_service.dart';
 import 'services/database_service.dart';
 import 'services/global_voice_assistant_manager.dart';
@@ -208,6 +210,22 @@ Future<void> _initializeHeavyServices() async {
   } else {
     debugPrint('[App] 跳过语音助手初始化: NLS Token 未就绪');
     logger.info('Skipped voice assistant init: NLS Token not ready', tag: 'App');
+  }
+
+  // Initialize share receiver service (for receiving shared files from WeChat etc.)
+  try {
+    await ShareReceiverService().init();
+    logger.info('Share receiver service initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize share receiver service: $e', tag: 'App');
+  }
+
+  // Initialize payment notification service (for auto-detecting WeChat/Alipay payments)
+  try {
+    await PaymentNotificationService().initialize();
+    logger.info('Payment notification service initialized', tag: 'App');
+  } catch (e) {
+    logger.warning('Failed to initialize payment notification service: $e', tag: 'App');
   }
 
   // Check for app updates (non-blocking)

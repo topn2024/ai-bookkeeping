@@ -13,7 +13,9 @@ import 'sms_import_config_page.dart';
 
 /// Smart import page with format detection and deduplication
 class SmartImportPage extends ConsumerStatefulWidget {
-  const SmartImportPage({super.key});
+  final String? initialFilePath;
+
+  const SmartImportPage({super.key, this.initialFilePath});
 
   @override
   ConsumerState<SmartImportPage> createState() => _SmartImportPageState();
@@ -30,6 +32,39 @@ class _SmartImportPageState extends ConsumerState<SmartImportPage> {
   String _statusMessage = '';
   int _progressCurrent = 0;
   int _progressTotal = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // 如果有初始文件路径（从分享接收），自动加载
+    if (widget.initialFilePath != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadSharedFile(widget.initialFilePath!);
+      });
+    }
+  }
+
+  /// 加载从外部分享的文件
+  Future<void> _loadSharedFile(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        final bytes = await file.readAsBytes();
+        final fileName = filePath.split('/').last;
+        setState(() {
+          _selectedFileBytes = bytes;
+          _selectedFileName = fileName;
+        });
+        await _processFile();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载文件失败: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

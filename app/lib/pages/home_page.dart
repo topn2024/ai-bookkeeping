@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
@@ -21,6 +22,8 @@ import 'budget_center_page.dart';
 import 'zero_based_budget_page.dart';
 import 'import/smart_import_page.dart';
 import '../services/feature_guide_service.dart';
+import '../services/share_receiver_service.dart';
+import '../services/payment_notification_service.dart';
 import '../models/guide_step.dart';
 import '../providers/feature_guide_provider.dart';
 import 'main_navigation.dart';
@@ -45,15 +48,119 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   // GlobalKey for feature guide
   final GlobalKey appContentKey = GlobalKey();
+  StreamSubscription<PaymentNotificationEvent>? _paymentSubscription;
 
   @override
   void initState() {
     super.initState();
 
-    // 页面加载完成后检查是否需要显示引导
+    // 注册文件分享回调
+    ShareReceiverService().onFilesReceived = _handleSharedFiles;
+
+    // 监听支付通知
+    _paymentSubscription =
+        PaymentNotificationService().onPaymentDetected.listen(_handlePaymentNotification);
+
+    // 页面加载完成后检查是否需要显示引导 + 检查初始分享
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowGuide();
+      _checkInitialSharedFiles();
     });
+  }
+
+  @override
+  void dispose() {
+    ShareReceiverService().onFilesReceived = null;
+    _paymentSubscription?.cancel();
+    super.dispose();
+  }
+
+  /// 检查启动时是否有待处理的分享文件
+  void _checkInitialSharedFiles() {
+    final service = ShareReceiverService();
+    if (service.pendingFiles.isNotEmpty) {
+      _handleSharedFiles(service.pendingFiles);
+    }
+  }
+
+  /// 处理从微信等应用分享过来的账单文件
+  void _handleSharedFiles(List<String> filePaths) {
+    if (!mounted || filePaths.isEmpty) return;
+
+    // 消费掉待处理文件
+    ShareReceiverService().consumePendingFiles();
+
+    final filePath = filePaths.first;
+    final fileName = filePath.split('/').last.toLowerCase();
+
+    // 检查是否是支持的账单文件格式
+    if (fileName.endsWith('.csv') ||
+        fileName.endsWith('.xlsx') ||
+        fileName.endsWith('.xls')) {
+      // 跳转到智能导入页面
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SmartImportPage(initialFilePath: filePath),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('不支持的文件格式: $fileName\n支持 CSV、Excel 格式的账单文件'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  /// 处理支付通知事件，弹出快速记账确认
+  void _handlePaymentNotification(PaymentNotificationEvent event) {
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PaymentNotificationSheet(
+        event: event,
+        onConfirm: (amount, category, note) {
+          _savePaymentTransaction(amount, category, note, event.app);
+          Navigator.pop(ctx);
+        },
+        onDismiss: () => Navigator.pop(ctx),
+      ),
+    );
+  }
+
+  /// 保存支付通知为交易记录
+  void _savePaymentTransaction(
+      double amount, String category, String note, String source) {
+    final transaction = Transaction(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      type: TransactionType.expense,
+      amount: amount,
+      category: category,
+      note: note.isNotEmpty ? note : '来自$source通知',
+      date: DateTime.now(),
+      accountId: 'default',
+    );
+
+    ref.read(transactionProvider.notifier).addTransaction(transaction);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('已记录 ¥${amount.toStringAsFixed(2)}'),
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: '撤销',
+          onPressed: () {
+            ref.read(transactionProvider.notifier)
+                .deleteTransaction(transaction.id);
+          },
+        ),
+      ),
+    );
   }
 
   /// 检查并显示功能引导
@@ -1051,4 +1158,200 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
+}
+
+/// 支付通知快速记账底部弹窗
+class _PaymentNotificationSheet extends StatefulWidget {
+  final PaymentNotificationEvent event;
+  final void Function(double amount, String category, String note) onConfirm;
+  final VoidCallback onDismiss;
+
+  const _PaymentNotificationSheet({
+    required this.event,
+    required this.onConfirm,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_PaymentNotificationSheet> createState() =>
+      _PaymentNotificationSheetState();
+}
+
+class _PaymentNotificationSheetState extends State<_PaymentNotificationSheet> {
+  late TextEditingController _amountController;
+  late TextEditingController _noteController;
+  String _selectedCategory = 'other_expense';
+
+  static const _quickCategories = [
+    ('food', '餐饮', '🍜'),
+    ('transport', '交通', '🚗'),
+    ('shopping', '购物', '🛒'),
+    ('entertainment', '娱乐', '🎮'),
+    ('medical', '医疗', '💊'),
+    ('other_expense', '其他', '📋'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController =
+        TextEditingController(text: widget.event.amount.toStringAsFixed(2));
+    _noteController = TextEditingController(
+        text: widget.event.merchant ?? widget.event.title ?? '');
+
+    // 根据通知内容猜测分类
+    _selectedCategory = _guessCategory(
+        widget.event.merchant ?? widget.event.title ?? '');
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  String _guessCategory(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('餐') || t.contains('饭') || t.contains('食') ||
+        t.contains('外卖') || t.contains('美团') || t.contains('饿了么')) {
+      return 'food';
+    }
+    if (t.contains('打车') || t.contains('滴滴') || t.contains('出行') ||
+        t.contains('地铁') || t.contains('公交')) {
+      return 'transport';
+    }
+    if (t.contains('淘宝') || t.contains('京东') || t.contains('拼多多') ||
+        t.contains('购物')) {
+      return 'shopping';
+    }
+    return 'other_expense';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final source = widget.event.app;
+    final sourceIcon = source.contains('微信')
+        ? '💬'
+        : source.contains('支付宝')
+            ? '🔵'
+            : '📱';
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 标题栏
+          Row(
+            children: [
+              Text(sourceIcon, style: const TextStyle(fontSize: 20)),
+              const SizedBox(width: 8),
+              Text(
+                '$source支付通知',
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: widget.onDismiss,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // 金额输入
+          TextField(
+            controller: _amountController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            decoration: const InputDecoration(
+              prefixText: '¥ ',
+              prefixStyle: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              border: InputBorder.none,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 快速分类选择
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _quickCategories.map((cat) {
+              final isSelected = _selectedCategory == cat.$1;
+              return ChoiceChip(
+                label: Text('${cat.$3} ${cat.$2}'),
+                selected: isSelected,
+                onSelected: (_) =>
+                    setState(() => _selectedCategory = cat.$1),
+                selectedColor: Colors.blue[100],
+                labelStyle: TextStyle(
+                  fontSize: 13,
+                  color: isSelected ? Colors.blue[800] : Colors.grey[700],
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+
+          // 备注
+          TextField(
+            controller: _noteController,
+            decoration: InputDecoration(
+              hintText: '备注',
+              hintStyle: TextStyle(color: Colors.grey[400]),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 操作按钮
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: widget.onDismiss,
+                  child: const Text('忽略'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: FilledButton(
+                  onPressed: () {
+                    final amount =
+                        double.tryParse(_amountController.text) ?? 0;
+                    if (amount > 0) {
+                      widget.onConfirm(
+                        amount,
+                        _selectedCategory,
+                        _noteController.text,
+                      );
+                    }
+                  },
+                  child: const Text('记一笔'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
