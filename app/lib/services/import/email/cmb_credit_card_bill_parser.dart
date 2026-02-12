@@ -58,13 +58,19 @@ class CmbCreditCardBillParser extends BillParser {
     EmailMessage message,
     int startIndex,
   ) async {
+    debugPrint('[CmbParser] parseHtmlBill: htmlBody=${message.htmlBody != null ? "${message.htmlBody!.length}字符" : "null"}, subject="${message.subject}"');
     if (message.htmlBody == null || message.htmlBody!.isEmpty) {
+      debugPrint('[CmbParser] htmlBody 为空，跳过');
       return [];
     }
     return _parseHtmlContent(message.htmlBody!, startIndex);
   }
 
   List<ImportCandidate> _parseHtmlContent(String htmlContent, int startIndex) {
+    // 打印前200字符帮助调试 charset 是否正确解码
+    final preview = htmlContent.length > 200 ? htmlContent.substring(0, 200) : htmlContent;
+    debugPrint('[CmbParser] HTML前200字符: $preview');
+
     final document = html_parser.parse(htmlContent);
     final candidates = <ImportCandidate>[];
 
@@ -74,10 +80,6 @@ class CmbCreditCardBillParser extends BillParser {
 
     // 策略2：查找所有包含 ¥ 金额的 FONT/DIV/TD 元素
     // 招行账单用 &yen; 前缀标记金额
-    final allText = document.body?.text ?? '';
-
-    // 用正则从纯文本中提取交易条目
-    // 招行账单文本模式：商户名 ¥ 金额（每笔交易的商户名和金额在相邻单元格）
     final transactions = _extractTransactionsFromDom(document, billPeriod);
     debugPrint('[CmbParser] 从DOM提取到 ${transactions.length} 笔交易');
 
@@ -115,7 +117,7 @@ class CmbCreditCardBillParser extends BillParser {
     String currentSection = '';  // 当前区块类型
 
     for (final font in allFonts) {
-      final text = font.text.trim();
+      final text = font.text.replaceAll('\u00A0', ' ').trim();
 
       // 检测区块标题
       if (text == '还款' || text == '退款' || text == '消费' || text == '预借现金') {
@@ -136,7 +138,7 @@ class CmbCreditCardBillParser extends BillParser {
 
       // 检测金额：以 ¥ 或包含 yen 实体的文本
       if (text.contains('¥') || text.contains('\u00A5')) {
-        final amountMatch = RegExp(r'[¥\u00A5]\s*(-?[\d,]+\.\d{2})').firstMatch(text);
+        final amountMatch = RegExp(r'[¥\u00A5][\s\u00A0]*(-?[\d,]+\.\d{2})').firstMatch(text);
         if (amountMatch != null) {
           final amountStr = amountMatch.group(1)!;
           final amount = double.tryParse(amountStr.replaceAll(',', ''));
@@ -149,11 +151,16 @@ class CmbCreditCardBillParser extends BillParser {
           // 跳过汇总行（本期应还、信用额度等）
           if (_isSummaryRow(merchantName)) continue;
 
+          // 提取交易日期（MMDD格式，在同一TR的前面TD中）
+          final txnDate = _findDateInRow(font, billPeriod);
+
+          debugPrint('[CmbParser] 交易: 商户=$merchantName, 金额=$amount, 区块=$currentSection, 日期=$txnDate');
           transactions.add(_CmbTransaction(
             merchant: merchantName,
             amount: amount,
             section: currentSection,
             billPeriod: billPeriod,
+            transactionDate: txnDate,
           ));
         }
       }
@@ -174,7 +181,7 @@ class CmbCreditCardBillParser extends BillParser {
     // 获取该 TR 中所有 TD 的文本
     final tds = tr.querySelectorAll('td');
     for (final td in tds) {
-      final text = td.text.trim();
+      final text = td.text.replaceAll('\u00A0', ' ').trim();
       // 跳过空的、纯数字的、含 ¥ 的（那是金额列）
       if (text.isEmpty) continue;
       if (text.contains('¥') || text.contains('\u00A5')) continue;
@@ -187,19 +194,57 @@ class CmbCreditCardBillParser extends BillParser {
     return null;
   }
 
+  /// 从 TR 中提取交易日期（MMDD 格式）
+  DateTime? _findDateInRow(Element amountElement, String? billPeriod) {
+    Element? tr = amountElement;
+    while (tr != null && tr.localName != 'tr') {
+      tr = tr.parent;
+    }
+    if (tr == null) return null;
+
+    // 账单周期用于推断年份
+    int year = DateTime.now().year;
+    if (billPeriod != null) {
+      final startMatch = RegExp(r'(\d{4})/(\d{2})/(\d{2})').firstMatch(billPeriod);
+      if (startMatch != null) {
+        year = int.parse(startMatch.group(1)!);
+      }
+    }
+
+    // 查找 4 位数字的 TD（MMDD 格式）
+    final tds = tr.querySelectorAll('td');
+    for (final td in tds) {
+      final text = td.text.replaceAll('\u00A0', ' ').trim();
+      final dateMatch = RegExp(r'^(\d{2})(\d{2})$').firstMatch(text);
+      if (dateMatch != null) {
+        final month = int.parse(dateMatch.group(1)!);
+        final day = int.parse(dateMatch.group(2)!);
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+          return DateTime(year, month, day);
+        }
+      }
+    }
+    return null;
+  }
+
   /// 判断是否是汇总行（非交易）
   bool _isSummaryRow(String text) {
+    final trimmed = text.trim();
+    // 精确匹配区块标题（这些单独出现时是标题，不是交易）
+    const exactTitles = ['还款', '退款', '消费', '预借现金'];
+    if (exactTitles.contains(trimmed)) return true;
+
+    // 包含汇总关键词的行
     const summaryKeywords = [
-      '本期应还', '最低还款', '信用额度', '可用额度',
+      '本期应还', '最低还款额', '信用额度', '可用额度',
       '到期日', '账单日', '本期账单', '上期', '积分',
-      '取现额度', '还款', '退款', '消费', '预借现金',
-      '合计', '月账单', '尊敬的', '先生', '您好',
+      '取现额度', '合计', '月账单', '尊敬的', '先生', '您好',
     ];
-    if (summaryKeywords.any((k) => text.contains(k))) return true;
+    if (summaryKeywords.any((k) => trimmed.contains(k))) return true;
     // 过滤账单周期格式 "2024/03/18-2024/04/17"
-    if (RegExp(r'^\d{4}/\d{2}/\d{2}\s*-\s*\d{4}/\d{2}/\d{2}$').hasMatch(text.trim())) return true;
+    if (RegExp(r'^\d{4}/\d{2}/\d{2}\s*-\s*\d{4}/\d{2}/\d{2}$').hasMatch(trimmed)) return true;
     // 过滤过短的无意义文本（如 "CN"）
-    if (text.trim().length < 3) return true;
+    if (trimmed.length < 3) return true;
     return false;
   }
 
@@ -221,9 +266,9 @@ class CmbCreditCardBillParser extends BillParser {
       final absAmount = t.amount.abs();
       if (absAmount == 0) return null;
 
-      // 解析日期：使用账单周期的结束日期作为近似日期
-      DateTime date = DateTime.now();
-      if (t.billPeriod != null) {
+      // 解析日期：优先使用交易行中的日期，否则用账单周期结束日期
+      DateTime date = t.transactionDate ?? DateTime.now();
+      if (t.transactionDate == null && t.billPeriod != null) {
         final endMatch = RegExp(r'-\s*(\d{4})/(\d{2})/(\d{2})').firstMatch(t.billPeriod!);
         if (endMatch != null) {
           date = DateTime(
@@ -257,11 +302,13 @@ class _CmbTransaction {
   final double amount;
   final String section;
   final String? billPeriod;
+  final DateTime? transactionDate;
 
   _CmbTransaction({
     required this.merchant,
     required this.amount,
     required this.section,
     this.billPeriod,
+    this.transactionDate,
   });
 }

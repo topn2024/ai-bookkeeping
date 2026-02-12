@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:gbk_codec/gbk_codec.dart';
 import '../../../models/email_account.dart';
 import '../import_exceptions.dart';
 
@@ -66,6 +67,7 @@ class EmailImapService {
   SecureSocket? _socket;
   int _tagCounter = 0;
   final StringBuffer _buffer = StringBuffer();
+  String _recentChunk = '';  // 保留最近的数据块尾部，用于高效检测响应完成
   StreamSubscription? _subscription;
   Completer<String>? _responseCompleter;
   String _currentFolder = '';
@@ -244,9 +246,11 @@ class EmailImapService {
   List<_FolderMessage> _pendingFolderMessages = [];
 
   /// 批量获取邮件内容（支持跨文件夹）
+  /// [subjectFilter] 可选的主题过滤函数，返回 false 的邮件不下载完整内容
   Future<List<EmailMessage>> fetchMessages(
     List<int> sequenceNumbers, {
     void Function(int current, int total)? onProgress,
+    bool Function(String subject)? subjectFilter,
   }) async {
     if (_socket == null) {
       throw EmailConnectionException('未连接到邮箱服务器');
@@ -271,25 +275,57 @@ class EmailImapService {
         continue;
       }
 
-      const batchSize = 10;
-      for (int i = 0; i < seqNums.length; i += batchSize) {
-        final end = (i + batchSize).clamp(0, seqNums.length);
-        final batch = seqNums.sublist(i, end);
-        final seqSet = batch.join(',');
+      // 阶段1：如果有 subjectFilter，先批量获取 ENVELOPE 过滤
+      List<int> filteredSeqNums = seqNums;
+      if (subjectFilter != null && seqNums.isNotEmpty) {
+        filteredSeqNums = [];
+        // 批量获取 ENVELOPE（很小，可以一次取多封）
+        const envBatchSize = 50;
+        for (int i = 0; i < seqNums.length; i += envBatchSize) {
+          final end = (i + envBatchSize).clamp(0, seqNums.length);
+          final batch = seqNums.sublist(i, end);
+          final seqSet = batch.join(',');
+          try {
+            final envResponse = await _sendCommand(
+              'FETCH $seqSet (ENVELOPE)',
+              timeout: const Duration(seconds: 30),
+            );
+            // 解析每封邮件的 subject，决定是否需要下载
+            for (int j = 0; j < batch.length; j++) {
+              final subject = _extractSubjectFromEnvelopeResponse(envResponse, batch[j]);
+              if (subject != null && !subjectFilter(subject)) {
+                debugPrint('[EmailImapService] 跳过邮件 #${batch[j]}: "$subject"');
+                fetched++;
+                onProgress?.call(fetched.clamp(0, total), total);
+                continue;
+              }
+              filteredSeqNums.add(batch[j]);
+            }
+          } catch (e) {
+            // ENVELOPE 获取失败，保留所有邮件
+            debugPrint('[EmailImapService] ENVELOPE 获取失败，保留全部: $e');
+            filteredSeqNums.addAll(batch);
+          }
+        }
+        debugPrint('[EmailImapService] 文件夹 "$folder": ${seqNums.length} 封 -> 过滤后 ${filteredSeqNums.length} 封需下载');
+      }
 
+      // 阶段2：逐封获取完整邮件内容
+      for (final seqNum in filteredSeqNums) {
         try {
           final fetchResponse = await _sendCommand(
-            'FETCH $seqSet (ENVELOPE BODY[])',
-            timeout: const Duration(seconds: 60),
+            'FETCH $seqNum (ENVELOPE BODY[])',
+            timeout: const Duration(seconds: 120),
           );
 
           final parsed = _parseFetchResponse(fetchResponse);
           messages.addAll(parsed);
+          debugPrint('[EmailImapService] 获取邮件 #$seqNum 成功, 响应长度=${fetchResponse.length}, 解析出${parsed.length}条');
         } catch (e) {
-          debugPrint('[EmailImapService] Fetch batch failed in "$folder": $e');
+          debugPrint('[EmailImapService] 获取邮件 #$seqNum 失败 in "$folder": $e');
         }
 
-        fetched += batch.length;
+        fetched++;
         onProgress?.call(fetched.clamp(0, total), total);
       }
     }
@@ -298,12 +334,53 @@ class EmailImapService {
     return messages;
   }
 
+  /// 从 ENVELOPE 批量响应中提取指定邮件的 subject
+  String? _extractSubjectFromEnvelopeResponse(String response, int seqNum) {
+    // 查找 "* seqNum FETCH" 开头的块
+    final pattern = '* $seqNum FETCH';
+    final start = response.indexOf(pattern);
+    if (start < 0) return null;
+
+    // 在这个块中提取 ENVELOPE 的 subject（第二个引号字段）
+    final envelopeStart = response.indexOf('ENVELOPE (', start);
+    if (envelopeStart < 0) return null;
+
+    // ENVELOPE 格式: (date subject from sender ...)
+    // subject 是第二个引号字段
+    int pos = envelopeStart + 'ENVELOPE ('.length;
+    int fieldCount = 0;
+    while (pos < response.length && fieldCount < 2) {
+      if (response[pos] == '"') {
+        final closeQuote = response.indexOf('"', pos + 1);
+        if (closeQuote < 0) return null;
+        fieldCount++;
+        if (fieldCount == 2) {
+          final subject = response.substring(pos + 1, closeQuote);
+          return _decodeEncodedWord(subject);
+        }
+        pos = closeQuote + 1;
+      } else if (response[pos] == 'N' && response.substring(pos, pos + 3) == 'NIL') {
+        fieldCount++;
+        pos += 3;
+      } else {
+        pos++;
+      }
+    }
+    return null;
+  }
+
   // === IMAP 协议实现 ===
 
   void _setupListenerSync() {
     _subscription = _socket!.listen(
       (data) {
-        _buffer.write(utf8.decode(data, allowMalformed: true));
+        final decoded = utf8.decode(data, allowMalformed: true);
+        _buffer.write(decoded);
+        // 只保留最近 200 字符用于检测 tag 行，避免对大邮件做全量扫描
+        _recentChunk = (_recentChunk + decoded);
+        if (_recentChunk.length > 500) {
+          _recentChunk = _recentChunk.substring(_recentChunk.length - 500);
+        }
         _checkResponseComplete();
       },
       onError: (error) {
@@ -342,6 +419,7 @@ class EmailImapService {
     final fullCommand = '$tag $command\r\n';
 
     _buffer.clear();
+    _recentChunk = '';
     _responseCompleter = Completer<String>();
 
     _socket!.add(utf8.encode(fullCommand));
@@ -359,16 +437,12 @@ class EmailImapService {
   void _checkResponseComplete() {
     if (_responseCompleter == null || _responseCompleter!.isCompleted) return;
 
-    final content = _buffer.toString();
     final tag = 'A$_tagCounter';
 
-    // 检查是否包含完整的响应（以 tag OK/NO/BAD 结尾的行）
-    final lines = content.split('\r\n');
-    for (final line in lines) {
-      if (line.startsWith('$tag ')) {
-        _responseCompleter!.complete(content);
-        return;
-      }
+    // 只检查最近收到的数据块，避免对大邮件反复扫描整个 buffer
+    // IMAP tag 行总是在响应最末尾，所以只需检查尾部
+    if (_recentChunk.contains('$tag OK') || _recentChunk.contains('$tag NO') || _recentChunk.contains('$tag BAD')) {
+      _responseCompleter!.complete(_buffer.toString());
     }
   }
 
@@ -458,20 +532,22 @@ class EmailImapService {
     String? textBody;
     final attachments = <EmailAttachment>[];
 
-    _parseMimeContent(bodyContent, (contentType, content, filename) {
-      // 从当前 part 内容中提取 encoding（不是整个 block）
-      final encoding = _extractEncoding(content, contentType);
+    _parseMimeContent(bodyContent, (contentType, content, filename, encoding, charset) {
       final lowerFilename = filename?.toLowerCase() ?? '';
       if (filename != null && (lowerFilename.endsWith('.csv') || lowerFilename.endsWith('.zip'))) {
+        final data = _decodeContent(content, encoding);
+        // 调试附件：显示解码大小和前4字节（ZIP 文件以 PK/50 4B 开头）
+        final header = data.length >= 4 ? data.sublist(0, 4).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ') : 'empty';
+        debugPrint('[EmailImapService] 附件 "$filename": encoding=$encoding, raw=${content.length}字符, decoded=${data.length}字节, header=$header');
         attachments.add(EmailAttachment(
           filename: filename,
           mimeType: contentType,
-          data: _decodeContent(content, encoding),
+          data: data,
         ));
       } else if (contentType.contains('text/html')) {
-        htmlBody = _decodeTextContent(content, encoding);
+        htmlBody = _decodeTextContent(content, encoding, charset);
       } else if (contentType.contains('text/plain') && textBody == null) {
-        textBody = _decodeTextContent(content, encoding);
+        textBody = _decodeTextContent(content, encoding, charset);
       }
     });
 
@@ -613,7 +689,7 @@ class EmailImapService {
 
   void _parseMimeContent(
     String content,
-    void Function(String contentType, String body, String? filename) onPart, {
+    void Function(String contentType, String body, String? filename, String? encoding, String? charset) onPart, {
     int depth = 0,
   }) {
     if (depth > 5) return; // 防止无限递归
@@ -640,12 +716,20 @@ class EmailImapService {
         final contentType = contentTypeMatch?.group(1)?.toLowerCase() ?? 'text/plain';
         var filename = filenameMatch?.group(1)?.trim();
 
+        // 从 header 中提取 Content-Transfer-Encoding
+        final encodingMatch = RegExp(r'Content-Transfer-Encoding:\s*(\S+)', caseSensitive: false).firstMatch(unfoldedHeader);
+        final partEncoding = encodingMatch?.group(1)?.toLowerCase();
+
+        // 从 Content-Type 中提取 charset
+        final charsetMatch = RegExp(r'charset=["'']?([^"''\s;]+)', caseSensitive: false).firstMatch(unfoldedHeader);
+        final charset = charsetMatch?.group(1)?.toLowerCase();
+
         // 解码 RFC 2047 编码的文件名
         if (filename != null && filename.contains('=?')) {
           filename = _decodeEncodedWord(filename);
         }
 
-        debugPrint('[EmailImapService] MIME part: type=$contentType, filename=$filename');
+        debugPrint('[EmailImapService] MIME part: type=$contentType, encoding=$partEncoding, charset=$charset, filename=$filename');
 
         // 递归处理嵌套 multipart
         if (contentType.startsWith('multipart/')) {
@@ -653,7 +737,7 @@ class EmailImapService {
         } else {
           final bodyStart = part.indexOf('\r\n\r\n');
           if (bodyStart >= 0) {
-            onPart(contentType, part.substring(bodyStart + 4), filename);
+            onPart(contentType, part.substring(bodyStart + 4), filename, partEncoding, charset);
           }
         }
       }
@@ -661,17 +745,14 @@ class EmailImapService {
       // 单部分消息
       final contentTypeMatch = RegExp(r'Content-Type:\s*([^\s;]+)', caseSensitive: false).firstMatch(content);
       final contentType = contentTypeMatch?.group(1)?.toLowerCase() ?? 'text/html';
-      onPart(contentType, content, null);
+      final encodingMatch = RegExp(r'Content-Transfer-Encoding:\s*(\S+)', caseSensitive: false).firstMatch(content);
+      final singleEncoding = encodingMatch?.group(1)?.toLowerCase();
+      final charsetMatch = RegExp(r'charset=["'']?([^"''\s;]+)', caseSensitive: false).firstMatch(content);
+      final singleCharset = charsetMatch?.group(1)?.toLowerCase();
+      onPart(contentType, content, null, singleEncoding, singleCharset);
     }
   }
 
-  String? _extractEncoding(String block, String contentType) {
-    final encodingMatch = RegExp(
-      r'Content-Transfer-Encoding:\s*(\S+)',
-      caseSensitive: false,
-    ).firstMatch(block);
-    return encodingMatch?.group(1)?.toLowerCase();
-  }
 
   Uint8List _decodeContent(String content, String? encoding) {
     switch (encoding) {
@@ -680,71 +761,95 @@ class EmailImapService {
           final cleaned = content.replaceAll(RegExp(r'\s'), '');
           return base64Decode(cleaned);
         } catch (e) {
+          debugPrint('[EmailImapService] base64 decode failed: $e');
           return utf8.encode(content);
         }
       case 'quoted-printable':
-        return utf8.encode(_decodeQuotedPrintable(content));
+        return _decodeQuotedPrintableBytes(content);
       default:
         return utf8.encode(content);
     }
   }
 
-  String _decodeTextContent(String content, String? encoding) {
+  String _decodeTextContent(String content, String? encoding, String? charset) {
     switch (encoding) {
       case 'base64':
         try {
           final cleaned = content.replaceAll(RegExp(r'\s'), '');
-          return utf8.decode(base64Decode(cleaned), allowMalformed: true);
+          final bytes = base64Decode(cleaned);
+          return _convertBytesWithCharset(bytes, charset);
         } catch (e) {
+          debugPrint('[EmailImapService] base64 text decode failed: $e');
           return content;
         }
       case 'quoted-printable':
-        return _decodeQuotedPrintable(content);
+        final bytes = _decodeQuotedPrintableBytes(content);
+        return _convertBytesWithCharset(bytes, charset);
       default:
         return content;
     }
   }
 
-  String _decodeQuotedPrintable(String input) {
-    final buffer = StringBuffer();
+  /// 根据 charset 将字节转换为字符串
+  String _convertBytesWithCharset(Uint8List bytes, String? charset) {
+    final cs = charset?.toLowerCase() ?? 'utf-8';
+    if (['gbk', 'gb2312', 'gb18030'].contains(cs)) {
+      try {
+        return gbk_bytes.decode(bytes);
+      } catch (e) {
+        debugPrint('[EmailImapService] GBK decode failed, falling back to UTF-8: $e');
+        return utf8.decode(bytes, allowMalformed: true);
+      }
+    }
+    return utf8.decode(bytes, allowMalformed: true);
+  }
+
+  /// 解码 Quoted-Printable 为原始字节（charset-safe）
+  Uint8List _decodeQuotedPrintableBytes(String input) {
+    final bytes = <int>[];
     int i = 0;
     while (i < input.length) {
       if (input[i] == '=' && i + 2 < input.length) {
         if (input[i + 1] == '\r' || input[i + 1] == '\n') {
-          // 软换行
+          // 软换行 - 跳过
           i += 2;
           if (i < input.length && input[i] == '\n') i++;
         } else {
           try {
             final hex = input.substring(i + 1, i + 3);
-            buffer.writeCharCode(int.parse(hex, radix: 16));
+            bytes.add(int.parse(hex, radix: 16));
             i += 3;
           } catch (e) {
-            buffer.write(input[i]);
+            bytes.add(input.codeUnitAt(i));
             i++;
           }
         }
       } else {
-        buffer.write(input[i]);
+        bytes.add(input.codeUnitAt(i));
         i++;
       }
     }
-    return buffer.toString();
+    return Uint8List.fromList(bytes);
   }
 
   /// 解码 RFC 2047 编码的单词（如 =?UTF-8?B?...?= 或 =?GBK?Q?...?=）
   String _decodeEncodedWord(String input) {
     final regex = RegExp(r'=\?([^?]+)\?([BbQq])\?([^?]*)\?=');
     return input.replaceAllMapped(regex, (match) {
+      final charset = match.group(1)!;
       final encoding = match.group(2)!.toUpperCase();
       final encodedText = match.group(3)!;
 
       try {
+        Uint8List bytes;
         if (encoding == 'B') {
-          return utf8.decode(base64Decode(encodedText), allowMalformed: true);
+          bytes = base64Decode(encodedText);
         } else if (encoding == 'Q') {
-          return _decodeQuotedPrintable(encodedText.replaceAll('_', ' '));
+          bytes = _decodeQuotedPrintableBytes(encodedText.replaceAll('_', ' '));
+        } else {
+          return match.group(0)!;
         }
+        return _convertBytesWithCharset(bytes, charset);
       } catch (e) {
         // 解码失败，返回原文
       }

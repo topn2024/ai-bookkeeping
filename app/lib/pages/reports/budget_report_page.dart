@@ -1,12 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/budget_provider.dart';
 import '../../providers/transaction_provider.dart';
+import '../../models/budget.dart';
 import '../../models/transaction.dart';
 import '../../models/category.dart';
 import '../../extensions/category_extensions.dart';
 import '../../services/category_localization_service.dart';
+import '../../core/di/service_locator.dart';
+import '../../core/contracts/i_database_service.dart';
 import '../budget_management_page.dart';
 import '../category_detail_page.dart';
 
@@ -26,6 +30,43 @@ class BudgetReportPage extends ConsumerStatefulWidget {
 class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
   int _selectedPeriod = 0;
   final List<String> _periods = ['本月', '上月', '近3月', '全年'];
+  Map<String, double> _zeroBasedAllocations = {};
+  bool _allocationsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadZeroBasedAllocations();
+  }
+
+  /// 加载零基预算的当月分配金额
+  Future<void> _loadZeroBasedAllocations() async {
+    try {
+      final db = sl<IDatabaseService>();
+      final budgets = ref.read(budgetProvider);
+      final now = DateTime.now();
+      final allocations = <String, double>{};
+
+      for (final budget in budgets.where((b) => b.budgetType == BudgetType.zeroBased && b.isEnabled)) {
+        final allocation = await db.getZeroBasedAllocationForMonth(budget.id, now.year, now.month);
+        if (allocation != null) {
+          allocations[budget.id] = allocation.allocatedAmount;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _zeroBasedAllocations = allocations;
+          _allocationsLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('[BudgetReport] 加载零基预算分配失败: $e');
+      if (mounted) {
+        setState(() => _allocationsLoaded = true);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +152,14 @@ class _BudgetReportPageState extends ConsumerState<BudgetReportPage> {
       if (usage.budget.categoryId != null) {
         final categoryId = usage.budget.categoryId!;
         final spent = categoryExpenses[categoryId] ?? 0;
-        final budget = usage.budget.amount;
+
+        // 零基预算使用当月分配金额，传统预算使用 budget.amount
+        double budget;
+        if (usage.budget.budgetType == BudgetType.zeroBased) {
+          budget = _zeroBasedAllocations[usage.budget.id] ?? usage.budget.amount;
+        } else {
+          budget = usage.budget.amount;
+        }
 
         // 获取分类颜色和名称
         final category = DefaultCategories.findById(categoryId);

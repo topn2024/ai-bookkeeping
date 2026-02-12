@@ -8,6 +8,7 @@ import '../../services/import/batch_import_service.dart';
 import '../../services/import/bill_format_detector.dart';
 import '../../services/import/bill_parser.dart';
 import '../../providers/transaction_provider.dart';
+import '../../services/category_localization_service.dart';
 import '../../providers/budget_vault_provider.dart';
 
 /// Import preview page for reviewing and confirming candidates
@@ -362,7 +363,7 @@ class _ImportPreviewPageState extends ConsumerState<ImportPreviewPage>
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          candidate.category!,
+                          CategoryLocalizationService.instance.getCategoryName(candidate.category!),
                           style: TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 11,
@@ -659,7 +660,7 @@ class _CandidateDetailSheet extends StatelessWidget {
           if (candidate.rawMerchant != null)
             _buildDetailRow('商户', candidate.rawMerchant!),
           if (candidate.category != null)
-            _buildDetailRow('分类', candidate.category!),
+            _buildDetailRow('分类', CategoryLocalizationService.instance.getCategoryName(candidate.category!)),
           if (candidate.externalId != null)
             _buildDetailRow('交易号', candidate.externalId!),
           // Duplicate info

@@ -97,13 +97,17 @@ class EmailBillDispatcher {
         );
       }
 
-      // 阶段3: 下载邮件
+      // 阶段3: 下载邮件（先用 ENVELOPE 过滤掉非账单邮件，再下载完整内容）
       debugPrint('[EmailBillDispatcher] 开始下载 ${sequenceNumbers.length} 封邮件');
       onProgress?.call('fetching', 0, sequenceNumbers.length, '正在下载邮件...');
       var messages = await _imapService.fetchMessages(
         sequenceNumbers,
         onProgress: (current, total) {
           onProgress?.call('fetching', current, total, '下载中 $current/$total');
+        },
+        subjectFilter: (subject) {
+          // 返回 false 的邮件不下载完整内容
+          return !_skipSubjects.any((s) => subject.contains(s));
         },
       );
 
@@ -164,6 +168,13 @@ class EmailBillDispatcher {
     }
   }
 
+  /// 已知不含账单数据的邮件主题（跳过解析以提升效率）
+  static const _skipSubjects = [
+    '每日信用管家',    // 招行每日消费通知，不含可解析的交易数据
+    '还款提醒',       // 还款提醒通知
+    '账单提醒',       // 账单提醒通知
+  ];
+
   /// 根据发件人路由到不同的解析器
   Future<List<ImportCandidate>> _dispatchMessage(
     EmailMessage message,
@@ -171,9 +182,18 @@ class EmailBillDispatcher {
     String? zipPassword,
   }) async {
     final sender = message.senderAddress.toLowerCase();
+    final subject = message.subject;
 
-    // 招行信用卡账单
-    if (sender.contains('cmbchina.com') || sender.contains('招商银行')) {
+    // 跳过已知不含账单数据的邮件
+    if (_skipSubjects.any((s) => subject.contains(s))) {
+      debugPrint('[EmailBillDispatcher] 跳过非账单邮件: "$subject"');
+      return [];
+    }
+
+    // 招行信用卡账单（发件人匹配 或 主题包含招行关键词）
+    if (sender.contains('cmbchina.com') || sender.contains('招商银行') ||
+        subject.contains('招商银行') || subject.contains('信用卡电子账单')) {
+      debugPrint('[EmailBillDispatcher] 路由到招行解析器: sender=$sender, subject=$subject, htmlLength=${message.htmlBody?.length}');
       return await _cmbParser.parseHtmlBill(message, startIndex);
     }
 

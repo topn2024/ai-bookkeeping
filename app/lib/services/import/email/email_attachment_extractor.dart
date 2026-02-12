@@ -90,6 +90,10 @@ class EmailAttachmentExtractor {
       if (errStr.contains('encrypt') || errStr.contains('password') || errStr.contains('Password')) {
         _lastZipEncrypted = true;
         debugPrint('[EmailAttachmentExtractor] ZIP文件已加密: $e');
+      } else if (errStr.contains('Filter error') || errStr.contains('bad data')) {
+        // 加密ZIP用错误密码或无密码解压时的典型错误
+        _lastZipEncrypted = true;
+        debugPrint('[EmailAttachmentExtractor] ZIP解压失败(可能需要密码): $e');
       } else {
         debugPrint('[EmailAttachmentExtractor] ZIP解压失败: $e');
       }

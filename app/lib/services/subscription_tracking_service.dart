@@ -214,6 +214,15 @@ class SubscriptionTrackingService {
     '日常', '生活', '消费支出', '支出',
   };
 
+  // 高频日常消费关键词（不应被识别为订阅）
+  static const Set<String> _dailyConsumptionKeywords = {
+    '早餐', '午餐', '中餐', '晚餐', '早饭', '午饭', '晚饭',
+    '食堂', '餐厅', '饭店', '小吃', '快餐', '外卖', '奶茶',
+    '咖啡', '面包', '包子', '粉面', '米粉', '拉面', '麻辣烫',
+    '便利店', '超市', '菜市场', '水果', '零食',
+    '打车', '出租车', '地铁', '公交', '停车',
+  };
+
   SubscriptionTrackingService(this._db);
 
   /// 自动识别订阅类消费
@@ -232,6 +241,9 @@ class SubscriptionTrackingService {
 
       // 至少需要2笔交易才能判断周期性
       if (txList.length < 2) continue;
+
+      // 排除日常高频消费（早餐、午餐等不是订阅）
+      if (_isDailyConsumption(entry.key.merchant)) continue;
 
       // 检测周期性
       final interval = _detectInterval(txList);
@@ -419,6 +431,9 @@ class SubscriptionTrackingService {
     // 标准差过大说明不是稳定订阅
     if (stdDev > avgInterval * 0.3) return SubscriptionInterval.unknown;
 
+    // 平均间隔小于5天的排除（日常消费，不是订阅）
+    if (avgInterval < 5) return SubscriptionInterval.unknown;
+
     // 根据平均间隔判断周期
     if (avgInterval <= 10) return SubscriptionInterval.weekly;
     if (avgInterval <= 20) return SubscriptionInterval.biweekly;
@@ -432,6 +447,15 @@ class SubscriptionTrackingService {
   bool _isLikelySubscription(String merchant) {
     final lowerMerchant = merchant.toLowerCase();
     return _subscriptionKeywords.any((keyword) =>
+        lowerMerchant.contains(keyword.toLowerCase()));
+  }
+
+  /// 判断是否是日常高频消费（不应被识别为订阅）
+  bool _isDailyConsumption(String merchant) {
+    final lowerMerchant = merchant.toLowerCase();
+    // 如果商户名包含订阅关键词，优先认为是订阅
+    if (_isLikelySubscription(merchant)) return false;
+    return _dailyConsumptionKeywords.any((keyword) =>
         lowerMerchant.contains(keyword.toLowerCase()));
   }
 
