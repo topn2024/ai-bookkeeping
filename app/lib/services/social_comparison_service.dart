@@ -492,40 +492,41 @@ class SocialComparisonService {
     final now = DateTime.now();
     final since = DateTime(now.year, now.month - months + 1, 1);
 
-    // 获取收入
+    // 获取收入 (type: 0=income, 1=expense)
     final incomeResult = await _db.rawQuery('''
       SELECT SUM(amount) as total FROM transactions
-      WHERE date >= ? AND type = 'income'
+      WHERE date >= ? AND type = 0 AND isDeleted = 0
     ''', [since.millisecondsSinceEpoch]);
     final totalIncome = (incomeResult.first['total'] as num?)?.toDouble() ?? 0;
 
     // 获取支出
     final expenseResult = await _db.rawQuery('''
       SELECT SUM(amount) as total FROM transactions
-      WHERE date >= ? AND type = 'expense'
+      WHERE date >= ? AND type = 1 AND isDeleted = 0
     ''', [since.millisecondsSinceEpoch]);
     final totalExpense = (expenseResult.first['total'] as num?)?.toDouble() ?? 0;
 
     // 获取餐饮支出
     final foodResult = await _db.rawQuery('''
       SELECT SUM(amount) as total FROM transactions
-      WHERE date >= ? AND type = 'expense' AND categoryId LIKE '%food%'
+      WHERE date >= ? AND type = 1 AND isDeleted = 0
+        AND (category LIKE '%food%' OR category LIKE '%dining%' OR category LIKE '%restaurant%')
     ''', [since.millisecondsSinceEpoch]);
     final foodExpense = (foodResult.first['total'] as num?)?.toDouble() ?? 0;
 
     // 获取平均钱龄
     final moneyAgeResult = await _db.rawQuery('''
       SELECT AVG(moneyAge) as avg FROM transactions
-      WHERE date >= ? AND type = 'expense' AND moneyAge > 0
+      WHERE date >= ? AND type = 1 AND moneyAge > 0 AND isDeleted = 0
     ''', [since.millisecondsSinceEpoch]);
     final avgMoneyAge = (moneyAgeResult.first['avg'] as num?)?.toDouble() ?? 0;
 
     // 获取记账天数
     final recordingDaysResult = await _db.rawQuery('''
       SELECT COUNT(DISTINCT date(date/1000, 'unixepoch')) as days
-      FROM transactions WHERE date >= ?
+      FROM transactions WHERE date >= ? AND isDeleted = 0
     ''', [since.millisecondsSinceEpoch]);
-    final recordingDays = (recordingDaysResult.first['days'] as int?) ?? 0;
+    final recordingDays = (recordingDaysResult.first['days'] as num?)?.toInt() ?? 0;
 
     final avgIncome = totalIncome / months;
     final avgExpense = totalExpense / months;

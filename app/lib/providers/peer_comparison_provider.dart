@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/social_comparison_service.dart';
 import '../services/database_service.dart';
@@ -85,22 +86,25 @@ class PeerComparisonNotifier extends StateNotifier<PeerComparisonState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // 并行加载所有数据
-      final results = await Future.wait([
-        _service.inferUserProfile(),
-        _service.getPeerBenchmark(),
-        _service.getUserRankings(),
-        _service.getComparisonInsights(),
-        _service.getSpendingLevel(),
-        _getMonthlyStats(),
-      ]);
+      debugPrint('[PeerComparison] 开始加载数据...');
 
-      final userProfile = results[0] as UserProfileTag;
-      final benchmark = results[1] as PeerBenchmark?;
-      final rankings = results[2] as List<UserRanking>;
-      final insights = results[3] as List<ComparisonInsight>;
-      final spendingLevel = results[4] as SpendingLevel;
-      final monthlyStats = results[5] as Map<String, dynamic>;
+      final userProfile = await _service.inferUserProfile();
+      debugPrint('[PeerComparison] 用户画像: $userProfile');
+
+      final benchmark = await _service.getPeerBenchmark();
+      debugPrint('[PeerComparison] 基准数据: ${benchmark != null}');
+
+      final rankings = await _service.getUserRankings();
+      debugPrint('[PeerComparison] 排名: ${rankings.length}条');
+
+      final insights = await _service.getComparisonInsights();
+      debugPrint('[PeerComparison] 洞察: ${insights.length}条');
+
+      final spendingLevel = await _service.getSpendingLevel();
+      debugPrint('[PeerComparison] 消费水平: $spendingLevel');
+
+      final monthlyStats = await _getMonthlyStats();
+      debugPrint('[PeerComparison] 月度统计: $monthlyStats');
 
       state = state.copyWith(
         isLoading: false,
@@ -109,14 +113,17 @@ class PeerComparisonNotifier extends StateNotifier<PeerComparisonState> {
         rankings: rankings,
         insights: insights,
         spendingLevel: spendingLevel,
-        totalExpense: monthlyStats['totalExpense'] as double?,
-        totalIncome: monthlyStats['totalIncome'] as double?,
-        savingsRate: monthlyStats['savingsRate'] as double?,
-        moneyAge: monthlyStats['avgMoneyAge'] as double?,
-        recordingDays: monthlyStats['recordingDays'] as int?,
+        totalExpense: (monthlyStats['totalExpense'] as num?)?.toDouble(),
+        totalIncome: (monthlyStats['totalIncome'] as num?)?.toDouble(),
+        savingsRate: (monthlyStats['savingsRate'] as num?)?.toDouble(),
+        moneyAge: (monthlyStats['avgMoneyAge'] as num?)?.toDouble(),
+        recordingDays: (monthlyStats['recordingDays'] as num?)?.toInt(),
         categoryExpenses: monthlyStats['categoryExpenses'] as Map<String, double>?,
       );
-    } catch (e) {
+      debugPrint('[PeerComparison] 数据加载完成');
+    } catch (e, stack) {
+      debugPrint('[PeerComparison] 加载数据失败: $e');
+      debugPrint('[PeerComparison] 堆栈: $stack');
       state = state.copyWith(
         isLoading: false,
         error: '加载数据失败: $e',
@@ -175,7 +182,7 @@ class PeerComparisonNotifier extends StateNotifier<PeerComparisonState> {
       FROM transactions
       WHERE date >= ? AND date <= ? AND isDeleted = 0
     ''', [startOfMonth.millisecondsSinceEpoch, endOfMonth.millisecondsSinceEpoch]);
-    final recordingDays = (recordingDaysResult.first['days'] as int?) ?? 0;
+    final recordingDays = (recordingDaysResult.first['days'] as num?)?.toInt() ?? 0;
 
     // 计算储蓄率
     final savingsRate = totalIncome > 0 ? (totalIncome - totalExpense) / totalIncome : 0.0;
