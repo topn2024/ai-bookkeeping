@@ -19,10 +19,10 @@ import 'enhanced_voice_assistant_page.dart';
 import 'add_transaction_page.dart';
 
 /// 主导航页面
-/// 底部导航：首页 | 分析 | 小记 | ➕ | 我的
+/// 底部导航：首页 | 分析 | 鱼记 | ➕ | 我的
 /// - 首页（仪表盘）
 /// - 分析（数据分析中心）
-/// - 小记（语音助手，中间按钮）
+/// - 鱼记（语音助手，中间按钮）
 /// - ➕（手动记账）
 /// - 我的（个人中心，包含预算）
 class MainNavigation extends ConsumerStatefulWidget {
@@ -31,7 +31,7 @@ class MainNavigation extends ConsumerStatefulWidget {
   /// 获取FAB按钮的GlobalKey（用于功能引导）
   static GlobalKey get fabKey => _mainNavFabKey;
 
-  /// 获取小记导航栏的GlobalKey（用于功能引导）
+  /// 获取鱼记导航栏的GlobalKey（用于功能引导）
   static GlobalKey get xiaojiNavKey => _mainNavXiaojiNavKey;
 
   @override
@@ -75,7 +75,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
     _pages = [
       const HomePage(),
       const AnalysisCenterPage(),
-      EnhancedVoiceAssistantPage(onBack: _goToHome),  // 小记宠物助手
+      EnhancedVoiceAssistantPage(onBack: _goToHome),  // 鱼记宠物助手
       const SettingsPage(),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -134,7 +134,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
         setState(() {
           // 将语音导航索引映射到底部导航索引
           // 语音导航: 0=首页, 1=报表, 2=预算, 3=储蓄, 4=钱龄
-          // 底部导航: 0=首页, 1=分析, 2=小记, 3=我的
+          // 底部导航: 0=首页, 1=分析, 2=鱼记, 3=我的
           switch (index) {
             case 0: // 首页
               _currentIndex = 0;
@@ -214,7 +214,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
 
   @override
   Widget build(BuildContext context) {
-    // 小记页面（index=2）不显示底部导航栏
+    // 鱼记页面（index=2）不显示底部导航栏
     final isVoiceAssistantPage = _currentIndex == 2;
 
     return PopScope(
@@ -263,17 +263,17 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
     );
   }
 
-  /// 中间的小记按钮
+  /// 中间的鱼记按钮
   /// 单击：进入语音助手页面
   /// 长按：直接开始单次语音记账
   Widget _buildCenterButton(BuildContext context) {
     return Transform.translate(
       offset: const Offset(0, 8),  // 向下偏移
       child: Container(
-        key: _mainNavXiaojiNavKey,  // 小记按钮的key（用于功能引导）
+        key: _mainNavXiaojiNavKey,  // 鱼记按钮的key（用于功能引导）
         child: GestureDetector(
           onTap: () {
-            // 单击进入小记语音助手页面
+            // 单击进入鱼记语音助手页面
             setState(() => _currentIndex = 2);
           },
           onLongPressStart: (_) {
@@ -520,7 +520,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation>
           activeIcon: Icons.analytics,
           label: context.l10n.trends,
         ),
-        // 中间占位（给小记FAB留空间）
+        // 中间占位（给鱼记FAB留空间）
         const GlassBottomNavItem(
           label: '',
           isPlaceholder: true,

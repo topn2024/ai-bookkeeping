@@ -210,12 +210,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         description: '语音是最强大的功能！\n\n• 语音记账："午餐花了50块"\n• 语音查询："这个月餐饮花了多少"\n• 语音导航："打开预算管理"\n\n长按此按钮即可开始',
         position: GuidePosition.top,
       ),
-      // 第3步：小记助手
+      // 第3步：鱼记助手
       GuideStep(
         id: 'xiaoji_assistant',
         targetKey: MainNavigation.xiaojiNavKey,
-        title: '🐾 小记助手',
-        description: '所有操作都会记录在小记中\n\n小记会帮你：\n• 记住你说过的话\n• 追踪账目变化\n• 提供智能建议\n\n随时点击查看对话历史',
+        title: '🐾 鱼记助手',
+        description: '所有操作都会记录在鱼记中\n\n鱼记会帮你：\n• 记住你说过的话\n• 追踪账目变化\n• 提供智能建议\n\n随时点击查看对话历史',
         position: GuidePosition.top,
       ),
     ];

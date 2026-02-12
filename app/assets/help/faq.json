@@ -215,9 +215,9 @@
       "id": "faq_voice_wakeword",
       "category": "voice",
       "question": "怎么唤醒语音助手",
-      "keywords": ["唤醒", "唤醒词", "小记", "叫助手"],
-      "answer": "您可以说"小记"来唤醒语音助手，或者点击悬浮球按钮。",
-      "voiceGuide": "说"小记"或点击悬浮球可以唤醒助手"
+      "keywords": ["唤醒", "唤醒词", "鱼记", "叫助手"],
+      "answer": "您可以说"鱼记"来唤醒语音助手，或者点击悬浮球按钮。",
+      "voiceGuide": "说"鱼记"或点击悬浮球可以唤醒助手"
     },
     {
       "id": "faq_voice_interrupt",

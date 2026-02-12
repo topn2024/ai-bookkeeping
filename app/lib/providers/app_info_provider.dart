@@ -28,7 +28,7 @@ class AppInfo {
   static const AppInfo empty = AppInfo(
     version: '...',
     buildNumber: '...',
-    appName: 'AI智能记账',
+    appName: '鱼记',
     packageName: '',
     buildTime: '',
   );

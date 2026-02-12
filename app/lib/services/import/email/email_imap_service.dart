@@ -42,11 +42,22 @@ class EmailAttachment {
 
 /// 账单邮件发件人常量
 class BillEmailSenders {
+  // 招行信用卡 - 两个常见发件地址
   static const cmbCreditCard = 'creditcard@cmbchina.com';
+  static const cmbDaily = 'ccsvc@message.cmbchina.com';
+  // 微信支付
   static const wechatPay = 'wechatpay-noreply@tenpay.com';
+  // 支付宝
   static const alipay = 'service@mail.alipay.com';
-  static const alipayAlt = 'alipay';  // 模糊匹配，覆盖支付宝各种发件地址
-  static const all = [cmbCreditCard, wechatPay, alipay];
+
+  static const all = [cmbCreditCard, cmbDaily, wechatPay, alipay];
+}
+
+/// 文件夹内邮件定位
+class _FolderMessage {
+  final String folder;
+  final int sequenceNumber;
+  _FolderMessage(this.folder, this.sequenceNumber);
 }
 
 /// IMAP 邮件服务
@@ -57,6 +68,7 @@ class EmailImapService {
   final StringBuffer _buffer = StringBuffer();
   StreamSubscription? _subscription;
   Completer<String>? _responseCompleter;
+  String _currentFolder = '';
 
   /// 连接邮箱服务器
   Future<void> connect(EmailAccount account) async {
@@ -136,8 +148,43 @@ class EmailImapService {
     }
   }
 
-  /// 搜索账单邮件
-  Future<List<int>> searchBillEmails({
+  /// 列出所有可搜索的文件夹
+  Future<List<String>> _listFolders() async {
+    final response = await _sendCommand('LIST "" "*"');
+    final folders = <String>[];
+    final lines = response.split('\r\n');
+    for (final line in lines) {
+      if (!line.startsWith('* LIST')) continue;
+      // 跳过 \NoSelect 文件夹
+      if (line.contains('\\NoSelect')) continue;
+      // 提取文件夹名：最后一个空格后的引号内容或无引号字符串
+      final match = RegExp(r'"([^"]+)"$|(\S+)$').firstMatch(line);
+      if (match != null) {
+        final folder = match.group(1) ?? match.group(2) ?? '';
+        if (folder.isNotEmpty) folders.add(folder);
+      }
+    }
+    debugPrint('[EmailImapService] 发现 ${folders.length} 个文件夹: $folders');
+    return folders;
+  }
+
+  /// 选择文件夹
+  Future<bool> _selectFolder(String folder) async {
+    if (_currentFolder == folder) return true;
+    try {
+      final response = await _sendCommand('SELECT "$folder"');
+      if (response.contains('OK')) {
+        _currentFolder = folder;
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[EmailImapService] 选择文件夹 "$folder" 失败: $e');
+    }
+    return false;
+  }
+
+  /// 搜索账单邮件（跨所有文件夹）
+  Future<List<_FolderMessage>> searchBillEmailsAcrossFolders({
     required DateTime startDate,
     required DateTime endDate,
     List<String>? senderFilter,
@@ -146,101 +193,57 @@ class EmailImapService {
       throw EmailConnectionException('未连接到邮箱服务器');
     }
 
-    // 选择收件箱
-    debugPrint('[EmailImapService] 正在选择收件箱...');
-    final selectResponse = await _sendCommand('SELECT INBOX');
-    debugPrint('[EmailImapService] SELECT响应: ${selectResponse.substring(0, selectResponse.length.clamp(0, 200))}');
-    if (!selectResponse.contains('OK')) {
-      throw EmailConnectionException('无法打开收件箱');
-    }
-
     final senders = senderFilter ?? BillEmailSenders.all;
-    final allSequenceNumbers = <int>{};
-
     final sinceDate = _formatImapDate(startDate);
-    final beforeDate = _formatImapDate(endDate.add(const Duration(days: 1)));
+    final allResults = <_FolderMessage>[];
 
-    debugPrint('[EmailImapService] 搜索范围: $sinceDate ~ $beforeDate, 发件人: $senders');
+    // 列出所有文件夹
+    final folders = await _listFolders();
 
-    // 诊断：先搜整个日期范围内所有邮件
-    try {
-      final diagCmd = 'SEARCH SINCE $sinceDate BEFORE $beforeDate';
-      debugPrint('[EmailImapService] 诊断搜索(无过滤): $diagCmd');
-      final diagResponse = await _sendCommand(diagCmd);
-      final diagNumbers = _parseSearchResponse(diagResponse);
-      debugPrint('[EmailImapService] 日期范围内共有 ${diagNumbers.length} 封邮件');
+    for (final folder in folders) {
+      if (!await _selectFolder(folder)) continue;
 
-      // 如果有邮件，FETCH 前几封的发件人和主题
-      if (diagNumbers.isNotEmpty) {
-        final sampleIds = diagNumbers.take(5).join(',');
-        final sampleResponse = await _sendCommand(
-          'FETCH $sampleIds (ENVELOPE)',
-          timeout: const Duration(seconds: 30),
-        );
-        debugPrint('[EmailImapService] 样本邮件ENVELOPE:\n$sampleResponse');
-      }
-    } catch (e) {
-      debugPrint('[EmailImapService] 诊断搜索失败: $e');
-    }
-
-    for (final sender in senders) {
-      try {
-        final cmd = 'SEARCH SINCE $sinceDate BEFORE $beforeDate FROM "$sender"';
-        debugPrint('[EmailImapService] 执行: $cmd');
-        final searchResponse = await _sendCommand(cmd);
-        debugPrint('[EmailImapService] SEARCH响应: $searchResponse');
-
-        final numbers = _parseSearchResponse(searchResponse);
-        debugPrint('[EmailImapService] 找到 ${numbers.length} 封来自 $sender 的邮件');
-        allSequenceNumbers.addAll(numbers);
-      } catch (e) {
-        debugPrint('[EmailImapService] Search failed for $sender: $e');
-      }
-    }
-
-    // 如果精确匹配没找到，用宽松关键词再搜一次
-    if (allSequenceNumbers.isEmpty) {
-      debugPrint('[EmailImapService] 精确匹配无结果，尝试宽松搜索...');
-      final broadKeywords = ['alipay', '支付宝', 'wechat', '微信', '账单', '招商银行', 'cmbchina'];
-      for (final keyword in broadKeywords) {
+      for (final sender in senders) {
         try {
-          final cmd = 'SEARCH SINCE $sinceDate BEFORE $beforeDate FROM "$keyword"';
-          debugPrint('[EmailImapService] 宽松搜索: $cmd');
+          final cmd = 'SEARCH SINCE $sinceDate FROM "$sender"';
           final searchResponse = await _sendCommand(cmd);
           final numbers = _parseSearchResponse(searchResponse);
           if (numbers.isNotEmpty) {
-            debugPrint('[EmailImapService] 关键词 "$keyword" 找到 ${numbers.length} 封');
-            allSequenceNumbers.addAll(numbers);
+            debugPrint('[EmailImapService] 文件夹 "$folder" 找到 ${numbers.length} 封来自 $sender');
+            for (final n in numbers) {
+              allResults.add(_FolderMessage(folder, n));
+            }
           }
         } catch (e) {
-          debugPrint('[EmailImapService] 宽松搜索 "$keyword" 失败: $e');
-        }
-      }
-      // 也搜索主题中包含账单关键词的
-      if (allSequenceNumbers.isEmpty) {
-        for (final keyword in ['账单', 'bill', '对账单', '交易']) {
-          try {
-            final cmd = 'SEARCH SINCE $sinceDate BEFORE $beforeDate SUBJECT "$keyword"';
-            debugPrint('[EmailImapService] 主题搜索: $cmd');
-            final searchResponse = await _sendCommand(cmd);
-            final numbers = _parseSearchResponse(searchResponse);
-            if (numbers.isNotEmpty) {
-              debugPrint('[EmailImapService] 主题 "$keyword" 找到 ${numbers.length} 封');
-              allSequenceNumbers.addAll(numbers);
-            }
-          } catch (e) {
-            debugPrint('[EmailImapService] 主题搜索 "$keyword" 失败: $e');
-          }
+          debugPrint('[EmailImapService] 搜索 "$folder" $sender 失败: $e');
         }
       }
     }
 
-    final sorted = allSequenceNumbers.toList()..sort();
-    debugPrint('[EmailImapService] 总共找到 ${sorted.length} 封账单邮件');
-    return sorted;
+    debugPrint('[EmailImapService] 跨文件夹总共找到 ${allResults.length} 封账单邮件');
+    return allResults;
   }
 
-  /// 批量获取邮件内容
+  /// 兼容旧接口 - 搜索账单邮件（返回 sequence numbers）
+  Future<List<int>> searchBillEmails({
+    required DateTime startDate,
+    required DateTime endDate,
+    List<String>? senderFilter,
+  }) async {
+    // 委托给跨文件夹搜索，结果由 fetchMessagesFromFolders 处理
+    final results = await searchBillEmailsAcrossFolders(
+      startDate: startDate,
+      endDate: endDate,
+      senderFilter: senderFilter,
+    );
+    // 存储结果供 fetchMessages 使用
+    _pendingFolderMessages = results;
+    return List.generate(results.length, (i) => i); // 返回虚拟序号
+  }
+
+  List<_FolderMessage> _pendingFolderMessages = [];
+
+  /// 批量获取邮件内容（支持跨文件夹）
   Future<List<EmailMessage>> fetchMessages(
     List<int> sequenceNumbers, {
     void Function(int current, int total)? onProgress,
@@ -250,31 +253,48 @@ class EmailImapService {
     }
 
     final messages = <EmailMessage>[];
-    const batchSize = 10;
+    final total = _pendingFolderMessages.length;
 
-    for (int i = 0; i < sequenceNumbers.length; i += batchSize) {
-      final end = (i + batchSize).clamp(0, sequenceNumbers.length);
-      final batch = sequenceNumbers.sublist(i, end);
-      final seqSet = batch.join(',');
-
-      try {
-        final fetchResponse = await _sendCommand(
-          'FETCH $seqSet (ENVELOPE BODY[])',
-          timeout: const Duration(seconds: 60),
-        );
-
-        final parsed = _parseFetchResponse(fetchResponse);
-        messages.addAll(parsed);
-      } catch (e) {
-        debugPrint('[EmailImapService] Fetch batch failed: $e');
-      }
-
-      onProgress?.call(
-        (i + batch.length).clamp(0, sequenceNumbers.length),
-        sequenceNumbers.length,
-      );
+    // 按文件夹分组以减少 SELECT 切换
+    final byFolder = <String, List<int>>{};
+    for (final fm in _pendingFolderMessages) {
+      byFolder.putIfAbsent(fm.folder, () => []).add(fm.sequenceNumber);
     }
 
+    int fetched = 0;
+    for (final entry in byFolder.entries) {
+      final folder = entry.key;
+      final seqNums = entry.value;
+
+      if (!await _selectFolder(folder)) {
+        fetched += seqNums.length;
+        continue;
+      }
+
+      const batchSize = 10;
+      for (int i = 0; i < seqNums.length; i += batchSize) {
+        final end = (i + batchSize).clamp(0, seqNums.length);
+        final batch = seqNums.sublist(i, end);
+        final seqSet = batch.join(',');
+
+        try {
+          final fetchResponse = await _sendCommand(
+            'FETCH $seqSet (ENVELOPE BODY[])',
+            timeout: const Duration(seconds: 60),
+          );
+
+          final parsed = _parseFetchResponse(fetchResponse);
+          messages.addAll(parsed);
+        } catch (e) {
+          debugPrint('[EmailImapService] Fetch batch failed in "$folder": $e');
+        }
+
+        fetched += batch.length;
+        onProgress?.call(fetched.clamp(0, total), total);
+      }
+    }
+
+    _pendingFolderMessages = [];
     return messages;
   }
 
@@ -414,9 +434,9 @@ class EmailImapService {
   }
 
   EmailMessage? _parseMessageBlock(String block) {
-    // 从 ENVELOPE 中提取信息
-    final subject = _extractEnvelopeField(block, 'Subject') ??
-        _extractFromEnvelope(block, 1) ??
+    // 优先从 ENVELOPE 结构提取（可靠），header regex 作为后备
+    final subject = _extractFromEnvelope(block, 1) ??
+        _extractHeaderFromBody(block, 'Subject') ??
         '(无主题)';
     final sender = _extractSenderFromEnvelope(block) ?? '';
     final dateStr = _extractFromEnvelope(block, 0);
@@ -439,17 +459,19 @@ class EmailImapService {
     final attachments = <EmailAttachment>[];
 
     _parseMimeContent(bodyContent, (contentType, content, filename) {
+      // 从当前 part 内容中提取 encoding（不是整个 block）
+      final encoding = _extractEncoding(content, contentType);
       final lowerFilename = filename?.toLowerCase() ?? '';
       if (filename != null && (lowerFilename.endsWith('.csv') || lowerFilename.endsWith('.zip'))) {
         attachments.add(EmailAttachment(
           filename: filename,
           mimeType: contentType,
-          data: _decodeContent(content, _extractEncoding(block, contentType)),
+          data: _decodeContent(content, encoding),
         ));
       } else if (contentType.contains('text/html')) {
-        htmlBody = _decodeTextContent(content, _extractEncoding(block, contentType));
+        htmlBody = _decodeTextContent(content, encoding);
       } else if (contentType.contains('text/plain') && textBody == null) {
-        textBody = _decodeTextContent(content, _extractEncoding(block, contentType));
+        textBody = _decodeTextContent(content, encoding);
       }
     });
 
@@ -464,10 +486,17 @@ class EmailImapService {
     );
   }
 
-  String? _extractEnvelopeField(String block, String field) {
-    // 尝试直接从 header 提取
-    final regex = RegExp('$field:\\s*(.+)', caseSensitive: false);
-    final match = regex.firstMatch(block);
+  /// 从 BODY 内容的邮件头部分提取字段（仅在 ENVELOPE 解析失败时使用）
+  String? _extractHeaderFromBody(String block, String field) {
+    // 先定位 BODY[] 内容
+    final bodyStart = RegExp(r'BODY\[\]\s*\{\d+\}\r\n').firstMatch(block);
+    if (bodyStart == null) return null;
+    final headerSection = block.substring(bodyStart.end);
+    // 邮件头以空行结束
+    final headerEnd = headerSection.indexOf('\r\n\r\n');
+    final headers = headerEnd > 0 ? headerSection.substring(0, headerEnd) : headerSection.substring(0, (headerSection.length).clamp(0, 2000));
+    final regex = RegExp('^$field:\\s*(.+)', caseSensitive: false, multiLine: true);
+    final match = regex.firstMatch(headers);
     return match?.group(1)?.trim();
   }
 
@@ -584,8 +613,11 @@ class EmailImapService {
 
   void _parseMimeContent(
     String content,
-    void Function(String contentType, String body, String? filename) onPart,
-  ) {
+    void Function(String contentType, String body, String? filename) onPart, {
+    int depth = 0,
+  }) {
+    if (depth > 5) return; // 防止无限递归
+
     // 查找 Content-Type 中的 boundary
     final boundaryMatch = RegExp(r'boundary="?([^"\s;]+)"?', caseSensitive: false).firstMatch(content);
 
@@ -597,14 +629,27 @@ class EmailImapService {
       for (final part in parts) {
         if (part.trim().isEmpty || part.trim() == '--') continue;
 
-        final contentTypeMatch = RegExp(r'Content-Type:\s*([^\s;]+)', caseSensitive: false).firstMatch(part);
-        final filenameMatch = RegExp(r'(?:filename|name)="?([^"\r\n;]+)"?', caseSensitive: false).firstMatch(part);
+        // 展开折叠的 MIME 头部（CRLF + 空白 → 单空格）
+        final headerEnd = part.indexOf('\r\n\r\n');
+        final headerSection = headerEnd > 0 ? part.substring(0, headerEnd) : part;
+        final unfoldedHeader = headerSection.replaceAll(RegExp(r'\r\n[ \t]+'), ' ');
+
+        final contentTypeMatch = RegExp(r'Content-Type:\s*([^\s;]+)', caseSensitive: false).firstMatch(unfoldedHeader);
+        // 支持 RFC 2047 编码和普通文件名
+        final filenameMatch = RegExp(r'''(?:filename|name)=["']?([^"'\r\n;]+)["']?''', caseSensitive: false).firstMatch(unfoldedHeader);
         final contentType = contentTypeMatch?.group(1)?.toLowerCase() ?? 'text/plain';
-        final filename = filenameMatch?.group(1);
+        var filename = filenameMatch?.group(1)?.trim();
+
+        // 解码 RFC 2047 编码的文件名
+        if (filename != null && filename.contains('=?')) {
+          filename = _decodeEncodedWord(filename);
+        }
+
+        debugPrint('[EmailImapService] MIME part: type=$contentType, filename=$filename');
 
         // 递归处理嵌套 multipart
         if (contentType.startsWith('multipart/')) {
-          _parseMimeContent(part, onPart);
+          _parseMimeContent(part, onPart, depth: depth + 1);
         } else {
           final bodyStart = part.indexOf('\r\n\r\n');
           if (bodyStart >= 0) {

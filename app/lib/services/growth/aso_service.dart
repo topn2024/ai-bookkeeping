@@ -98,7 +98,7 @@ class ASOService {
     _metadata['zh-Hans_appleAppStore'] = const AppStoreMetadata(
       store: AppStore.appleAppStore,
       locale: 'zh-Hans',
-      appName: 'AI智能记账',
+      appName: '鱼记',
       subtitle: '轻松记账，智慧理财',
       shortDescription: '让记账变得简单有趣，AI智能识别，一句话轻松记账',
       fullDescription: '''
@@ -138,7 +138,7 @@ class ASOService {
 【联系我们】
 官网：https://aibook.example.com
 邮箱：support@aibook.example.com
-微信公众号：AI智能记账
+微信公众号：鱼记
 ''',
       keywords: [
         '记账',
@@ -262,11 +262,11 @@ Version 2.0.0:
     _metadata['zh-Hans_googlePlay'] = const AppStoreMetadata(
       store: AppStore.googlePlay,
       locale: 'zh-Hans',
-      appName: 'AI智能记账',
+      appName: '鱼记',
       subtitle: '轻松记账，智慧理财',
       shortDescription: '让记账变得简单有趣，AI智能识别，一句话轻松记账',
       fullDescription: '''
-AI智能记账 - 您的私人财务助手
+鱼记 - 您的私人财务助手
 
 告别繁琐的手动输入，用最自然的方式记录每一笔开支。
 

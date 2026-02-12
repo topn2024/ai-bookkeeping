@@ -489,7 +489,7 @@ class InvitationService {
       case 'invite':
         return ShareContent(
           title: '邀你一起记账',
-          description: '我在用AI智能记账，帮我省了不少钱！使用邀请码 $inviteCode 注册，我们都能获得奖励！',
+          description: '我在用鱼记，帮我省了不少钱！使用邀请码 $inviteCode 注册，我们都能获得奖励！',
           link: 'https://app.example.com/invite?code=$inviteCode',
         );
 
@@ -506,7 +506,7 @@ class InvitationService {
         final achievement = data?['achievement'] ?? '记账达人';
         return ShareContent(
           title: '我获得了「$achievement」成就！',
-          description: '在AI智能记账坚持记录，收获满满成就感！',
+          description: '在鱼记坚持记录，收获满满成就感！',
           link: 'https://app.example.com/download',
         );
 
@@ -528,7 +528,7 @@ class InvitationService {
 
       default:
         return ShareContent(
-          title: 'AI智能记账',
+          title: '鱼记',
           description: '让记账变得简单有趣',
           link: 'https://app.example.com/download',
         );

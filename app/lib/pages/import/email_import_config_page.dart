@@ -413,7 +413,10 @@ class _EmailImportConfigPageState extends State<EmailImportConfigPage> {
 
   List<String> _getSelectedSenders() {
     final senders = <String>[];
-    if (_filterCmb) senders.add(BillEmailSenders.cmbCreditCard);
+    if (_filterCmb) {
+      senders.add(BillEmailSenders.cmbCreditCard);
+      senders.add(BillEmailSenders.cmbDaily);
+    }
     if (_filterWechat) senders.add(BillEmailSenders.wechatPay);
     if (_filterAlipay) senders.add(BillEmailSenders.alipay);
     return senders;

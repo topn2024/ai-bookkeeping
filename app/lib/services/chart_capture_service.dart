@@ -167,7 +167,7 @@ class CaptureResult {
 ///   options: ChartCaptureOptions(
 ///     addWatermark: true,
 ///     watermarkConfig: WatermarkConfig(
-///       text: 'AI智能记账',
+///       text: '鱼记',
 ///     ),
 ///   ),
 /// );
@@ -620,7 +620,7 @@ class ChartCaptureService {
                 style: pw.TextStyle(fontSize: 10, color: PdfColors.grey),
               ),
               pw.Text(
-                '由 AI智能记账 生成',
+                '由 鱼记 生成',
                 style: pw.TextStyle(fontSize: 10, color: PdfColors.grey),
               ),
             ],

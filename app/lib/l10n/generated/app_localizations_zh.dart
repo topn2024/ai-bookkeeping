@@ -9,7 +9,7 @@ class SZh extends S {
   SZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appName => 'AI智能记账';
+  String get appName => '鱼记';
 
   @override
   String get confirm => '确认';
@@ -1140,7 +1140,7 @@ class SZh extends S {
   String get dateInvalid => '日期无效';
 
   @override
-  String get welcomeMessage => '欢迎使用AI智能记账';
+  String get welcomeMessage => '欢迎使用鱼记';
 
   @override
   String get quickAdd => '快速记账';
@@ -1209,7 +1209,7 @@ class SZh extends S {
   String get openMembership => '开通会员';
 
   @override
-  String get unlockAIFeatures => '解锁AI智能记账功能';
+  String get unlockAIFeatures => '解锁鱼记功能';
 
   @override
   String get openNow => '立即开通';
@@ -1321,7 +1321,7 @@ class SZh extends S {
   String get pleaseEnterValidAmount => '请输入有效金额';
 
   @override
-  String get aiSmartBookkeeping => 'AI智能记账';
+  String get aiSmartBookkeeping => '鱼记';
 
   @override
   String get thisMonthLabel => '本月';
@@ -1550,7 +1550,7 @@ class SZh extends S {
 
   @override
   String copyrightText(int year) {
-    return '© $year AI智能记账\n智能财务管理助手';
+    return '© $year 鱼记\n智能财务管理助手';
   }
 
   @override
@@ -2886,7 +2886,7 @@ class SZhCn extends SZh {
   SZhCn() : super('zh_CN');
 
   @override
-  String get appName => 'AI智能记账';
+  String get appName => '鱼记';
 
   @override
   String get confirm => '确认';
@@ -4014,7 +4014,7 @@ class SZhCn extends SZh {
   String get dateInvalid => '日期无效';
 
   @override
-  String get welcomeMessage => '欢迎使用AI智能记账';
+  String get welcomeMessage => '欢迎使用鱼记';
 
   @override
   String get quickAdd => '快速记账';
@@ -4083,7 +4083,7 @@ class SZhCn extends SZh {
   String get openMembership => '开通会员';
 
   @override
-  String get unlockAIFeatures => '解锁AI智能记账功能';
+  String get unlockAIFeatures => '解锁鱼记功能';
 
   @override
   String get openNow => '立即开通';
@@ -4195,7 +4195,7 @@ class SZhCn extends SZh {
   String get pleaseEnterValidAmount => '请输入有效金额';
 
   @override
-  String get aiSmartBookkeeping => 'AI智能记账';
+  String get aiSmartBookkeeping => '鱼记';
 
   @override
   String get thisMonthLabel => '本月';

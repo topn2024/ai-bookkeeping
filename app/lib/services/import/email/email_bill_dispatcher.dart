@@ -99,12 +99,17 @@ class EmailBillDispatcher {
       // 阶段3: 下载邮件
       debugPrint('[EmailBillDispatcher] 开始下载 ${sequenceNumbers.length} 封邮件');
       onProgress?.call('fetching', 0, sequenceNumbers.length, '正在下载邮件...');
-      final messages = await _imapService.fetchMessages(
+      var messages = await _imapService.fetchMessages(
         sequenceNumbers,
         onProgress: (current, total) {
           onProgress?.call('fetching', current, total, '下载中 $current/$total');
         },
       );
+
+      // 本地过滤 endDate（因为 QQ IMAP BEFORE+FROM 组合有 bug，SEARCH 只用了 SINCE）
+      final endCutoff = endDate.add(const Duration(days: 1));
+      messages = messages.where((m) => m.date.isBefore(endCutoff)).toList();
+      debugPrint('[EmailBillDispatcher] 日期过滤后: ${messages.length} 封邮件');
 
       // 阶段4: 解析账单
       onProgress?.call('parsing', 0, messages.length, '正在解析账单...');

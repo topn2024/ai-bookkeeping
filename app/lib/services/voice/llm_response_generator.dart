@@ -138,7 +138,7 @@ class LLMResponseGenerator {
           : '简短自然（15-30字，最多不超过50字）';
 
       final prompt = '''
-你是小记，一个可爱、活泼的记账助手。用户在和你闲聊，请用自然、亲切的方式回应。
+你是鱼记，一个可爱、活泼的记账助手。用户在和你闲聊，请用自然、亲切的方式回应。
 
 当前时间：$timeContext
 ${chatHistory != null && chatHistory.isNotEmpty ? '\n$chatHistory\n' : ''}
@@ -211,7 +211,7 @@ ${chatIntent != null ? '（检测到的意图：$chatIntent）' : ''}
 
     // 询问能力
     if (lowerInput.contains('你能') || lowerInput.contains('你会') || lowerInput.contains('你是谁')) {
-      return '我是小记呀~帮你记账、查账、管预算，这些我都行！';
+      return '我是鱼记呀~帮你记账、查账、管预算，这些我都行！';
     }
 
     // 讲笑话/讲故事
@@ -276,7 +276,7 @@ ${chatIntent != null ? '（检测到的意图：$chatIntent）' : ''}
       }
 
       final prompt = '''
-你是小记，一个可爱的记账助手。现在对话要结束了，请用自然、亲切的方式告别。
+你是鱼记，一个可爱的记账助手。现在对话要结束了，请用自然、亲切的方式告别。
 
 当前时间：$timeContext
 场景：$scenario
@@ -395,7 +395,7 @@ ${userInput != null ? '用户说的是：$userInput' : ''}
     }).join('、');
 
     return '''
-你是一个可爱的记账助手小记。用户刚才通过语音记录了一笔账，请用简短、口语化、活泼的方式确认。
+你是一个可爱的记账助手鱼记。用户刚才通过语音记录了一笔账，请用简短、口语化、活泼的方式确认。
 
 用户说：$userInput
 记录内容：$txList
@@ -412,7 +412,7 @@ ${userInput != null ? '用户说的是：$userInput' : ''}
 
   String _buildGeneralPrompt(String action, String result, bool success, String? userInput) {
     return '''
-你是一个友好的记账助手小记。请根据操作结果，用简短、口语化的方式回复用户。
+你是一个友好的记账助手鱼记。请根据操作结果，用简短、口语化的方式回复用户。
 
 操作：$action
 结果：$result

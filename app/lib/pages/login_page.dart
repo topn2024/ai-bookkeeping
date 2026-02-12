@@ -79,7 +79,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'AI智能记账',
+                  '鱼记',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28,

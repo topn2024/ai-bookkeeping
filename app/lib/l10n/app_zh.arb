@@ -1,7 +1,7 @@
 {
   "@@locale": "zh",
 
-  "appName": "AI智能记账",
+  "appName": "鱼记",
 
   "confirm": "确认",
   "cancel": "取消",
@@ -393,7 +393,7 @@
   "amountInvalid": "金额无效",
   "dateInvalid": "日期无效",
 
-  "welcomeMessage": "欢迎使用AI智能记账",
+  "welcomeMessage": "欢迎使用鱼记",
   "quickAdd": "快速记账",
   "voiceAdd": "语音记账",
   "scanReceipt": "扫描票据",
@@ -417,7 +417,7 @@
   "templateManagement": "记账模板",
   "recurringManagement": "定时记账",
   "openMembership": "开通会员",
-  "unlockAIFeatures": "解锁AI智能记账功能",
+  "unlockAIFeatures": "解锁鱼记功能",
   "openNow": "立即开通",
   "dataCloudSync": "数据云同步",
   "cloudSyncEnabled": "已开启，数据自动同步到云端",
@@ -455,7 +455,7 @@
   "accountsCannotBeSame": "转出和转入账户不能相同",
   "pleaseEnterValidAmount": "请输入有效金额",
 
-  "aiSmartBookkeeping": "AI智能记账",
+  "aiSmartBookkeeping": "鱼记",
   "thisMonthLabel": "本月",
   "quickRecord": "快速记账",
   "reportAnalysis": "报表分析",
@@ -538,7 +538,7 @@
   "userAgreement": "用户协议",
   "logManagement": "日志管理",
   "logManagementDesc": "查看和清理应用日志",
-  "copyrightText": "© {year} AI智能记账\n智能财务管理助手",
+  "copyrightText": "© {year} 鱼记\n智能财务管理助手",
   "smartFinanceAssistant": "智能财务管理助手",
   "downloadCacheManagement": "下载缓存管理",
   "cacheFileList": "缓存文件列表：",

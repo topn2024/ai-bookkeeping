@@ -635,7 +635,7 @@ class AppLocalizations {
   // 简体中文
   static const Map<String, String> _zhCN = {
     // 通用
-    'app_name': 'AI智能记账',
+    'app_name': '鱼记',
     'confirm': '确认',
     'cancel': '取消',
     'save': '保存',

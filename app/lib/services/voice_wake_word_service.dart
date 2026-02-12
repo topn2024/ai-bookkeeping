@@ -101,7 +101,7 @@ class PorcupineWakeWordEngine implements WakeWordEngine {
   /// 唤醒词模型文件路径列表（assets中的路径）
   final List<String>? keywordPaths;
 
-  /// 默认唤醒词模型（小记）
+  /// 默认唤醒词模型（鱼记）
   static const String defaultKeywordAsset = 'assets/wake_words/xiaoji_zh.ppn';
 
   PorcupineWakeWordEngine({
@@ -244,7 +244,7 @@ class VoiceWakeWordService {
 
   /// 默认唤醒词列表
   /// 注意：每个唤醒词需要对应一个.ppn模型文件
-  static const List<String> defaultWakeWords = ['小记'];
+  static const List<String> defaultWakeWords = ['鱼记'];
 
   /// 当前启用的唤醒词
   List<String> _enabledWakeWords = [...defaultWakeWords];
