@@ -530,12 +530,12 @@ class SocialComparisonService {
 
     final avgIncome = totalIncome / months;
     final avgExpense = totalExpense / months;
-    final savingsRate = avgIncome > 0 ? (avgIncome - avgExpense) / avgIncome : 0;
+    final savingsRate = avgIncome > 0 ? (avgIncome - avgExpense) / avgIncome : 0.0;
 
     return {
       'avgIncome': avgIncome,
       'avgExpense': avgExpense,
-      'savingsRate': savingsRate.clamp(0, 1),
+      'savingsRate': savingsRate.clamp(0.0, 1.0),
       'foodExpense': foodExpense / months,
       'avgMoneyAge': avgMoneyAge,
       'recordingDays': recordingDays,
