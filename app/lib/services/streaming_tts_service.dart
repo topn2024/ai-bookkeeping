@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'voice_token_service.dart';
 import 'audio_stream_player.dart';
+import 'tts_text_utils.dart';
 import 'voice/pcm_audio_player.dart';
 
 /// 流式TTS服务
@@ -168,8 +169,11 @@ class StreamingTTSService {
     _stateController.add(StreamingTTSState.started);
 
     try {
+      // 预处理文本：格式化金额、移除特殊符号等
+      final processedText = TTSTextUtils.preprocessTextForTTS(text);
+
       // 分割文本为句子
-      final sentences = _splitIntoSentences(text);
+      final sentences = _splitIntoSentences(processedText);
       debugPrint('StreamingTTSService: split into ${sentences.length} sentences');
 
       if (sentences.isEmpty) {

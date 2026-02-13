@@ -1078,10 +1078,32 @@ class GlobalVoiceAssistantManager extends ChangeNotifier {
       onChunk(farewell);
       onComplete();
 
-      // 延迟后停止流水线，让告别语有时间播放
-      Future.delayed(const Duration(milliseconds: 2000), () {
-        _stopRecordingWithPipeline();
-      });
+      // 等待TTS真正播放完成后再停止流水线
+      // 监听StreamingTTSService的状态，而非pipeline状态
+      // 因为pipeline状态会在TTS合成完成前就变为listening
+      if (_streamingTtsService != null) {
+        final completer = Completer<void>();
+        StreamSubscription<StreamingTTSState>? sub;
+        sub = _streamingTtsService!.stateStream.listen((state) {
+          if ((state == StreamingTTSState.completed ||
+               state == StreamingTTSState.stopped ||
+               state == StreamingTTSState.error) &&
+              !completer.isCompleted) {
+            debugPrint('[GlobalVoiceAssistant] 告别语TTS播放完成，状态=$state');
+            sub?.cancel();
+            completer.complete();
+          }
+        });
+
+        // 最多等15秒，防止永久阻塞
+        await completer.future.timeout(const Duration(seconds: 15), onTimeout: () {
+          debugPrint('[GlobalVoiceAssistant] 告别语TTS播放超时，强制停止');
+          sub?.cancel();
+        });
+      }
+
+      // TTS播放完成后停止流水线
+      await _stopRecordingWithPipeline();
       return;
     }
 

@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 /// 统一封装消息列表的滚动行为：
 /// - 首次进入时滚动到底部
 /// - 有新消息时滚动到底部
+/// - 消息内容更新时滚动到底部
 /// - 允许用户向上查看历史记录（不会被自动滚动打断）
 class ChatMessageListWidget extends StatefulWidget {
   /// 消息列表
@@ -40,32 +41,61 @@ class _ChatMessageListWidgetState extends State<ChatMessageListWidget> {
   /// 上次消息数量，用于检测是否有新消息
   int _lastMessageCount = -1; // -1表示未初始化
 
+  /// 上次最后一条消息的内容，用于检测消息更新
+  String _lastMessageContent = '';
+
   /// 是否是首次构建
   bool _isFirstBuild = true;
 
+  /// 用户是否正在手动向上滚动查看历史
+  bool _isUserScrolling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    // 如果用户滚动到距底部超过100像素，认为在查看历史
+    _isUserScrolling = position.maxScrollExtent - position.pixels > 100;
   }
 
   @override
   Widget build(BuildContext context) {
     final messages = widget.messages;
 
-    // 滚动控制逻辑：只在首次进入和有新消息时滚动到底部
+    // 获取最后一条消息的内容用于检测更新
+    final lastContent = messages.isNotEmpty ? messages.last.content : '';
+    final hasNewMessage = messages.length > _lastMessageCount;
+    final hasContentUpdate = !hasNewMessage && lastContent != _lastMessageContent;
+
+    // 滚动控制逻辑
     if (_isFirstBuild) {
       _isFirstBuild = false;
       _lastMessageCount = messages.length;
+      _lastMessageContent = lastContent;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToBottom();
+        _scrollToBottom(animate: false);
       });
-    } else if (messages.length > _lastMessageCount) {
-      // 只在有新消息时才滚动到底部（允许用户向上查看历史）
+    } else if (hasNewMessage || hasContentUpdate) {
       _lastMessageCount = messages.length;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToBottom();
-      });
+      _lastMessageContent = lastContent;
+      // 如果用户没有在手动查看历史，自动滚动到底部
+      if (!_isUserScrolling) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom();
+        });
+      }
     }
 
     if (messages.isEmpty) {
@@ -83,13 +113,17 @@ class _ChatMessageListWidgetState extends State<ChatMessageListWidget> {
   }
 
   /// 滚动到底部
-  void _scrollToBottom() {
+  void _scrollToBottom({bool animate = true}) {
     if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      if (animate) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
     }
   }
 

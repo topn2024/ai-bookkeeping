@@ -453,6 +453,13 @@ class VoiceServiceCoordinator extends ChangeNotifier {
   void setSkipTTSPlayback(bool skip) {
     _skipTTSPlayback = skip;
     debugPrint('[VoiceCoordinator] TTS播放跳过设置: $skip');
+
+    // 同步禁用 FeedbackSystem 的 TTS，避免重复播放
+    if (skip) {
+      _feedbackSystem.updateConfig(
+        _feedbackSystem.config.copyWith(enableTts: false),
+      );
+    }
   }
 
   /// 设置网络状态提供者

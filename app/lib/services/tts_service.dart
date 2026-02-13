@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'voice_token_service.dart';
 import 'streaming_tts_service.dart';
+import 'tts_text_utils.dart';
 
 /// 文字转语音服务（TTS）
 ///
@@ -217,7 +218,7 @@ class TTSService {
     }
 
     // 预处理文本：移除不应被朗读的特殊字符
-    final processedText = _preprocessTextForTTS(text);
+    final processedText = TTSTextUtils.preprocessTextForTTS(text);
 
     if (processedText.trim().isEmpty) {
       debugPrint('TTS: text is empty, returning');
@@ -296,37 +297,6 @@ class TTSService {
     await _engine.speak(text);
     debugPrint('TTS: _speakWithOfflineEngine() completed');
     _speakingController.add(TTSSpeakingState.completed);
-  }
-
-  /// 预处理文本，移除不应被TTS朗读的特殊字符
-  ///
-  /// TTS引擎会把某些符号（如波浪号~）当作独立词朗读出来，
-  /// 需要在播报前移除这些符号。
-  String _preprocessTextForTTS(String text) {
-    // 移除波浪号（会被TTS读成"波浪号"或奇怪的音）
-    // 移除其他装饰性符号
-    String processed = text
-        .replaceAll('~', '')
-        .replaceAll('～', '')  // 全角波浪号
-        .replaceAll('♪', '')
-        .replaceAll('♫', '')
-        .replaceAll('★', '')
-        .replaceAll('☆', '')
-        .replaceAll('♥', '')
-        .replaceAll('♡', '')
-        .replaceAll('→', '')
-        .replaceAll('←', '')
-        .replaceAll('↑', '')
-        .replaceAll('↓', '');
-
-    // 清理多余空格
-    processed = processed.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-    if (text != processed) {
-      debugPrint('TTS: 文本预处理: "$text" -> "$processed"');
-    }
-
-    return processed;
   }
 
   /// 重置流式TTS失败计数（用于网络恢复后重试）
